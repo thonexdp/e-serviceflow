@@ -10,16 +10,14 @@ var vite_config_default = defineConfig({
     }),
     react()
   ],
-  server: {
-    host: "0.0.0.0",
-    // <-- allow external access (important for Docker)
+ server: {
+    host: "127.0.0.1",
     port: 5173,
-    // match your docker-compose.yml
     strictPort: true,
-    watch: {
-      usePolling: true
-    }
-  }
+    hmr: {
+      host: "127.0.0.1",
+    },
+  },
 });
 export {
   vite_config_default as default
