@@ -34,3 +34,30 @@ DB_DATABASE=laravel
 DB_USERNAME=laravel
 DB_PASSWORD=secret
 DB_ROOT_PASSWORD=rootsecret
+
+
+## 🚀 Getting Started
+
+Follow these steps to set up and run the Laravel application:
+
+```bash
+# Step 1 — Clone the repository
+git clone https://github.com/your-username/your-laravel-app.git
+cd your-laravel-app
+
+# Step 2 — Build and start containers
+docker compose up -d --build
+
+# Step 3 — Install Laravel dependencies
+docker exec -it laravel_app composer install
+
+# Step 4 — Generate application key
+docker exec -it laravel_app php artisan key:generate
+
+# Step 5 — Run migrations
+docker exec -it laravel_app php artisan migrate
+
+# Step 6 — Access the application
+# Laravel app → http://localhost:8000
+# Vite dev server → http://localhost:5173
+
