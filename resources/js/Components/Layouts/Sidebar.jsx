@@ -1,9 +1,17 @@
 import React from 'react';
 import { Link } from '@inertiajs/react';
 
-export default function Sidebar() {
+export default function Sidebar({ isCollapsed }) {
+    const sidebarClasses = [
+        'sidebar',
+        'sidebar-hide-to-small',
+        'sidebar-shrink',
+        'sidebar-gestures',
+        isCollapsed ? 'sidebar-hide' : ''
+    ].filter(Boolean).join(' ');
+
     return (
-        <div className="sidebar sidebar-hide-to-small sidebar-shrink sidebar-gestures">
+        <div className={sidebarClasses}>
             <div className="nano">
                 <div className="nano-content">
                     <div className="logo">
@@ -12,7 +20,7 @@ export default function Sidebar() {
                         </Link>
                     </div>
                     <ul>
-                        <li className="label">Main</li>
+                        <li className="label">Main - Fron Desk</li>
                         <li>
                             <Link href="/">
                                 <i className="ti-calendar"></i> Dashboard
@@ -24,7 +32,76 @@ export default function Sidebar() {
                             </Link>
                         </li>
                         <li>
-                            <Link href="/reports">
+                            <Link href="/customers">
+                                <i className="ti-user"></i> Customers
+                            </Link>
+                        </li>
+                    </ul>
+
+
+                     <ul>
+                        <li className="label">Main | Graphic Artist</li>
+                        <li>
+                            <Link href="/">
+                                <i className="ti-calendar"></i> Dashboard
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/tickets">
+                                <i className="ti-email"></i> Tickets
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/customers">
+                                <i className="ti-user"></i> Mock-Ups
+                            </Link>
+                        </li>
+                    </ul>
+
+
+                    <ul>
+                        <li className="label">Main - Production</li>
+                        <li>
+                            <Link href="/">
+                                <i className="ti-calendar"></i> Dashboard
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/tickets">
+                                <i className="ti-email"></i> Tickets (Approved / Ready to Print)
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/customers">
+                                <i className="ti-user"></i> Daily Output
+                            </Link>
+                        </li>
+                    </ul>
+
+                    <ul>
+                        <li className="label">Main - Admin</li>
+                        <li>
+                            <Link href="/">
+                                <i className="ti-calendar"></i> Dashboard
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/tickets">
+                                <i className="ti-email"></i> Tickets
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/customers">
+                                <i className="ti-user"></i> Customers
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/customers">
+                                <i className="ti-user"></i> Payments
+                            </Link>
+                        </li>
+                         <li>
+                            <Link href="/customers">
                                 <i className="ti-user"></i> Reports
                             </Link>
                         </li>
@@ -34,6 +111,8 @@ export default function Sidebar() {
                             </Link>
                         </li>
                     </ul>
+
+
                 </div>
             </div>
         </div>

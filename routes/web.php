@@ -84,6 +84,10 @@ Route::get('/tickets', function () {
     return Inertia::render('Tickets/Tickets');
 })->name('tickets');
 
+Route::get('/customers', function () {
+    return Inertia::render('Clients/Client');
+})->name('customers');
+
 Route::get('/reports', function () {
     return Inertia::render('Reports');
 })->name('reports');

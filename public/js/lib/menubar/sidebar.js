@@ -42,6 +42,9 @@
     // sidebar toggle
     $('.sidebar-toggle').on( 'click', function(e) {
       e.preventDefault();
+
+      console.log('222');
+
       _this.togglesidebar();
     });
 
