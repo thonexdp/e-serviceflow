@@ -1585,17 +1585,17 @@ footer p {
   margin-left: 90px;
 }
 .stat-widget-three .stat-digit {
-  font-size: 30px;
+  font-size: 26px;
 }
 .stat-widget-three .stat-text {
   padding-top: 4px;
 }
 .home-widget-three .stat-icon {
   line-height: 19px;
-  padding: 27px;
+  padding: 24px;
 }
 .home-widget-three .stat-digit {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 300;
   color: #373757;
 }
@@ -1666,6 +1666,10 @@ footer p {
 .stat-widget-six .stat-heading {
   font-size: 16px;
   font-weight: 300;
+}
+.stat-widget-three .stat-text {
+  font-size: 16px;
+
 }
 .stat-widget-six .stat-text {
   font-size: 12px;

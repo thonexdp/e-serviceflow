@@ -7,7 +7,8 @@ export default function useJQueryIntegration() {
         if (window.jQuery) {
             // Sidebar toggle
             window.jQuery('.sidebar-toggle').on('click', function() {
-                // Your existing sidebar logic
+                console.log('side bar');
+                
             });
 
             // Initialize charts, calendars, etc.

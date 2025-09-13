@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import AdminLayout from '../Components/Layouts/AdminLayout';
+import AdminLayout from '@/Components/Layouts/AdminLayout';
 import { Head } from '@inertiajs/react';
 import Footer from '@/Components/Layouts/Footer';
 import Modal from '@/Components/Main/Modal';
@@ -50,24 +50,20 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                 submitButtonText="Record Payment"
             >
                 <form>
-                    <div className="flex items-center my-4">
-                        <div className="flex-grow border-t border-gray-300"></div>
-                        <span className="px-4 text-gray-500 text-sm">
-                            Job Tickets Details
-                        </span>
-                        <div className="flex-grow border-t border-gray-300"></div>
+                    <div className="mb-4">
+                        <h3 className="mb-4"> Record Payment for Ticket #20454-12</h3>
+                        <hr />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium">
+                            Customer : <b>John Doe</b>
+                        </label>
                     </div>
                     <div>
                         <label className="block text-sm font-medium">
-                            Customer :
+                            Amount Due : <b> P 2,000.00</b>
                         </label>
-                        <label><b>John Doe</b></label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Amount Due :
-                        </label>
-                        <label><b> P 2,000.00</b></label>
                     </div>
                     <div className="grid grid-cols-2 gap-4 mt-2">
                         <div>
@@ -76,8 +72,8 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             </label>
                             <input
                                 type="text"
-                                className="mt-1 w-full border rounded-md p-2"
-                                placeholder="Amount"
+                                className="mt-1 w-full border"
+                                placeholder="0.00"
                                 value=""
                             // value={forms.ticket.due_date}
 
@@ -96,7 +92,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             <label className="block text-sm font-medium">
                                 Payment Method
                             </label>
-                            <select name="" id="">
+                            <select class name="" id="">
                                 <option value="cash">Cash</option>
                                 <option value="cash">Card</option>
                                 <option value="cash">Gcash</option>
@@ -111,7 +107,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             <input
                                 type="text"
                                 className="mt-1 w-full border rounded-md p-2" // fixed small width
-                                placeholder="Status"
+                                placeholder=""
                                 value=""
                             // value={forms.ticket.quantity}
                             // onChange={(e) =>
@@ -135,7 +131,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-facebook">
-                                    <i className="ti-printer"></i>
+                                    <i className="ti-write"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">New Tickets</div>
@@ -147,12 +143,12 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon ti-receipt">
-                                    <i className="ti-check-box"></i>
+                                <div className="stat-icon bg-youtube">
+                                    <i className="ti-receipt"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">Payment Pending</div>
-                                    <div className="stat-text">7 Tickets | P18,000 Due</div>
+                                    <div className="stat-text">7 Tickets</div>
                                 </div>
                             </div>
                         </div>
@@ -161,7 +157,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-twitter">
-                                    <i className="ti-user"></i>
+                                    <i className="ti-check-box"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit"> Completed Tickets</div>
@@ -174,7 +170,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-danger">
-                                    <i className="ti-pin"></i>
+                                    <i className="ti-angle-double-right"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">In Progress</div>
@@ -197,10 +193,23 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th> <a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                > #3424234243</a></th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th> 
+                                                    <a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >
+                                                    #3424234243
+                                                </a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -225,10 +234,20 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#TRE234FDF34</a></th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#ERTEW235346</a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -252,10 +271,20 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#FGDG6456DFD</a></th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#SDFSDFSD35345</a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -279,10 +308,20 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#345345DSFSD</a></th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#DFGDFG3253</a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -313,7 +352,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#43242</td>
                                                 <td>
                                                     John Doe
                                                 </td>
@@ -327,11 +366,11 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                     <span className="badge badge-primary">Pending</span>
                                                 </td>
                                                 <td>
-                                                    P 2400.00
+                                                    <b>P 2400.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#7456345</td>
                                                 <td>
                                                     Jan Dela Cruz
                                                 </td>
@@ -346,11 +385,11 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
 
                                                 </td>
                                                 <td>
-                                                    P 335.00
+                                                    <b> P 335.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#54653232</td>
                                                 <td>
                                                     John Doe
                                                 </td>
@@ -364,11 +403,11 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                     <span className="badge badge-primary badge-outline">Pending</span>
                                                 </td>
                                                 <td>
-                                                    P 2400.00
+                                                    <b>P 2400.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#2436754</td>
                                                 <td>
                                                     Jan Dela Cruz
                                                 </td>
@@ -383,7 +422,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
 
                                                 </td>
                                                 <td>
-                                                    P 335.00
+                                                    <b> P 335.00</b>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -409,6 +448,8 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                 <th>Customer</th>
                                                 <th>Amount Due</th>
                                                 <th>Due Date</th>
+                                                <th>Status</th>
+                                                <th>Payment Date</th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
@@ -424,8 +465,10 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                 <td>
                                                     Oct. 05, 2025
                                                 </td>
+                                                <td>Pending</td>
+                                                <td>-</td>
                                                 <td>
-                                                    <button type="button" className="btn btn-default btn-outline m-b-10" onClick={() => setPaymentModalOpen(true)}><span className="ti-dropbox"></span> Pay</button>
+                                                    <button type="button" className="btn btn-default btn-sm btn-outline m-b-10" onClick={() => setPaymentModalOpen(true)}><span className="ti-credit-card"></span> Payment</button>
 
                                                 </td>
                                             </tr>
@@ -440,8 +483,10 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                 <td>
                                                     Oct. 05, 2025
                                                 </td>
+                                                <td><b className='text-success'>PAID</b></td>
+                                                <td>2025-09-11</td>
                                                 <td>
-                                                    PAID
+
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -451,7 +496,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         </div>
                     </div>
                 </div>
-                <div className="row">
+                {/* <div className="row">
                     <div className="col-lg-4">
                         <div className="card">
                             <div className="card-body">
@@ -608,7 +653,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> */}
             </section>
 
             <Footer />

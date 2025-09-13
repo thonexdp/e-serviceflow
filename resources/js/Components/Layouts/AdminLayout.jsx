@@ -1,52 +1,62 @@
 import React, { useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import useSidebar from '@/Hooks/useSidebar';
 
 export default function AdminLayout({ children, user = {}, notifications = [], messages = [] }) {
+    const { isCollapsed, toggleSidebar, hideSidebar, isMobile } = useSidebar();
+
     useEffect(() => {
-        // Enhanced initialization with error handling
-        const initializeLibraries = () => {
-            try {
-                if (window.jQuery) {
-                    // Initialize sidebar with error handling
-                    window.jQuery(document).ready(function($) {
-                        // Sidebar toggle
-                        $('.sidebar-toggle').off('click').on('click', function() {
-                            $('body').toggleClass('sidebar-collapse');
-                        });
+        // Initialize other jQuery plugins (excluding sidebar)
+        const initializeOtherLibraries = () => {
+            if (window.jQuery) {
+                const $ = window.jQuery;
+                
+                try {
+                    // Initialize nano scroller
+                    if ($.fn.nanoScroller) {
+                        $('.nano').nanoScroller({ preventPageScrolling: true });
+                    }
 
-                        // Initialize nano scroller if available
-                        if ($.fn.nanoScroller) {
-                            $('.nano').nanoScroller();
-                        }
+                    // Initialize Bootstrap dropdowns
+                    if ($.fn.dropdown) {
+                        $('[data-toggle="dropdown"]').dropdown();
+                    }
 
-                        // Initialize Bootstrap dropdowns
-                        if ($.fn.dropdown) {
-                            $('[data-toggle="dropdown"]').dropdown();
-                        }
-                    });
+                    // Initialize other plugins but NOT the sidebar
+                    console.log('jQuery plugins initialized (excluding sidebar)');
+                } catch (error) {
+                    console.warn('jQuery initialization error:', error);
                 }
-            } catch (error) {
-                console.warn('Library initialization error:', error);
             }
         };
 
-        // Wait for libraries to be available
-        const checkLibraries = setInterval(() => {
-            if (window.jQuery) {
-                clearInterval(checkLibraries);
-                initializeLibraries();
-            }
-        }, 100);
-
-        return () => clearInterval(checkLibraries);
+        const timer = setTimeout(initializeOtherLibraries, 100);
+        return () => clearTimeout(timer);
     }, []);
+
+    // Handle content click - only hide sidebar on mobile when sidebar is visible
+    const handleContentClick = (e) => {
+        // Only hide sidebar on mobile and when sidebar is visible
+        if (isMobile && !isCollapsed) {
+            // Check if click is not on sidebar or its children
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar && !sidebar.contains(e.target)) {
+                hideSidebar();
+            }
+        }
+    };
 
     return (
         <div>
-            <Sidebar />
-            <Header user={user} notifications={notifications} messages={messages} />
-            <div className="content-wrap">
+            <Sidebar isCollapsed={isCollapsed} />
+            <Header 
+                user={user} 
+                notifications={notifications} 
+                messages={messages}
+                onToggleSidebar={toggleSidebar}
+            />
+            <div className="content-wrap" onClick={handleContentClick}>
                 <div className="main">
                     <div className="container-fluid">
                         {children}
