@@ -1,29 +1,37 @@
-import React, { useEffect, useRef, useState } from 'react';
-import AdminLayout from '../Components/Layouts/AdminLayout';
-import { Head } from '@inertiajs/react';
-import Footer from '@/Components/Layouts/Footer';
-import Modal from '@/Components/Main/Modal';
+import React, { useEffect, useRef, useState } from "react";
+import AdminLayout from "@/Components/Layouts/AdminLayout";
+import { Head } from "@inertiajs/react";
+import Footer from "@/Components/Layouts/Footer";
+import Modal from "@/Components/Main/Modal";
 
-export default function Dashboard({ user = {}, notifications = [], messages = [] }) {
-
+export default function Dashboard({
+    user = {},
+    notifications = [],
+    messages = [],
+}) {
     const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
     const handleSave = () => {
-        console.log('save');
+        console.log("save");
+    };
 
-    }
-
-    console.log('openPaymentModal:', openPaymentModal);
+    console.log("openPaymentModal:", openPaymentModal);
 
     return (
-        <AdminLayout user={user} notifications={notifications} messages={messages}>
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
             <Head title="Dashboard" />
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
                     <div className="page-header">
                         <div className="page-title">
-                            <h1>Hello, <span>Welcome Here</span></h1>
+                            <h1>
+                                Hello, <span>Welcome Here</span>
+                            </h1>
                         </div>
                     </div>
                 </div>
@@ -50,24 +58,23 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                 submitButtonText="Record Payment"
             >
                 <form>
-                    <div className="flex items-center my-4">
-                        <div className="flex-grow border-t border-gray-300"></div>
-                        <span className="px-4 text-gray-500 text-sm">
-                            Job Tickets Details
-                        </span>
-                        <div className="flex-grow border-t border-gray-300"></div>
+                    <div className="mb-4">
+                        <h3 className="mb-4">
+                            {" "}
+                            Record Payment for Ticket #20454-12
+                        </h3>
+                        <hr />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium">
+                            Customer : <b>John Doe</b>
+                        </label>
                     </div>
                     <div>
                         <label className="block text-sm font-medium">
-                            Customer :
+                            Amount Due : <b> P 2,000.00</b>
                         </label>
-                        <label><b>John Doe</b></label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Amount Due :
-                        </label>
-                        <label><b> P 2,000.00</b></label>
                     </div>
                     <div className="grid grid-cols-2 gap-4 mt-2">
                         <div>
@@ -76,27 +83,27 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             </label>
                             <input
                                 type="text"
-                                className="mt-1 w-full border rounded-md p-2"
-                                placeholder="Amount"
+                                className="mt-1 w-full border"
+                                placeholder="0.00"
                                 value=""
-                            // value={forms.ticket.due_date}
+                                // value={forms.ticket.due_date}
 
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             due_date: e.target.value,
-                            //         },
-                            //     })
-                            // }
+                                // onChange={(e) =>
+                                //     setForms({
+                                //         ...forms,
+                                //         ticket: {
+                                //             ...forms.ticket,
+                                //             due_date: e.target.value,
+                                //         },
+                                //     })
+                                // }
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium">
                                 Payment Method
                             </label>
-                            <select name="" id="">
+                            <select class name="" id="">
                                 <option value="cash">Cash</option>
                                 <option value="cash">Card</option>
                                 <option value="cash">Gcash</option>
@@ -111,18 +118,18 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             <input
                                 type="text"
                                 className="mt-1 w-full border rounded-md p-2" // fixed small width
-                                placeholder="Status"
+                                placeholder=""
                                 value=""
-                            // value={forms.ticket.quantity}
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             quantity: e.target.value,
-                            //         },
-                            //     })
-                            // }
+                                // value={forms.ticket.quantity}
+                                // onChange={(e) =>
+                                //     setForms({
+                                //         ...forms,
+                                //         ticket: {
+                                //             ...forms.ticket,
+                                //             quantity: e.target.value,
+                                //         },
+                                //     })
+                                // }
                             />
                         </div>
                     </div>
@@ -131,59 +138,75 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
 
             <section id="main-content">
                 <div className="row">
+                    {/* New Tickets */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-facebook">
-                                    <i className="ti-printer"></i>
+                                <div className="stat-icon bg-primary">
+                                    <i className="ti-ticket"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">New Tickets</div>
-                                    <div className="stat-text">12 Today | 45 weeks</div>
+                                    <div className="stat-digit">
+                                        New Tickets
+                                    </div>
+                                    <div className="stat-text">18</div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* Payment Pending */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon ti-receipt">
-                                    <i className="ti-check-box"></i>
+                                <div className="stat-icon bg-warning">
+                                    <i className="ti-wallet"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">Payment Pending</div>
-                                    <div className="stat-text">7 Tickets | P18,000 Due</div>
+                                    <div className="stat-digit">
+                                        Payment Pending
+                                    </div>
+                                    <div className="stat-text">6</div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* Completed Tickets */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-twitter">
-                                    <i className="ti-user"></i>
+                                <div className="stat-icon bg-success">
+                                    <i className="ti-check"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit"> Completed Tickets</div>
-                                    <div className="stat-text">5 Ready for PickUp</div>
+                                    <div className="stat-digit">
+                                        Completed Tickets
+                                    </div>
+                                    <div className="stat-text">23 <small>this week</small></div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* In Progress */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-danger">
-                                    <i className="ti-pin"></i>
+                                <div className="stat-icon bg-info">
+                                    <i className="ti-time"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">In Progress</div>
-                                    <div className="stat-text">7 Tickets</div>
+                                    <div className="stat-digit">
+                                        In Progress
+                                    </div>
+                                    <div className="stat-text">11</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <div className="row">
                     <div className="col-lg-3">
                         <div className="card">
@@ -192,43 +215,37 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                     <table className="table w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-center">Pending Payment</th>
+                                                <th className="text-center">
+                                                    Pending Payment
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th>
+                                                    {" "}
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        {" "}
+                                                        #3424234243
+                                                    </a>
+                                                </th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">In Progress</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>#3424234243</th>
-                                            </tr>
-                                            <tr>
-                                                <th>#3424234243</th>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #3424234243
+                                                    </a>
+                                                </th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -247,15 +264,35 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                     <table className="table w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-center">Ready for Pick Up</th>
+                                                <th className="text-center">
+                                                    In Progress
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #TRE234FDF34
+                                                    </a>
+                                                </th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #ERTEW235346
+                                                    </a>
+                                                </th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -274,15 +311,82 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                     <table className="table w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-center">Completed</th>
+                                                <th className="text-center">
+                                                    Ready for Pick Up
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #FGDG6456DFD
+                                                    </a>
+                                                </th>
                                             </tr>
                                             <tr>
-                                                <th>#3424234243</th>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #SDFSDFSD35345
+                                                    </a>
+                                                </th>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="col-lg-3">
+                        <div className="card">
+                            {/* <div className="card-title">
+                                    <h4>Table Basic </h4>
+                                    
+                                </div> */}
+                            <div className="card-body">
+                                <div className="table-responsive">
+                                    <table className="table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th className="text-center">
+                                                    Completed
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #345345DSFSD
+                                                    </a>
+                                                </th>
+                                            </tr>
+                                            <tr>
+                                                <th>
+                                                    <a
+                                                        href="/"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        #DFGDFG3253
+                                                    </a>
+                                                </th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -296,7 +400,6 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         <div className="card">
                             <div className="card-title pr">
                                 <h4>All Tickets</h4>
-
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
@@ -313,77 +416,59 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#43242</td>
+                                                <td>John Doe</td>
+                                                <td>Print 30 tshirt</td>
+                                                <td>Sept. 23, 2025</td>
                                                 <td>
-                                                    John Doe
+                                                    <span className="badge badge-primary">
+                                                        Pending
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    Print 30 tshirt
-                                                </td>
-                                                <td>
-                                                    Sept. 23, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-primary">Pending</span>
-                                                </td>
-                                                <td>
-                                                    P 2400.00
+                                                    <b>P 2400.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#7456345</td>
+                                                <td>Jan Dela Cruz</td>
+                                                <td>Print Mugs</td>
+                                                <td>Sept. 30, 2025</td>
                                                 <td>
-                                                    Jan Dela Cruz
+                                                    <span className="badge badge-success">
+                                                        Approve
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    Print Mugs
-                                                </td>
-                                                <td>
-                                                    Sept. 30, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-success">Approve</span>
-
-                                                </td>
-                                                <td>
-                                                    P 335.00
+                                                    <b> P 335.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#54653232</td>
+                                                <td>John Doe</td>
+                                                <td>Print 30 tshirt</td>
+                                                <td>Sept. 23, 2025</td>
                                                 <td>
-                                                    John Doe
+                                                    <span className="badge badge-primary badge-outline">
+                                                        Pending
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    Print 30 tshirt
-                                                </td>
-                                                <td>
-                                                    Sept. 23, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-primary badge-outline">Pending</span>
-                                                </td>
-                                                <td>
-                                                    P 2400.00
+                                                    <b>P 2400.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#2901</td>
+                                                <td>#2436754</td>
+                                                <td>Jan Dela Cruz</td>
+                                                <td>Print Mugs</td>
+                                                <td>Sept. 30, 2025</td>
                                                 <td>
-                                                    Jan Dela Cruz
+                                                    <span className="badge badge-success">
+                                                        Approve
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    Print Mugs
-                                                </td>
-                                                <td>
-                                                    Sept. 30, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-success">Approve</span>
-
-                                                </td>
-                                                <td>
-                                                    P 335.00
+                                                    <b> P 335.00</b>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -398,7 +483,6 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         <div className="card">
                             <div className="card-title pr">
                                 <h4>Payments</h4>
-
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
@@ -409,40 +493,46 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                 <th>Customer</th>
                                                 <th>Amount Due</th>
                                                 <th>Due Date</th>
+                                                <th>Status</th>
+                                                <th>Payment Date</th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
                                                 <td>#2901</td>
+                                                <td>John Doe</td>
+                                                <td>P 4500.00</td>
+                                                <td>Oct. 05, 2025</td>
+                                                <td>Pending</td>
+                                                <td>-</td>
                                                 <td>
-                                                    John Doe
-                                                </td>
-                                                <td>
-                                                    P 4500.00
-                                                </td>
-                                                <td>
-                                                    Oct. 05, 2025
-                                                </td>
-                                                <td>
-                                                    <button type="button" className="btn btn-default btn-outline m-b-10" onClick={() => setPaymentModalOpen(true)}><span className="ti-dropbox"></span> Pay</button>
-
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-default btn-sm btn-outline m-b-10"
+                                                        onClick={() =>
+                                                            setPaymentModalOpen(
+                                                                true
+                                                            )
+                                                        }
+                                                    >
+                                                        <span className="ti-credit-card"></span>{" "}
+                                                        Payment
+                                                    </button>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td>#2901</td>
+                                                <td>John Doe</td>
+                                                <td>P 4500.00</td>
+                                                <td>Oct. 05, 2025</td>
                                                 <td>
-                                                    John Doe
+                                                    <b className="text-success">
+                                                        PAID
+                                                    </b>
                                                 </td>
-                                                <td>
-                                                    P 4500.00
-                                                </td>
-                                                <td>
-                                                    Oct. 05, 2025
-                                                </td>
-                                                <td>
-                                                    PAID
-                                                </td>
+                                                <td>2025-09-11</td>
+                                                <td></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -451,7 +541,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                         </div>
                     </div>
                 </div>
-                <div className="row">
+                {/* <div className="row">
                     <div className="col-lg-4">
                         <div className="card">
                             <div className="card-body">
@@ -608,7 +698,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> */}
             </section>
 
             <Footer />

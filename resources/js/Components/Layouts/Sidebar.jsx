@@ -9,112 +9,121 @@ export default function Sidebar({ isCollapsed }) {
         'sidebar-gestures',
         isCollapsed ? 'sidebar-hide' : ''
     ].filter(Boolean).join(' ');
+    // Front Desk = 4
+    // Graphic Artist = 3
+    // Production = 2
+    // Admin = 1
 
+    const role = 4;
     return (
         <div className={sidebarClasses}>
             <div className="nano">
                 <div className="nano-content">
                     <div className="logo">
                         <Link href="/">
-                            <span>Focus</span>
+                            <span>E-System</span>
                         </Link>
                     </div>
                     <ul>
-                        <li className="label">Main - Fron Desk</li>
-                        <li>
-                            <Link href="/">
-                                <i className="ti-calendar"></i> Dashboard
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/tickets">
-                                <i className="ti-email"></i> Tickets
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/customers">
-                                <i className="ti-user"></i> Customers
-                            </Link>
-                        </li>
+                        <li className="label">Main</li>
                     </ul>
-
-
-                     <ul>
-                        <li className="label">Main | Graphic Artist</li>
-                        <li>
-                            <Link href="/">
-                                <i className="ti-calendar"></i> Dashboard
-                            </Link>
-                        </li>
-                        <li>
+                    {role === 4 ? (
+                        <ul>
+                            <li>
+                                <Link href="/">
+                                    <i className="ti-calendar"></i> Dashboard
+                                </Link>
+                            </li>
+                            <li>
                             <Link href="/tickets">
-                                <i className="ti-email"></i> Tickets
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/customers">
-                                <i className="ti-user"></i> Mock-Ups
-                            </Link>
-                        </li>
-                    </ul>
+                                    <i className="ti-email"></i> Tickets
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href="/customers">
+                                    <i className="ti-user"></i> Customers
+                                </Link>
+                            </li>
+                        </ul>
+                    )
 
+                        : role === 3 ? (
+                            < ul >
+                                <li>
+                                    <Link href="/">
+                                        <i className="ti-calendar"></i> Dashboard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/tickets">
+                                        <i className="ti-email"></i> Tickets
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/mock-ups">
+                                        <i className="ti-user"></i> Mock-Ups
+                                    </Link>
+                                </li>
+                            </ul>
 
-                    <ul>
-                        <li className="label">Main - Production</li>
-                        <li>
-                            <Link href="/">
-                                <i className="ti-calendar"></i> Dashboard
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/tickets">
-                                <i className="ti-email"></i> Tickets (Approved / Ready to Print)
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/customers">
-                                <i className="ti-user"></i> Daily Output
-                            </Link>
-                        </li>
-                    </ul>
+                        ) : role === 2 ? (
+                            <ul>
 
-                    <ul>
-                        <li className="label">Main - Admin</li>
-                        <li>
-                            <Link href="/">
-                                <i className="ti-calendar"></i> Dashboard
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/tickets">
-                                <i className="ti-email"></i> Tickets
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/customers">
-                                <i className="ti-user"></i> Customers
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/customers">
-                                <i className="ti-user"></i> Payments
-                            </Link>
-                        </li>
-                         <li>
-                            <Link href="/customers">
-                                <i className="ti-user"></i> Reports
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/settings">
-                                <i className="ti-layout-grid2-alt"></i> Settings
-                            </Link>
-                        </li>
-                    </ul>
+                                <li>
+                                    <Link href="/">
+                                        <i className="ti-calendar"></i> Dashboard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/tickets">
+                                        <i className="ti-email"></i> Tickets
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/production">
+                                        <i className="ti-user"></i> Production Queue
+                                    </Link>
+                                </li>
+                            </ul>
+                        ) : role === 1 && (
+                            <ul>
+                                <li>
+                                    <Link href="/">
+                                        <i className="ti-calendar"></i> Dashboard
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/tickets">
+                                        <i className="ti-email"></i> Tickets
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/customers">
+                                        <i className="ti-user"></i> Customers
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/customers">
+                                        <i className="ti-user"></i> Payments
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/customers">
+                                        <i className="ti-user"></i> Reports
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/settings">
+                                        <i className="ti-layout-grid2-alt"></i> Settings
+                                    </Link>
+                                </li>
+                            </ul>
 
+                        )
+                    }
 
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

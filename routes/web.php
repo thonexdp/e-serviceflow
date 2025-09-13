@@ -36,6 +36,12 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/', function () {
+        return Inertia::render("Dashboard/FrontDesk");
+
+        return Inertia::render("Dashboard/Graphic");
+        return Inertia::render("Dashboard/Production");
+        return Inertia::render("Dashboard/Admin");
+
     return Inertia::render('Dashboard', [
         'user' => [
             'name' => 'John',
@@ -87,6 +93,13 @@ Route::get('/tickets', function () {
 Route::get('/customers', function () {
     return Inertia::render('Clients/Client');
 })->name('customers');
+
+Route::get('/mock-ups', function () {
+    return Inertia::render('Mock-ups');
+})->name('mockups');
+Route::get('/production', function () {
+    return Inertia::render('Production-Queue');
+})->name('production-queue');
 
 Route::get('/reports', function () {
     return Inertia::render('Reports');

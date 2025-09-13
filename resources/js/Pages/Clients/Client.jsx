@@ -74,7 +74,7 @@ export default function Dashboard({
                 isOpen={openCustomerModal}
                 onClose={() => setCustomerModalOpen(false)}
                 onSave={handleSave}
-                size="3xl"
+                size="4xl"
                 submitButtonText="Save"
             >
                 <form>
@@ -192,9 +192,9 @@ export default function Dashboard({
                                 }
                             />
                         </div>
-                        </div>
-                        <div className="mt-2">
-                          <div>
+                    </div>
+                    <div className="mt-2">
+                        <div>
                             <label className="block text-sm font-medium">
                                 Address
                             </label>
@@ -225,20 +225,28 @@ export default function Dashboard({
                             <div class="row">
                                 <div class="col-lg-12">
                                     <div class="card">
-                                         <div class="button-list float-start">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-primary btn-flat btn-sm btn-addon m-b-10 m-l-5"
-                                                        onClick={() => setCustomerModalOpen(true)}
-                                                    >
-                                                        <i class="ti-plus"></i>Add
-                                                        Customer
-                                                    </button>
-                                                </div>
+                                        <div class="button-list float-start">
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary btn-flat btn-sm btn-addon m-b-10 m-l-5"
+                                                onClick={() => setCustomerModalOpen(true)}
+                                            >
+                                                <i class="ti-plus"></i>Add
+                                                Customer
+                                            </button>
+                                        </div>
                                         <div class="card-title mt-3">
                                             <h4>Customer Lists </h4>
                                         </div>
                                         <div class="card-body">
+                                            <div className="row mt-4">
+                                                <div className="col-3">
+                                                    <div class="form-group">
+                                                        <input type="text" class="form-control input-sm input-focus" placeholder="Search" />
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="table-responsive">
                                                 <table class="table table-hover ">
                                                     <thead>
@@ -265,19 +273,19 @@ export default function Dashboard({
                                                             </td>
                                                             <td>092323232</td>
                                                             <td>
-                                                               test@gmail.com
+                                                                test@gmail.com
                                                             </td>
                                                             <td>
                                                                 Bontoc, Sogod Souther Leyte
                                                             </td>
-                                                             <td>
+                                                            <td>
                                                                 <div class="btn-group">
                                                                     <button type="button" class="btn btn-link btn-outline btn-sm text-blue-500"><span className="ti-pencil-alt"></span> Edit</button>
                                                                     <button type="button" class="btn btn-link btn-outline btn-sm text-red-500"><span className="ti-trash"></span> Delete</button>
                                                                 </div>
                                                             </td>
                                                         </tr>
-                                                       <tr>
+                                                        <tr>
                                                             <th scope="row">
                                                                 2
                                                             </th>
@@ -286,12 +294,12 @@ export default function Dashboard({
                                                             </td>
                                                             <td>09232ddsd3232</td>
                                                             <td>
-                                                               test@gmail.com
+                                                                test@gmail.com
                                                             </td>
                                                             <td>
                                                                 Sogod, Sogod Souther Leyte
                                                             </td>
-                                                             <td>
+                                                            <td>
                                                                 <div class="btn-group">
                                                                     <button type="button" class="btn btn-link btn-outline btn-sm text-blue-500"><span className="ti-pencil-alt"></span> Edit</button>
                                                                     <button type="button" class="btn btn-link btn-outline btn-sm text-red-500"><span className="ti-trash"></span> Delete</button>
@@ -307,12 +315,12 @@ export default function Dashboard({
                                                             </td>
                                                             <td>092323232</td>
                                                             <td>
-                                                               test@gmail.com
+                                                                test@gmail.com
                                                             </td>
                                                             <td>
                                                                 Bontoc, Sogod Souther Leyte
                                                             </td>
-                                                             <td>
+                                                            <td>
                                                                 <div class="btn-group">
                                                                     <button type="button" class="btn btn-link btn-outline btn-sm text-blue-500"><span className="ti-pencil-alt"></span> Edit</button>
                                                                     <button type="button" class="btn btn-link btn-outline btn-sm text-red-500"><span className="ti-trash"></span> Delete</button>
