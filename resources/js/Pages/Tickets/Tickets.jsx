@@ -727,7 +727,7 @@ export default function Dashboard({
                                                 <td> PAID </td>
                                                 <td>
                                                     <span class="badge badge-success">
-                                                        DONE
+                                                        Completed
                                                     </span>
                                                 </td>
                                             </tr>

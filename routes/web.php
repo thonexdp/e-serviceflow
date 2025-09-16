@@ -36,11 +36,12 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/', function () {
+        return Inertia::render("Dashboard/Admin");
+
         return Inertia::render("Dashboard/FrontDesk");
 
         return Inertia::render("Dashboard/Graphic");
         return Inertia::render("Dashboard/Production");
-        return Inertia::render("Dashboard/Admin");
 
     return Inertia::render('Dashboard', [
         'user' => [
