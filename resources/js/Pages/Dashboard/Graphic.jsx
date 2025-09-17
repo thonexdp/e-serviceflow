@@ -157,10 +157,11 @@ export default function Dashboard({
                                     <i className="ti-clipboard"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">12</div>
+
+                                    <div className="stat-text">
                                         Tickets Pending Review
                                     </div>
-                                    <div className="stat-text">12</div>
                                 </div>
                             </div>
                         </div>
@@ -174,10 +175,10 @@ export default function Dashboard({
                                     <i className="ti-reload"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">4</div>
+                                    <div className="stat-text">
                                         Revision Requested
                                     </div>
-                                    <div className="stat-text">4</div>
                                 </div>
                             </div>
                         </div>
@@ -191,10 +192,10 @@ export default function Dashboard({
                                     <i className="ti-upload"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">9</div>
+                                    <div className="stat-text">
                                         Mock-Ups Uploaded Today
                                     </div>
-                                    <div className="stat-text">9</div>
                                 </div>
                             </div>
                         </div>
@@ -205,13 +206,13 @@ export default function Dashboard({
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-success">
-                                    <i className="ti-thumb-up"></i>
+                                    <i className="ti-check-box"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">15</div>
+                                    <div className="stat-text">
                                         Approved Design
                                     </div>
-                                    <div className="stat-text">15</div>
                                 </div>
                             </div>
                         </div>

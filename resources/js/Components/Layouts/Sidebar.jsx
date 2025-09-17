@@ -94,17 +94,17 @@ export default function Sidebar({ isCollapsed }) {
                                 </li>
                                  <li>
                                     <Link href="/tickets">
-                                        <i className="ti-email"></i> Users Management
+                                        <i className="ti-user"></i> Users Management
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/tickets">
-                                        <i className="ti-email"></i> Job Tickets
+                                        <i className="ti-ticket"></i> Job Tickets
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/customers">
-                                        <i className="ti-user"></i> Job Types & Pricing
+                                        <i className="ti-stamp"></i> Job Types & Pricing
                                     </Link>
                                 </li>
                                   <li>
@@ -114,17 +114,17 @@ export default function Sidebar({ isCollapsed }) {
                                 </li>
                                 <li>
                                     <Link href="/customers">
-                                        <i className="ti-user"></i> Payments & Finance
+                                        <i className="ti-credit-card"></i> Payments & Finance
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/customers">
-                                        <i className="ti-user"></i> Reports & Analytics
+                                        <i className="ti-stats-up"></i> Reports & Analytics
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/settings">
-                                        <i className="ti-layout-grid2-alt"></i> System Settings
+                                        <i className="ti-settings"></i> System Settings
                                     </Link>
                                 </li>
                             </ul>

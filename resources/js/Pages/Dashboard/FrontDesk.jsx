@@ -146,10 +146,11 @@ export default function Dashboard({
                                     <i className="ti-ticket"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">18</div>
+
+                                    <div className="stat-text">
                                         New Tickets
                                     </div>
-                                    <div className="stat-text">18</div>
                                 </div>
                             </div>
                         </div>
@@ -163,10 +164,10 @@ export default function Dashboard({
                                     <i className="ti-wallet"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">6</div>
+                                    <div className="stat-text">
                                         Payment Pending
                                     </div>
-                                    <div className="stat-text">6</div>
                                 </div>
                             </div>
                         </div>
@@ -180,10 +181,10 @@ export default function Dashboard({
                                     <i className="ti-check"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">23</div>
+                                    <div className="stat-text">
                                         Completed Tickets
                                     </div>
-                                    <div className="stat-text">23 <small>this week</small></div>
                                 </div>
                             </div>
                         </div>
@@ -197,10 +198,10 @@ export default function Dashboard({
                                     <i className="ti-time"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">11</div>
+                                    <div className="stat-text">
                                         In Progress
                                     </div>
-                                    <div className="stat-text">11</div>
                                 </div>
                             </div>
                         </div>

@@ -15,39 +15,39 @@ import {
 import { BarChart } from "@mui/x-charts/BarChart";
 
 const sampleData = [
-    { date: "2023-01-01", value: 30 },
-    { date: "2023-01-02", value: 45 },
-    { date: "2023-01-03", value: 57 },
-    { date: "2023-01-04", value: 89 },
-    { date: "2023-01-05", value: 47 },
-    { date: "2023-01-06", value: 90 },
-    { date: "2023-01-07", value: 10 },
-    { date: "2023-01-08", value: 69 },
-    { date: "2023-01-09", value: 5 },
-    { date: "2023-01-10", value: 140 },
-    { date: "2023-01-11", value: 30 },
-    { date: "2023-01-12", value: 45 },
-    { date: "2023-01-13", value: 57 },
-    { date: "2023-01-14", value: 89 },
-    { date: "2023-01-15", value: 47 },
-    { date: "2023-01-16", value: 90 },
-    { date: "2023-01-17", value: 10 },
-    { date: "2023-01-18", value: 69 },
-    { date: "2023-01-19", value: 5 },
-    { date: "2023-01-20", value: 140 },
-    { date: "2023-01-21", value: 30 },
-    { date: "2023-01-22", value: 45 },
-    { date: "2023-01-23", value: 57 },
-    { date: "2023-01-24", value: 89 },
-    { date: "2023-01-25", value: 47 },
-    { date: "2023-01-26", value: 90 },
-    { date: "2023-01-27", value: 10 },
-    { date: "2023-01-28", value: 69 },
-    { date: "2023-01-29", value: 5 },
-    { date: "2023-01-30", value: 140 },
+    { date: "2025-01-01", value: 30 },
+    { date: "2025-01-02", value: 45 },
+    { date: "2025-01-03", value: 57 },
+    { date: "2025-01-04", value: 89 },
+    { date: "2025-01-05", value: 47 },
+    { date: "2025-01-06", value: 90 },
+    { date: "2025-01-07", value: 10 },
+    { date: "2025-01-08", value: 69 },
+    { date: "2025-01-09", value: 5 },
+    { date: "2025-01-10", value: 140 },
+    { date: "2025-01-11", value: 30 },
+    { date: "2025-01-12", value: 45 },
+    { date: "2025-01-13", value: 57 },
+    { date: "2025-01-14", value: 89 },
+    { date: "2025-01-15", value: 47 },
+    { date: "2025-01-16", value: 90 },
+    { date: "2025-01-17", value: 10 },
+    { date: "2025-01-18", value: 69 },
+    { date: "2025-01-19", value: 5 },
+    { date: "2025-01-20", value: 140 },
+    { date: "2025-01-21", value: 30 },
+    { date: "2025-01-22", value: 45 },
+    { date: "2025-01-23", value: 57 },
+    { date: "2025-01-24", value: 89 },
+    { date: "2025-01-25", value: 47 },
+    { date: "2025-01-26", value: 90 },
+    { date: "2025-01-27", value: 10 },
+    { date: "2025-01-28", value: 69 },
+    { date: "2025-01-29", value: 5 },
+    { date: "2025-01-30", value: 140 },
 
-    { date: "2023-02-01", value: 50 },
-    { date: "2023-02-02", value: 45 },
+    { date: "2025-02-01", value: 50 },
+    { date: "2025-02-02", value: 45 },
     { date: "2024-01-01", value: 60 },
     { date: "2024-01-02", value: 70 },
     { date: "2024-02-01", value: 80 },
@@ -58,38 +58,38 @@ const getRandomValue = (min = 2000, max = 40000) =>
     Math.floor(Math.random() * (max - min + 1)) + min;
 
 let saleData = [
-    { date: "2023-01-01" },
-    { date: "2023-01-02" },
-    { date: "2023-01-03" },
-    { date: "2023-01-04" },
-    { date: "2023-01-05" },
-    { date: "2023-01-06" },
-    { date: "2023-01-07" },
-    { date: "2023-01-08" },
-    { date: "2023-01-09" },
-    { date: "2023-01-10" },
-    { date: "2023-01-11" },
-    { date: "2023-01-12" },
-    { date: "2023-01-13" },
-    { date: "2023-01-14" },
-    { date: "2023-01-15" },
-    { date: "2023-01-16" },
-    { date: "2023-01-17" },
-    { date: "2023-01-18" },
-    { date: "2023-01-19" },
-    { date: "2023-01-20" },
-    { date: "2023-01-21" },
-    { date: "2023-01-22" },
-    { date: "2023-01-23" },
-    { date: "2023-01-24" },
-    { date: "2023-01-25" },
-    { date: "2023-01-26" },
-    { date: "2023-01-27" },
-    { date: "2023-01-28" },
-    { date: "2023-01-29" },
-    { date: "2023-01-30" },
-    { date: "2023-02-01" },
-    { date: "2023-02-02" },
+    { date: "2025-01-01" },
+    { date: "2025-01-02" },
+    { date: "2025-01-03" },
+    { date: "2025-01-04" },
+    { date: "2025-01-05" },
+    { date: "2025-01-06" },
+    { date: "2025-01-07" },
+    { date: "2025-01-08" },
+    { date: "2025-01-09" },
+    { date: "2025-01-10" },
+    { date: "2025-01-11" },
+    { date: "2025-01-12" },
+    { date: "2025-01-13" },
+    { date: "2025-01-14" },
+    { date: "2025-01-15" },
+    { date: "2025-01-16" },
+    { date: "2025-01-17" },
+    { date: "2025-01-18" },
+    { date: "2025-01-19" },
+    { date: "2025-01-20" },
+    { date: "2025-01-21" },
+    { date: "2025-01-22" },
+    { date: "2025-01-23" },
+    { date: "2025-01-24" },
+    { date: "2025-01-25" },
+    { date: "2025-01-26" },
+    { date: "2025-01-27" },
+    { date: "2025-01-28" },
+    { date: "2025-01-29" },
+    { date: "2025-01-30" },
+    { date: "2025-02-01" },
+    { date: "2025-02-02" },
     { date: "2024-01-01" },
     { date: "2024-01-02" },
     { date: "2024-02-01" },
@@ -98,7 +98,7 @@ let saleData = [
 
 saleData = saleData.map((item) => ({
     ...item,
-    value: getRandomValue(2000, 1400000), 
+    value: getRandomValue(1000, 200000),
 }));
 
 export default function Dashboard({
@@ -112,7 +112,7 @@ export default function Dashboard({
         console.log("save");
     };
 
-    const [year, setYear] = useState("2023");
+    const [year, setYear] = useState("2025");
     const [month, setMonth] = useState("01");
 
     // 🔹 Filter data based on year + month
@@ -136,15 +136,15 @@ export default function Dashboard({
     const yDataR = filteredDataSale.map((d) => d.value);
 
     const pesoFormatter = (value) => {
-  if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toFixed(1)}B`;
-  } else if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(1)}M`;
-  } else if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}K`;
-  }
-  return `${value}`;
-};
+        if (value >= 1_000_000_000) {
+            return `${(value / 1_000_000_000).toFixed(1)}B`;
+        } else if (value >= 1_000_000) {
+            return `${(value / 1_000_000).toFixed(1)}M`;
+        } else if (value >= 1_000) {
+            return `${(value / 1_000).toFixed(1)}K`;
+        }
+        return `${value}`;
+    };
 
     return (
         <AdminLayout
@@ -215,17 +215,17 @@ export default function Dashboard({
                                 className="mt-1 w-full border"
                                 placeholder="0.00"
                                 value=""
-                                // value={forms.ticket.due_date}
+                            // value={forms.ticket.due_date}
 
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             due_date: e.target.value,
-                                //         },
-                                //     })
-                                // }
+                            // onChange={(e) =>
+                            //     setForms({
+                            //         ...forms,
+                            //         ticket: {
+                            //             ...forms.ticket,
+                            //             due_date: e.target.value,
+                            //         },
+                            //     })
+                            // }
                             />
                         </div>
                         <div>
@@ -249,16 +249,16 @@ export default function Dashboard({
                                 className="mt-1 w-full border rounded-md p-2" // fixed small width
                                 placeholder=""
                                 value=""
-                                // value={forms.ticket.quantity}
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             quantity: e.target.value,
-                                //         },
-                                //     })
-                                // }
+                            // value={forms.ticket.quantity}
+                            // onChange={(e) =>
+                            //     setForms({
+                            //         ...forms,
+                            //         ticket: {
+                            //             ...forms.ticket,
+                            //             quantity: e.target.value,
+                            //         },
+                            //     })
+                            // }
                             />
                         </div>
                     </div>
@@ -271,7 +271,7 @@ export default function Dashboard({
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-facebook">
-                                    <i className="ti-write"></i>
+                                    <i className="ti-ticket"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">120</div>
@@ -283,8 +283,8 @@ export default function Dashboard({
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-youtube">
-                                    <i className="ti-receipt"></i>
+                                <div className="stat-icon bg-warning">
+                                    <i className="ti-time"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">45</div>
@@ -298,7 +298,7 @@ export default function Dashboard({
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-twitter">
+                                <div className="stat-icon bg-success">
                                     <i className="ti-check-box"></i>
                                 </div>
                                 <div className="stat-content">
@@ -313,15 +313,15 @@ export default function Dashboard({
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-danger">
-                                    <i className="ti-angle-double-right"></i>
+                                <div className="stat-icon bg-info">
+                                    <i className="ti-money"></i>
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">₱ 23,909.89</div>
                                     <div className="stat-text">
                                         Revenue Today
                                     </div>
-                                    
+
                                 </div>
                             </div>
                         </div>
@@ -331,7 +331,7 @@ export default function Dashboard({
                     <div className="col-lg-6">
                         <div className="card">
                             <div className="card-body">
-                                <Box sx={{ p: 1 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="h6" gutterBottom>
                                         Daily Orders
                                     </Typography>
@@ -350,8 +350,8 @@ export default function Dashboard({
                                                 }
                                                 sx={{ minWidth: 100 }}
                                             >
-                                                <MenuItem value="2023">
-                                                    2023
+                                                <MenuItem value="2025">
+                                                    2025
                                                 </MenuItem>
                                                 <MenuItem value="2024">
                                                     2024
@@ -378,7 +378,8 @@ export default function Dashboard({
                                             </Select>
                                         </FormControl>
                                     </Box>
-
+                                </Box>
+                                <Box>
                                     {/* 🔹 Chart */}
                                     <LineChart
                                         xAxis={[
@@ -388,15 +389,15 @@ export default function Dashboard({
                                                 scaleType: "band",
                                             },
                                         ]}
-                                          yAxis={[
-                                        {
-                                            label: "Orders",
-                                        },
-                                    ]}
+                                        yAxis={[
+                                            {
+                                                label: "Orders",
+                                            },
+                                        ]}
                                         series={[
                                             {
                                                 data: yData,
-                                                label: "Value",
+                                                label: "Order",
                                                 color: "#0b84ff",
                                             },
                                         ]}
@@ -410,17 +411,17 @@ export default function Dashboard({
                     <div className="col-lg-6">
                         <div className="card">
                             <div className="card-body"></div>
-                            <Box sx={{ p: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography variant="h6" gutterBottom>
                                     Daily Revenue
                                 </Typography>
 
                                 {/* 🔹 Year & Month selectors */}
-                                <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                                <Box sx={{ display: "flex", justifyContent: 'flex-end', gap: 1, mb: 2 }}>
                                     <FormControl size="small">
                                         <InputLabel>Year</InputLabel>
                                         <Select
-                                        size="small"
+                                            size="small"
                                             value={year}
                                             label="Year"
                                             onChange={(e) =>
@@ -428,8 +429,8 @@ export default function Dashboard({
                                             }
                                             sx={{ minWidth: 100 }}
                                         >
-                                            <MenuItem value="2023">
-                                                2023
+                                            <MenuItem value="2025">
+                                                2025
                                             </MenuItem>
                                             <MenuItem value="2024">
                                                 2024
@@ -440,7 +441,7 @@ export default function Dashboard({
                                     <FormControl size="small">
                                         <InputLabel>Month</InputLabel>
                                         <Select
-                                         size="small" 
+                                            size="small"
                                             value={month}
                                             label="Month"
                                             onChange={(e) =>
@@ -457,6 +458,8 @@ export default function Dashboard({
                                         </Select>
                                     </FormControl>
                                 </Box>
+                            </Box>
+                            <Box>
 
                                 {/* 🔹 Bar Chart */}
                                 <BarChart
@@ -470,7 +473,7 @@ export default function Dashboard({
                                     yAxis={[
                                         {
                                             label: "Revenue (₱)",
-                                             valueFormatter: pesoFormatter,
+                                            valueFormatter: pesoFormatter,
                                         },
                                     ]}
                                     series={[
@@ -478,12 +481,12 @@ export default function Dashboard({
                                             data: yDataR,
                                             label: "Revenue (PHP)",
                                             color: "#1da1f2",
-                                           
+
                                         },
                                     ]}
                                     width={800}
                                     height={400}
-                                    
+
                                 />
                             </Box>
                         </div>
@@ -679,69 +682,35 @@ export default function Dashboard({
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Ticket ID</th>
+                                                <th>Tracking #</th>
                                                 <th>Customer</th>
-                                                <th>Description</th>
-                                                <th>Due Date</th>
                                                 <th>Status</th>
-                                                <th>Payment</th>
+                                                <th>Due Date</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td>#43242</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
+                                                <td>#2901</td>
                                                 <td>
-                                                    <span className="badge badge-primary">
-                                                        Pending
-                                                    </span>
+                                                    John Doe
                                                 </td>
                                                 <td>
-                                                    <b>P 2400.00</b>
+                                                    <span className="badge badge-primary">Pending</span>
+                                                </td>
+                                                <td>
+                                                    Sept. 23, 2025
                                                 </td>
                                             </tr>
-                                            <tr>
-                                                <td>#7456345</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
+                                           <tr>
+                                                <td>#2901FD54r</td>
                                                 <td>
-                                                    <span className="badge badge-success">
-                                                        Approve
-                                                    </span>
+                                                    Anne Dela Cruz
                                                 </td>
                                                 <td>
-                                                    <b> P 335.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#54653232</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-primary badge-outline">
-                                                        Pending
-                                                    </span>
+                                                    <span className="badge badge-primary">Pending</span>
                                                 </td>
                                                 <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2436754</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-success">
-                                                        Approve
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
+                                                    Sept. 23, 2025
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -750,10 +719,10 @@ export default function Dashboard({
                             </div>
                         </div>
                     </div>
-                      <div className="col-lg-6">
+                    <div className="col-lg-6">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>Payments</h4>
+                                <h4>Pending Payments</h4>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
@@ -762,67 +731,29 @@ export default function Dashboard({
                                             <tr>
                                                 <th>Ticket ID</th>
                                                 <th>Customer</th>
-                                                <th>Description</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
-                                                <th>Payment</th>
+                                                <th>Amount</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
                                                 <td>#43242</td>
                                                 <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-primary">
-                                                        Pending
-                                                    </span>
-                                                </td>
                                                 <td>
                                                     <b>P 2400.00</b>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td>#7456345</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
+                                                <td>#43242</td>
+                                                <td>Anne Doe</td>
                                                 <td>
-                                                    <span className="badge badge-success">
-                                                        Approve
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
+                                                    <b>P 1500.00</b>
                                                 </td>
                                             </tr>
-                                            <tr>
-                                                <td>#54653232</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
+                                              <tr>
+                                                <td>#4JEO3242</td>
+                                                <td>Juan Dela Cruz</td>
                                                 <td>
-                                                    <span className="badge badge-primary badge-outline">
-                                                        Pending
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2436754</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-success">
-                                                        Approve
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
+                                                    <b>P 400.00</b>
                                                 </td>
                                             </tr>
                                         </tbody>

@@ -36,12 +36,15 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/', function () {
-        return Inertia::render("Dashboard/Admin");
+        return Inertia::render("Dashboard/Production");
+
+        return Inertia::render("Dashboard/Graphic");
 
         return Inertia::render("Dashboard/FrontDesk");
 
-        return Inertia::render("Dashboard/Graphic");
-        return Inertia::render("Dashboard/Production");
+        return Inertia::render("Dashboard/Admin");
+
+
 
     return Inertia::render('Dashboard', [
         'user' => [
@@ -109,5 +112,10 @@ Route::get('/reports', function () {
 Route::get('/settings', function () {
     return Inertia::render('Settings');
 })->name('settings');
+
+
+Route::get('/tracking', function () {
+    return Inertia::render('Tracking');
+})->name('tracking');
 
 require __DIR__.'/auth.php';
