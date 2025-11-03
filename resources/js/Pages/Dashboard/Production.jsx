@@ -147,11 +147,12 @@ export default function Dashboard({
                                 </div>
                                 <div className="stat-content">
                                     <div className="stat-digit">
-                                        Ready to Print
-                                    </div>
-                                    <div className="stat-text">
                                         <b>34</b>
                                     </div>
+                                    <div className="stat-text">
+                                        Ready to Print
+                                    </div>
+                                    
                                 </div>
                             </div>
                         </div>
@@ -165,10 +166,11 @@ export default function Dashboard({
                                     <i className="ti-reload"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit"><b>7</b></div>
+
+                                    <div className="stat-text">
                                         In Production
                                     </div>
-                                    <div className="stat-text">7</div>
                                 </div>
                             </div>
                         </div>
@@ -182,8 +184,8 @@ export default function Dashboard({
                                     <i className="ti-check-box"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">Completed</div>
-                                    <div className="stat-text">5</div>
+                                    <div className="stat-digit"><b>5</b></div>
+                                    <div className="stat-text">Completed</div>
                                 </div>
                             </div>
                         </div>
@@ -197,10 +199,10 @@ export default function Dashboard({
                                     <i className="ti-package"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit"><b>120</b></div>
+                                    <div className="stat-text">
                                         Total Items Produced Today
                                     </div>
-                                    <div className="stat-text">120</div>
                                 </div>
                             </div>
                         </div>

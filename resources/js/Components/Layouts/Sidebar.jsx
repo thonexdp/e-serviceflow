@@ -14,7 +14,7 @@ export default function Sidebar({ isCollapsed }) {
     // Production = 2
     // Admin = 1
 
-    const role = 4;
+    const role = 1;
     return (
         <div className={sidebarClasses}>
             <div className="nano">
@@ -92,29 +92,39 @@ export default function Sidebar({ isCollapsed }) {
                                         <i className="ti-calendar"></i> Dashboard
                                     </Link>
                                 </li>
+                                 <li>
+                                    <Link href="/tickets">
+                                        <i className="ti-user"></i> Users Management
+                                    </Link>
+                                </li>
                                 <li>
                                     <Link href="/tickets">
-                                        <i className="ti-email"></i> Tickets
+                                        <i className="ti-ticket"></i> Job Tickets
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/customers">
-                                        <i className="ti-user"></i> Customers
+                                        <i className="ti-stamp"></i> Job Types & Pricing
+                                    </Link>
+                                </li>
+                                  <li>
+                                    <Link href="/customers">
+                                        <i className="ti-user"></i> Clients
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/customers">
-                                        <i className="ti-user"></i> Payments
+                                        <i className="ti-credit-card"></i> Payments & Finance
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/customers">
-                                        <i className="ti-user"></i> Reports
+                                        <i className="ti-stats-up"></i> Reports & Analytics
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/settings">
-                                        <i className="ti-layout-grid2-alt"></i> Settings
+                                        <i className="ti-settings"></i> System Settings
                                     </Link>
                                 </li>
                             </ul>
