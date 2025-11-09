@@ -4,7 +4,7 @@ import { Head } from "@inertiajs/react";
 import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 
-export default function Dashboard({
+export default function Customers({
     user = {},
     notifications = [],
     messages = [],
@@ -13,7 +13,6 @@ export default function Dashboard({
     const [forms, setForms] = useState({
         client: {
             firstname: "",
-            middlename: "",
             lastname: "",
             phone: "",
             address: "",
@@ -27,7 +26,6 @@ export default function Dashboard({
             {
                 client: {
                     firstname: "",
-                    middlename: "",
                     lastname: "",
                     phone: "",
                     email: "",
@@ -43,7 +41,7 @@ export default function Dashboard({
             notifications={notifications}
             messages={messages}
         >
-            <Head title="Dashboard" />
+            <Head title="Customers" />
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
@@ -86,7 +84,7 @@ export default function Dashboard({
                         <div class="flex-grow border-t border-gray-300"></div>
                     </div>
 
-                    <div className="grid grid-cols-[1fr_auto_1fr] gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium">
                                 FirstName
@@ -102,27 +100,6 @@ export default function Dashboard({
                                         client: {
                                             ...forms.client,
                                             firstname: e.target.value,
-                                        },
-                                    })
-                                }
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium">
-                                MiddleName
-                            </label>
-                            <input
-                                type="text"
-                                className="mt-1 w-32 border rounded-md p-2" // fixed small width
-                                placeholder="(Optional))"
-                                value={forms.client.middlename}
-                                onChange={(e) =>
-                                    setForms({
-                                        ...forms,
-                                        client: {
-                                            ...forms.client,
-                                            middlename: e.target.value,
                                         },
                                     })
                                 }

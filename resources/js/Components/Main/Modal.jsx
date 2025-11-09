@@ -20,6 +20,8 @@ export default function Modal({
         "2xl": "max-w-2xl",
         "3xl": "max-w-3xl",
         "4xl": "max-w-4xl",
+        "5xl": "max-w-5xl",
+        "6xl": "max-w-6xl",
     };
 
     return (
@@ -71,7 +73,7 @@ export default function Modal({
                             <div className="mb-4">{children}</div>
 
                             {/* Footer */}
-                            <div className="flex justify-end gap-2">
+                            {/* <div className="flex justify-end gap-2">
                                 <button
                                     onClick={onClose}
                                     className="btn-sm border border-gray-300"
@@ -94,7 +96,7 @@ export default function Modal({
                                         {submitSecond}
                                     </button>
                                 )}
-                            </div>
+                            </div> */}
                         </Dialog.Panel>
                     </Transition.Child>
                 </div>
