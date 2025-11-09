@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
     ];
 
     /**
@@ -42,4 +43,52 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    /**
+     * User role constants
+     */
+    const ROLE_ADMIN = 'admin';
+    const ROLE_FRONTDESK = 'FrontDesk';
+    const ROLE_DESIGNER = 'Designer';
+    const ROLE_PRODUCTION = 'Production';
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(self::ROLE_ADMIN);
+    }
+
+    /**
+     * Check if user is FrontDesk
+     */
+    public function isFrontDesk(): bool
+    {
+        return $this->hasRole(self::ROLE_FRONTDESK);
+    }
+
+    /**
+     * Check if user is Designer
+     */
+    public function isDesigner(): bool
+    {
+        return $this->hasRole(self::ROLE_DESIGNER);
+    }
+
+    /**
+     * Check if user is Production
+     */
+    public function isProduction(): bool
+    {
+        return $this->hasRole(self::ROLE_PRODUCTION);
+    }
 }
