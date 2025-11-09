@@ -146,10 +146,11 @@ export default function Dashboard({
                                     <i className="ti-ticket"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">18</div>
+
+                                    <div className="stat-text">
                                         New Tickets
                                     </div>
-                                    <div className="stat-text">18</div>
                                 </div>
                             </div>
                         </div>
@@ -163,10 +164,10 @@ export default function Dashboard({
                                     <i className="ti-wallet"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">6</div>
+                                    <div className="stat-text">
                                         Payment Pending
                                     </div>
-                                    <div className="stat-text">6</div>
                                 </div>
                             </div>
                         </div>
@@ -180,10 +181,10 @@ export default function Dashboard({
                                     <i className="ti-check"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">23</div>
+                                    <div className="stat-text">
                                         Completed Tickets
                                     </div>
-                                    <div className="stat-text">23 <small>this week</small></div>
                                 </div>
                             </div>
                         </div>
@@ -197,10 +198,10 @@ export default function Dashboard({
                                     <i className="ti-time"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">
+                                    <div className="stat-digit">11</div>
+                                    <div className="stat-text">
                                         In Progress
                                     </div>
-                                    <div className="stat-text">11</div>
                                 </div>
                             </div>
                         </div>
@@ -422,7 +423,7 @@ export default function Dashboard({
                                                 <td>Sept. 23, 2025</td>
                                                 <td>
                                                     <span className="badge badge-primary">
-                                                        Pending
+                                                        Pending Design Verification
                                                     </span>
                                                 </td>
                                                 <td>
@@ -435,8 +436,8 @@ export default function Dashboard({
                                                 <td>Print Mugs</td>
                                                 <td>Sept. 30, 2025</td>
                                                 <td>
-                                                    <span className="badge badge-success">
-                                                        Approve
+                                                    <span className="badge badge-warning">
+                                                        Payment Pending
                                                     </span>
                                                 </td>
                                                 <td>
@@ -449,8 +450,8 @@ export default function Dashboard({
                                                 <td>Print 30 tshirt</td>
                                                 <td>Sept. 23, 2025</td>
                                                 <td>
-                                                    <span className="badge badge-primary badge-outline">
-                                                        Pending
+                                                    <span className="badge badge-info badge-outline">
+                                                        Ready for Production
                                                     </span>
                                                 </td>
                                                 <td>
@@ -464,7 +465,7 @@ export default function Dashboard({
                                                 <td>Sept. 30, 2025</td>
                                                 <td>
                                                     <span className="badge badge-success">
-                                                        Approve
+                                                        Completed
                                                     </span>
                                                 </td>
                                                 <td>

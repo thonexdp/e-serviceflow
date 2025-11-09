@@ -295,7 +295,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                     <div className="col-lg-12">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>All Tickets</h4>
+                                <h4>Recents Tickets</h4>
 
                             </div>
                             <div className="card-body">
@@ -303,12 +303,10 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Ticket ID</th>
+                                                <th>Tracking #</th>
                                                 <th>Customer</th>
-                                                <th>Description</th>
-                                                <th>Due Date</th>
                                                 <th>Status</th>
-                                                <th>Payment</th>
+                                                <th>Due Date</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -318,72 +316,22 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                     John Doe
                                                 </td>
                                                 <td>
-                                                    Print 30 tshirt
+                                                    <span className="badge badge-primary">Pending</span>
                                                 </td>
                                                 <td>
                                                     Sept. 23, 2025
+                                                </td>
+                                            </tr>
+                                           <tr>
+                                                <td>#2901FD54r</td>
+                                                <td>
+                                                    Anne Dela Cruz
                                                 </td>
                                                 <td>
                                                     <span className="badge badge-primary">Pending</span>
                                                 </td>
                                                 <td>
-                                                    P 2400.00
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>
-                                                    Jan Dela Cruz
-                                                </td>
-                                                <td>
-                                                    Print Mugs
-                                                </td>
-                                                <td>
-                                                    Sept. 30, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-success">Approve</span>
-
-                                                </td>
-                                                <td>
-                                                    P 335.00
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>
-                                                    John Doe
-                                                </td>
-                                                <td>
-                                                    Print 30 tshirt
-                                                </td>
-                                                <td>
                                                     Sept. 23, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-primary badge-outline">Pending</span>
-                                                </td>
-                                                <td>
-                                                    P 2400.00
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>
-                                                    Jan Dela Cruz
-                                                </td>
-                                                <td>
-                                                    Print Mugs
-                                                </td>
-                                                <td>
-                                                    Sept. 30, 2025
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-success">Approve</span>
-
-                                                </td>
-                                                <td>
-                                                    P 335.00
                                                 </td>
                                             </tr>
                                         </tbody>
