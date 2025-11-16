@@ -15,14 +15,20 @@ class Ticket extends Model
         'customer_id',
         'description',
         'job_type',
+        'job_type_id',
         'quantity',
+        'produced_quantity',
         'size_value',
         'size_unit',
         'due_date',
         'total_amount',
+        'subtotal',
         'discount',
         'downpayment',
+        'payment_method',
         'status',
+        'design_status',
+        'design_notes',
         'payment_status',
         'file_path',
     ];
@@ -30,9 +36,11 @@ class Ticket extends Model
     protected $casts = [
         'due_date' => 'date',
         'total_amount' => 'decimal:2',
+        'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'downpayment' => 'decimal:2',
         'quantity' => 'integer',
+        'produced_quantity' => 'integer',
     ];
 
     /**
@@ -70,6 +78,38 @@ class Ticket extends Model
     }
 
     /**
+     * Get the job type for the ticket.
+     */
+    public function jobType()
+    {
+        return $this->belongsTo(JobType::class, 'job_type_id');
+    }
+
+    /**
+     * Get the files for the ticket.
+     */
+    public function files()
+    {
+        return $this->hasMany(TicketFile::class);
+    }
+
+    /**
+     * Get customer files for the ticket.
+     */
+    public function customerFiles()
+    {
+        return $this->hasMany(TicketFile::class)->where('type', 'customer');
+    }
+
+    /**
+     * Get mockup files for the ticket.
+     */
+    public function mockupFiles()
+    {
+        return $this->hasMany(TicketFile::class)->where('type', 'mockup');
+    }
+
+    /**
      * Get the full size attribute.
      */
     public function getFullSizeAttribute(): ?string
@@ -80,6 +120,9 @@ class Ticket extends Model
         return null;
     }
 }
+
+
+
 
 
 

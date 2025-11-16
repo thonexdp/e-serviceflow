@@ -52,7 +52,7 @@ export default function DataTable({
                                                     <div className="btn-group">
                                                     {onEdit && (
                                                         <button
-                                                            className="btn btn-primary btn-outline btn-sm"
+                                                            className="btn btn-default btn-outline btn-sm"
                                                             onClick={() => onEdit(row)}
                                                             title="Edit"
                                                         >
@@ -61,7 +61,7 @@ export default function DataTable({
                                                     )}
                                                     {onDelete && (
                                                         <button
-                                                            className="btn btn-danger btn-outline btn-sm"
+                                                            className="btn btn-default btn-outline btn-sm"
                                                             onClick={() => onDelete(row.id)}
                                                             title="Delete"
                                                         >

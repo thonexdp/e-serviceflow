@@ -16,12 +16,13 @@ export default function Header({
         onToggleSidebar();
     };
 
-    const handleLogout = () => {
-        // e.preventDefault();
-        console.log("logut");
+    const handleLogout = (e) => {
+    e.preventDefault();
+    console.log("logout");
 
-        //router.post(route('logout'), {}, { preserveScroll: true });
-    };
+    router.post(route("logout"), {}, { preserveScroll: true });
+};
+
 
     return (
         <div className="header">
@@ -40,6 +41,9 @@ export default function Header({
                         </div>
                         <div className="float-right">
                             <div class="dropdown dib">
+                                <a href="#" onClick={handleLogout}>
+    Logout
+</a>
                                 <div class="header-icon" data-toggle="dropdown">
                                     <i class="ti-bell"></i>
                                     <div class="drop-down dropdown-menu dropdown-menu-right">
@@ -163,7 +167,7 @@ export default function Header({
                                         </div>
                                         <div className="dropdown-content-body">
                                             <ul>
-                                                <li>
+                                                {/* <li>
                                                     <a href="#">
                                                         <i className="ti-user"></i>
                                                         <span>Profile</span>
@@ -186,13 +190,18 @@ export default function Header({
                                                         <i className="ti-lock"></i>
                                                         <span>Lock Screen</span>
                                                     </a>
-                                                </li>
+                                                </li> */}
                                                 <li>
-                                                    <a onClick={handleLogout}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleLogout}
+                                                        className="dropdown-item"
+                                                    >
                                                         <i className="ti-power-off"></i>
                                                         <span>Logout</span>
-                                                    </a>
+                                                    </button>
                                                 </li>
+
                                             </ul>
                                         </div>
                                     </div>

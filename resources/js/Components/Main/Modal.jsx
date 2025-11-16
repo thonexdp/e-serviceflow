@@ -11,7 +11,6 @@ export default function Modal({
     submitButtonText = "Save",
     submitSecond = "",
 }) {
-    // Map sizes to Tailwind width classes
     const sizeClasses = {
         sm: "max-w-sm",
         md: "max-w-md",
@@ -27,7 +26,6 @@ export default function Modal({
     return (
         <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-50" onClose={onClose}>
-                {/* Overlay */}
                 <Transition.Child
                     as={Fragment}
                     enter="ease-out duration-200"
@@ -40,7 +38,6 @@ export default function Modal({
                     <div className="fixed inset-0 bg-black/40" />
                 </Transition.Child>
 
-                {/* Modal content */}
                 <div className="fixed inset-0 flex items-center justify-center p-4">
                     <Transition.Child
                         as={Fragment}
@@ -54,7 +51,7 @@ export default function Modal({
                         <Dialog.Panel
                             className={`w-full ${
                                 sizeClasses[size] || sizeClasses.md
-                            } bg-white p-6 shadow-xl`}
+                            } bg-white p-6 shadow-xl rounded-lg`}
                         >
                             {/* Header */}
                             <div className="flex justify-between items-center border-b pb-2 mb-4">
@@ -69,30 +66,30 @@ export default function Modal({
                                 </button>
                             </div>
 
-                            {/* Body */}
-                            <div className="mb-4">{children}</div>
+                            {/* Scrollable Body */}
+                            <div className="mb-4 max-h-[70vh] overflow-y-auto pr-2">
+                                {children}
+                            </div>
 
-                            {/* Footer */}
+                            {/* Footer — uncomment if needed */}
                             {/* <div className="flex justify-end gap-2">
                                 <button
                                     onClick={onClose}
                                     className="btn-sm border border-gray-300"
                                 >
-                                    <i class="ti-close text-xs"></i>
                                     Close
                                 </button>
                                 <button
                                     onClick={onSave}
                                     className="btn-sm bg-blue-600 text-white hover:bg-blue-700"
                                 >
-                                    <i class="ti-save text-xs"></i> {submitButtonText}
+                                    {submitButtonText}
                                 </button>
                                 {submitSecond && (
                                     <button
                                         onClick={onSave}
                                         className="btn-sm bg-blue-600 text-white hover:bg-blue-700"
                                     >
-                                        <i class="ti-save text-xs"></i>{" "}
                                         {submitSecond}
                                     </button>
                                 )}

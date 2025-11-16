@@ -18,7 +18,6 @@ class DashboardController extends Controller
         if (!$user) {
             return redirect()->route('login');
         }
-
         // Render dashboard based on user role
         return match($user->role) {
             'admin' => Inertia::render('Dashboard/Admin', [

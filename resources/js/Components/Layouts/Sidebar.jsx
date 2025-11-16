@@ -1,7 +1,13 @@
 import React from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+
 
 export default function Sidebar({ isCollapsed }) {
+      const { auth } = usePage().props;
+
+    console.log("Auth side", auth)
+
+
     const sidebarClasses = [
         'sidebar',
         'sidebar-hide-to-small',
@@ -14,7 +20,10 @@ export default function Sidebar({ isCollapsed }) {
     // Production = 2
     // Admin = 1
 
-    const role = 1;
+    const role = auth?.user?.role;
+    if(!role){
+        return null;
+    }
     return (
         <div className={sidebarClasses}>
             <div className="nano">
@@ -27,7 +36,7 @@ export default function Sidebar({ isCollapsed }) {
                     <ul>
                         <li className="label">Main</li>
                     </ul>
-                    {role === 4 ? (
+                    {role === "FrontDesk" ? (
                         <ul>
                             <li>
                                 <Link href="/">
@@ -47,18 +56,18 @@ export default function Sidebar({ isCollapsed }) {
                         </ul>
                     )
 
-                        : role === 3 ? (
+                        : role === "Designer" ? (
                             < ul >
                                 <li>
                                     <Link href="/">
                                         <i className="ti-calendar"></i> Dashboard
                                     </Link>
                                 </li>
-                                <li>
+                                {/* <li>
                                     <Link href="/tickets">
                                         <i className="ti-email"></i> Tickets
                                     </Link>
-                                </li>
+                                </li> */}
                                 <li>
                                     <Link href="/mock-ups">
                                         <i className="ti-user"></i> Mock-Ups
@@ -66,7 +75,7 @@ export default function Sidebar({ isCollapsed }) {
                                 </li>
                             </ul>
 
-                        ) : role === 2 ? (
+                        ) : role === "Production" ? (
                             <ul>
 
                                 <li>
@@ -74,18 +83,18 @@ export default function Sidebar({ isCollapsed }) {
                                         <i className="ti-calendar"></i> Dashboard
                                     </Link>
                                 </li>
-                                <li>
+                                {/* <li>
                                     <Link href="/tickets">
                                         <i className="ti-email"></i> Tickets
                                     </Link>
-                                </li>
+                                </li> */}
                                 <li>
                                     <Link href="/production">
                                         <i className="ti-user"></i> Production Queue
                                     </Link>
                                 </li>
                             </ul>
-                        ) : role === 1 && (
+                        ) : role === "admin" && (
                             <ul>
                                 <li>
                                     <Link href="/">
@@ -103,8 +112,13 @@ export default function Sidebar({ isCollapsed }) {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/customers">
+                                    <Link href="/job-types">
                                         <i className="ti-stamp"></i> Job Types & Pricing
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/inventory">
+                                        <i className="ti-stamp"></i> Inventory
                                     </Link>
                                 </li>
                                   <li>
