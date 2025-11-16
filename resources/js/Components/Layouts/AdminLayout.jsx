@@ -49,7 +49,7 @@ export default function AdminLayout({ children, user = {}, notifications = [], m
 
     return (
         <div>
-            <Sidebar isCollapsed={isCollapsed} />
+            <Sidebar isCollapsed={isCollapsed}  user={user}  />
             <Header 
                 user={user} 
                 notifications={notifications} 

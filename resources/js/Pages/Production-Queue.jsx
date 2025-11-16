@@ -1,44 +1,241 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
+import DataTable from "@/Components/Common/DataTable";
+import SearchBox from "@/Components/Common/SearchBox";
+import FlashMessage from "@/Components/Common/FlashMessage";
+import FormInput from "@/Components/Common/FormInput";
 
-export default function Dashboard({
+export default function ProductionQueue({
     user = {},
     notifications = [],
     messages = [],
+    tickets = { data: [] },
+    filters = {},
 }) {
-    const [openCustomerModal, setCustomerModalOpen] = useState(false);
-    const [forms, setForms] = useState({
-        client: {
-            firstname: "",
-            middlename: "",
-            lastname: "",
-            phone: "",
-            address: "",
-        },
-    });
+    const [openViewModal, setViewModalOpen] = useState(false);
+    const [openUpdateModal, setUpdateModalOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [producedQuantity, setProducedQuantity] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const { flash } = usePage().props;
 
-    const [openReviewModal, setReviewModalOpen] = useState(false);
-    const [openUploadModal, setUploadModalOpen] = useState(false);
-
-    const handleSave = () => {
-        console.log("Form submitted:", forms);
-        setCustomerModalOpen(false);
-        setForms([
-            {
-                client: {
-                    firstname: "",
-                    middlename: "",
-                    lastname: "",
-                    phone: "",
-                    email: "",
-                    address: "",
-                },
-            },
-        ]);
+    const handleView = (ticket) => {
+        setSelectedTicket(ticket);
+        setViewModalOpen(true);
     };
+
+    const handleUpdate = (ticket) => {
+        setSelectedTicket(ticket);
+        setProducedQuantity(ticket.produced_quantity || 0);
+        setUpdateModalOpen(true);
+    };
+
+    const handleCloseModals = () => {
+        setViewModalOpen(false);
+        setUpdateModalOpen(false);
+        setSelectedTicket(null);
+        setProducedQuantity(0);
+    };
+
+    const handleStartProduction = (ticketId) => {
+        setLoading(true);
+        router.post(`/production/${ticketId}/start`, {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleUpdateProgress = () => {
+        if (!selectedTicket) return;
+
+        const quantity = parseInt(producedQuantity) || 0;
+        if (quantity < 0 || quantity > selectedTicket.quantity) {
+            alert(`Quantity must be between 0 and ${selectedTicket.quantity}`);
+            return;
+        }
+
+        setLoading(true);
+        const status = quantity >= selectedTicket.quantity ? 'completed' : 'in_production';
+
+        router.post(`/production/${selectedTicket.id}/update`, {
+            produced_quantity: quantity,
+            status: status,
+        }, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                handleCloseModals();
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleMarkCompleted = (ticketId) => {
+        if (!confirm("Mark this ticket as completed?")) return;
+
+        setLoading(true);
+        router.post(`/production/${ticketId}/complete`, {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleQuickAdd = (amount) => {
+        const current = parseInt(producedQuantity) || 0;
+        const newValue = Math.min(current + amount, selectedTicket?.quantity || 0);
+        setProducedQuantity(newValue);
+    };
+
+    const getStatusBadge = (status) => {
+        const classes = {
+            ready_to_print: "badge-info",
+            in_production: "badge-warning",
+            completed: "badge-success",
+            pending: "badge-secondary",
+        };
+        const labels = {
+            ready_to_print: "Ready to Print",
+            in_production: "In Progress",
+            completed: "Completed",
+            pending: "Pending",
+        };
+        return (
+            <span className={`badge ${classes[status] || "badge-secondary"}`}>
+                {labels[status] || status?.toUpperCase() || "PENDING"}
+            </span>
+        );
+    };
+
+    const getActionButton = (ticket) => {
+        if (ticket.status === "ready_to_print") {
+            return (
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleView(ticket)}
+                    >
+                        <i className="ti-eye"></i> View
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-green-500"
+                        onClick={() => handleStartProduction(ticket.id)}
+                        disabled={loading}
+                    >
+                        <i className="ti-play"></i> Start
+                    </button>
+                </div>
+            );
+        } else if (ticket.status === "in_production") {
+            return (
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleUpdate(ticket)}
+                    >
+                        <i className="ti-pencil"></i> Update
+                    </button>
+                    {ticket.produced_quantity >= ticket.quantity && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-success"
+                            onClick={() => handleMarkCompleted(ticket.id)}
+                            disabled={loading}
+                        >
+                            <i className="ti-check"></i> Complete
+                        </button>
+                    )}
+                </div>
+            );
+        } else if (ticket.status === "completed") {
+            return (
+                <span className="text-success">
+                    <i className="ti-check"></i> Completed
+                </span>
+            );
+        } else {
+            return (
+                <button
+                    type="button"
+                    className="btn btn-link btn-sm text-blue-500"
+                    onClick={() => handleView(ticket)}
+                >
+                    <i className="ti-eye"></i> View
+                </button>
+            );
+        }
+    };
+
+    // Define table columns
+    const ticketColumns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) =>
+                (tickets.current_page - 1) * tickets.per_page + index + 1,
+        },
+        { label: "Ticket ID", key: "ticket_number" },
+        {
+            label: "Customer",
+            key: "customer",
+            render: (row) =>
+                row.customer
+                    ? `${row.customer.firstname} ${row.customer.lastname}`
+                    : "N/A",
+        },
+        { label: "Description", key: "description" },
+        {
+            label: "Quantity",
+            key: "quantity",
+            render: (row) => (
+                <span>
+                    <b className={row.produced_quantity >= row.quantity ? "text-success" : "text-warning"}>
+                        {row.produced_quantity || 0}
+                    </b>
+                    {" / "}
+                    <b>{row.quantity}</b>
+                </span>
+            ),
+        },
+        {
+            label: "Status",
+            key: "status",
+            render: (row) => getStatusBadge(row.status),
+        },
+        {
+            label: "Due Date",
+            key: "due_date",
+            render: (row) =>
+                row.due_date ? new Date(row.due_date).toLocaleDateString() : "N/A",
+        },
+        {
+            label: "Action",
+            key: "action",
+            render: (row) => getActionButton(row),
+        },
+    ];
+
+    const mockupFiles = selectedTicket?.mockup_files || [];
 
     return (
         <AdminLayout
@@ -46,177 +243,22 @@ export default function Dashboard({
             notifications={notifications}
             messages={messages}
         >
-            <Head title="Dashboard" />
+            <Head title="Production Queue" />
 
-            <Modal
-                title="Review"
-                isOpen={openReviewModal}
-                onClose={() => setReviewModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Start Production"
-            >
-                <form>
-                    <div className="mb-4">
-                        <h3>
-                            {" "}
-                            Record Payment for Ticket: <b>#20454-12</b>{" "}
-                        </h3>
-                        <div className="my-1">
-                            <h5>
-                                {" "}
-                                Description :{" "}
-                                <b> 50pcs T-shirts (front & back)</b>
-                            </h5>
-                        </div>
-                        <div className="my-1">
-                            <h5>
-                                {" "}
-                                Status : <b> Ready for Production</b>
-                            </h5>
-                        </div>
-                        <hr className="my-3" />
-                        <h5>Costumer Info : </h5>
-                        <div className="my-1">
-                            <h5>
-                                {" "}
-                                Name : <b> John Doe</b>
-                            </h5>
-                        </div>
-                        <div className="my-1">
-                            <h5>
-                                {" "}
-                                Contact : <b> 0912121212</b> |{" "}
-                                <b> test@gmail.com</b>
-                            </h5>
-                        </div>
-                        <hr className="my-3" />
-                        <div>
-                            <h6>Design Files : </h6>
-                            <ul>
-                                <li>
-                                    <span className="mr-2">
-                                        Final Design1.png
-                                    </span>{" "}
-                                    |
-                                    <div class="btn-group ml-3">
-                                        <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-blue-500"
-                                        >
-                                            <span className="ti-download"></span>{" "}
-                                            Download
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-green-800"
-                                        >
-                                            <span className="ti-eye"></span>{" "}
-                                            Preview
-                                        </button>
-                                    </div>
-                                </li>
-                            </ul>
-                        </div>
-                        <hr className="my-3" />
-                    </div>
+            {/* Flash Messages */}
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
 
-                    <div>
-                        <h5>
-                            Quantity : <b>0 / 50</b>
-                        </h5>
-                    </div>
-                </form>
-            </Modal>
-
-            <Modal
-                title="Update Production"
-                isOpen={openUploadModal}
-                onClose={() => setUploadModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Save Progress"
-                submitSecond="Mark Completed"
-            >
-                <form>
-                    <div className="mb-4">
-                        <h2>
-                            Update Progress - Ticket <b>#GH43456</b>{" "}
-                        </h2>
-                        <hr className="my-3" />
-                        <div className="my-1">
-                            <h5>
-                                {" "}
-                                Description :{" "}
-                                <b> 50pcs T-shirts (front & back)</b>
-                            </h5>
-                        </div>
-                        <div className="my-1">
-                            <h5>
-                                {" "}
-                                Status : <b> In Production</b>
-                            </h5>
-                        </div>
-                        <hr className="my-3" />
-                    </div>
-                    <div className="grid grid-cols-12 gap-3 items-center">
-                        <div className="col-span-12">
-                            <h2 className="text-lg font-semibold">
-                                Produced so far : <b className="text-red-700">30 / </b> 100
-                            </h2>
-                        </div>
-
-                          <div className="col-span-5">
-                            <h5 className="text-sm font-medium mb-1">
-                                Custom :
-                            </h5>
-                            <input
-                                type="text"
-                                className="w-[100px] border-0 border-b-2 border-black-800 focus:border-blue-500 focus:ring-0 text-sm"
-                                placeholder="0"
-                            />
-                        </div>
-
-                        <div className="col-span-4">
-                            <div className="flex divide-x divide-gray-300 rounded overflow-hidden">
-                                <button
-                                    type="button"
-                                    className="px-2 text-blue-500 text-sm hover:underline"
-                                >
-                                    <span className="ti-plus text-xs"></span> 1
-                                </button>
-                                <button
-                                    type="button"
-                                    className="px-2 text-blue-500 text-sm hover:underline"
-                                >
-                                    <span className="ti-plus text-xs"></span> 2
-                                </button>
-                                <button
-                                    type="button"
-                                    className="px-2 text-blue-500 text-sm hover:underline"
-                                >
-                                    <span className="ti-plus text-xs"></span> 5
-                                </button>
-                                <button
-                                    type="button"
-                                    className="px-2 text-blue-500 text-sm hover:underline"
-                                >
-                                    <span className="ti-plus text-xs"></span> 10
-                                </button>
-                            </div>
-                        </div>
-
-                      
-                    </div>
-                    <hr className="my-3" />
-                </form>
-            </Modal>
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
                     <div className="page-header">
                         <div className="page-title">
                             <h1>
-                                Hello, <span>Welcome Here</span>
+                                Production Queue <span>Management</span>
                             </h1>
                         </div>
                     </div>
@@ -226,165 +268,315 @@ export default function Dashboard({
                         <div className="page-title">
                             <ol className="breadcrumb">
                                 <li className="breadcrumb-item">
-                                    <a href="#">Dashboard</a>
+                                    <a href="/dashboard">Dashboard</a>
                                 </li>
-                                <li className="breadcrumb-item active">Home</li>
+                                <li className="breadcrumb-item active">Production Queue</li>
                             </ol>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <section id="main-content">
-                <div class="content-wrap">
-                    <div class="main">
-                        <div class="container-fluid">
-                            <div class="row">
-                                <div class="col-lg-12">
-                                    <div class="card">
-                                        {/* <div class="button-list float-start">
-                                            <button
-                                                type="button"
-                                                className="btn btn-primary btn-flat btn-sm btn-addon m-b-10 m-l-5"
-                                                onClick={() =>
-                                                    setCustomerModalOpen(true)
-                                                }
-                                            >
-                                                <i class="ti-plus"></i>Add
-                                                Upload Mock-Up
-                                            </button>
-                                        </div> */}
-                                        <div class="card-title mt-3">
-                                            <h4>Mock-Ups Lists </h4>
+            {/* View Modal */}
+            <Modal
+                title={`Ticket Details - #${selectedTicket?.ticket_number}`}
+                isOpen={openViewModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="row mb-4">
+                            <div className="col-md-6">
+                                <h5>
+                                    Customer: <b>{selectedTicket.customer?.firstname} {selectedTicket.customer?.lastname}</b>
+                                </h5>
+                                <h5>
+                                    Description: <b>{selectedTicket.description}</b>
+                                </h5>
+                                <p>
+                                    Status: {getStatusBadge(selectedTicket.status)}
+                                </p>
+                            </div>
+                            <div className="col-md-6">
+                                <p>
+                                    <strong>Quantity:</strong> {selectedTicket.produced_quantity || 0} / {selectedTicket.quantity}
+                                </p>
+                                <p>
+                                    <strong>Due Date:</strong> {selectedTicket.due_date ? new Date(selectedTicket.due_date).toLocaleDateString() : "N/A"}
+                                </p>
+                                {selectedTicket.size_value && (
+                                    <p>
+                                        <strong>Size:</strong> {selectedTicket.size_value} {selectedTicket.size_unit || ""}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <hr className="my-3" />
+
+                        <div className="mb-4">
+                            <h6>Design Files:</h6>
+                            {mockupFiles.length > 0 ? (
+                                <div className="table-responsive">
+                                    <table className="table table-sm table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Filename</th>
+                                                <th>Uploaded</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {mockupFiles.map((file) => (
+                                                <tr key={file.id}>
+                                                    <td>{file.filename}</td>
+                                                    <td>{new Date(file.created_at).toLocaleDateString()}</td>
+                                                    <td>
+                                                        <a
+                                                            href={`/mock-ups/files/${file.id}/download`}
+                                                            target="_blank"
+                                                            className="btn btn-link btn-sm text-blue-500"
+                                                        >
+                                                            <i className="ti-download"></i> Download
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <p className="text-muted">No design files available</p>
+                            )}
+                        </div>
+
+                        {selectedTicket.status === "ready_to_print" && (
+                            <div className="d-flex justify-content-end gap-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-success"
+                                    onClick={() => {
+                                        handleCloseModals();
+                                        handleStartProduction(selectedTicket.id);
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <i className="ti-play"></i> Start Production
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={handleCloseModals}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
+
+            {/* Update Progress Modal */}
+            <Modal
+                title={`Update Production - Ticket #${selectedTicket?.ticket_number}`}
+                isOpen={openUpdateModal}
+                onClose={handleCloseModals}
+                size="4xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="mb-4">
+                            <h4>
+                                Description: <b>{selectedTicket.description}</b>
+                            </h4>
+                            <p>
+                                Status: {getStatusBadge(selectedTicket.status)}
+                            </p>
+                        </div>
+
+                        <hr className="my-3" />
+
+                        <div className="mb-4">
+                            <div className="row align-items-center">
+                                <div className="col-md-12 mb-3">
+                                    <h3 className="text-lg font-semibold">
+                                        Produced so far:{" "}
+                                        <span className={producedQuantity >= selectedTicket.quantity ? "text-success" : "text-warning"}>
+                                            {producedQuantity} / {selectedTicket.quantity}
+                                        </span>
+                                    </h3>
+                                    <div className="progress mt-2" style={{ height: "25px" }}>
+                                        <div
+                                            className={`progress-bar ${
+                                                producedQuantity >= selectedTicket.quantity
+                                                    ? "bg-success"
+                                                    : "bg-warning"
+                                            }`}
+                                            role="progressbar"
+                                            style={{
+                                                width: `${(producedQuantity / selectedTicket.quantity) * 100}%`,
+                                            }}
+                                        >
+                                            {Math.round((producedQuantity / selectedTicket.quantity) * 100)}%
                                         </div>
-                                        <div class="card-body">
-                                            <div className="row mt-4">
-                                                <div className="col-lg-3">
-                                                    <div class="form-group">
-                                                        <input
-                                                            type="text"
-                                                            class="form-control input-sm input-focus"
-                                                            placeholder="Search"
-                                                        />
-                                                    </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-5">
+                                    <FormInput
+                                        label="Produced Quantity"
+                                        type="number"
+                                        name="produced_quantity"
+                                        value={producedQuantity}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 0;
+                                            setProducedQuantity(Math.min(val, selectedTicket.quantity));
+                                        }}
+                                        placeholder="0"
+                                        min="0"
+                                        max={selectedTicket.quantity}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="col-md-7">
+                                    <label className="block text-sm font-medium mb-2">Quick Add:</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(1)}
+                                        >
+                                            <i className="ti-plus"></i> +1
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(2)}
+                                        >
+                                            <i className="ti-plus"></i> +2
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(5)}
+                                        >
+                                            <i className="ti-plus"></i> +5
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(10)}
+                                        >
+                                            <i className="ti-plus"></i> +10
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-secondary btn-sm"
+                                            onClick={() => setProducedQuantity(selectedTicket.quantity)}
+                                        >
+                                            Set to Max
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr className="my-3" />
+
+                        <div className="d-flex justify-content-end gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleUpdateProgress}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <span>
+                                        <i className="ti-reload mr-2 animate-spin"></i> Saving...
+                                    </span>
+                                ) : (
+                                    <span>
+                                        <i className="ti-save"></i> Save Progress
+                                    </span>
+                                )}
+                            </button>
+                            {producedQuantity >= selectedTicket.quantity && (
+                                <button
+                                    type="button"
+                                    className="btn btn-success"
+                                    onClick={() => {
+                                        handleUpdateProgress();
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <i className="ti-check"></i> Mark Completed
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleCloseModals}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            <section id="main-content">
+                <div className="content-wrap">
+                    <div className="main">
+                        <div className="container-fluid">
+                            <div className="row">
+                                <div className="col-lg-12">
+                                    <div className="card">
+                                        <div className="card-title mt-3">
+                                            <h4>Production Queue</h4>
+                                        </div>
+                                        <div className="card-body">
+                                            <div className="row mt-4 align-items-center">
+                                                <div className="col-md-5">
+                                                    <SearchBox
+                                                        placeholder="Search tickets..."
+                                                        initialValue={filters.search || ""}
+                                                        route="/production"
+                                                    />
                                                 </div>
-                                                <div className="col-lg-3">
-                                                    <div class="form-group">
-                                                        <select class="form-control input-sm">
-                                                            <option>All</option>
-                                                            <option>
-                                                                Ready for
-                                                                Production
-                                                            </option>
-                                                            <option>
-                                                                In Progress
-                                                            </option>
-                                                            <option>
-                                                                Completed
-                                                            </option>
-                                                        </select>
-                                                    </div>
+                                                <div className="col-md-4">
+                                                    <FormInput
+                                                        label=""
+                                                        type="select"
+                                                        name="status"
+                                                        value={filters.status || "all"}
+                                                        onChange={(e) => {
+                                                            router.get("/production", {
+                                                                ...filters,
+                                                                status: e.target.value === "all" ? null : e.target.value
+                                                            }, {
+                                                                preserveState: false,
+                                                                preserveScroll: true,
+                                                            });
+                                                        }}
+                                                        options={[
+                                                            { value: "all", label: "All Status" },
+                                                            { value: "ready_to_print", label: "Ready to Print" },
+                                                            { value: "in_production", label: "In Progress" },
+                                                            { value: "completed", label: "Completed" },
+                                                        ]}
+                                                    />
                                                 </div>
                                             </div>
 
-                                            <div class="table-responsive">
-                                                <table class="table table-hover ">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>#</th>
-                                                            <th>Ticket ID</th>
-                                                            <th>Customer</th>
-                                                            <th>
-                                                                Descripition
-                                                            </th>
-                                                            <th>
-                                                                Qty
-                                                                <br />
-                                                                (Produced/Total)
-                                                            </th>
-                                                            <th>Status</th>
-                                                            <th>Action</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <tr>
-                                                            <th scope="row">
-                                                                1
-                                                            </th>
-                                                            <td>092323232</td>
-                                                            <td>
-                                                                Juan dela Cruz
-                                                            </td>
-                                                            <td>
-                                                                50 Pcs T-shirts
-                                                            </td>
-                                                            <td> 0 / 30 </td>
-                                                            <td>
-                                                                Ready to Print
-                                                            </td>
-                                                            <td>
-                                                                <button
-                                                                    type="button"
-                                                                    class="btn btn-link btn-outline btn-sm text-blue-500"
-                                                                    onClick={() =>
-                                                                        setReviewModalOpen(
-                                                                            true
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <span className="ti-eye"></span>{" "}
-                                                                    View
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <th scope="row">
-                                                                2
-                                                            </th>
-                                                            <td>
-                                                                09232ddsd3232
-                                                            </td>
-
-                                                            <td>Pedo Cruz</td>
-                                                            <td>
-                                                                Poster Design
-                                                            </td>
-                                                            <td> 10 / 40 </td>
-                                                            <td>In Progress</td>
-                                                            <td>
-                                                                <button
-                                                                    type="button"
-                                                                    class="btn btn-link btn-outline btn-sm text-blue-500"
-                                                                    onClick={() =>
-                                                                        setUploadModalOpen(
-                                                                            true
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <span className="ti-eye"></span>{" "}
-                                                                    Update
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <th scope="row">
-                                                                3
-                                                            </th>
-                                                            <td>092323232</td>
-
-                                                            <td>
-                                                                Anna dela Cruz
-                                                            </td>
-                                                            <td>Poster</td>
-                                                            <td> 10 / 10 </td>
-                                                            <td>Completed</td>
-                                                            <td>
-                                                                <span className="ti-check"></span>
-                                                                Approved
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
+                                            <div className="mt-4">
+                                                <DataTable
+                                                    columns={ticketColumns}
+                                                    data={tickets.data}
+                                                    pagination={tickets}
+                                                    emptyMessage="No tickets ready for production."
+                                                />
                                             </div>
                                         </div>
                                     </div>

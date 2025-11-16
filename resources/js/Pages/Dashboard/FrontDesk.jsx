@@ -9,6 +9,7 @@ export default function Dashboard({
     notifications = [],
     messages = [],
 }) {
+    
     const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
     const handleSave = () => {

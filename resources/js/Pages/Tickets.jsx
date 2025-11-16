@@ -27,7 +27,9 @@ export default function Tickets({
     const [editingTicket, setEditingTicket] = useState(null);
     const [_selectedCustomer, setSelectedCustomer] = useState(selectedCustomer);
 
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
+
+    const isAllowedToAddCustomer = auth?.user?.role === "Admin" || auth?.user?.role === "FrontDesk";
 
     // Handle customer form submission
     // const handleCustomerSubmit = (data) => {
@@ -54,20 +56,20 @@ export default function Tickets({
             //setLoading(true);
             const { data } = await axios.post("/customers", formData);
 
-            if(data.success){
-               setSelectedCustomer({
+            if (data.success) {
+                setSelectedCustomer({
                     ...data?.customer,
                     full_name: `${data?.customer?.firstname} ${data?.customer?.lastname}`,
                 });
             }
             setCustomerModalOpen(false);
         } catch (error) {
-            console.error("Add failed:",error, error.response?.data);
-           // toast.error("Failed to add customer.");
+            console.error("Add failed:", error, error.response?.data);
+            // toast.error("Failed to add customer.");
         } finally {
-           setCustomerModalOpen(false);
+            setCustomerModalOpen(false);
         }
-        };
+    };
 
     // Handle ticket form submission
     const handleTicketSubmit = (data) => {
@@ -269,7 +271,7 @@ export default function Tickets({
                 title={editingTicket ? "Edit Ticket" : "Add Ticket"}
                 isOpen={openTicketModal}
                 onClose={closeTicketModal}
-                size="5xl"
+                size="6xl"
                 submitButtonText={null}
             >
                 <TicketForm
@@ -282,96 +284,92 @@ export default function Tickets({
 
             <section id="main-content">
                 {/* Customer Search and Add Section */}
-                <div className="row">
-                    <div className="col-lg-6">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Search Customer</h4>
-                            </div>
-                            <div className="card-body">
-                                <div className="basic-form">
-                                    <div className="form-group">
-                                        <p className="text-muted m-b-15 f-s-12">
-                                            Search customer here if already registered.
-                                        </p>
-                                        <CustomerSearchBox onSelect={(customer) => setSelectedCustomer(customer)} _selectedCustomer={_selectedCustomer} />
-
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-md-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <button
-                                    type="button"
-                                    onClick={() => setCustomerModalOpen(true)}
-                                    className="px-5 py-2.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-lg hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
-                                >
-                                    <i className="ti-plus"></i>Add Customer
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Customer Details Section */}
-                {_selectedCustomer && (
+                {isAllowedToAddCustomer && (
                     <div className="row">
                         <div className="col-lg-6">
                             <div className="card">
                                 <div className="card-title">
-                                    <h6>Customer Details</h6>
+                                    <h4>Search Customer</h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCustomerModalOpen(true)}
+                                        className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition float-end"
+                                    >
+                                        <i className="ti-plus"></i> Add Customer
+                                    </button>
                                 </div>
-                                <div className="card-body mt-3">
-                                    <div className="row">
-                                        <div className="col-lg-6">
-                                            <ul>
-                                                <li>
-                                                    <label>
-                                                        Name:{" "}
-                                                        <span>
-                                                            <b>{_selectedCustomer.full_name}</b>
-                                                        </span>
-                                                    </label>
-                                                </li>
-                                                <li>
-                                                    <label>
-                                                        Phone:{" "}
-                                                        <span>
-                                                            <b>{_selectedCustomer.phone || "N/A"}</b>
-                                                        </span>
-                                                    </label>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                        <div className="col-lg-6">
-                                            <ul>
-                                                <li>
-                                                    <label>
-                                                        Email:{" "}
-                                                        <span>
-                                                            <b>{_selectedCustomer.email || "N/A"}</b>
-                                                        </span>
-                                                    </label>
-                                                </li>
-                                                <li>
-                                                    <label>
-                                                        Address:{" "}
-                                                        <span>
-                                                            <b>{_selectedCustomer.address || "N/A"}</b>
-                                                        </span>
-                                                    </label>
-                                                </li>
-                                            </ul>
+                                <div className="card-body">
+
+                                    <div className="basic-form">
+                                        <div className="form-group">
+                                            <p className="text-muted m-b-15 f-s-12">
+                                                Search customer here if already registered.
+                                            </p>
+                                            <CustomerSearchBox onSelect={(customer) => setSelectedCustomer(customer)} _selectedCustomer={_selectedCustomer} />
+
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        {_selectedCustomer && (
+                            <div className="col-lg-6">
+                                <div className="card">
+                                    <div className="card-title">
+                                        <h6>Customer Details</h6>
+                                    </div>
+                                    <div className="card-body mt-3">
+                                        <div className="row">
+                                            <div className="col-lg-6">
+                                                <ul>
+                                                    <li>
+                                                        <label>
+                                                            Name:{" "}
+                                                            <span>
+                                                                <b>{_selectedCustomer.full_name}</b>
+                                                            </span>
+                                                        </label>
+                                                    </li>
+                                                    <li>
+                                                        <label>
+                                                            Phone:{" "}
+                                                            <span>
+                                                                <b>{_selectedCustomer.phone || "N/A"}</b>
+                                                            </span>
+                                                        </label>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                            <div className="col-lg-6">
+                                                <ul>
+                                                    <li>
+                                                        <label>
+                                                            Email:{" "}
+                                                            <span>
+                                                                <b>{_selectedCustomer.email || "N/A"}</b>
+                                                            </span>
+                                                        </label>
+                                                    </li>
+                                                    <li>
+                                                        <label>
+                                                            Address:{" "}
+                                                            <span>
+                                                                <b>{_selectedCustomer.address || "N/A"}</b>
+                                                            </span>
+                                                        </label>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
+
+                {/* Customer Details Section */}
+
 
                 {/* Tickets Section */}
                 <div className="row">
@@ -393,12 +391,22 @@ export default function Tickets({
                                     <div className="button-list float-end">
                                         <button
                                             type="button"
-                                            className="btn btn-primary btn-flat btn-sm btn-addon m-b-10 m-l-5"
                                             onClick={() => setTicketModalOpen(true)}
                                             disabled={!_selectedCustomer}
+                                            className="
+                                                px-3 py-2.5 text-sm font-medium rounded-md transition
+                                                text-white bg-blue-700 hover:bg-blue-500
+                                                focus:outline-none focus:ring-2 focus:ring-blue-300
+
+                                                disabled:bg-gray-300
+                                                disabled:text-gray-500
+                                                disabled:cursor-not-allowed
+                                                disabled:hover:bg-gray-300
+                                            "
                                         >
-                                            <i className="ti-plus"></i>Add Tickets
+                                            <i className="ti-plus"></i> Add Tickets
                                         </button>
+
                                     </div>
                                 </div>
                             </div>
