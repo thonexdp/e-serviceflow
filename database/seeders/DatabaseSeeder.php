@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UserSeeder::class,
+            InventorySeeder::class, // Add inventory seeder
         ]);
     }
 }

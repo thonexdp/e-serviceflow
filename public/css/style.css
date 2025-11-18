@@ -707,7 +707,7 @@ a.dt-button.active:not(.disabled) {
   transition: margin-left 300ms ease-in-out 0s;
 }
 .logo {
-  background: #f2f2f2;
+  background: #fff;
   /* background: #343957; */
   display: inline-block;
   padding: 15px 0;
@@ -4516,4 +4516,38 @@ h6.h1 {
   .retina-logo {
     display: inline-block !important;
   }
+}
+
+
+
+/* Add/update these rules at the end of the file */
+
+/* Headless UI Dialog (Modal) z-index layering */
+[role="dialog"] {
+    z-index: 9999 !important;
+}
+
+.relative.z-50 {
+    z-index: 9999 !important;
+}
+
+/* Modal backdrop */
+.fixed.inset-0.bg-black\/40 {
+    z-index: 9998 !important;
+}
+
+/* Ensure sidebar stays behind */
+.sidebar,
+aside,
+[class*="sidebar"],
+[id*="sidebar"],
+nav {
+    z-index: 100 !important;
+}
+
+/* If there's a drawer or navigation overlay */
+.drawer-backdrop,
+.nav-backdrop {
+    z-index: 99 !important;
+}  z-index: 1000;
 }

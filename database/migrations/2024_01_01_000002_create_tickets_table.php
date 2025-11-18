@@ -26,6 +26,8 @@ return new class extends Migration
             $table->decimal('downpayment', 10, 2)->default(0);
             $table->string('status')->default('pending'); // pending, in_production, completed, cancelled
             $table->string('payment_status')->default('pending'); // pending, partial, paid
+            $table->string('status_notes')->nullable();
+            $table->decimal('amount_paid', 10, 2)->default(0);
             $table->text('file_path')->nullable();
             $table->timestamps();
             $table->softDeletes();

@@ -118,9 +118,17 @@ export default function JobTypes({
             render: (row) => row.name,
         },
         {
-            label: "Price",
+            label: "Pricing",
             key: "price",
-            render: (row) => `₱${parseFloat(row.price).toFixed(2)} / ${row.price_by}`,
+            render: (row) => {
+                if (row.price_tiers && row.price_tiers.length > 0) {
+                    return <div className="badge badge-info">Tiered by Qty</div>;
+                }
+                if (row.size_rates && row.size_rates.length > 0) {
+                    return <div className="badge badge-primary">Size-Based</div>;
+                }
+                return `₱${parseFloat(row.price).toFixed(2)} / ${row.price_by}`;
+            },
         },
         {
             label: "Discount",
@@ -131,7 +139,7 @@ export default function JobTypes({
             label: "Status",
             key: "is_active",
             render: (row) => (
-                <span className={`badge ${row.is_active ? 'badge-success' : 'badge-danger'}`}>
+                <span className={` ${row.is_active ? 'text-success' : 'text-danger'}`}>
                     {row.is_active ? 'Active' : 'Inactive'}
                 </span>
             ),

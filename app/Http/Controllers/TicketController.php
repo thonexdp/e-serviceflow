@@ -10,6 +10,7 @@ use App\Models\JobType;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TicketController extends BaseCrudController
 {
@@ -27,7 +28,7 @@ class TicketController extends BaseCrudController
      */
     public function index(Request $request)
     {
-        $query = Ticket::with('customer');
+        $query = Ticket::with('customer','customerFiles');
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -58,7 +59,10 @@ class TicketController extends BaseCrudController
 
         // Get job categories and types for ticket form
         $jobCategories = JobCategory::with(['jobTypes' => function($query) {
-            $query->where('is_active', true)->orderBy('sort_order')->orderBy('name');
+            $query->where('is_active', true)
+                ->with(['priceTiers', 'sizeRates'])
+                ->orderBy('sort_order')
+                ->orderBy('name');
         }])->orderBy('name')->get();
 
         return Inertia::render('Tickets', [
@@ -82,6 +86,9 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
+            'size_width' => 'nullable|numeric|min:0',
+            'size_height' => 'nullable|numeric|min:0',
             'size_value' => 'nullable|string|max:50',
             'size_unit' => 'nullable|string|max:10',
             'due_date' => 'nullable|date',
@@ -102,6 +109,8 @@ class TicketController extends BaseCrudController
             $validated['file_path'] = $path;
         }
 
+        $this->applyPricing($validated, $request);
+        unset($validated['size_width'], $validated['size_height'], $validated['size_rate_id']);
         $ticket = Ticket::create($validated);
 
         // Save file to ticket_files if file was uploaded
@@ -132,6 +141,9 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
+            'size_width' => 'nullable|numeric|min:0',
+            'size_height' => 'nullable|numeric|min:0',
             'size_value' => 'nullable|string|max:50',
             'size_unit' => 'nullable|string|max:10',
             'due_date' => 'nullable|date',
@@ -164,6 +176,9 @@ class TicketController extends BaseCrudController
             ]);
         }
 
+        $this->applyPricing($validated, $request);
+        unset($validated['size_width'], $validated['size_height'], $validated['size_rate_id']);
+
         $ticket->update($validated);
 
         return redirect()
@@ -189,6 +204,156 @@ class TicketController extends BaseCrudController
             ->route('tickets.index')
             ->with('success', 'Ticket deleted successfully.');
     }
+    
+    protected function applyPricing(array &$validated, Request $request): void
+    {
+        $jobTypeId = $validated['job_type_id'] ?? null;
+        $quantity = max((int)($validated['quantity'] ?? 1), 1);
+        $validated['quantity'] = $quantity;
+
+        $subtotal = 0;
+
+        if ($jobTypeId) {
+            $jobType = JobType::with(['priceTiers', 'sizeRates'])->find($jobTypeId);
+
+            if ($jobType) {
+                if ($jobType->sizeRates->isNotEmpty()) {
+                    $sizeRateId = $request->input('size_rate_id');
+                    $sizeRate = $jobType->sizeRates->firstWhere('id', $sizeRateId)
+                        ?? $jobType->sizeRates->firstWhere('is_default', true)
+                        ?? $jobType->sizeRates->first();
+
+                    $width = (float)$request->input('size_width', 0);
+                    $height = (float)$request->input('size_height', 0);
+
+                    if ($sizeRate && $width > 0 && ($sizeRate->calculation_method === 'length' || $height > 0)) {
+                        $measurement = $sizeRate->calculation_method === 'length'
+                            ? $width
+                            : $width * $height;
+                        $subtotal = $measurement * (float)$sizeRate->rate * $quantity;
+                        $validated['size_unit'] = $sizeRate->dimension_unit;
+                        $validated['size_value'] = $sizeRate->calculation_method === 'length'
+                            ? "{$width} {$sizeRate->dimension_unit}"
+                            : "{$width} x {$height}";
+                    }
+                } elseif ($jobType->priceTiers->isNotEmpty()) {
+                    $tier = $jobType->priceTiers
+                        ->sortBy('min_quantity')
+                        ->filter(function ($tier) use ($quantity) {
+                            return $quantity >= $tier->min_quantity &&
+                                (!$tier->max_quantity || $quantity <= $tier->max_quantity);
+                        })
+                        ->last();
+
+                    $unitPrice = $tier ? (float)$tier->price : (float)$jobType->price;
+                    $subtotal = $unitPrice * $quantity;
+                } else {
+                    $subtotal = (float)$jobType->price * $quantity;
+                }
+            }
+        }
+
+        if ($subtotal <= 0) {
+            $subtotal = (float)($validated['subtotal'] ?? 0);
+        }
+
+        $validated['subtotal'] = round($subtotal, 2);
+
+        $discountPercent = isset($validated['discount']) ? (float)$validated['discount'] : 0;
+        $discountAmount = $discountPercent > 0 ? $subtotal * ($discountPercent / 100) : 0;
+
+        $validated['total_amount'] = round($subtotal - $discountAmount, 2);
+    }
+
+
+    /**
+ * Update ticket status with notes
+ */
+public function updateStatus(Request $request, $id)
+{
+    $ticket = Ticket::findOrFail($id);
+    
+    $validated = $request->validate([
+        'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled',
+        'notes' => 'nullable|string|max:500',
+    ]);
+    
+    // Update the status
+    $ticket->status = $validated['status'];
+    
+    // If there are notes, you can save them (add a notes field to your tickets table)
+    if (!empty($validated['notes'])) {
+        $ticket->status_notes = $validated['notes'];
+    }
+    
+    $ticket->save();
+    
+    // Optional: Log the status change
+    // StatusChangeLog::create([
+    //     'ticket_id' => $ticket->id,
+    //     'user_id' => auth()->id(),
+    //     'old_status' => $ticket->getOriginal('status'),
+    //     'new_status' => $validated['status'],
+    //     'notes' => $validated['notes'],
+    // ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Ticket status updated successfully',
+        'ticket' => $ticket->fresh()
+    ]);
+}
+
+/**
+ * Update payment status with payment details
+ */
+public function updatePayment(Request $request, $id)
+{
+    $ticket = Ticket::findOrFail($id);
+    
+    $validated = $request->validate([
+        'payment_status' => 'required|in:pending,partial,paid',
+        'amount_paid' => 'nullable|numeric|min:0',
+        'payment_method' => 'nullable|in:cash,gcash,bank_transfer,credit_card,check',
+        'payment_notes' => 'nullable|string|max:500',
+    ]);
+    
+    // Update payment status
+    $ticket->payment_status = $validated['payment_status'];
+    
+    // If amount is provided, add it to the total amount paid
+    if (!empty($validated['amount_paid']) && $validated['amount_paid'] > 0) {
+        $currentPaid = $ticket->amount_paid ?? 0;
+        $ticket->amount_paid = $currentPaid + $validated['amount_paid'];
+        
+        // Check if fully paid and update status accordingly
+        if ($ticket->amount_paid >= $ticket->total_amount) {
+            $ticket->payment_status = 'paid';
+        } elseif ($ticket->amount_paid > 0) {
+            $ticket->payment_status = 'partial';
+        }
+    }
+    
+    $ticket->save();
+    
+    // Optional: Create payment transaction record
+    // PaymentTransaction::create([
+    //     'ticket_id' => $ticket->id,
+    //     'user_id' => auth()->id(),
+    //     'amount' => $validated['amount_paid'],
+    //     'payment_method' => $validated['payment_method'],
+    //     'payment_notes' => $validated['payment_notes'],
+    //     'balance_before' => $ticket->total_amount - ($currentPaid ?? 0),
+    //     'balance_after' => $ticket->total_amount - $ticket->amount_paid,
+    // ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Payment updated successfully',
+        'ticket' => $ticket->fresh(),
+        'new_balance' => $ticket->total_amount - $ticket->amount_paid
+    ]);
+}
 
     protected function getValidationRules(string $action, $model = null): array
     {
@@ -198,6 +363,9 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
+            'size_width' => 'nullable|numeric|min:0',
+            'size_height' => 'nullable|numeric|min:0',
             'size_value' => 'nullable|string|max:50',
             'size_unit' => 'nullable|string|max:10',
             'due_date' => 'nullable|date',

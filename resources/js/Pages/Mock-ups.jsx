@@ -146,9 +146,9 @@ export default function Mockups({
             mockup_uploaded: "Mock-up Uploaded",
         };
         return (
-            <span className={`badge ${classes[status] || "badge-secondary"}`}>
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
                 {labels[status] || status?.toUpperCase() || "PENDING"}
-            </span>
+            </div>
         );
     };
 
