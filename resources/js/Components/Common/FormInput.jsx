@@ -13,6 +13,7 @@ export default function FormInput({
   className = "",
   rows = 3,
   options = [], // For select inputs
+  defaultChecked, // For checkbox
 }) {
   const baseClasses = `
     w-full text-sm rounded-md border border-gray-300 
@@ -26,6 +27,28 @@ export default function FormInput({
 
   const renderInput = () => {
     switch (type) {
+      case "checkbox":
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name={name}
+              checked={value}
+              defaultChecked={defaultChecked}
+              onChange={(e) =>
+                onChange
+                  ? onChange({
+                      target: { name, value: e.target.checked },
+                    })
+                  : null
+              }
+              disabled={disabled}
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            />
+            <span className="text-sm">{label}</span>
+          </div>
+        );
+
       case "textarea":
         return (
           <textarea
@@ -39,6 +62,7 @@ export default function FormInput({
             className={`${baseClasses} p-2.5`}
           />
         );
+
       case "select":
         return (
           <select
@@ -57,6 +81,7 @@ export default function FormInput({
             ))}
           </select>
         );
+
       default:
         return (
           <input
@@ -75,7 +100,8 @@ export default function FormInput({
 
   return (
     <div className="mb-4">
-      {label && (
+      {/* For checkbox we don't render label above */}
+      {type !== "checkbox" && label && (
         <label
           htmlFor={name}
           className="block text-sm font-medium text-gray-700 mb-1"
@@ -83,43 +109,10 @@ export default function FormInput({
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
+
       {renderInput()}
-      {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
-      )}
+
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }
-
-
-
-//Usage : 
-
-// <FormInput
-//   label="Customer Name"
-//   name="name"
-//   value={form.name}
-//   onChange={handleChange}
-//   required
-//   error={errors.name}
-// />
-
-// <FormInput
-//   label="Notes"
-//   type="textarea"
-//   name="notes"
-//   value={form.notes}
-//   onChange={handleChange}
-// />
-
-// <FormInput
-//   label="Status"
-//   type="select"
-//   name="status"
-//   value={form.status}
-//   onChange={handleChange}
-//   options={[
-//     { value: "active", label: "Active" },
-//     { value: "inactive", label: "Inactive" },
-//   ]}
-// />

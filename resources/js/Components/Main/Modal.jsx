@@ -21,6 +21,7 @@ export default function Modal({
         "4xl": "max-w-4xl",
         "5xl": "max-w-5xl",
         "6xl": "max-w-6xl",
+        "7xl": "max-w-7xl",
     };
 
     return (
@@ -35,7 +36,7 @@ export default function Modal({
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                 >
-                    <div className="fixed inset-0 bg-black/40" />
+                    <div className="fixed inset-0 bg-black/30" />
                 </Transition.Child>
 
                 <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -67,7 +68,7 @@ export default function Modal({
                             </div>
 
                             {/* Scrollable Body */}
-                            <div className="mb-4 max-h-[70vh] overflow-y-auto pr-2">
+                            <div className="mb-4 max-h-[80vh] overflow-y-auto pr-2">
                                 {children}
                             </div>
 

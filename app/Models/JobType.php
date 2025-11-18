@@ -36,4 +36,32 @@ class JobType extends Model
     {
         return $this->belongsTo(JobCategory::class, 'category_id');
     }
+
+    public function priceTiers()
+    {
+        return $this->hasMany(JobTypePriceTier::class)->orderBy('min_quantity');
+    }
+
+    public function sizeRates()
+    {
+        return $this->hasMany(JobTypeSizeRate::class)->orderBy('rate');
+    }
+
+    /**
+     * Get stock requirements for this job type.
+     */
+    public function stockRequirements()
+    {
+        return $this->hasMany(JobTypeStockRequirement::class);
+    }
+
+    /**
+     * Get required stock items for this job type.
+     */
+    public function requiredStockItems()
+    {
+        return $this->belongsToMany(StockItem::class, 'job_type_stock_requirements')
+            ->withPivot('quantity_per_unit', 'is_required', 'notes')
+            ->withTimestamps();
+    }
 }

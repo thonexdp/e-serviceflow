@@ -1,0 +1,255 @@
+import React, { useState } from "react";
+import AdminLayout from "@/Components/Layouts/AdminLayout";
+import { Head, router, usePage } from "@inertiajs/react";
+import Footer from "@/Components/Layouts/Footer";
+import FlashMessage from "@/Components/Common/FlashMessage";
+import { formatDate } from "@/Utils/formatDate";
+
+export default function PurchaseOrdersShow({
+    user = {},
+    notifications = [],
+    messages = [],
+    purchaseOrder = {},
+}) {
+    const { flash } = usePage().props;
+
+    const handleApprove = () => {
+        if (!confirm("Approve this purchase order?")) return;
+        router.post(`/purchase-orders/${purchaseOrder.id}/approve`, {}, {
+            preserveState: false,
+            preserveScroll: true,
+        });
+    };
+
+    const handleMarkOrdered = () => {
+        if (!confirm("Mark this purchase order as ordered?")) return;
+        router.post(`/purchase-orders/${purchaseOrder.id}/mark-ordered`, {}, {
+            preserveState: false,
+            preserveScroll: true,
+        });
+    };
+
+    const handleCancel = () => {
+        if (!confirm("Cancel this purchase order?")) return;
+        router.post(`/purchase-orders/${purchaseOrder.id}/cancel`, {}, {
+            preserveState: false,
+            preserveScroll: true,
+        });
+    };
+
+    const getStatusBadge = (status) => {
+        const classes = {
+            draft: "badge-secondary",
+            pending: "badge-info",
+            approved: "badge-primary",
+            ordered: "badge-warning",
+            received: "badge-success",
+            cancelled: "badge-danger",
+        };
+        return (
+            <span className={`badge ${classes[status] || "badge-secondary"}`}>
+                {status?.toUpperCase()}
+            </span>
+        );
+    };
+
+    return (
+        <AdminLayout user={user} notifications={notifications} messages={messages}>
+            <Head title={`Purchase Order - ${purchaseOrder.po_number}`} />
+
+            {flash?.success && <FlashMessage type="success" message={flash.success} />}
+            {flash?.error && <FlashMessage type="error" message={flash.error} />}
+
+            <div className="row">
+                <div className="col-lg-8 p-r-0 title-margin-right">
+                    <div className="page-header">
+                        <div className="page-title">
+                            <h1>
+                                Purchase Order <span>{purchaseOrder.po_number}</span>
+                            </h1>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-lg-4 p-l-0 title-margin-left">
+                    <div className="page-header">
+                        <div className="page-title">
+                            <ol className="breadcrumb">
+                                <li className="breadcrumb-item">
+                                    <a href="/dashboard">Dashboard</a>
+                                </li>
+                                <li className="breadcrumb-item">
+                                    <a href="/purchase-orders">Purchase Orders</a>
+                                </li>
+                                <li className="breadcrumb-item active">{purchaseOrder.po_number}</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <section id="main-content">
+                <div className="content-wrap">
+                    <div className="main">
+                        <div className="container-fluid">
+                            <div className="row">
+                                <div className="col-lg-12">
+                                    <div className="card">
+                                        <div className="card-title mt-3 d-flex justify-content-between align-items-center">
+                                            <h4>Purchase Order Details</h4>
+                                            <div>
+                                                {getStatusBadge(purchaseOrder.status)}
+                                                {purchaseOrder.status === "draft" && (
+                                                    <button
+                                                        className="btn btn-primary btn-sm ml-2"
+                                                        onClick={handleApprove}
+                                                    >
+                                                        <i className="ti-check"></i> Approve
+                                                    </button>
+                                                )}
+                                                {purchaseOrder.status === "approved" && (
+                                                    <button
+                                                        className="btn btn-warning btn-sm ml-2"
+                                                        onClick={handleMarkOrdered}
+                                                    >
+                                                        <i className="ti-shopping-cart"></i> Mark as Ordered
+                                                    </button>
+                                                )}
+                                                {!["received", "cancelled"].includes(purchaseOrder.status) && (
+                                                    <button
+                                                        className="btn btn-danger btn-sm ml-2"
+                                                        onClick={handleCancel}
+                                                    >
+                                                        <i className="ti-close"></i> Cancel
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="card-body">
+                                            <div className="row mb-4">
+                                                <div className="col-md-6">
+                                                    <p><strong>PO Number:</strong> {purchaseOrder.po_number}</p>
+                                                    <p><strong>Supplier:</strong> {purchaseOrder.supplier || "N/A"}</p>
+                                                    <p><strong>Contact:</strong> {purchaseOrder.supplier_contact || "N/A"}</p>
+                                                    <p><strong>Email:</strong> {purchaseOrder.supplier_email || "N/A"}</p>
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <p><strong>Order Date:</strong> {formatDate(purchaseOrder.order_date)}</p>
+                                                    <p><strong>Expected Delivery:</strong> {formatDate(purchaseOrder.expected_delivery_date)}</p>
+                                                    {purchaseOrder.received_date && (
+                                                        <p><strong>Received Date:</strong> {formatDate(purchaseOrder.received_date)}</p>
+                                                    )}
+                                                    <p><strong>Created By:</strong> {purchaseOrder.creator?.name || "N/A"}</p>
+                                                    {purchaseOrder.approver && (
+                                                        <p><strong>Approved By:</strong> {purchaseOrder.approver?.name}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {purchaseOrder.notes && (
+                                                <div className="mb-3">
+                                                    <strong>Notes:</strong>
+                                                    <p>{purchaseOrder.notes}</p>
+                                                </div>
+                                            )}
+
+                                            <hr />
+
+                                            <h5 className="mb-3">Items</h5>
+                                            <div className="table-responsive">
+                                                <table className="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Item</th>
+                                                            <th>SKU</th>
+                                                            <th>Quantity</th>
+                                                            <th>Unit Cost</th>
+                                                            <th>Total</th>
+                                                            <th>Received</th>
+                                                            <th>Remaining</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {purchaseOrder.items?.map((item) => (
+                                                            <tr key={item.id}>
+                                                                <td>{item.stock_item?.name}</td>
+                                                                <td>{item.stock_item?.sku}</td>
+                                                                <td>
+                                                                    {parseFloat(item.quantity).toFixed(2)} {item.stock_item?.base_unit_of_measure}
+                                                                </td>
+                                                                <td>${parseFloat(item.unit_cost).toFixed(2)}</td>
+                                                                <td>${parseFloat(item.total_cost).toFixed(2)}</td>
+                                                                <td>
+                                                                    {parseFloat(item.received_quantity || 0).toFixed(2)} {item.stock_item?.base_unit_of_measure}
+                                                                </td>
+                                                                <td>
+                                                                    {parseFloat(item.remaining_quantity || 0).toFixed(2)} {item.stock_item?.base_unit_of_measure}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <div className="row mt-4">
+                                                <div className="col-md-6"></div>
+                                                <div className="col-md-6">
+                                                    <table className="table">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td><strong>Subtotal:</strong></td>
+                                                                <td className="text-right">${parseFloat(purchaseOrder.subtotal || 0).toFixed(2)}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Tax:</strong></td>
+                                                                <td className="text-right">${parseFloat(purchaseOrder.tax || 0).toFixed(2)}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Shipping:</strong></td>
+                                                                <td className="text-right">${parseFloat(purchaseOrder.shipping_cost || 0).toFixed(2)}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Total:</strong></td>
+                                                                <td className="text-right">
+                                                                    <strong>${parseFloat(purchaseOrder.total_amount || 0).toFixed(2)}</strong>
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            <div className="d-flex justify-content-end gap-2 mt-4">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary"
+                                                    onClick={() => router.get("/purchase-orders")}
+                                                >
+                                                    Back to List
+                                                </button>
+                                                {(purchaseOrder.status === "approved" || purchaseOrder.status === "ordered") && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-success"
+                                                        onClick={() => {
+                                                            // Navigate to index with receive parameter
+                                                            router.get(`/purchase-orders?receive_po_id=${purchaseOrder.id}`);
+                                                        }}
+                                                    >
+                                                        <i className="ti-check"></i> Receive Items
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <Footer />
+        </AdminLayout>
+    );
+}
+

@@ -37,6 +37,7 @@ export default function Customers({
     };
 
     const handleCustomerSubmit = (data) => {
+        console.log('handleCustomerSubmit', data);
         if (editingCustomer) {
             router.put(`/customers/${editingCustomer.id}`, data, {
                 onSuccess: () => {
@@ -117,6 +118,11 @@ export default function Customers({
             label: "Email",
             key: "email",
             render: (row) => row.email || "N/A",
+        },
+        {
+            label: "Facebook",
+            key: "facebook",
+            render: (row) => row.facebook || "N/A",
         },
         {
             label: "Address",

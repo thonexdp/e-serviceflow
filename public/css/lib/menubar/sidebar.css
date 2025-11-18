@@ -12,8 +12,8 @@
     top: 0px;
     left: 0;
     bottom: 0;
-    width: 250px;
-    background: #f2f2f2;
+    width: 240px;
+    background: #fff;
     /* background: #343957; */
     /* font-size: 14px; */
     z-index: 100;
@@ -22,7 +22,7 @@
     transform: translateZ(0);
     -webkit-transition: width 300ms ease-in-out;
     transition: width 300ms ease-in-out;
-     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.50);
+     box-shadow: 0 1px 5px rgba(210, 209, 209, 0.5);
 }
 
 .sidebar.sidebar-static {
@@ -89,7 +89,7 @@
     line-height: 30px;
     border-bottom: none;
     /* background: #343957; */
-    background: #f2f2f2;
+    background: #fff;
     text-decoration: none;
     -webkit-transition: all 0.3s ease-in-out;
     transition: all 0.3s ease-in-out;

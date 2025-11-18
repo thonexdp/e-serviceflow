@@ -118,7 +118,12 @@ export default function Sidebar({ isCollapsed }) {
                                 </li>
                                 <li>
                                     <Link href="/inventory">
-                                        <i className="ti-stamp"></i> Inventory
+                                        <i className="ti-package"></i> Inventory
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/purchase-orders">
+                                        <i className="ti-shopping-cart"></i> Purchase Orders
                                     </Link>
                                 </li>
                                   <li>

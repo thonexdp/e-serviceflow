@@ -20,6 +20,7 @@ class CustomerController extends Controller
                         ->orWhere('lastname', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('facebook', 'like', "%{$search}%")
                         ->orWhere('address', 'like', "%{$search}%");
                 });
             })
@@ -40,8 +41,9 @@ class CustomerController extends Controller
             ->where('firstname', 'like', "%{$q}%")
             ->orWhere('lastname', 'like', "%{$q}%")
             ->orWhere('email', 'like', "%{$q}%")
+            ->orWhere('facebook', 'like', "%{$q}%")
             ->limit(10)
-            ->get(['id', 'firstname', 'lastname', 'email', 'phone', 'address'])
+            ->get(['id', 'firstname', 'lastname', 'email', 'phone', 'address', 'facebook'])
             ->map(function ($customer) {
                 $customer->full_name = "{$customer->firstname} {$customer->lastname}";
                 return $customer;
@@ -61,6 +63,7 @@ class CustomerController extends Controller
             'lastname' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'facebook' => 'required|string|max:255',
             // 'email' => 'nullable|email|max:255|unique:customers,email',
             'address' => 'nullable|string|max:500',
         ]);
@@ -87,6 +90,7 @@ class CustomerController extends Controller
             'lastname' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255|unique:customers,email,' . $customer->id,
+            'facebook' => 'required|string|max:255',
             'address' => 'nullable|string|max:500',
         ]);
 

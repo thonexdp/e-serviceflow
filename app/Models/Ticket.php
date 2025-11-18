@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
+
 
 class Ticket extends Model
 {
@@ -62,11 +64,16 @@ class Ticket extends Model
      */
     protected static function generateTicketNumber(): string
     {
-        do {
-            $number = 'TKT-' . strtoupper(uniqid());
-        } while (static::where('ticket_number', $number)->exists());
+        // do {
+        //     $number = 'TKT-' .(Str::uuid()->toString());
+        // } while (static::where('ticket_number', $number)->exists());
 
-        return $number;
+        // return $number;
+
+        $last = static::orderBy('id', 'desc')->first();
+        $num = $last ? $last->id + 1 : 1;
+    
+        return 'TKT-' . str_pad($num, 6, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -118,6 +125,14 @@ class Ticket extends Model
             return "{$this->size_value} {$this->size_unit}";
         }
         return null;
+    }
+
+    /**
+     * Get production stock consumptions for this ticket.
+     */
+    public function stockConsumptions()
+    {
+        return $this->hasMany(ProductionStockConsumption::class);
     }
 }
 

@@ -6,6 +6,7 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel , jso
     const [formData, setFormData] = useState({
         firstname: "",
         lastname: "",
+        facebook: "",
         phone: "",
         email: "",
         address: "",
@@ -23,6 +24,7 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel , jso
                 phone: customer.phone || "",
                 email: customer.email || "",
                 address: customer.address || "",
+                facebook: customer.facebook || "",
             });
         }
     }, [customer]);
@@ -69,11 +71,11 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel , jso
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        console.log(formData);
 
         if (!validateForm()) {
             return;
         }
-
         setProcessing(true);
         formData.return_json = jsonReturn;
         onSubmit(formData);
@@ -139,6 +141,21 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel , jso
             <div className="row">
                 <div className="col-md-12">
                     <FormInput
+                        label="Facebook Account"
+                        type="text"
+                        name="facebook"
+                        value={formData.facebook}
+                        onChange={handleChange}
+                        error={errors.facebook}
+                        placeholder="Enter Facebook Account"
+                        required
+                    />
+                </div>
+            </div>
+
+            <div className="row">
+                <div className="col-md-12">
+                    <FormInput
                         label="Address"
                         type="textarea"
                         name="address"
@@ -161,7 +178,7 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel , jso
                         </button>
                         <button
                             type="submit"
-                            onClick={onSubmit}
+                            // onClick={onSubmit}
                             disabled={processing}
                             className={`px-4 py-2.5 text-sm font-medium text-white rounded-md transition
                                 ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-400"}

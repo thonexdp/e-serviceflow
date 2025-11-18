@@ -7,18 +7,22 @@ import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
+import { formatDate } from "@/Utils/formatDate";
 
 export default function ProductionQueue({
     user = {},
     notifications = [],
     messages = [],
     tickets = { data: [] },
+    stockItems = [],
     filters = {},
 }) {
     const [openViewModal, setViewModalOpen] = useState(false);
     const [openUpdateModal, setUpdateModalOpen] = useState(false);
+    const [openStockModal, setStockModalOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [producedQuantity, setProducedQuantity] = useState(0);
+    const [stockConsumptions, setStockConsumptions] = useState([]);
     const [loading, setLoading] = useState(false);
     const { flash } = usePage().props;
 
@@ -36,8 +40,10 @@ export default function ProductionQueue({
     const handleCloseModals = () => {
         setViewModalOpen(false);
         setUpdateModalOpen(false);
+        setStockModalOpen(false);
         setSelectedTicket(null);
         setProducedQuantity(0);
+        setStockConsumptions([]);
     };
 
     const handleStartProduction = (ticketId) => {
@@ -91,6 +97,91 @@ export default function ProductionQueue({
             preserveState: false,
             onSuccess: () => {
                 setLoading(false);
+                // Open stock consumption modal
+                const ticket = tickets.data.find(t => t.id === ticketId);
+                if (ticket) {
+                    handleOpenStockModal(ticket);
+                }
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleOpenStockModal = (ticket) => {
+        setSelectedTicket(ticket);
+        
+        // Pre-populate with suggested stocks based on job type requirements
+        const initialConsumptions = [];
+        if (ticket.job_type?.stock_requirements) {
+            ticket.job_type.stock_requirements.forEach(req => {
+                const requiredQty = parseFloat(req.quantity_per_unit) * ticket.quantity;
+                initialConsumptions.push({
+                    stock_item_id: req.stock_item_id,
+                    quantity: requiredQty.toFixed(2),
+                    notes: req.notes || '',
+                });
+            });
+        }
+        
+        // If no requirements, add one empty row
+        if (initialConsumptions.length === 0) {
+            initialConsumptions.push({
+                stock_item_id: '',
+                quantity: '',
+                notes: '',
+            });
+        }
+        
+        setStockConsumptions(initialConsumptions);
+        setStockModalOpen(true);
+    };
+
+    const handleAddStockConsumption = () => {
+        setStockConsumptions([...stockConsumptions, {
+            stock_item_id: '',
+            quantity: '',
+            notes: '',
+        }]);
+    };
+
+    const handleRemoveStockConsumption = (index) => {
+        setStockConsumptions(stockConsumptions.filter((_, i) => i !== index));
+    };
+
+    const handleStockConsumptionChange = (index, field, value) => {
+        const updated = [...stockConsumptions];
+        updated[index][field] = value;
+        setStockConsumptions(updated);
+    };
+
+    const handleRecordStockConsumption = (e) => {
+        e.preventDefault();
+        if (!selectedTicket) return;
+
+        const validConsumptions = stockConsumptions.filter(
+            c => c.stock_item_id && parseFloat(c.quantity) > 0
+        );
+
+        if (validConsumptions.length === 0) {
+            alert("Please add at least one stock consumption record.");
+            return;
+        }
+
+        setLoading(true);
+        router.post(`/production/${selectedTicket.id}/record-stock`, {
+            stock_consumptions: validConsumptions.map(c => ({
+                stock_item_id: parseInt(c.stock_item_id),
+                quantity: parseFloat(c.quantity),
+                notes: c.notes || null,
+            })),
+        }, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                handleCloseModals();
+                setLoading(false);
             },
             onError: () => {
                 setLoading(false);
@@ -118,9 +209,9 @@ export default function ProductionQueue({
             pending: "Pending",
         };
         return (
-            <span className={`badge ${classes[status] || "badge-secondary"}`}>
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
                 {labels[status] || status?.toUpperCase() || "PENDING"}
-            </span>
+            </div>
         );
     };
 
@@ -169,9 +260,21 @@ export default function ProductionQueue({
             );
         } else if (ticket.status === "completed") {
             return (
-                <span className="text-success">
-                    <i className="ti-check"></i> Completed
-                </span>
+                <div className="btn-group">
+                    <span className="text-success mr-2">
+                        <i className="ti-check"></i> Completed
+                    </span>
+                    {(!ticket.stock_consumptions || ticket.stock_consumptions.length === 0) && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-warning"
+                            onClick={() => handleOpenStockModal(ticket)}
+                            title="Record stock consumption"
+                        >
+                            <i className="ti-package"></i> Record Stock
+                        </button>
+                    )}
+                </div>
             );
         } else {
             return (
@@ -195,14 +298,6 @@ export default function ProductionQueue({
                 (tickets.current_page - 1) * tickets.per_page + index + 1,
         },
         { label: "Ticket ID", key: "ticket_number" },
-        {
-            label: "Customer",
-            key: "customer",
-            render: (row) =>
-                row.customer
-                    ? `${row.customer.firstname} ${row.customer.lastname}`
-                    : "N/A",
-        },
         { label: "Description", key: "description" },
         {
             label: "Quantity",
@@ -226,7 +321,7 @@ export default function ProductionQueue({
             label: "Due Date",
             key: "due_date",
             render: (row) =>
-                row.due_date ? new Date(row.due_date).toLocaleDateString() : "N/A",
+                formatDate(row.due_date),
         },
         {
             label: "Action",
@@ -522,6 +617,144 @@ export default function ProductionQueue({
                                 Cancel
                             </button>
                         </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Stock Consumption Modal */}
+            <Modal
+                title={`Record Stock Consumption - Ticket #${selectedTicket?.ticket_number}`}
+                isOpen={openStockModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="mb-4">
+                            <h5>
+                                Job: <b>{selectedTicket.job_type?.name || 'N/A'}</b>
+                            </h5>
+                            <p>
+                                Quantity Produced: <b>{selectedTicket.produced_quantity || selectedTicket.quantity}</b> {selectedTicket.job_type?.price_by || 'pcs'}
+                            </p>
+                            {selectedTicket.job_type?.stock_requirements?.length > 0 && (
+                                <div className="alert alert-info">
+                                    <i className="ti-info"></i> Suggested stocks based on job type requirements are pre-filled. Adjust as needed.
+                                </div>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleRecordStockConsumption}>
+                            <div className="table-responsive">
+                                <table className="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock Item</th>
+                                            <th>Quantity</th>
+                                            <th>Unit</th>
+                                            <th>Available</th>
+                                            <th>Notes</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {stockConsumptions.map((consumption, index) => {
+                                            const stockItem = stockItems.find(si => si.id === parseInt(consumption.stock_item_id));
+                                            return (
+                                                <tr key={index}>
+                                                    <td>
+                                                        <select
+                                                            className="form-control"
+                                                            value={consumption.stock_item_id}
+                                                            onChange={(e) => handleStockConsumptionChange(index, 'stock_item_id', e.target.value)}
+                                                            required
+                                                        >
+                                                            <option value="">Select Stock Item</option>
+                                                            {stockItems.map((si) => (
+                                                                <option key={si.id} value={si.id}>
+                                                                    {si.name} ({si.sku}) - {parseFloat(si.current_stock).toFixed(2)} {si.base_unit_of_measure} available
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            step="0.01"
+                                                            min="0.01"
+                                                            value={consumption.quantity}
+                                                            onChange={(e) => handleStockConsumptionChange(index, 'quantity', e.target.value)}
+                                                            required
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        {stockItem ? stockItem.base_unit_of_measure : '-'}
+                                                    </td>
+                                                    <td>
+                                                        {stockItem ? (
+                                                            <span className={parseFloat(stockItem.current_stock) >= parseFloat(consumption.quantity || 0) ? 'text-success' : 'text-danger'}>
+                                                                {parseFloat(stockItem.current_stock).toFixed(2)} {stockItem.base_unit_of_measure}
+                                                            </span>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            value={consumption.notes}
+                                                            onChange={(e) => handleStockConsumptionChange(index, 'notes', e.target.value)}
+                                                            placeholder="Optional notes"
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        {stockConsumptions.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-danger"
+                                                                onClick={() => handleRemoveStockConsumption(index)}
+                                                            >
+                                                                <i className="ti-trash"></i>
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="d-flex justify-content-between align-items-center mt-3">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-primary"
+                                    onClick={handleAddStockConsumption}
+                                >
+                                    <i className="ti-plus"></i> Add Another Item
+                                </button>
+                                <div className="d-flex gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={handleCloseModals}
+                                    >
+                                        Skip (Record Later)
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn btn-success"
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <span><i className="ti-reload mr-2 animate-spin"></i> Recording...</span>
+                                        ) : (
+                                            <span><i className="ti-save"></i> Record Consumption</span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 )}
             </Modal>
