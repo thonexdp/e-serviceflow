@@ -56,12 +56,12 @@ export default function InventoryMovements({
         {
             label: "Unit Cost",
             key: "unit_cost",
-            render: (row) => `$${parseFloat(row.unit_cost || 0).toFixed(2)}`,
+            render: (row) => `₱${parseFloat(row.unit_cost || 0).toFixed(2)}`,
         },
         {
             label: "Total Cost",
             key: "total_cost",
-            render: (row) => `$${parseFloat(row.total_cost || 0).toFixed(2)}`,
+            render: (row) => `₱${parseFloat(row.total_cost || 0).toFixed(2)}`,
         },
         {
             label: "Stock Before",
@@ -143,7 +143,7 @@ export default function InventoryMovements({
                                                     <p><strong>Minimum Level:</strong> {parseFloat(stockItem.minimum_stock_level || 0).toFixed(2)} {stockItem.base_unit_of_measure}</p>
                                                 </div>
                                                 <div className="col-md-3">
-                                                    <p><strong>Unit Cost:</strong> ${parseFloat(stockItem.unit_cost || 0).toFixed(2)}</p>
+                                                    <p><strong>Unit Cost:</strong> ₱{parseFloat(stockItem.unit_cost || 0).toFixed(2)}</p>
                                                 </div>
                                             </div>
 

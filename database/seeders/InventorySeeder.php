@@ -14,118 +14,78 @@ class InventorySeeder extends Seeder
      */
     public function run(): void
     {
-        // Create sample stock items for a printing shop
+        // Get first job type for linking (or create sample if none exist)
+        $jobType = JobType::first();
+        
+        if (!$jobType) {
+            $this->command->warn('No job types found. Please create job types first.');
+            return;
+        }
+
+        // Create sample stock items for a printing shop (T-shirt, tarpaulin, mugs, etc.)
         $stockItems = [
             [
-                'sku' => 'PAPER-A4-80GSM',
-                'name' => 'A4 Paper 80gsm',
-                'description' => 'Standard A4 printing paper, 80gsm weight',
-                'category' => 'Paper',
-                'base_unit_of_measure' => 'ream',
+                'job_type_id' => $jobType->id,
+                'sku' => 'TARPAULIN-3X4',
+                'name' => 'Tarpaulin 3ft x 4ft',
+                'description' => 'Standard tarpaulin sheet for printing',
+                'base_unit_of_measure' => 'pcs',
+                'length' => 3,
+                'width' => 4,
+                'is_area_based' => true,
                 'current_stock' => 50,
                 'minimum_stock_level' => 10,
                 'maximum_stock_level' => 200,
-                'unit_cost' => 25.00,
-                'supplier' => 'Paper Supplies Co.',
+                'unit_cost' => 150.00,
+                'supplier' => 'Material Supplies Co.',
                 'location' => 'Warehouse A',
                 'is_active' => true,
             ],
             [
-                'sku' => 'PAPER-A3-100GSM',
-                'name' => 'A3 Paper 100gsm',
-                'description' => 'Premium A3 printing paper, 100gsm weight',
-                'category' => 'Paper',
-                'base_unit_of_measure' => 'ream',
+                'job_type_id' => $jobType->id,
+                'sku' => 'TARPAULIN-4X6',
+                'name' => 'Tarpaulin 4ft x 6ft',
+                'description' => 'Large tarpaulin sheet for printing',
+                'base_unit_of_measure' => 'pcs',
+                'length' => 4,
+                'width' => 6,
+                'is_area_based' => true,
                 'current_stock' => 30,
                 'minimum_stock_level' => 5,
                 'maximum_stock_level' => 100,
-                'unit_cost' => 35.00,
-                'supplier' => 'Paper Supplies Co.',
+                'unit_cost' => 250.00,
+                'supplier' => 'Material Supplies Co.',
                 'location' => 'Warehouse A',
                 'is_active' => true,
             ],
             [
-                'sku' => 'INK-BLACK-CMYK',
-                'name' => 'Black Ink Cartridge',
-                'description' => 'CMYK Black ink cartridge for digital printers',
-                'category' => 'Ink',
+                'job_type_id' => $jobType->id,
+                'sku' => 'TSHIRT-WHITE-M',
+                'name' => 'White T-Shirt Medium',
+                'description' => 'White cotton t-shirt for printing',
                 'base_unit_of_measure' => 'pcs',
-                'current_stock' => 20,
-                'minimum_stock_level' => 5,
-                'maximum_stock_level' => 50,
-                'unit_cost' => 45.00,
-                'supplier' => 'Ink Solutions Ltd.',
-                'location' => 'Storage Room B',
-                'is_active' => true,
-            ],
-            [
-                'sku' => 'INK-COLOR-CMYK',
-                'name' => 'Color Ink Set (CMYK)',
-                'description' => 'Full color CMYK ink set for digital printing',
-                'category' => 'Ink',
-                'base_unit_of_measure' => 'set',
-                'current_stock' => 15,
-                'minimum_stock_level' => 3,
-                'maximum_stock_level' => 30,
-                'unit_cost' => 180.00,
-                'supplier' => 'Ink Solutions Ltd.',
-                'location' => 'Storage Room B',
-                'is_active' => true,
-            ],
-            [
-                'sku' => 'BINDING-SPIRAL',
-                'name' => 'Spiral Binding Wire',
-                'description' => 'Spiral binding wire for book binding',
-                'category' => 'Binding',
-                'base_unit_of_measure' => 'pcs',
+                'is_area_based' => false,
                 'current_stock' => 100,
                 'minimum_stock_level' => 20,
                 'maximum_stock_level' => 500,
-                'unit_cost' => 2.50,
-                'supplier' => 'Binding Materials Inc.',
-                'location' => 'Warehouse C',
+                'unit_cost' => 120.00,
+                'supplier' => 'Apparel Supplier',
+                'location' => 'Warehouse B',
                 'is_active' => true,
             ],
             [
-                'sku' => 'BINDING-STAPLE',
-                'name' => 'Staples Box',
-                'description' => 'Standard staples for document binding',
-                'category' => 'Binding',
-                'base_unit_of_measure' => 'box',
-                'current_stock' => 25,
-                'minimum_stock_level' => 5,
-                'maximum_stock_level' => 100,
-                'unit_cost' => 8.00,
-                'supplier' => 'Office Supplies Co.',
-                'location' => 'Storage Room B',
-                'is_active' => true,
-            ],
-            [
-                'sku' => 'LAMINATE-A4',
-                'name' => 'A4 Lamination Film',
-                'description' => 'A4 size lamination film sheets',
-                'category' => 'Lamination',
-                'base_unit_of_measure' => 'sheet',
-                'current_stock' => 500,
-                'minimum_stock_level' => 100,
-                'maximum_stock_level' => 2000,
-                'unit_cost' => 0.50,
-                'supplier' => 'Lamination Supplies',
-                'location' => 'Warehouse A',
-                'is_active' => true,
-            ],
-            [
-                'sku' => 'CARDSTOCK-300GSM',
-                'name' => 'Cardstock 300gsm',
-                'description' => 'Heavy cardstock paper for business cards and invitations',
-                'category' => 'Paper',
-                'base_unit_of_measure' => 'sheet',
-                'current_stock' => 200,
-                'minimum_stock_level' => 50,
-                'maximum_stock_level' => 1000,
-                'unit_cost' => 0.75,
-                'supplier' => 'Paper Supplies Co.',
-                'location' => 'Warehouse A',
+                'job_type_id' => $jobType->id,
+                'sku' => 'MUG-WHITE',
+                'name' => 'White Ceramic Mug',
+                'description' => 'White ceramic mug for sublimation printing',
+                'base_unit_of_measure' => 'pcs',
+                'is_area_based' => false,
+                'current_stock' => 80,
+                'minimum_stock_level' => 15,
+                'maximum_stock_level' => 300,
+                'unit_cost' => 45.00,
+                'supplier' => 'Mug Supplier',
+                'location' => 'Warehouse B',
                 'is_active' => true,
             ],
         ];
@@ -134,37 +94,26 @@ class InventorySeeder extends Seeder
             StockItem::create($item);
         }
 
-        // Link stock items to job types (if job types exist)
-        $jobTypes = JobType::all();
+        // Create stock requirements linking job types to stock items
         $stockItemsCreated = StockItem::all();
 
-        if ($jobTypes->count() > 0 && $stockItemsCreated->count() > 0) {
-            // Example: Link paper to printing job types
-            $paperStock = $stockItemsCreated->where('category', 'Paper')->first();
-            $inkStock = $stockItemsCreated->where('category', 'Ink')->first();
-            $bindingStock = $stockItemsCreated->where('category', 'Binding')->first();
-
-            foreach ($jobTypes as $jobType) {
-                // Add paper requirement (1 ream per 100 prints)
-                if ($paperStock) {
-                    JobTypeStockRequirement::create([
-                        'job_type_id' => $jobType->id,
-                        'stock_item_id' => $paperStock->id,
-                        'quantity_per_unit' => 0.01, // 1 ream per 100 units
-                        'is_required' => true,
-                        'notes' => 'Standard paper requirement',
-                    ]);
-                }
-
-                // Add ink requirement (1 cartridge per 500 prints)
-                if ($inkStock) {
-                    JobTypeStockRequirement::create([
-                        'job_type_id' => $jobType->id,
-                        'stock_item_id' => $inkStock->id,
-                        'quantity_per_unit' => 0.002, // 1 cartridge per 500 units
-                        'is_required' => true,
-                        'notes' => 'Ink consumption',
-                    ]);
+        if ($stockItemsCreated->count() > 0) {
+            // Link each stock item to its job type with requirement
+            foreach ($stockItemsCreated as $stockItem) {
+                if ($stockItem->job_type_id) {
+                    JobTypeStockRequirement::updateOrCreate(
+                        [
+                            'job_type_id' => $stockItem->job_type_id,
+                            'stock_item_id' => $stockItem->id,
+                        ],
+                        [
+                            'quantity_per_unit' => $stockItem->is_area_based ? 0 : 1, // For area-based, calculation is done by area
+                            'is_required' => true,
+                            'notes' => $stockItem->is_area_based 
+                                ? 'Area-based material - calculated from production dimensions' 
+                                : 'Standard 1:1 consumption',
+                        ]
+                    );
                 }
             }
         }

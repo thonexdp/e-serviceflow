@@ -23,20 +23,24 @@ class InventoryController extends Controller
      */
     public function index(Request $request)
     {
-        $query = StockItem::query();
+        $query = StockItem::with(['jobType', 'productionConsumptions' => function($q) {
+            $q->latest()->limit(5); // Get recent consumptions
+        }]);
 
         // Search
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('sku', 'like', '%' . $request->search . '%')
                     ->orWhere('name', 'like', '%' . $request->search . '%')
-                    ->orWhere('category', 'like', '%' . $request->search . '%');
+                    ->orWhereHas('jobType', function ($q) use ($request) {
+                        $q->where('name', 'like', '%' . $request->search . '%');
+                    });
             });
         }
 
-        // Filter by category
-        if ($request->has('category') && $request->category) {
-            $query->where('category', $request->category);
+        // Filter by job type
+        if ($request->has('job_type_id') && $request->job_type_id) {
+            $query->where('job_type_id', $request->job_type_id);
         }
 
         // Filter by stock status
@@ -56,13 +60,18 @@ class InventoryController extends Controller
         }
 
         $stockItems = $query->orderBy('name')->paginate($request->get('per_page', 15));
+        
+        // Load production consumptions for each stock item (for display)
+        foreach ($stockItems->items() as $stockItem) {
+            $stockItem->load(['productionConsumptions' => function($q) {
+                $q->with('ticket')->latest()->limit(3);
+            }]);
+        }
 
-        // Get categories for filter
-        $categories = StockItem::whereNotNull('category')
-            ->distinct()
-            ->pluck('category')
-            ->sort()
-            ->values();
+        // Get job types for filter
+        $jobTypes = \App\Models\JobType::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         // Get low stock items count
         $lowStockCount = StockItem::where('is_active', true)
@@ -71,9 +80,9 @@ class InventoryController extends Controller
 
         return Inertia::render('Inventory/Index', [
             'stockItems' => $stockItems,
-            'categories' => $categories,
+            'jobTypes' => $jobTypes,
             'lowStockCount' => $lowStockCount,
-            'filters' => $request->only(['search', 'category', 'stock_status', 'is_active']),
+            'filters' => $request->only(['search', 'job_type_id', 'stock_status', 'is_active']),
         ]);
     }
 
@@ -83,11 +92,14 @@ class InventoryController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'job_type_id' => 'required|exists:job_types,id',
             'sku' => 'required|string|unique:stock_items,sku|max:255',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'nullable|string|max:255',
             'base_unit_of_measure' => 'required|string|max:50',
+            'is_area_based' => 'boolean',
+            'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
+            'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
             'current_stock' => 'nullable|numeric|min:0',
             'minimum_stock_level' => 'nullable|numeric|min:0',
             'maximum_stock_level' => 'nullable|numeric|min:0',
@@ -97,15 +109,17 @@ class InventoryController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        // dd($validated);
+        // Create stock item with 0 stock initially to avoid double counting
+        $initialStock = $validated['current_stock'] ?? 0;
+        $validated['current_stock'] = 0; // Set to 0 first
         $stockItem = StockItem::create($validated);
 
-        // Record initial stock movement if stock is provided
-        if (isset($validated['current_stock']) && $validated['current_stock'] > 0) {
+        // Record initial stock movement if stock is provided (this will add it properly)
+        if ($initialStock > 0) {
             $this->stockService->recordMovement(
                 $stockItem,
                 'adjustment',
-                $validated['current_stock'],
+                $initialStock,
                 $validated['unit_cost'] ?? 0,
                 null,
                 null,
@@ -124,11 +138,14 @@ class InventoryController extends Controller
         $stockItem = StockItem::findOrFail($id);
 
         $validated = $request->validate([
+            'job_type_id' => 'required|exists:job_types,id',
             'sku' => 'required|string|unique:stock_items,sku,' . $id . '|max:255',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'nullable|string|max:255',
             'base_unit_of_measure' => 'required|string|max:50',
+            'is_area_based' => 'boolean',
+            'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
+            'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
             'minimum_stock_level' => 'nullable|numeric|min:0',
             'maximum_stock_level' => 'nullable|numeric|min:0',
             'unit_cost' => 'nullable|numeric|min:0',

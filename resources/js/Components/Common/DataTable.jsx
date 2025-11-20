@@ -1,4 +1,3 @@
-// Components/Common/DataTable.jsx
 import React from "react";
 import { router } from "@inertiajs/react";
 
@@ -48,29 +47,28 @@ export default function DataTable({
                                             {actions ? (
                                                 actions(row)
                                             ) : (
-                                                <div class="button-list">
-                                                    <div className="btn-group">
+                                                <div className="btn-group">
                                                     {onEdit && (
-                                                        <button
-                                                            className="btn btn-default btn-outline btn-sm"
-                                                            onClick={() => onEdit(row)}
-                                                            title="Edit"
-                                                        >
-                                                            <i className="ti-pencil"></i>
-                                                        </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-link btn-sm text-primary"
+                                                        onClick={() => onEdit(row)}
+                                                         title="Edit"
+                                                    >
+                                                       <small><i className="ti-pencil"></i> Edit</small> 
+                                                    </button>
                                                     )}
                                                     {onDelete && (
-                                                        <button
-                                                            className="btn btn-default btn-outline btn-sm"
-                                                            onClick={() => onDelete(row.id)}
-                                                            title="Delete"
-                                                        >
-                                                            <i className="ti-trash"></i>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                </div>
-                                                
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-link btn-sm text-danger"
+                                                        onClick={() => onDelete(row.id)}
+                                                         title="Delete"
+                                                    >
+                                                       <small> <i className="ti-trash"></i> Delete</small>
+                                                    </button>
+                                                     )}
+                                                </div> 
                                             )}
                                         </td>
                                     )}

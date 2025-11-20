@@ -29,9 +29,13 @@ export default function PurchaseOrdersIndex({
         setSelectedPO(po);
         const initialReceived = {};
         po.items?.forEach((item) => {
-            initialReceived[item.id] = item.remaining_quantity || 0;
+            // Calculate remaining quantity properly
+            const remainingQty = Math.max(
+                0,
+                parseFloat(item.quantity) - parseFloat(item.received_quantity || 0)
+            );
+            initialReceived[item.id] = remainingQty;
         });
-        console.log(initialReceived);
         setReceivedItems(initialReceived);
         setReceiveModalOpen(true);
     };
@@ -107,9 +111,9 @@ export default function PurchaseOrdersIndex({
             cancelled: "Cancelled",
         };
         return (
-            <span className={`badge ${classes[status] || "badge-secondary"}`}>
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
                 {labels[status] || status}
-            </span>
+            </div>
         );
     };
 
@@ -132,7 +136,7 @@ export default function PurchaseOrdersIndex({
         {
             label: "Total Amount",
             key: "total_amount",
-            render: (row) => `$${parseFloat(row.total_amount).toFixed(2)}`,
+            render: (row) => `₱${parseFloat(row.total_amount).toFixed(2)}`,
         },
         {
             label: "Order Date",

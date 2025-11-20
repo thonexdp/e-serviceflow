@@ -14,7 +14,7 @@ export default function InventoryIndex({
     notifications = [],
     messages = [],
     stockItems = { data: [] },
-    categories = [],
+    jobTypes = [],
     lowStockCount = 0,
     filters = {},
 }) {
@@ -27,10 +27,14 @@ export default function InventoryIndex({
     const [loading, setLoading] = useState(false);
     const [adjustQuantity, setAdjustQuantity] = useState(0);
     const [adjustNotes, setAdjustNotes] = useState("");
-    const { flash } = usePage().props;
+    const [isAreaBased, setIsAreaBased] = useState(false);
+    const { flash, auth } = usePage().props;
+
+    const isAdmin = auth?.user?.role === "admin";
 
     const handleOpenModal = (stockItem = null) => {
         setEditingStockItem(stockItem);
+        setIsAreaBased(stockItem?.is_area_based || false);
         setStockModalOpen(true);
     };
 
@@ -42,6 +46,7 @@ export default function InventoryIndex({
         setSelectedStockItem(null);
         setAdjustQuantity(0);
         setAdjustNotes("");
+        setIsAreaBased(false);
     };
 
     const handleOpenAdjustModal = (stockItem) => {
@@ -53,13 +58,27 @@ export default function InventoryIndex({
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData);
-        
+
         // Convert boolean and numeric fields
-        data.is_active = data.is_active === 'on' || data.is_active === true;
+        data.is_active = data.is_active === "on" || data.is_active === true;
+        data.is_area_based =
+            data.is_area_based === "on" ||
+            data.is_area_based === true ||
+            isAreaBased;
+        data.job_type_id = parseInt(data.job_type_id);
         data.current_stock = parseFloat(data.current_stock) || 0;
         data.minimum_stock_level = parseFloat(data.minimum_stock_level) || 0;
         data.maximum_stock_level = parseFloat(data.maximum_stock_level) || 0;
         data.unit_cost = parseFloat(data.unit_cost) || 0;
+
+        // Handle area-based fields
+        if (data.is_area_based) {
+            data.length = parseFloat(data.length) || 0;
+            data.width = parseFloat(data.width) || 0;
+        } else {
+            data.length = null;
+            data.width = null;
+        }
 
         if (editingStockItem) {
             router.put(`/inventory/${editingStockItem.id}`, data, {
@@ -84,16 +103,20 @@ export default function InventoryIndex({
         e.preventDefault();
         if (!selectedStockItem) return;
 
-        router.post(`/inventory/${selectedStockItem.id}/adjust`, {
-            quantity: parseFloat(adjustQuantity),
-            notes: adjustNotes,
-        }, {
-            onSuccess: () => {
-                handleCloseModal();
+        router.post(
+            `/inventory/${selectedStockItem.id}/adjust`,
+            {
+                quantity: parseFloat(adjustQuantity),
+                notes: adjustNotes,
             },
-            preserveState: false,
-            preserveScroll: true,
-        });
+            {
+                onSuccess: () => {
+                    handleCloseModal();
+                },
+                preserveState: false,
+                preserveScroll: true,
+            }
+        );
     };
 
     const handleDelete = (stockItemId) => {
@@ -134,27 +157,102 @@ export default function InventoryIndex({
         },
         { label: "SKU", key: "sku" },
         { label: "Name", key: "name" },
-        { label: "Category", key: "category" },
+        {
+            label: "Job Type",
+            key: "job_type",
+            render: (row) => row.job_type?.name || "N/A",
+        },
+        {
+            label: "Dimensions",
+            key: "dimensions",
+            render: (row) => {
+                if (row.is_area_based && row.length && row.width) {
+                    return `${parseFloat(row.length).toFixed(2)} x ${parseFloat(
+                        row.width
+                    ).toFixed(2)} ${row.base_unit_of_measure}`;
+                }
+                return "-";
+            },
+        },
         {
             label: "Current Stock",
             key: "current_stock",
             render: (row) => (
                 <div>
-                    {parseFloat(row.current_stock).toFixed(2)} {row.base_unit_of_measure}
+                    <strong>{parseFloat(row.current_stock).toFixed(2)}</strong>{" "}
+                    {row.base_unit_of_measure}
+                    {row.is_area_based && row.length && row.width && (
+                        <div className="text-xs text-muted mt-1">
+                            Area:{" "}
+                            {(
+                                parseFloat(row.length) * parseFloat(row.width)
+                            ).toFixed(2)}{" "}
+                            {row.base_unit_of_measure}² per piece
+                        </div>
+                    )}
                 </div>
             ),
         },
         {
+            label: "Consumption",
+            key: "consumption",
+            render: (row) => {
+                if (row.is_area_based && row.length && row.width) {
+                    const stockArea =
+                        parseFloat(row.length) * parseFloat(row.width);
+                    return (
+                        <div className="text-xs">
+                            <div>
+                                <strong>Stock Area:</strong>{" "}
+                                {stockArea.toFixed(2)}{" "}
+                                {row.base_unit_of_measure}²
+                            </div>
+                            <div className="text-muted mt-1">
+                                <small>
+                                    Consumption: Calculated by production area
+                                </small>
+                            </div>
+                            <div className="text-muted">
+                                <small>
+                                    Formula: ceil(prod_area / stock_area) × qty
+                                </small>
+                            </div>
+                        </div>
+                    );
+                }
+                return (
+                    <div className="text-xs text-muted">
+                        <div>Standard: 1 piece per unit</div>
+                        {row.production_consumptions &&
+                            row.production_consumptions.length > 0 && (
+                                <div className="mt-1">
+                                    <small>
+                                        Recent:{" "}
+                                        {row.production_consumptions.length}{" "}
+                                        consumption(s)
+                                    </small>
+                                </div>
+                            )}
+                    </div>
+                );
+            },
+        },
+        {
             label: "Min Level",
             key: "minimum_stock_level",
+            adminOnly: true,
             render: (row) => (
-                <div>{parseFloat(row.minimum_stock_level).toFixed(2)} {row.base_unit_of_measure}</div>
+                <div>
+                    {parseFloat(row.minimum_stock_level).toFixed(2)}{" "}
+                    {row.base_unit_of_measure}
+                </div>
             ),
         },
         {
             label: "Unit Cost",
             key: "unit_cost",
-            render: (row) => `$${parseFloat(row.unit_cost).toFixed(2)}`,
+            adminOnly: true,
+            render: (row) => `₱${parseFloat(row.unit_cost).toFixed(2)}`,
         },
         {
             label: "Status",
@@ -164,12 +262,15 @@ export default function InventoryIndex({
         {
             label: "Actions",
             key: "actions",
+            adminOnly: true,
             render: (row) => (
                 <div className="btn-group">
                     <button
                         type="button"
                         className="btn btn-link btn-sm text-blue-500"
-                        onClick={() => router.get(`/inventory/${row.id}/movements`)}
+                        onClick={() =>
+                            router.get(`/inventory/${row.id}/movements`)
+                        }
                     >
                         <i className="ti-eye"></i> Movements
                     </button>
@@ -197,14 +298,22 @@ export default function InventoryIndex({
                 </div>
             ),
         },
-    ];
+    ].filter((col) => !col.adminOnly || isAdmin);
 
     return (
-        <AdminLayout user={user} notifications={notifications} messages={messages}>
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
             <Head title="Inventory Management" />
 
-            {flash?.success && <FlashMessage type="success" message={flash.success} />}
-            {flash?.error && <FlashMessage type="error" message={flash.error} />}
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
@@ -223,7 +332,9 @@ export default function InventoryIndex({
                                 <li className="breadcrumb-item">
                                     <a href="/dashboard">Dashboard</a>
                                 </li>
-                                <li className="breadcrumb-item active">Inventory</li>
+                                <li className="breadcrumb-item active">
+                                    Inventory
+                                </li>
                             </ol>
                         </div>
                     </div>
@@ -258,66 +369,59 @@ export default function InventoryIndex({
                                 required
                             />
                         </div>
-                        <div className="col-md-12">
+                    </div>
+                    <div className="row">
+                        <div className="col-md-10">
                             <FormInput
                                 label="Description"
                                 type="textarea"
+                                rows={2}
                                 name="description"
                                 defaultValue={editingStockItem?.description}
                             />
                         </div>
-                        <div className="col-md-6">
+                        <div className="col-md-2">
                             <FormInput
-                                label="Category"
-                                type="text"
-                                name="category"
-                                defaultValue={editingStockItem?.category}
-                                placeholder="e.g., Paper, Ink, Binding"
+                                label="Active"
+                                type="checkbox"
+                                name="is_active"
+                                defaultChecked={
+                                    editingStockItem?.is_active !== false
+                                }
                             />
                         </div>
+                    </div>
+                    <div className="row">
                         <div className="col-md-6">
+                            <FormInput
+                                label="Job Type"
+                                type="select"
+                                name="job_type_id"
+                                defaultValue={editingStockItem?.job_type_id}
+                                required
+                                options={[
+                                    { value: "", label: "Select Job Type" },
+                                    ...jobTypes.map((jt) => ({
+                                        value: jt.id,
+                                        label: jt.name,
+                                    })),
+                                ]}
+                            />
+                        </div>
+                        <div className="col-md-3">
                             <FormInput
                                 label="Base Unit of Measure"
                                 type="text"
                                 name="base_unit_of_measure"
-                                defaultValue={editingStockItem?.base_unit_of_measure || "pcs"}
+                                defaultValue={
+                                    editingStockItem?.base_unit_of_measure ||
+                                    "pcs"
+                                }
                                 required
-                                placeholder="pcs, kg, liter, roll, sheet"
+                                placeholder="pcs, kg, liter, roll, sheet, sqm"
                             />
                         </div>
-                        {!editingStockItem && (
-                            <div className="col-md-6">
-                                <FormInput
-                                    label="Initial Stock"
-                                    type="number"
-                                    name="current_stock"
-                                    defaultValue={editingStockItem?.current_stock || 0}
-                                    step="0.01"
-                                    min="0"
-                                />
-                            </div>
-                        )}
-                        <div className="col-md-6">
-                            <FormInput
-                                label="Minimum Stock Level"
-                                type="number"
-                                name="minimum_stock_level"
-                                defaultValue={editingStockItem?.minimum_stock_level || 0}
-                                step="0.01"
-                                min="0"
-                            />
-                        </div>
-                        <div className="col-md-6">
-                            <FormInput
-                                label="Maximum Stock Level"
-                                type="number"
-                                name="maximum_stock_level"
-                                defaultValue={editingStockItem?.maximum_stock_level || 0}
-                                step="0.01"
-                                min="0"
-                            />
-                        </div>
-                        <div className="col-md-6">
+                        <div className="col-md-3">
                             <FormInput
                                 label="Unit Cost"
                                 type="number"
@@ -327,6 +431,120 @@ export default function InventoryIndex({
                                 min="0"
                             />
                         </div>
+                    </div>
+                    <div className="row">
+                        <div className="col-md-6">
+                            <div className="mb-4">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        name="is_area_based"
+                                        id="is_area_based"
+                                        checked={
+                                            isAreaBased ||
+                                            editingStockItem?.is_area_based ||
+                                            false
+                                        }
+                                        onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setIsAreaBased(checked);
+                                            // Also update the editingStockItem if it exists (for immediate UI update)
+                                            if (editingStockItem) {
+                                                setEditingStockItem({
+                                                    ...editingStockItem,
+                                                    is_area_based: checked,
+                                                });
+                                            }
+                                        }}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="is_area_based"
+                                        className="text-sm font-medium text-gray-700"
+                                    >
+                                        Area Based Material
+                                    </label>
+                                </div>
+                                <small className="text-muted d-block mt-1">
+                                    Check if this material is cut by area
+                                    (tarpaulin, fabric, etc.)
+                                </small>
+                            </div>
+                        </div>
+                        {(isAreaBased || editingStockItem?.is_area_based) && (
+                            <>
+                                <div className="col-md-3">
+                                    <FormInput
+                                        label="Length"
+                                        type="number"
+                                        name="length"
+                                        defaultValue={
+                                            editingStockItem?.length || 0
+                                        }
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        placeholder="Length in base unit"
+                                    />
+                                </div>
+                                <div className="col-md-3">
+                                    <FormInput
+                                        label="Width"
+                                        type="number"
+                                        name="width"
+                                        defaultValue={
+                                            editingStockItem?.width || 0
+                                        }
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        placeholder="Width in base unit"
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <div className="row">
+                        {!editingStockItem && (
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Initial Stock"
+                                    type="number"
+                                    name="current_stock"
+                                    defaultValue={
+                                        editingStockItem?.current_stock || 0
+                                    }
+                                    step="0.01"
+                                    min="0"
+                                />
+                            </div>
+                        )}
+                        <div className="col-md-4">
+                            <FormInput
+                                label="Minimum Stock Level"
+                                type="number"
+                                name="minimum_stock_level"
+                                defaultValue={
+                                    editingStockItem?.minimum_stock_level || 0
+                                }
+                                step="0.01"
+                                min="0"
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <FormInput
+                                label="Maximum Stock Level"
+                                type="number"
+                                name="maximum_stock_level"
+                                defaultValue={
+                                    editingStockItem?.maximum_stock_level || 0
+                                }
+                                step="0.01"
+                                min="0"
+                            />
+                        </div>
+                    </div>
+                    <div className="row">
                         <div className="col-md-6">
                             <FormInput
                                 label="Supplier"
@@ -343,20 +561,17 @@ export default function InventoryIndex({
                                 defaultValue={editingStockItem?.location}
                             />
                         </div>
-                        <div className="col-md-6">
-                            <FormInput
-                                label="Active"
-                                type="checkbox"
-                                name="is_active"
-                                defaultChecked={editingStockItem?.is_active !== false}
-                            />
-                        </div>
                     </div>
                     <div className="d-flex justify-content-end gap-2 mt-3">
                         <button type="submit" className="btn btn-primary">
-                            <i className="ti-save"></i> {editingStockItem ? "Update" : "Create"}
+                            <i className="ti-save"></i>{" "}
+                            {editingStockItem ? "Update" : "Create"}
                         </button>
-                        <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={handleCloseModal}
+                        >
                             Cancel
                         </button>
                     </div>
@@ -373,7 +588,11 @@ export default function InventoryIndex({
                 {selectedStockItem && (
                     <form onSubmit={handleAdjustStock}>
                         <div className="mb-3">
-                            <p><strong>Current Stock:</strong> {selectedStockItem.current_stock} {selectedStockItem.base_unit_of_measure}</p>
+                            <p>
+                                <strong>Current Stock:</strong>{" "}
+                                {selectedStockItem.current_stock}{" "}
+                                {selectedStockItem.base_unit_of_measure}
+                            </p>
                         </div>
                         <FormInput
                             label="Adjustment Quantity"
@@ -396,7 +615,11 @@ export default function InventoryIndex({
                             <button type="submit" className="btn btn-primary">
                                 <i className="ti-save"></i> Adjust Stock
                             </button>
-                            <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleCloseModal}
+                            >
                                 Cancel
                             </button>
                         </div>
@@ -411,17 +634,15 @@ export default function InventoryIndex({
                 size="md"
                 submitButtonText={null}
             >
-               <DeleteConfirmation
-                isOpen={openDeleteModal}
-                onClose={handleCloseModal}
-                onConfirm={handleDeleteStockItem}
-                loading={loading}
-                title="Delete Stock Item"
-                message="Are you sure you want to delete this stock item? This action cannot be undone."
-            />
+                <DeleteConfirmation
+                    isOpen={openDeleteModal}
+                    onClose={handleCloseModal}
+                    onConfirm={handleDeleteStockItem}
+                    loading={loading}
+                    title="Delete Stock Item"
+                    message="Are you sure you want to delete this stock item? This action cannot be undone."
+                />
             </Modal>
-
-            
 
             <section id="main-content">
                 <div className="content-wrap">
@@ -438,15 +659,22 @@ export default function InventoryIndex({
                                                         href="/inventory/low-stock"
                                                         className="btn btn-warning btn-sm mr-2"
                                                     >
-                                                        <i className="ti-alert"></i> Low Stock ({lowStockCount})
+                                                        <i className="ti-alert"></i>{" "}
+                                                        Low Stock (
+                                                        {lowStockCount})
                                                     </a>
                                                 )}
-                                                <button
-                                                    className="btn btn-primary btn-sm"
-                                                    onClick={() => handleOpenModal()}
-                                                >
-                                                    <i className="ti-plus"></i> Add Stock Item
-                                                </button>
+                                                {isAdmin && (
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        onClick={() =>
+                                                            handleOpenModal()
+                                                        }
+                                                    >
+                                                        <i className="ti-plus"></i>{" "}
+                                                        Add Stock Item
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="card-body">
@@ -454,7 +682,9 @@ export default function InventoryIndex({
                                                 <div className="col-md-4">
                                                     <SearchBox
                                                         placeholder="Search by SKU, name, or category..."
-                                                        initialValue={filters.search || ""}
+                                                        initialValue={
+                                                            filters.search || ""
+                                                        }
                                                         route="/inventory"
                                                     />
                                                 </div>
@@ -462,23 +692,38 @@ export default function InventoryIndex({
                                                     <FormInput
                                                         label=""
                                                         type="select"
-                                                        name="category"
-                                                        value={filters.category || ""}
+                                                        name="job_type_id"
+                                                        value={
+                                                            filters.job_type_id ||
+                                                            ""
+                                                        }
                                                         onChange={(e) => {
-                                                            router.get("/inventory", {
-                                                                ...filters,
-                                                                category: e.target.value || null,
-                                                            }, {
-                                                                preserveState: false,
-                                                                preserveScroll: true,
-                                                            });
+                                                            router.get(
+                                                                "/inventory",
+                                                                {
+                                                                    ...filters,
+                                                                    job_type_id:
+                                                                        e.target
+                                                                            .value ||
+                                                                        null,
+                                                                },
+                                                                {
+                                                                    preserveState: false,
+                                                                    preserveScroll: true,
+                                                                }
+                                                            );
                                                         }}
                                                         options={[
-                                                            { value: "", label: "All Categories" },
-                                                            ...categories.map((cat) => ({
-                                                                value: cat,
-                                                                label: cat,
-                                                            })),
+                                                            {
+                                                                value: "",
+                                                                label: "All Job Types",
+                                                            },
+                                                            ...jobTypes.map(
+                                                                (jt) => ({
+                                                                    value: jt.id,
+                                                                    label: jt.name,
+                                                                })
+                                                            ),
                                                         ]}
                                                     />
                                                 </div>
@@ -487,20 +732,39 @@ export default function InventoryIndex({
                                                         label=""
                                                         type="select"
                                                         name="stock_status"
-                                                        value={filters.stock_status || ""}
+                                                        value={
+                                                            filters.stock_status ||
+                                                            ""
+                                                        }
                                                         onChange={(e) => {
-                                                            router.get("/inventory", {
-                                                                ...filters,
-                                                                stock_status: e.target.value || null,
-                                                            }, {
-                                                                preserveState: false,
-                                                                preserveScroll: true,
-                                                            });
+                                                            router.get(
+                                                                "/inventory",
+                                                                {
+                                                                    ...filters,
+                                                                    stock_status:
+                                                                        e.target
+                                                                            .value ||
+                                                                        null,
+                                                                },
+                                                                {
+                                                                    preserveState: false,
+                                                                    preserveScroll: true,
+                                                                }
+                                                            );
                                                         }}
                                                         options={[
-                                                            { value: "", label: "All Status" },
-                                                            { value: "low", label: "Low Stock" },
-                                                            { value: "out", label: "Out of Stock" },
+                                                            {
+                                                                value: "",
+                                                                label: "All Status",
+                                                            },
+                                                            {
+                                                                value: "low",
+                                                                label: "Low Stock",
+                                                            },
+                                                            {
+                                                                value: "out",
+                                                                label: "Out of Stock",
+                                                            },
                                                         ]}
                                                     />
                                                 </div>
@@ -527,4 +791,3 @@ export default function InventoryIndex({
         </AdminLayout>
     );
 }
-

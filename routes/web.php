@@ -92,7 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/production/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->middleware('role:admin,Production')->name('production.record-stock');
 
     // Inventory Management - accessible to Admin only
-    Route::get('/inventory', [InventoryController::class, 'index'])->middleware('role:admin')->name('inventory.index');
+    Route::get('/inventory', [InventoryController::class, 'index'])->middleware('role:admin,FrontDesk,Production')->name('inventory.index');
     Route::post('/inventory', [InventoryController::class, 'store'])->middleware('role:admin')->name('inventory.store');
     Route::put('/inventory/{id}', [InventoryController::class, 'update'])->middleware('role:admin')->name('inventory.update');
     Route::delete('/inventory/{id}', [InventoryController::class, 'destroy'])->middleware('role:admin')->name('inventory.destroy');
@@ -101,16 +101,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/inventory/low-stock', [InventoryController::class, 'lowStock'])->middleware('role:admin')->name('inventory.low-stock');
 
     // Purchase Orders - accessible to Admin only
-    Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->middleware('role:admin')->name('purchase-orders.index');
-    Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])->middleware('role:admin')->name('purchase-orders.create');
-    Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->middleware('role:admin')->name('purchase-orders.store');
-    Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show'])->middleware('role:admin')->name('purchase-orders.show');
-    Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update'])->middleware('role:admin')->name('purchase-orders.update');
-    Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy'])->middleware('role:admin')->name('purchase-orders.destroy');
-    Route::post('/purchase-orders/{id}/approve', [PurchaseOrderController::class, 'approve'])->middleware('role:admin')->name('purchase-orders.approve');
-    Route::post('/purchase-orders/{id}/mark-ordered', [PurchaseOrderController::class, 'markOrdered'])->middleware('role:admin')->name('purchase-orders.mark-ordered');
-    Route::post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive'])->middleware('role:admin')->name('purchase-orders.receive');
-    Route::post('/purchase-orders/{id}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('role:admin')->name('purchase-orders.cancel');
+    Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->middleware('role:admin,Production')->name('purchase-orders.index');
+    Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])->middleware('role:admin,Production')->name('purchase-orders.create');
+    Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->middleware('role:admin,Production')->name('purchase-orders.store');
+    Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show'])->middleware('role:admin,Production')->name('purchase-orders.show');
+    Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update'])->middleware('role:admin,Production')->name('purchase-orders.update');
+    Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy'])->middleware('role:admin,Production')->name('purchase-orders.destroy');
+    Route::post('/purchase-orders/{id}/approve', [PurchaseOrderController::class, 'approve'])->middleware('role:admin,Production')->name('purchase-orders.approve');
+    Route::post('/purchase-orders/{id}/mark-ordered', [PurchaseOrderController::class, 'markOrdered'])->middleware('role:admin,Production')->name('purchase-orders.mark-ordered');
+    Route::post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive'])->middleware('role:admin,Production')->name('purchase-orders.receive');
+    Route::post('/purchase-orders/{id}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('role:admin,Production')->name('purchase-orders.cancel');
 
     // Reports - accessible to Admin only
     Route::get('/reports', function () {
