@@ -134,6 +134,103 @@ class Ticket extends Model
     {
         return $this->hasMany(ProductionStockConsumption::class);
     }
+
+    /**
+     * Parse size_value to extract width and height.
+     * 
+     * @return array{width: float|null, height: float|null}
+     */
+    public function parseSizeDimensions(): array
+    {
+        if (!$this->size_value) {
+            return ['width' => null, 'height' => null];
+        }
+
+        // Parse "width x height" format (e.g., "10 x 20" or "10x20")
+        $parts = preg_split('/\s*x\s*/i', $this->size_value);
+        
+        if (count($parts) >= 2) {
+            $width = (float) preg_replace('/[^\d.]/', '', $parts[0]);
+            $height = (float) preg_replace('/[^\d.]/', '', $parts[1]);
+            return [
+                'width' => $width > 0 ? $width : null,
+                'height' => $height > 0 ? $height : null,
+            ];
+        }
+
+        // Try to parse single value (for length-based)
+        $singleValue = (float) preg_replace('/[^\d.]/', '', $this->size_value);
+        if ($singleValue > 0) {
+            return ['width' => $singleValue, 'height' => null];
+        }
+
+        return ['width' => null, 'height' => null];
+    }
+
+    /**
+     * Calculate total area in square meters.
+     * 
+     * @return float|null Total area in sqm, or null if area cannot be calculated
+     */
+    public function calculateTotalArea(): ?float
+    {
+        $dimensions = $this->parseSizeDimensions();
+        
+        if (!$dimensions['width'] || !$dimensions['height']) {
+            return null;
+        }
+
+        $width = $dimensions['width'];
+        $height = $dimensions['height'];
+        
+        // Calculate area per piece
+        $areaPerPiece = $width * $height;
+        
+        // Convert to square meters if needed (assuming size_unit might indicate the unit)
+        // For now, assume dimensions are already in meters if size_unit contains 'm' or 'sqm'
+        // Otherwise, assume they're in the same unit and calculate directly
+        if ($this->size_unit && (stripos($this->size_unit, 'sqm') !== false || stripos($this->size_unit, 'm²') !== false)) {
+            // Already in square meters
+            return $areaPerPiece * $this->quantity;
+        } elseif ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
+            // Convert from cm² to m²
+            return ($areaPerPiece / 10000) * $this->quantity;
+        } elseif ($this->size_unit && stripos($this->size_unit, 'mm') !== false) {
+            // Convert from mm² to m²
+            return ($areaPerPiece / 1000000) * $this->quantity;
+        } else {
+            // Assume meters (default)
+            return $areaPerPiece * $this->quantity;
+        }
+    }
+
+    /**
+     * Calculate total length in meters.
+     * 
+     * @return float|null Total length in meters, or null if length cannot be calculated
+     */
+    public function calculateTotalLength(): ?float
+    {
+        $dimensions = $this->parseSizeDimensions();
+        
+        if (!$dimensions['width']) {
+            return null;
+        }
+
+        $length = $dimensions['width'];
+        
+        // Convert to meters if needed
+        if ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
+            // Convert from cm to m
+            return ($length / 100) * $this->quantity;
+        } elseif ($this->size_unit && stripos($this->size_unit, 'mm') !== false) {
+            // Convert from mm to m
+            return ($length / 1000) * $this->quantity;
+        } else {
+            // Assume meters (default)
+            return $length * $this->quantity;
+        }
+    }
 }
 
 

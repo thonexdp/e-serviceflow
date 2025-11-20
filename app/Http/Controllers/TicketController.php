@@ -28,7 +28,7 @@ class TicketController extends BaseCrudController
      */
     public function index(Request $request)
     {
-        $query = Ticket::with('customer','customerFiles');
+        $query = Ticket::with('customer', 'customerFiles');
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -52,13 +52,23 @@ class TicketController extends BaseCrudController
             $query->where('payment_status', $request->payment_status);
         }
 
-        $tickets = $query->with('jobType.category')->latest()->paginate($request->get('per_page', 15));
-        
+        $tickets = $query->with('jobType.category')
+            ->orderByRaw("
+                CASE status
+                    WHEN 'pending' THEN 1
+                    WHEN 'in_production' THEN 2
+                    WHEN 'completed' THEN 3
+                    WHEN 'cancelled' THEN 4
+                    ELSE 5
+                END
+            ")
+            ->latest()->paginate($request->get('per_page', 15));
+
         // Get customers for dropdown/search
         $customers = \App\Models\Customer::latest()->limit(10)->get();
 
         // Get job categories and types for ticket form
-        $jobCategories = JobCategory::with(['jobTypes' => function($query) {
+        $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
             $query->where('is_active', true)
                 ->with(['priceTiers', 'sizeRates'])
                 ->orderBy('sort_order')
@@ -72,7 +82,6 @@ class TicketController extends BaseCrudController
             'selectedCustomer' => $request->get('customer_id') ? \App\Models\Customer::find($request->get('customer_id')) : null,
             'filters' => $request->only(['search', 'status', 'payment_status']),
         ]);
-
     }
 
     /**
@@ -204,7 +213,7 @@ class TicketController extends BaseCrudController
             ->route('tickets.index')
             ->with('success', 'Ticket deleted successfully.');
     }
-    
+
     protected function applyPricing(array &$validated, Request $request): void
     {
         $jobTypeId = $validated['job_type_id'] ?? null;
@@ -267,93 +276,93 @@ class TicketController extends BaseCrudController
 
 
     /**
- * Update ticket status with notes
- */
-public function updateStatus(Request $request, $id)
-{
-    $ticket = Ticket::findOrFail($id);
-    
-    $validated = $request->validate([
-        'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled',
-        'notes' => 'nullable|string|max:500',
-    ]);
-    
-    // Update the status
-    $ticket->status = $validated['status'];
-    
-    // If there are notes, you can save them (add a notes field to your tickets table)
-    if (!empty($validated['notes'])) {
-        $ticket->status_notes = $validated['notes'];
-    }
-    
-    $ticket->save();
-    
-    // Optional: Log the status change
-    // StatusChangeLog::create([
-    //     'ticket_id' => $ticket->id,
-    //     'user_id' => auth()->id(),
-    //     'old_status' => $ticket->getOriginal('status'),
-    //     'new_status' => $validated['status'],
-    //     'notes' => $validated['notes'],
-    // ]);
-    
-    return response()->json([
-        'success' => true,
-        'message' => 'Ticket status updated successfully',
-        'ticket' => $ticket->fresh()
-    ]);
-}
+     * Update ticket status with notes
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $ticket = Ticket::findOrFail($id);
 
-/**
- * Update payment status with payment details
- */
-public function updatePayment(Request $request, $id)
-{
-    $ticket = Ticket::findOrFail($id);
-    
-    $validated = $request->validate([
-        'payment_status' => 'required|in:pending,partial,paid',
-        'amount_paid' => 'nullable|numeric|min:0',
-        'payment_method' => 'nullable|in:cash,gcash,bank_transfer,credit_card,check',
-        'payment_notes' => 'nullable|string|max:500',
-    ]);
-    
-    // Update payment status
-    $ticket->payment_status = $validated['payment_status'];
-    
-    // If amount is provided, add it to the total amount paid
-    if (!empty($validated['amount_paid']) && $validated['amount_paid'] > 0) {
-        $currentPaid = $ticket->amount_paid ?? 0;
-        $ticket->amount_paid = $currentPaid + $validated['amount_paid'];
-        
-        // Check if fully paid and update status accordingly
-        if ($ticket->amount_paid >= $ticket->total_amount) {
-            $ticket->payment_status = 'paid';
-        } elseif ($ticket->amount_paid > 0) {
-            $ticket->payment_status = 'partial';
+        $validated = $request->validate([
+            'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        // Update the status
+        $ticket->status = $validated['status'];
+
+        // If there are notes, you can save them (add a notes field to your tickets table)
+        if (!empty($validated['notes'])) {
+            $ticket->status_notes = $validated['notes'];
         }
+
+        $ticket->save();
+
+        // Optional: Log the status change
+        // StatusChangeLog::create([
+        //     'ticket_id' => $ticket->id,
+        //     'user_id' => auth()->id(),
+        //     'old_status' => $ticket->getOriginal('status'),
+        //     'new_status' => $validated['status'],
+        //     'notes' => $validated['notes'],
+        // ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ticket status updated successfully',
+            'ticket' => $ticket->fresh()
+        ]);
     }
-    
-    $ticket->save();
-    
-    // Optional: Create payment transaction record
-    // PaymentTransaction::create([
-    //     'ticket_id' => $ticket->id,
-    //     'user_id' => auth()->id(),
-    //     'amount' => $validated['amount_paid'],
-    //     'payment_method' => $validated['payment_method'],
-    //     'payment_notes' => $validated['payment_notes'],
-    //     'balance_before' => $ticket->total_amount - ($currentPaid ?? 0),
-    //     'balance_after' => $ticket->total_amount - $ticket->amount_paid,
-    // ]);
-    
-    return response()->json([
-        'success' => true,
-        'message' => 'Payment updated successfully',
-        'ticket' => $ticket->fresh(),
-        'new_balance' => $ticket->total_amount - $ticket->amount_paid
-    ]);
-}
+
+    /**
+     * Update payment status with payment details
+     */
+    public function updatePayment(Request $request, $id)
+    {
+        $ticket = Ticket::findOrFail($id);
+
+        $validated = $request->validate([
+            'payment_status' => 'required|in:pending,partial,paid',
+            'amount_paid' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:cash,gcash,bank_transfer,credit_card,check',
+            'payment_notes' => 'nullable|string|max:500',
+        ]);
+
+        // Update payment status
+        $ticket->payment_status = $validated['payment_status'];
+
+        // If amount is provided, add it to the total amount paid
+        if (!empty($validated['amount_paid']) && $validated['amount_paid'] > 0) {
+            $currentPaid = $ticket->amount_paid ?? 0;
+            $ticket->amount_paid = $currentPaid + $validated['amount_paid'];
+
+            // Check if fully paid and update status accordingly
+            if ($ticket->amount_paid >= $ticket->total_amount) {
+                $ticket->payment_status = 'paid';
+            } elseif ($ticket->amount_paid > 0) {
+                $ticket->payment_status = 'partial';
+            }
+        }
+
+        $ticket->save();
+
+        // Optional: Create payment transaction record
+        // PaymentTransaction::create([
+        //     'ticket_id' => $ticket->id,
+        //     'user_id' => auth()->id(),
+        //     'amount' => $validated['amount_paid'],
+        //     'payment_method' => $validated['payment_method'],
+        //     'payment_notes' => $validated['payment_notes'],
+        //     'balance_before' => $ticket->total_amount - ($currentPaid ?? 0),
+        //     'balance_after' => $ticket->total_amount - $ticket->amount_paid,
+        // ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment updated successfully',
+            'ticket' => $ticket->fresh(),
+            'new_balance' => $ticket->total_amount - $ticket->amount_paid
+        ]);
+    }
 
     protected function getValidationRules(string $action, $model = null): array
     {
@@ -379,4 +388,3 @@ public function updatePayment(Request $request, $id)
         ];
     }
 }
-

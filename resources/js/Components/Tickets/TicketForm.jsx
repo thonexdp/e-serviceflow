@@ -44,7 +44,7 @@ export default function TicketForm({
         description: "",
         category_id: "",
         job_type_id: "",
-        quantity: 1,
+        quantity: "",
         size_value: "",
         size_unit: "",
         size_rate_id: "",
@@ -59,7 +59,7 @@ export default function TicketForm({
         balance: "",
         change: "",
         payment_method: "cash",
-        payment_status: "pending",
+        payment_status: "",
         status: "pending",
         file: null,
     });
@@ -542,108 +542,109 @@ export default function TicketForm({
                 <div className="col-md-3">
                     <div className="sticky-top">
                         {/* Pricing Summary Card */}
-                        {/* <div className="card shadow-sm border-0"> */}
-                        {/* <div className="card-body"> */}
-                        <Section title="Pricing Summary">
-                            <div className="space-y-2">
-                                {/* Subtotal */}
-                                <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                    <span className="text-muted small text-uppercase font-weight-bold">
-                                        Subtotal
-                                    </span>
-                                    <span className="font-weight-bold">
-                                        ₱
-                                        {parseFloat(
-                                            formData.subtotal || 0
-                                        ).toLocaleString("en-US", {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                </div>
+                        <div className="card shadow-sm border-0">
+                            <div className="card-body">
+                                <Section title="Pricing Summary">
+                                    <div className="space-y-2">
+                                        {/* Subtotal */}
+                                        <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                            <span className="text-muted small text-uppercase font-weight-bold">
+                                                Subtotal
+                                            </span>
+                                            <span className="font-weight-bold">
+                                                ₱
+                                                {parseFloat(
+                                                    formData.subtotal || 0
+                                                ).toLocaleString("en-US", {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
+                                        </div>
 
-                                {/* Discount */}
-                                <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                    <span className="text-muted small Billing text-uppercase font-weight-bold">
-                                        Discount
-                                    </span>
-                                    <span className="text-danger font-weight-bold">
-                                        -₱
-                                        {parseFloat(
-                                            formData.discount_amount || 0
-                                        ).toLocaleString("en-US", {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                </div>
+                                        {/* Discount */}
+                                        <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                            <span className="text-muted small Billing text-uppercase font-weight-bold">
+                                                Discount
+                                            </span>
+                                            <span className="text-danger font-weight-bold">
+                                                -₱
+                                                {parseFloat(
+                                                    formData.discount_amount ||
+                                                        0
+                                                ).toLocaleString("en-US", {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
+                                        </div>
 
-                                {/* Total Amount */}
-                                <div className="d-flex justify-content-between align-items-center py-3 rounded">
-                                    <span className="small text-uppercase font-weight-bold">
-                                        Total Amount
-                                    </span>
-                                    <span
-                                        style={{ fontSize: "1.25rem" }}
-                                        className="font-weight-bold"
-                                    >
-                                        ₱
-                                        {parseFloat(
-                                            formData.total_amount || 0
-                                        ).toLocaleString("en-US", {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                </div>
+                                        {/* Total Amount */}
+                                        <div className="d-flex justify-content-between align-items-center py-3 rounded">
+                                            <span className="small text-uppercase font-weight-bold">
+                                                Total Amount
+                                            </span>
+                                            <span
+                                                style={{ fontSize: "1.25rem" }}
+                                                className="font-weight-bold"
+                                            >
+                                                ₱
+                                                {parseFloat(
+                                                    formData.total_amount || 0
+                                                ).toLocaleString("en-US", {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
+                                        </div>
 
-                                {/* Balance */}
-                                {/* {parseFloat(formData.balance || 0) > 0 && ( */}
-                                    <div className="d-flex justify-content-between align-items-center py-2 border-top">
-                                        <span className="text-muted small text-uppercase font-weight-bold">
-                                            Balance
-                                        </span>
-                                        <span className="text-warning font-weight-bold">
-                                            ₱
-                                            {parseFloat(
-                                                formData.balance || 0
-                                            ).toLocaleString("en-US", {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}
-                                        </span>
+                                        {/* Balance */}
+                                        {/* {parseFloat(formData.balance || 0) > 0 && ( */}
+                                        <div className="d-flex justify-content-between align-items-center py-2 border-top">
+                                            <span className="text-muted small text-uppercase font-weight-bold">
+                                                Balance
+                                            </span>
+                                            <span className="text-warning font-weight-bold">
+                                                ₱
+                                                {parseFloat(
+                                                    formData.balance || 0
+                                                ).toLocaleString("en-US", {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
+                                        </div>
+                                        {/* )} */}
+
+                                        {/* Change (Sukli) */}
+                                        {/* {parseFloat(formData.change || 0) > 0 && ( */}
+                                        <div className="d-flex justify-content-between align-items-center py-2 border-top rounded">
+                                            <span className="text-success small text-uppercase font-weight-bold">
+                                                Change
+                                            </span>
+                                            <span
+                                                className="text-success font-weight-bold"
+                                                style={{ fontSize: "1.1rem" }}
+                                            >
+                                                ₱
+                                                {parseFloat(
+                                                    formData.change || 0
+                                                ).toLocaleString("en-US", {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
+                                        </div>
+                                        {/* )} */}
                                     </div>
-                                {/* )} */}
-
-                                {/* Change (Sukli) */}
-                                {/* {parseFloat(formData.change || 0) > 0 && ( */}
-                                    <div className="d-flex justify-content-between align-items-center py-2 border-top rounded">
-                                        <span className="text-success small text-uppercase font-weight-bold">
-                                            Change
-                                        </span>
-                                        <span
-                                            className="text-success font-weight-bold"
-                                            style={{ fontSize: "1.1rem" }}
-                                        >
-                                            ₱
-                                            {parseFloat(
-                                                formData.change || 0
-                                            ).toLocaleString("en-US", {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}
-                                        </span>
-                                    </div>
-                                {/* )} */}
+                                </Section>
                             </div>
-                        </Section>
-                        {/* </div> */}
-                        {/* </div> */}
+                        </div>
                     </div>
                 </div>
 
                 {/* RIGHT COLUMN — ALL FORM FIELDS */}
-                <div className="col-md-8">
+                <div className="col-md-9">
                     {/* JOB DETAILS */}
                     <Section title="Job Details">
                         <div className="row">
@@ -673,6 +674,7 @@ export default function TicketForm({
                                     error={errors.category_id}
                                     options={categoryOptions}
                                     placeholder="Select Category"
+                                    required
                                 />
                             </div>
 
@@ -691,6 +693,7 @@ export default function TicketForm({
                                             : "Select category first"
                                     }
                                     disabled={!formData.category_id}
+                                    required
                                 />
                             </div>
                             <div className="col-md-2">
@@ -728,7 +731,10 @@ export default function TicketForm({
 
                     {hasPriceTiers && (
                         <div className="alert alert-light border mt-3">
-                            <h6 className="mb-2">Bulk Pricing</h6>
+                            <div className="alert alert-info" role="alert">
+                                <i className="fa fa-info-circle"></i>{" "}
+                                <strong>Promo:</strong> Bulk Pricing for 
+                            </div>
                             <div className="table-responsive">
                                 <table className="table table-sm mb-0">
                                     <thead>
@@ -773,103 +779,98 @@ export default function TicketForm({
                     {hasSizeRates && (
                         <div className="my-3">
                             {/* <div className="card-body"> */}
-                                <h5 className="mb-3">Size-Based Pricing</h5>
-                                <div className="row">
+                            <h5 className="mb-3">Size-Based Pricing</h5>
+                            <div className="row">
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Print Option"
+                                        type="select"
+                                        name="size_rate_id"
+                                        value={selectedSizeRateId || ""}
+                                        onChange={(e) =>
+                                            setSelectedSizeRateId(
+                                                e.target.value
+                                            )
+                                        }
+                                        options={sizeRates.map((rate) => ({
+                                            value: rate.id?.toString(),
+                                            label: `${
+                                                rate.variant_name || "Variant"
+                                            } - ₱${parseFloat(
+                                                rate.rate
+                                            ).toFixed(2)} per ${
+                                                rate.calculation_method ===
+                                                "length"
+                                                    ? rate.dimension_unit
+                                                    : `${rate.dimension_unit}²`
+                                            }`,
+                                        }))}
+                                    />
+                                </div>
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label={`Width (${
+                                            currentSizeRate?.dimension_unit ||
+                                            "unit"
+                                        })`}
+                                        type="number"
+                                        name="size_width"
+                                        value={sizeDimensions.width}
+                                        onChange={(e) => {
+                                            setSizeDimensions((prev) => ({
+                                                ...prev,
+                                                width: e.target.value,
+                                            }));
+                                            clearError("size_width");
+                                        }}
+                                        error={errors.size_width}
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Width"
+                                    />
+                                </div>
+                                {currentSizeRate?.calculation_method !==
+                                    "length" && (
                                     <div className="col-md-4">
                                         <FormInput
-                                            label="Print Option"
-                                            type="select"
-                                            name="size_rate_id"
-                                            value={selectedSizeRateId || ""}
-                                            onChange={(e) =>
-                                                setSelectedSizeRateId(
-                                                    e.target.value
-                                                )
-                                            }
-                                            options={sizeRates.map((rate) => ({
-                                                value: rate.id?.toString(),
-                                                label: `${
-                                                    rate.variant_name ||
-                                                    "Variant"
-                                                } - ₱${parseFloat(
-                                                    rate.rate
-                                                ).toFixed(2)} per ${
-                                                    rate.calculation_method ===
-                                                    "length"
-                                                        ? rate.dimension_unit
-                                                        : `${rate.dimension_unit}²`
-                                                }`,
-                                            }))}
-                                        />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <FormInput
-                                            label={`Width (${
+                                            label={`Height (${
                                                 currentSizeRate?.dimension_unit ||
                                                 "unit"
                                             })`}
                                             type="number"
-                                            name="size_width"
-                                            value={sizeDimensions.width}
+                                            name="size_height"
+                                            value={sizeDimensions.height}
                                             onChange={(e) => {
                                                 setSizeDimensions((prev) => ({
                                                     ...prev,
-                                                    width: e.target.value,
+                                                    height: e.target.value,
                                                 }));
-                                                clearError("size_width");
+                                                clearError("size_height");
                                             }}
-                                            error={errors.size_width}
+                                            error={errors.size_height}
                                             min="0"
                                             step="0.01"
-                                            placeholder="Width"
+                                            placeholder="Height"
                                         />
                                     </div>
-                                    {currentSizeRate?.calculation_method !==
-                                        "length" && (
-                                        <div className="col-md-4">
-                                            <FormInput
-                                                label={`Height (${
-                                                    currentSizeRate?.dimension_unit ||
-                                                    "unit"
-                                                })`}
-                                                type="number"
-                                                name="size_height"
-                                                value={sizeDimensions.height}
-                                                onChange={(e) => {
-                                                    setSizeDimensions(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            height: e.target
-                                                                .value,
-                                                        })
-                                                    );
-                                                    clearError("size_height");
-                                                }}
-                                                error={errors.size_height}
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="Height"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                                {currentSizeRate && (
-                                    <p className="text-muted text-sm mt-2">
-                                        Rate: ₱
-                                        {parseFloat(
-                                            currentSizeRate.rate
-                                        ).toFixed(2)}{" "}
-                                        per{" "}
-                                        {currentSizeRate.calculation_method ===
-                                        "length"
-                                            ? currentSizeRate.dimension_unit
-                                            : `${currentSizeRate.dimension_unit}²`}
-                                    </p>
                                 )}
+                            </div>
+                            {currentSizeRate && (
+                                <p className="text-muted text-sm mt-2">
+                                    Rate: ₱
+                                    {parseFloat(currentSizeRate.rate).toFixed(
+                                        2
+                                    )}{" "}
+                                    per{" "}
+                                    {currentSizeRate.calculation_method ===
+                                    "length"
+                                        ? currentSizeRate.dimension_unit
+                                        : `${currentSizeRate.dimension_unit}²`}
+                                </p>
+                            )}
                             {/* </div> */}
                             <hr />
                         </div>
-                        
                     )}
 
                     {/* SCHEDULE & PAYMENT */}
@@ -901,7 +902,7 @@ export default function TicketForm({
                             </div>
                             <div className="col-md-4">
                                 <FormInput
-                                    label="Payment Status"
+                                    label={`Payment Status ${formData.payment_status}`}
                                     type="select"
                                     name="payment_status"
                                     value={formData.payment_status}
@@ -932,7 +933,7 @@ export default function TicketForm({
                             </div>
 
                             <div className="col-md-3">
-                                <div className="custom-control custom-checkbox">
+                                <div className="custom-control custom-checkbox float-end">
                                     <input
                                         type="checkbox"
                                         className="custom-control-input"
@@ -953,8 +954,8 @@ export default function TicketForm({
                                         className="custom-control-label"
                                         htmlFor="enableDiscount"
                                     >
-                                        <i className="ti-cut mr-1"></i>Add
-                                        Discount
+                                        <i className="ti-cut mr-1"></i>{" "}
+                                        <small>Add Discount</small>
                                     </label>
                                 </div>
                             </div>

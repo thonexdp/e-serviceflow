@@ -5,7 +5,7 @@ export default function Footer() {
         <div className="row">
             <div className="col-lg-12">
                  <div className="footer">
-                    <p>2025 © System.</p>
+                    <p>© 2025 RC PrintShoppe. All rights reserved.</p>
                 </div>
             </div>
         </div>

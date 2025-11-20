@@ -89,7 +89,7 @@ export default function ProductionQueue({
     };
 
     const handleMarkCompleted = (ticketId) => {
-        if (!confirm("Mark this ticket as completed?")) return;
+        if (!confirm("Mark this ticket as completed? Stock will be automatically deducted.")) return;
 
         setLoading(true);
         router.post(`/production/${ticketId}/complete`, {}, {
@@ -97,11 +97,6 @@ export default function ProductionQueue({
             preserveState: false,
             onSuccess: () => {
                 setLoading(false);
-                // Open stock consumption modal
-                const ticket = tickets.data.find(t => t.id === ticketId);
-                if (ticket) {
-                    handleOpenStockModal(ticket);
-                }
             },
             onError: () => {
                 setLoading(false);
@@ -260,21 +255,14 @@ export default function ProductionQueue({
             );
         } else if (ticket.status === "completed") {
             return (
-                <div className="btn-group">
-                    <span className="text-success mr-2">
-                        <i className="ti-check"></i> Completed
-                    </span>
-                    {(!ticket.stock_consumptions || ticket.stock_consumptions.length === 0) && (
-                        <button
-                            type="button"
-                            className="btn btn-link btn-sm text-warning"
-                            onClick={() => handleOpenStockModal(ticket)}
-                            title="Record stock consumption"
-                        >
-                            <i className="ti-package"></i> Record Stock
-                        </button>
+                <span className="text-success">
+                    <i className="ti-check"></i> Completed
+                    {ticket.stock_consumptions && ticket.stock_consumptions.length > 0 && (
+                        <small className="d-block text-muted">
+                            Stock deducted automatically
+                        </small>
                     )}
-                </div>
+                </span>
             );
         } else {
             return (
@@ -602,7 +590,7 @@ export default function ProductionQueue({
                                     type="button"
                                     className="btn btn-success"
                                     onClick={() => {
-                                        handleUpdateProgress();
+                                        handleMarkCompleted(selectedTicket.id)
                                     }}
                                     disabled={loading}
                                 >

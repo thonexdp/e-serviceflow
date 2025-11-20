@@ -22,7 +22,12 @@ class ProductionQueueController extends Controller
     public function index(Request $request)
     {
         // Get tickets that are approved by designer (ready for production)
-        $query = Ticket::with(['jobType.category', 'jobType.stockRequirements.stockItem', 'mockupFiles', 'stockConsumptions.stockItem'])
+        $query = Ticket::with([
+            'jobType.category', 
+            'jobType.stockRequirements.stockItem', 
+            'mockupFiles', 
+            'stockConsumptions.stockItem'
+        ])
             ->where('design_status', 'approved')
             ->whereIn('status', ['pending', 'ready_to_print', 'in_production', 'completed']);
 
@@ -83,19 +88,55 @@ class ProductionQueueController extends Controller
      */
     public function updateProgress(Request $request, $id)
     {
-        $ticket = Ticket::findOrFail($id);
+        $ticket = Ticket::with([
+            'jobType',
+            'jobType.stockRequirements',
+            'jobType.stockRequirements.stockItem'
+        ])->findOrFail($id);
 
         $validated = $request->validate([
             'produced_quantity' => 'required|integer|min:0|max:' . $ticket->quantity,
             'status' => 'nullable|string|in:in_production,completed',
         ]);
 
-        $ticket->update([
-            'produced_quantity' => $validated['produced_quantity'],
-            'status' => $validated['status'] ?? ($validated['produced_quantity'] >= $ticket->quantity ? 'completed' : 'in_production'),
-        ]);
+        $newStatus = $validated['status'] ?? ($validated['produced_quantity'] >= $ticket->quantity ? 'completed' : 'in_production');
+        $wasCompleted = $ticket->status === 'completed';
+        $isNowCompleted = $newStatus === 'completed';
 
-        return redirect()->back()->with('success', 'Production progress updated successfully.');
+        try {
+            \DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted) {
+                $ticket->update([
+                    'produced_quantity' => $validated['produced_quantity'],
+                    'status' => $newStatus,
+                ]);
+
+                // Auto-consume stock if just marked as completed (and wasn't already completed)
+                if ($isNowCompleted && !$wasCompleted) {
+                    // Refresh ticket to ensure we have latest data
+                    $ticket->refresh();
+                    
+                    // Automatically consume stock based on job type requirements
+                    $this->stockService->autoConsumeStockForProduction($ticket);
+                }
+            });
+
+            $message = 'Production progress updated successfully.';
+            if ($isNowCompleted && !$wasCompleted) {
+                $consumptionCount = \App\Models\ProductionStockConsumption::where('ticket_id', $ticket->id)->count();
+                if ($consumptionCount > 0) {
+                    $message .= ' Stock automatically deducted.';
+                }
+            }
+            
+            return redirect()->back()->with('success', $message);
+        } catch (\Exception $e) {
+            \Log::error("Update progress failed for ticket {$id}: " . $e->getMessage());
+            \Log::error("Stack trace: " . $e->getTraceAsString());
+            
+            return redirect()->back()->with('warning', 
+                'Production progress updated, but automatic stock deduction failed: ' . $e->getMessage()
+            );
+        }
     }
 
     /**
@@ -103,17 +144,49 @@ class ProductionQueueController extends Controller
      */
     public function markCompleted($id)
     {
-        $ticket = Ticket::findOrFail($id);
+        // dd("completed:",$id);
+        $ticket = Ticket::with([
+            'jobType',
+            'jobType.stockRequirements',
+            'jobType.stockRequirements.stockItem'
+        ])->findOrFail($id);
 
-        $ticket->update([
-            'status' => 'completed',
-            'produced_quantity' => $ticket->quantity,
-        ]);
+        try {
+            \DB::transaction(function () use ($ticket) {
+                // Update ticket status first
+                $ticket->update([
+                    'status' => 'completed',
+                    'produced_quantity' => $ticket->quantity,
+                ]);
 
-        // Note: Stock consumption should be handled separately via a dedicated endpoint
-        // or through a production stock consumption form when production is completed
+                // Refresh ticket to ensure we have latest data
+                $ticket->refresh();
 
-        return redirect()->back()->with('success', 'Ticket marked as completed successfully.');
+                // Automatically consume stock based on job type requirements
+                $consumptions = $this->stockService->autoConsumeStockForProduction($ticket);
+            });
+            
+            $message = 'Ticket marked as completed successfully.';
+            
+            // Check if consumptions were created
+            $consumptionCount = \App\Models\ProductionStockConsumption::where('ticket_id', $ticket->id)->count();
+            if ($consumptionCount > 0) {
+                $message .= ' Stock automatically deducted.';
+            } else {
+                $message .= ' (No stock requirements found for this job type)';
+            }
+
+            return redirect()->back()->with('success', $message);
+        } catch (\Exception $e) {
+            // If auto-consumption fails, still mark as completed but show warning
+            \Log::error("Auto-consumption failed for ticket {$id}: " . $e->getMessage());
+            \Log::error("Stack trace: " . $e->getTraceAsString());
+            
+            return redirect()->back()->with('warning', 
+                'Ticket marked as completed, but automatic stock deduction failed: ' . $e->getMessage() . 
+                ' Please manually record stock consumption.'
+            );
+        }
     }
 
     /**
