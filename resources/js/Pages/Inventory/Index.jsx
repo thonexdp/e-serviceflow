@@ -8,6 +8,7 @@ import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 import FormInput from "@/Components/Common/FormInput";
+import { formatPeso } from "@/Utils/currency";
 
 export default function InventoryIndex({
     user = {},
@@ -252,7 +253,7 @@ export default function InventoryIndex({
             label: "Unit Cost",
             key: "unit_cost",
             adminOnly: true,
-            render: (row) => `₱${parseFloat(row.unit_cost).toFixed(2)}`,
+            render: (row) => `${formatPeso(parseFloat(row.unit_cost).toFixed(2))}`,
         },
         {
             label: "Status",

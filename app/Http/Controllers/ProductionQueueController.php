@@ -6,6 +6,7 @@ use App\Models\Ticket;
 use App\Services\StockManagementService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
 
 class ProductionQueueController extends Controller
 {
@@ -71,6 +72,7 @@ class ProductionQueueController extends Controller
     public function startProduction($id)
     {
         $ticket = Ticket::findOrFail($id);
+        $oldStatus = $ticket->status;
 
         if ($ticket->design_status !== 'approved') {
             return redirect()->back()->with('error', 'Ticket design must be approved before starting production.');
@@ -79,6 +81,9 @@ class ProductionQueueController extends Controller
         $ticket->update([
             'status' => 'in_production',
         ]);
+
+        // Notify FrontDesk (optional)
+        $this->notifyStatusChange($ticket, $oldStatus, 'in_production');
 
         return redirect()->back()->with('success', 'Production started successfully.');
     }
@@ -99,14 +104,15 @@ class ProductionQueueController extends Controller
             'status' => 'nullable|string|in:in_production,completed',
         ]);
 
+        $oldStatus = $ticket->status;
         $newStatus = $validated['status'] ?? ($validated['produced_quantity'] >= $ticket->quantity ? 'completed' : 'in_production');
         $wasCompleted = $ticket->status === 'completed';
         $isNowCompleted = $newStatus === 'completed';
 
         try {
-            \DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted) {
-                $ticket->update([
-                    'produced_quantity' => $validated['produced_quantity'],
+            \DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted, $oldStatus) {
+        $ticket->update([
+            'produced_quantity' => $validated['produced_quantity'],
                     'status' => $newStatus,
                 ]);
 
@@ -126,8 +132,13 @@ class ProductionQueueController extends Controller
                 if ($consumptionCount > 0) {
                     $message .= ' Stock automatically deducted.';
                 }
+                // Notify FrontDesk when completed
+                $this->notifyStatusChange($ticket, $oldStatus, 'completed');
+            } elseif ($oldStatus !== $newStatus && $newStatus === 'in_production') {
+                // Notify when status changes to in_production
+                $this->notifyStatusChange($ticket, $oldStatus, 'in_production');
             }
-            
+
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
             \Log::error("Update progress failed for ticket {$id}: " . $e->getMessage());
@@ -150,14 +161,15 @@ class ProductionQueueController extends Controller
             'jobType.stockRequirements',
             'jobType.stockRequirements.stockItem'
         ])->findOrFail($id);
+        $oldStatus = $ticket->status;
 
         try {
             \DB::transaction(function () use ($ticket) {
                 // Update ticket status first
-                $ticket->update([
-                    'status' => 'completed',
-                    'produced_quantity' => $ticket->quantity,
-                ]);
+        $ticket->update([
+            'status' => 'completed',
+            'produced_quantity' => $ticket->quantity,
+        ]);
 
                 // Refresh ticket to ensure we have latest data
                 $ticket->refresh();
@@ -175,6 +187,9 @@ class ProductionQueueController extends Controller
             } else {
                 $message .= ' (No stock requirements found for this job type)';
             }
+
+            // Notify FrontDesk when completed
+            $this->notifyStatusChange($ticket, $oldStatus, 'completed');
 
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
@@ -221,5 +236,73 @@ class ProductionQueueController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Notify users about ticket status changes (shared with TicketController logic)
+     */
+    protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
+    {
+        $triggeredBy = Auth::user();
+        $recipientIds = [];
+        $notificationType = '';
+        $title = '';
+        $message = '';
+
+        // Determine recipients and notification content based on status change
+        switch ($newStatus) {
+            case 'in_production':
+                // Notify FrontDesk (optional)
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_in_production';
+                $title = 'Ticket In Production';
+                $message = "Ticket {$ticket->ticket_number} is now in production.";
+                break;
+
+            case 'completed':
+                // Notify FrontDesk (optional)
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_completed';
+                $title = 'Ticket Completed';
+                $message = "Ticket {$ticket->ticket_number} has been completed.";
+                break;
+        }
+
+        if (empty($recipientIds) || empty($notificationType)) {
+            return;
+        }
+
+        // Create notifications for all recipients
+        $users = \App\Models\User::whereIn('id', $recipientIds)->get();
+        foreach ($users as $user) {
+            \App\Models\Notification::create([
+                'user_id' => $user->id,
+                'type' => $notificationType,
+                'notifiable_id' => $ticket->id,
+                'notifiable_type' => Ticket::class,
+                'title' => $title,
+                'message' => $message,
+                'data' => [
+                    'ticket_id' => $ticket->id,
+                    'ticket_number' => $ticket->ticket_number,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                ],
+            ]);
+        }
+
+        // Broadcast event
+        event(new \App\Events\TicketStatusChanged(
+            $ticket,
+            $oldStatus,
+            $newStatus,
+            $triggeredBy,
+            $recipientIds,
+            $notificationType,
+            $title,
+            $message
+        ));
     }
 }

@@ -294,7 +294,7 @@ export default function PurchaseOrdersCreate({
                                                                         />
                                                                     </td>
                                                                     <td>
-                                                                        ${((item.quantity || 0) * (item.unit_cost || 0)).toFixed(2)}
+                                                                        ₱{((item.quantity || 0) * (item.unit_cost || 0)).toFixed(2)}
                                                                     </td>
                                                                     <td>
                                                                         <input

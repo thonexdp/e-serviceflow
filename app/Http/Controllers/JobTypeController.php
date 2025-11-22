@@ -6,6 +6,7 @@ use App\Models\JobType;
 use App\Models\JobCategory;
 use App\Http\Requests\JobTypeRequest;
 use App\Services\JobTypePricingService;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class JobTypeController extends Controller
@@ -17,7 +18,7 @@ class JobTypeController extends Controller
         $this->pricing = $pricing;
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $jobTypes = JobType::with(['category', 'priceTiers', 'sizeRates'])
             ->when(request('search'), function ($q) {
@@ -32,9 +33,17 @@ class JobTypeController extends Controller
             ->orderBy('name')
             ->paginate(request('per_page', 15));
 
+         $categories = JobCategory::query()
+            ->when($request->search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->latest()
+            ->paginate(20);
+
         return Inertia::render('JobTypes', [
             'jobTypes' => $jobTypes,
-            'categories' => JobCategory::orderBy('name')->get(),
+            'allcategories' => JobCategory::orderBy('name')->get(),
+            'categories' => $categories,
             'filters' => request()->only(['search', 'category_id', 'is_active']),
         ]);
     }

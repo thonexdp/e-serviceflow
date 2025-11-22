@@ -4,6 +4,7 @@ import { Head, router, usePage } from "@inertiajs/react";
 import Footer from "@/Components/Layouts/Footer";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import { formatDate } from "@/Utils/formatDate";
+import { formatPeso } from "@/Utils/currency";
 
 export default function PurchaseOrdersShow({
     user = {},
@@ -176,8 +177,8 @@ export default function PurchaseOrdersShow({
                                                                 <td>
                                                                     {parseFloat(item.quantity).toFixed(2)} {item.stock_item?.base_unit_of_measure}
                                                                 </td>
-                                                                <td>${parseFloat(item.unit_cost).toFixed(2)}</td>
-                                                                <td>${parseFloat(item.total_cost).toFixed(2)}</td>
+                                                                <td>{formatPeso(parseFloat(item.unit_cost).toFixed(2))}</td>
+                                                                <td>{formatPeso(parseFloat(item.total_cost).toFixed(2))}</td>
                                                                 <td>
                                                                     {parseFloat(item.received_quantity || 0).toFixed(2)} {item.stock_item?.base_unit_of_measure}
                                                                 </td>
@@ -197,20 +198,20 @@ export default function PurchaseOrdersShow({
                                                         <tbody>
                                                             <tr>
                                                                 <td><strong>Subtotal:</strong></td>
-                                                                <td className="text-right">${parseFloat(purchaseOrder.subtotal || 0).toFixed(2)}</td>
+                                                                <td className="text-right">{formatPeso(parseFloat(purchaseOrder.subtotal || 0).toFixed(2))}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td><strong>Tax:</strong></td>
-                                                                <td className="text-right">${parseFloat(purchaseOrder.tax || 0).toFixed(2)}</td>
+                                                                <td className="text-right">{formatPeso(parseFloat(purchaseOrder.tax || 0).toFixed(2))}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td><strong>Shipping:</strong></td>
-                                                                <td className="text-right">${parseFloat(purchaseOrder.shipping_cost || 0).toFixed(2)}</td>
+                                                                <td className="text-right">{formatPeso(parseFloat(purchaseOrder.shipping_cost || 0).toFixed(2))}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td><strong>Total:</strong></td>
                                                                 <td className="text-right">
-                                                                    <strong>${parseFloat(purchaseOrder.total_amount || 0).toFixed(2)}</strong>
+                                                                    <strong>{formatPeso(parseFloat(purchaseOrder.total_amount || 0).toFixed(2))}</strong>
                                                                 </td>
                                                             </tr>
                                                         </tbody>

@@ -39,13 +39,23 @@ export default function Tickets({
 
     // Payment modal form state
     const [paymentFormData, setPaymentFormData] = useState({
-        payment_status: "",
-        amount_paid: "",
+        ticket_id: null,
+        amount: "",
         payment_method: "cash",
-        payment_notes: "",
+        payment_date: new Date().toISOString().slice(0, 10),
+        allocation: "downpayment",
+        official_receipt_number: "",
+        payment_reference: "",
+        notes: "",
+        attachments: [],
     });
 
     const { flash, auth } = usePage().props;
+
+    const formatCurrency = (value) =>
+        `₱${parseFloat(value || 0).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+        })}`;
 
     const isAllowedToAddCustomer =
         auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
@@ -70,11 +80,42 @@ export default function Tickets({
 
     const handleTicketSubmit = (data) => {
         const formData = new FormData();
-        Object.keys(data).forEach((key) => {
-            if (key === "file" && data[key]) {
-                formData.append("file", data[key]);
-            } else if (data[key] !== null && data[key] !== "") {
-                formData.append(key, data[key]);
+        const arrayKeyMap = {
+            ticketAttachments: "attachments[]",
+            paymentProofs: "payment_proofs[]",
+        };
+
+        Object.entries(data).forEach(([key, value]) => {
+            if (key === "file" && value) {
+                formData.append("file", value);
+                return;
+            }
+
+            if (arrayKeyMap[key] && Array.isArray(value)) {
+                value.forEach((file) => {
+                    if (file instanceof File) {
+                        formData.append(arrayKeyMap[key], file);
+                    }
+                });
+                return;
+            }
+
+            if (value instanceof File) {
+                formData.append(key, value);
+                return;
+            }
+
+            if (Array.isArray(value)) {
+                value.forEach((entry) => {
+                    if (entry !== null && entry !== "") {
+                        formData.append(`${key}[]`, entry);
+                    }
+                });
+                return;
+            }
+
+            if (value !== null && value !== "") {
+                formData.append(key, value);
             }
         });
 
@@ -109,16 +150,20 @@ export default function Tickets({
 
     // Open payment update modal
     const handleOpenPaymentModal = (ticket) => {
-        console.log(ticket);
         setSelectedTicket(ticket);
-        const remainingBalance =
-            parseFloat(ticket.total_amount || 0) -
-            parseFloat(ticket.amount_paid || 0);
         setPaymentFormData({
-            payment_status: ticket.payment_status || "pending",
-            amount_paid: "",
+            ticket_id: ticket.id,
+            amount: "",
             payment_method: "cash",
-            payment_notes: "",
+            payment_date: new Date().toISOString().slice(0, 10),
+            allocation:
+                ticket.payments && ticket.payments.length > 0
+                    ? "balance"
+                    : "downpayment",
+            official_receipt_number: "",
+            payment_reference: "",
+            notes: "",
+            attachments: [],
         });
         setPaymentModalOpen(true);
     };
@@ -149,28 +194,48 @@ export default function Tickets({
     const handlePaymentUpdate = async () => {
         if (!selectedTicket) return;
 
-        // Validation
-        if (
-            paymentFormData.payment_status !== "pending" &&
-            !paymentFormData.amount_paid
-        ) {
-            alert("Please enter the payment amount");
+        if (!paymentFormData.amount) {
+            alert("Please enter the payment amount.");
             return;
         }
 
+        const formData = new FormData();
+        formData.append("ticket_id", selectedTicket.id);
+        formData.append("payment_method", paymentFormData.payment_method);
+        formData.append("payment_date", paymentFormData.payment_date);
+        formData.append("amount", paymentFormData.amount);
+        if (paymentFormData.allocation) {
+            formData.append("allocation", paymentFormData.allocation);
+        }
+        if (paymentFormData.official_receipt_number) {
+            formData.append(
+                "official_receipt_number",
+                paymentFormData.official_receipt_number
+            );
+        }
+        if (paymentFormData.payment_reference) {
+            formData.append("payment_reference", paymentFormData.payment_reference);
+        }
+        if (paymentFormData.notes) {
+            formData.append("notes", paymentFormData.notes);
+        }
+        formData.append("payment_type", "collection");
+
+        paymentFormData.attachments.forEach((file) => {
+            formData.append("attachments[]", file);
+        });
+
         setIsUpdating(true);
         try {
-            await axios.patch(
-                `/tickets/${selectedTicket.id}/update-payment`,
-                paymentFormData
-            );
-
+            await axios.post("/payments", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
             setPaymentModalOpen(false);
             setSelectedTicket(null);
             router.reload({ preserveScroll: true });
         } catch (error) {
             console.error("Payment update failed:", error);
-            alert(error.response?.data?.message || "Failed to update payment");
+            alert(error.response?.data?.message || "Failed to record payment.");
         } finally {
             setIsUpdating(false);
         }
@@ -223,10 +288,15 @@ export default function Tickets({
         setPaymentModalOpen(false);
         setSelectedTicket(null);
         setPaymentFormData({
-            payment_status: "",
-            amount_paid: "",
+            ticket_id: null,
+            amount: "",
             payment_method: "cash",
-            payment_notes: "",
+            payment_date: new Date().toISOString().slice(0, 10),
+            allocation: "downpayment",
+            official_receipt_number: "",
+            payment_reference: "",
+            notes: "",
+            attachments: [],
         });
     };
 
@@ -307,16 +377,16 @@ export default function Tickets({
             render: (row) => (
                 <div>
                     {getPaymentStatusBadge(row.payment_status)}
-                    {row.payment_status !== "paid" && (
+                    {/* {row.payment_status !== "paid" && ( */}
                         <button
                             onClick={() => handleOpenPaymentModal(row)}
-                            className="btn btn-sm btn-outline-primary ml-1"
+                            className="btn btn-sm ml-1"
                             style={{ padding: "2px 8px", fontSize: "11px" }}
                             title="Update Payment"
                         >
-                            <i className="ti-pencil"></i>
+                            <i className={`ti-${row.payment_status === "paid" ? "eye" : "pencil"}`}></i>
                         </button>
-                    )}
+                    {/* )} */}
                 </div>
             ),
         },
@@ -519,137 +589,83 @@ export default function Tickets({
 
                 {/* Payment Update Modal */}
                 <Modal
-                    title="Update Payment Status"
+                    title="Record Payment"
                     isOpen={openPaymentModal}
                     onClose={closePaymentModal}
-                    size="lg"
+                    size="4xl"
                     submitButtonText={null}
                 >
                     <div className="modal-body">
                         {selectedTicket && (
-                            <div className="mb-3">
-                                <div className="alert alert-info">
-                                    <strong>Ticket:</strong>{" "}
-                                    {selectedTicket.ticket_number}
-                                    <br />
-                                    <strong>Customer:</strong>{" "}
-                                    {selectedTicket.customer
-                                        ? `${selectedTicket.customer.firstname} ${selectedTicket.customer.lastname}`
-                                        : "N/A"}
-                                    <br />
-                                    <strong>Total Amount:</strong> ₱
-                                    {parseFloat(
-                                        selectedTicket.total_amount || 0
-                                    ).toLocaleString("en-US", {
-                                        minimumFractionDigits: 2,
-                                    })}
-                                    <br />
-                                    <strong>Amount Paid:</strong> ₱
-                                    {parseFloat(
-                                        selectedTicket.amount_paid || 0
-                                    ).toLocaleString("en-US", {
-                                        minimumFractionDigits: 2,
-                                    })}
-                                    <br />
-                                    <strong>Balance:</strong>{" "}
-                                    <span className="text-danger font-weight-bold">
-                                        ₱
-                                        {(
-                                            parseFloat(
-                                                selectedTicket.total_amount || 0
-                                            ) -
-                                            parseFloat(
-                                                selectedTicket.amount_paid || 0
-                                            )
-                                        ).toLocaleString("en-US", {
-                                            minimumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                    <br />
-                                    <strong>
-                                        Current Payment Status:
-                                    </strong>{" "}
-                                    {getPaymentStatusBadge(
-                                        selectedTicket.payment_status
-                                    )}
+                            <div className="mb-4 border rounded p-3 bg-light">
+                                <div className="row">
+                                    <div className="col-md-6">
+                                        <p className="m-b-5">
+                                            <strong>Ticket:</strong>{" "}
+                                            {selectedTicket.ticket_number}
+                                        </p>
+                                        <p className="m-b-5">
+                                            <strong>Customer:</strong>{" "}
+                                            {selectedTicket.customer
+                                                ? `${selectedTicket.customer.firstname} ${selectedTicket.customer.lastname}`
+                                                : "Walk-in"}
+                                        </p>
+                                        <p className="m-b-0">
+                                            <strong>Status:</strong>{" "}
+                                            {getPaymentStatusBadge(
+                                                selectedTicket.payment_status
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="col-md-6">
+                                        <p className="m-b-5">
+                                            <strong>Total Amount:</strong>{" "}
+                                            {formatCurrency(
+                                                selectedTicket.total_amount
+                                            )}
+                                        </p>
+                                        <p className="m-b-5">
+                                            <strong>Amount Paid:</strong>{" "}
+                                            {formatCurrency(
+                                                selectedTicket.amount_paid
+                                            )}
+                                        </p>
+                                        <p className="m-b-0 text-danger font-bold">
+                                            <strong>Balance:</strong>{" "}
+                                            {formatCurrency(
+                                                parseFloat(
+                                                    selectedTicket.total_amount || 0
+                                                ) -
+                                                    parseFloat(
+                                                        selectedTicket.amount_paid ||
+                                                            0
+                                                    )
+                                            )}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        <div className="form-group">
-                            <label htmlFor="payment_status">
-                                Payment Status{" "}
-                                <span className="text-danger">*</span>
-                            </label>
-                            <select
-                                id="payment_status"
-                                className="form-control"
-                                value={paymentFormData.payment_status}
-                                onChange={(e) =>
-                                    setPaymentFormData({
-                                        ...paymentFormData,
-                                        payment_status: e.target.value,
-                                    })
-                                }
-                            >
-                                <option value="pending">Pending</option>
-                                <option value="partial">Partial Payment</option>
-                                <option value="paid">Fully Paid</option>
-                            </select>
-                        </div>
-
-                        {paymentFormData.payment_status !== "pending" && (
-                            <>
+                        <div className="row">
+                            <div className="col-md-6">
                                 <div className="form-group">
-                                    <label htmlFor="amount_paid">
-                                        Amount Paid{" "}
-                                        <span className="text-danger">*</span>
-                                    </label>
+                                    <label>Payment Date</label>
                                     <input
-                                        type="number"
-                                        id="amount_paid"
+                                        type="date"
                                         className="form-control"
-                                        placeholder="Enter amount"
-                                        step="0.01"
-                                        min="0"
-                                        value={paymentFormData.amount_paid}
+                                        value={paymentFormData.payment_date}
                                         onChange={(e) =>
                                             setPaymentFormData({
                                                 ...paymentFormData,
-                                                amount_paid: e.target.value,
+                                                payment_date: e.target.value,
                                             })
                                         }
                                     />
-                                    {selectedTicket &&
-                                        paymentFormData.amount_paid && (
-                                            <small className="text-muted">
-                                                New Balance: ₱
-                                                {(
-                                                    parseFloat(
-                                                        selectedTicket.total_amount ||
-                                                            0
-                                                    ) -
-                                                    parseFloat(
-                                                        selectedTicket.amount_paid ||
-                                                            0
-                                                    ) -
-                                                    parseFloat(
-                                                        paymentFormData.amount_paid ||
-                                                            0
-                                                    )
-                                                ).toLocaleString("en-US", {
-                                                    minimumFractionDigits: 2,
-                                                })}
-                                            </small>
-                                        )}
                                 </div>
-
                                 <div className="form-group">
-                                    <label htmlFor="payment_method">
-                                        Payment Method
-                                    </label>
+                                    <label>Payment Method</label>
                                     <select
-                                        id="payment_method"
                                         className="form-control"
                                         value={paymentFormData.payment_method}
                                         onChange={(e) =>
@@ -668,28 +684,167 @@ export default function Tickets({
                                             Credit Card
                                         </option>
                                         <option value="check">Check</option>
+                                        <option value="online">Online</option>
                                     </select>
                                 </div>
-                            </>
-                        )}
-
-                        <div className="form-group">
-                            <label htmlFor="payment_notes">
-                                Payment Notes (Optional)
-                            </label>
-                            <textarea
-                                id="payment_notes"
-                                className="form-control"
-                                rows="3"
-                                placeholder="Add any notes about this payment..."
-                                value={paymentFormData.payment_notes}
-                                onChange={(e) =>
-                                    setPaymentFormData({
-                                        ...paymentFormData,
-                                        payment_notes: e.target.value,
-                                    })
-                                }
-                            ></textarea>
+                                <div className="form-group">
+                                    <label>
+                                        Amount <span className="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Enter amount"
+                                        value={paymentFormData.amount}
+                                        onChange={(e) =>
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                amount: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Allocation</label>
+                                    <select
+                                        className="form-control"
+                                        value={paymentFormData.allocation}
+                                        onChange={(e) =>
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                allocation: e.target.value,
+                                            })
+                                        }
+                                    >
+                                        <option value="downpayment">
+                                            Downpayment
+                                        </option>
+                                        <option value="balance">Balance</option>
+                                        <option value="full">Full Payment</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Official Receipt #</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="OR number"
+                                        value={paymentFormData.official_receipt_number}
+                                        onChange={(e) =>
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                official_receipt_number:
+                                                    e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Reference # / GCash Trace</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="GCash, bank reference, etc."
+                                        value={paymentFormData.payment_reference}
+                                        onChange={(e) =>
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                payment_reference: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Notes</label>
+                                    <textarea
+                                        className="form-control"
+                                        rows="3"
+                                        placeholder="Add any details about this payment..."
+                                        value={paymentFormData.notes}
+                                        onChange={(e) =>
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                notes: e.target.value,
+                                            })
+                                        }
+                                    ></textarea>
+                                </div>
+                                <div className="form-group">
+                                    <label>Attachments (GCash / Bank proof)</label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        multiple
+                                        onChange={(e) =>
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                attachments: Array.from(
+                                                    e.target.files || []
+                                                ),
+                                            })
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <h5 className="m-b-3">Payment History</h5>
+                                <div className="border rounded p-3 payment-history">
+                                    {selectedTicket?.payments &&
+                                    selectedTicket.payments.length ? (
+                                        selectedTicket.payments.map((payment) => (
+                                            <div
+                                                key={payment.id}
+                                                className="border-bottom pb-2 mb-2"
+                                            >
+                                                <div className="d-flex justify-content-between">
+                                                    <strong>
+                                                        {formatCurrency(payment.amount)}
+                                                    </strong>
+                                                    <span className="text-muted text-sm">
+                                                        {new Date(
+                                                            payment.payment_date
+                                                        ).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {payment.payment_method?.replace(
+                                                        "_",
+                                                        " "
+                                                    ) || "N/A"}
+                                                    {payment.official_receipt_number && (
+                                                        <> • OR {payment.official_receipt_number}</>
+                                                    )}
+                                                </div>
+                                                {payment.payment_reference && (
+                                                    <div className="text-xs text-gray-500">
+                                                        Ref: {payment.payment_reference}
+                                                    </div>
+                                                )}
+                                                {payment.notes && (
+                                                    <p className="text-xs mt-1">
+                                                        {payment.notes}
+                                                    </p>
+                                                )}
+                                                {payment.documents?.length ? (
+                                                    <span className="badge badge-success">
+                                                        {payment.documents.length}{" "}
+                                                        attachment
+                                                        {payment.documents.length > 1
+                                                            ? "s"
+                                                            : ""}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-muted m-b-0">
+                                            No payments recorded yet.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="modal-footer border-top pt-3">
@@ -715,7 +870,7 @@ export default function Tickets({
                                 ) : (
                                     <>
                                         <i className="ti-check mr-2"></i>
-                                        Update Payment
+                                        Save Payment
                                     </>
                                 )}
                             </button>

@@ -7,9 +7,15 @@ use App\Models\TicketFile;
 use App\Models\Customer;
 use App\Models\JobCategory;
 use App\Models\JobType;
+use App\Models\Payment;
+use App\Models\Notification;
+use App\Models\User;
+use App\Services\PaymentRecorder;
+use App\Events\TicketStatusChanged;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class TicketController extends BaseCrudController
@@ -18,7 +24,7 @@ class TicketController extends BaseCrudController
     protected $resourceName = 'tickets';
     protected $viewPath = 'Tickets';
 
-    public function __construct()
+    public function __construct(protected PaymentRecorder $paymentRecorder)
     {
         parent::__construct();
     }
@@ -28,7 +34,7 @@ class TicketController extends BaseCrudController
      */
     public function index(Request $request)
     {
-        $query = Ticket::with('customer', 'customerFiles');
+        $query = Ticket::with(['customer', 'customerFiles', 'payments.documents']);
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -109,27 +115,84 @@ class TicketController extends BaseCrudController
             'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'initial_payment_reference' => 'nullable|string|max:150',
+            'initial_payment_notes' => 'nullable|string|max:500',
+            'initial_payment_or' => 'nullable|string|max:100',
         ]);
 
-        // Handle file upload
+        $ticketData = $validated;
+
+        // Remove request-only fields before persisting
+        $transientKeys = [
+            'attachments',
+            'payment_proofs',
+            'initial_payment_reference',
+            'initial_payment_notes',
+            'initial_payment_or',
+        ];
+        foreach ($transientKeys as $key) {
+            unset($ticketData[$key]);
+        }
+
+        // Handle legacy single file upload
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $path = $file->store('tickets/customer', 'public');
-            $validated['file_path'] = $path;
+            $ticketData['file_path'] = $path;
         }
 
-        $this->applyPricing($validated, $request);
-        unset($validated['size_width'], $validated['size_height'], $validated['size_rate_id']);
-        $ticket = Ticket::create($validated);
+        $this->applyPricing($ticketData, $request);
+        unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 
-        // Save file to ticket_files if file was uploaded
-        if ($request->hasFile('file')) {
+        $ticket = Ticket::create($ticketData);
+
+        if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
                 'filename' => $request->file('file')->getClientOriginalName(),
                 'filepath' => $path,
                 'type' => 'customer',
             ]);
+        }
+
+        // Store any additional attachments
+        foreach ($request->file('attachments', []) as $attachment) {
+            if (!$attachment) {
+                continue;
+            }
+            $storedPath = $attachment->store('tickets/customer', 'public');
+            TicketFile::create([
+                'ticket_id' => $ticket->id,
+                'filename' => $attachment->getClientOriginalName(),
+                'filepath' => $storedPath,
+                'type' => 'customer',
+            ]);
+        }
+
+        // Record initial payment if downpayment is provided
+        $downpaymentAmount = (float)($ticketData['downpayment'] ?? 0);
+        if ($downpaymentAmount > 0) {
+            $this->paymentRecorder->record(
+                [
+                    'ticket_id' => $ticket->id,
+                    'payment_method' => $ticketData['payment_method'] ?? 'cash',
+                    'amount' => $downpaymentAmount,
+                    'payment_date' => now()->toDateString(),
+                    'allocation' => 'downpayment',
+                    'payment_reference' => $validated['initial_payment_reference'] ?? null,
+                    'official_receipt_number' => $validated['initial_payment_or'] ?? null,
+                    'notes' => $validated['initial_payment_notes'] ?? 'Recorded during ticket creation.',
+                    'payment_type' => 'collection',
+                ],
+                (array)$request->file('payment_proofs', [])
+            );
+        }
+
+        // Notify designers when ticket is created (status: pending)
+        if ($ticket->status === 'pending') {
+            $this->notifyTicketCreated($ticket);
         }
 
         return redirect()
@@ -164,19 +227,34 @@ class TicketController extends BaseCrudController
             'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'initial_payment_reference' => 'nullable|string|max:150',
+            'initial_payment_notes' => 'nullable|string|max:500',
+            'initial_payment_or' => 'nullable|string|max:100',
         ]);
+
+        $ticketData = $validated;
+        $transientKeys = [
+            'attachments',
+            'payment_proofs',
+            'initial_payment_reference',
+            'initial_payment_notes',
+            'initial_payment_or',
+        ];
+        foreach ($transientKeys as $key) {
+            unset($ticketData[$key]);
+        }
 
         // Handle file upload
         if ($request->hasFile('file')) {
-            // Delete old file if exists
             if ($ticket->file_path) {
                 Storage::disk('public')->delete($ticket->file_path);
             }
             $file = $request->file('file');
             $path = $file->store('tickets/customer', 'public');
-            $validated['file_path'] = $path;
+            $ticketData['file_path'] = $path;
 
-            // Save new file to ticket_files
             TicketFile::create([
                 'ticket_id' => $ticket->id,
                 'filename' => $file->getClientOriginalName(),
@@ -185,10 +263,23 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        $this->applyPricing($validated, $request);
-        unset($validated['size_width'], $validated['size_height'], $validated['size_rate_id']);
+        $this->applyPricing($ticketData, $request);
+        unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 
-        $ticket->update($validated);
+        $ticket->update($ticketData);
+
+        foreach ($request->file('attachments', []) as $attachment) {
+            if (!$attachment) {
+                continue;
+            }
+            $storedPath = $attachment->store('tickets/customer', 'public');
+            TicketFile::create([
+                'ticket_id' => $ticket->id,
+                'filename' => $attachment->getClientOriginalName(),
+                'filepath' => $storedPath,
+                'type' => 'customer',
+            ]);
+        }
 
         return redirect()
             ->route('tickets.index')
@@ -281,9 +372,10 @@ class TicketController extends BaseCrudController
     public function updateStatus(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
+        $oldStatus = $ticket->status;
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled,approved,rejected',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -297,14 +389,10 @@ class TicketController extends BaseCrudController
 
         $ticket->save();
 
-        // Optional: Log the status change
-        // StatusChangeLog::create([
-        //     'ticket_id' => $ticket->id,
-        //     'user_id' => auth()->id(),
-        //     'old_status' => $ticket->getOriginal('status'),
-        //     'new_status' => $validated['status'],
-        //     'notes' => $validated['notes'],
-        // ]);
+        // Notify users about status change
+        if ($oldStatus !== $ticket->status) {
+            $this->notifyStatusChange($ticket, $oldStatus, $ticket->status);
+        }
 
         return response()->json([
             'success' => true,
@@ -321,46 +409,39 @@ class TicketController extends BaseCrudController
         $ticket = Ticket::findOrFail($id);
 
         $validated = $request->validate([
-            'payment_status' => 'required|in:pending,partial,paid',
-            'amount_paid' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|in:cash,gcash,bank_transfer,credit_card,check',
+            'amount_paid' => 'required|numeric|min:0.01',
+            'payment_method' => 'required|string|in:' . implode(',', Payment::METHODS),
+            'payment_date' => 'required|date',
+            'allocation' => 'nullable|string|in:' . implode(',', Payment::ALLOCATIONS),
+            'payment_reference' => 'nullable|string|max:150',
+            'official_receipt_number' => 'nullable|string|max:100',
             'payment_notes' => 'nullable|string|max:500',
+            'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:8192',
         ]);
 
-        // Update payment status
-        $ticket->payment_status = $validated['payment_status'];
+        $payment = $this->paymentRecorder->record(
+            [
+                'ticket_id' => $ticket->id,
+                'payment_method' => $validated['payment_method'],
+                'amount' => $validated['amount_paid'],
+                'payment_date' => $validated['payment_date'],
+                'allocation' => $validated['allocation'] ?? null,
+                'payment_reference' => $validated['payment_reference'] ?? null,
+                'official_receipt_number' => $validated['official_receipt_number'] ?? null,
+                'notes' => $validated['payment_notes'] ?? null,
+                'payment_type' => 'collection',
+            ],
+            (array)$request->file('attachments', [])
+        );
 
-        // If amount is provided, add it to the total amount paid
-        if (!empty($validated['amount_paid']) && $validated['amount_paid'] > 0) {
-            $currentPaid = $ticket->amount_paid ?? 0;
-            $ticket->amount_paid = $currentPaid + $validated['amount_paid'];
-
-            // Check if fully paid and update status accordingly
-            if ($ticket->amount_paid >= $ticket->total_amount) {
-                $ticket->payment_status = 'paid';
-            } elseif ($ticket->amount_paid > 0) {
-                $ticket->payment_status = 'partial';
-            }
-        }
-
-        $ticket->save();
-
-        // Optional: Create payment transaction record
-        // PaymentTransaction::create([
-        //     'ticket_id' => $ticket->id,
-        //     'user_id' => auth()->id(),
-        //     'amount' => $validated['amount_paid'],
-        //     'payment_method' => $validated['payment_method'],
-        //     'payment_notes' => $validated['payment_notes'],
-        //     'balance_before' => $ticket->total_amount - ($currentPaid ?? 0),
-        //     'balance_after' => $ticket->total_amount - $ticket->amount_paid,
-        // ]);
+        $ticket->refresh()->load(['payments.documents', 'customer']);
 
         return response()->json([
             'success' => true,
-            'message' => 'Payment updated successfully',
-            'ticket' => $ticket->fresh(),
-            'new_balance' => $ticket->total_amount - $ticket->amount_paid
+            'message' => 'Payment recorded successfully',
+            'ticket' => $ticket,
+            'payment' => $payment,
+            'new_balance' => $ticket->outstanding_balance,
         ]);
     }
 
@@ -386,5 +467,137 @@ class TicketController extends BaseCrudController
             'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
         ];
+    }
+
+    /**
+     * Notify designers when a new ticket is created (status: pending)
+     */
+    protected function notifyTicketCreated(Ticket $ticket): void
+    {
+        $designers = User::where('role', User::ROLE_DESIGNER)->get();
+        $recipientIds = $designers->pluck('id')->toArray();
+
+        if (empty($recipientIds)) {
+            return;
+        }
+
+        $title = 'New Ticket Created';
+        $message = "Ticket {$ticket->ticket_number} has been created and requires your review.";
+
+        foreach ($designers as $designer) {
+            Notification::create([
+                'user_id' => $designer->id,
+                'type' => 'ticket_created',
+                'notifiable_id' => $ticket->id,
+                'notifiable_type' => Ticket::class,
+                'title' => $title,
+                'message' => $message,
+                'data' => [
+                    'ticket_id' => $ticket->id,
+                    'ticket_number' => $ticket->ticket_number,
+                    'status' => $ticket->status,
+                ],
+            ]);
+        }
+
+        // Broadcast event
+        event(new TicketStatusChanged(
+            $ticket,
+            'new',
+            'pending',
+            Auth::user(),
+            $recipientIds,
+            'ticket_created',
+            $title,
+            $message
+        ));
+    }
+
+    /**
+     * Notify users about ticket status changes
+     */
+    protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
+    {
+        $triggeredBy = Auth::user();
+        $recipientIds = [];
+        $notificationType = '';
+        $title = '';
+        $message = '';
+
+        // Determine recipients and notification content based on status change
+        switch ($newStatus) {
+            case 'approved':
+                // Notify FrontDesk and Production
+                $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
+                $productionUsers = User::where('role', User::ROLE_PRODUCTION)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->merge($productionUsers->pluck('id'))->toArray();
+                $notificationType = 'ticket_approved';
+                $title = 'Ticket Approved';
+                $message = "Ticket {$ticket->ticket_number} has been approved by {$triggeredBy->name}.";
+                break;
+
+            case 'rejected':
+            case 'cancelled':
+                // Notify FrontDesk
+                $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_rejected';
+                $title = 'Ticket ' . ucfirst($newStatus);
+                $message = "Ticket {$ticket->ticket_number} has been {$newStatus} by {$triggeredBy->name}.";
+                break;
+
+            case 'in_production':
+                // Notify FrontDesk (optional)
+                $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_in_production';
+                $title = 'Ticket In Production';
+                $message = "Ticket {$ticket->ticket_number} is now in production.";
+                break;
+
+            case 'completed':
+                // Notify FrontDesk (optional)
+                $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_completed';
+                $title = 'Ticket Completed';
+                $message = "Ticket {$ticket->ticket_number} has been completed.";
+                break;
+        }
+
+        if (empty($recipientIds) || empty($notificationType)) {
+            return;
+        }
+
+        // Create notifications for all recipients
+        $users = User::whereIn('id', $recipientIds)->get();
+        foreach ($users as $user) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => $notificationType,
+                'notifiable_id' => $ticket->id,
+                'notifiable_type' => Ticket::class,
+                'title' => $title,
+                'message' => $message,
+                'data' => [
+                    'ticket_id' => $ticket->id,
+                    'ticket_number' => $ticket->ticket_number,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                ],
+            ]);
+        }
+
+        // Broadcast event
+        event(new TicketStatusChanged(
+            $ticket,
+            $oldStatus,
+            $newStatus,
+            $triggeredBy,
+            $recipientIds,
+            $notificationType,
+            $title,
+            $message
+        ));
     }
 }

@@ -58,6 +58,11 @@ export default function Sidebar({ isCollapsed }) {
                                 </Link>
                             </li>
                             <li>
+                                <Link href="/finance">
+                                    <i className="ti-credit-card"></i> Payments & Finance
+                                </Link>
+                            </li>
+                            <li>
                                 <Link href="/customers">
                                     <i className="ti-user"></i> Customers
                                 </Link>
@@ -125,9 +130,8 @@ export default function Sidebar({ isCollapsed }) {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/tickets">
-                                        <i className="ti-user"></i> Users
-                                        Management
+                                    <Link href="/customers">
+                                        <i className="ti-user"></i> Clients
                                     </Link>
                                 </li>
                                 <li>
@@ -153,15 +157,17 @@ export default function Sidebar({ isCollapsed }) {
                                         Purchase Orders
                                     </Link>
                                 </li>
+                              
                                 <li>
-                                    <Link href="/customers">
-                                        <i className="ti-user"></i> Clients
+                                <Link href="/finance">
+                                        <i className="ti-credit-card"></i>{" "}
+                                        Payments & Finance
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/customers">
-                                        <i className="ti-credit-card"></i>{" "}
-                                        Payments & Finance
+                                    <Link href="/tickets">
+                                        <i className="ti-user"></i> Users
+                                        Management
                                     </Link>
                                 </li>
                                 <li>

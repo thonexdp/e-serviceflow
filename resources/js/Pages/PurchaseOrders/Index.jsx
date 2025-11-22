@@ -8,6 +8,7 @@ import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
+import { formatPeso } from "@/Utils/currency";
 
 export default function PurchaseOrdersIndex({
     user = {},
@@ -136,7 +137,7 @@ export default function PurchaseOrdersIndex({
         {
             label: "Total Amount",
             key: "total_amount",
-            render: (row) => `₱${parseFloat(row.total_amount).toFixed(2)}`,
+            render: (row) => `${formatPeso(parseFloat(row.total_amount).toFixed(2))}`,
         },
         {
             label: "Order Date",

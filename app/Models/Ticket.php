@@ -41,6 +41,7 @@ class Ticket extends Model
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'downpayment' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
         'quantity' => 'integer',
         'produced_quantity' => 'integer',
     ];
@@ -114,6 +115,52 @@ class Ticket extends Model
     public function mockupFiles()
     {
         return $this->hasMany(TicketFile::class)->where('type', 'mockup');
+    }
+
+    /**
+     * Payments recorded for this ticket.
+     */
+    public function payments()
+    {
+        return $this->hasMany(Payment::class)->orderByDesc('payment_date');
+    }
+
+    /**
+     * Outstanding balance accessor.
+     */
+    public function getOutstandingBalanceAttribute(): float
+    {
+        $total = (float)($this->total_amount ?? 0);
+        $paid = (float)($this->amount_paid ?? 0);
+
+        return max($total - $paid, 0);
+    }
+
+    /**
+     * Sync amount_paid and payment_status with recorded payments.
+     */
+    public function refreshPaymentSummary(): void
+    {
+        if (!$this->exists) {
+            return;
+        }
+
+        $paid = (float)$this->payments()->where('status', 'posted')->sum('amount');
+        $total = (float)($this->total_amount ?? 0);
+
+        $status = 'pending';
+        if ($total <= 0 && $paid > 0) {
+            $status = 'paid';
+        } elseif ($paid >= $total && $total > 0) {
+            $status = 'paid';
+        } elseif ($paid > 0 && $paid < $total) {
+            $status = 'partial';
+        }
+
+        $this->forceFill([
+            'amount_paid' => round($paid, 2),
+            'payment_status' => $status,
+        ])->saveQuietly();
     }
 
     /**
