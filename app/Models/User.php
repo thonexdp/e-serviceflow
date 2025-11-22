@@ -91,4 +91,20 @@ class User extends Authenticatable
     {
         return $this->hasRole(self::ROLE_PRODUCTION);
     }
+
+    /**
+     * Get all notifications for the user.
+     */
+    public function notifications()
+    {
+        return $this->hasMany(\App\Models\Notification::class);
+    }
+
+    /**
+     * Get unread notifications for the user.
+     */
+    public function unreadNotifications()
+    {
+        return $this->hasMany(\App\Models\Notification::class)->where('read', false);
+    }
 }

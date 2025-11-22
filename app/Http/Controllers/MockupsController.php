@@ -7,6 +7,8 @@ use App\Models\TicketFile;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class MockupsController extends Controller
 {
@@ -105,6 +107,7 @@ class MockupsController extends Controller
     public function approve(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
+        $oldStatus = $ticket->status;
 
         $request->validate([
             'notes' => 'nullable|string|max:1000',
@@ -116,6 +119,12 @@ class MockupsController extends Controller
             'status' => 'ready_to_print', // Set status to ready for production
         ]);
 
+        // Refresh ticket to get latest data
+        $ticket->refresh();
+
+        // Notify FrontDesk and Production
+        $this->notifyStatusChange($ticket, $oldStatus, 'ready_to_print');
+
         return redirect()->back()->with('success', 'Design approved successfully.');
     }
 
@@ -125,6 +134,7 @@ class MockupsController extends Controller
     public function requestRevision(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
+        $oldStatus = $ticket->status;
 
         $request->validate([
             'notes' => 'required|string|max:1000',
@@ -133,7 +143,11 @@ class MockupsController extends Controller
         $ticket->update([
             'design_status' => 'revision_requested',
             'design_notes' => $request->notes,
+            'status' => 'rejected', // Set status to rejected
         ]);
+
+        // Notify FrontDesk
+        $this->notifyStatusChange($ticket, $oldStatus, 'rejected');
 
         return redirect()->back()->with('success', 'Revision requested successfully.');
     }
@@ -150,5 +164,98 @@ class MockupsController extends Controller
         }
 
         return Storage::disk('public')->download($file->filepath, $file->filename);
+    }
+
+    /**
+     * Notify users about ticket status changes (shared with TicketController logic)
+     */
+    protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
+    {
+        $triggeredBy = Auth::user();
+        
+        if (!$triggeredBy) {
+            Log::warning('Cannot send notification: No authenticated user');
+            return;
+        }
+
+        $recipientIds = [];
+        $notificationType = '';
+        $title = '';
+        $message = '';
+
+        // Determine recipients and notification content based on status change
+        switch ($newStatus) {
+            case 'approved':
+            case 'ready_to_print':
+                // Notify FrontDesk and Production
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->merge($productionUsers->pluck('id'))->unique()->toArray();
+
+                $notificationType = 'ticket_approved';
+                $title = 'Ticket Approved';
+                $message = "Ticket {$ticket->ticket_number} has been approved by {$triggeredBy->name} and is ready for production.";
+                break;
+
+            case 'rejected':
+            case 'cancelled':
+                // Notify FrontDesk
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_rejected';
+                $title = 'Ticket ' . ucfirst($newStatus);
+                $message = "Ticket {$ticket->ticket_number} has been {$newStatus} by {$triggeredBy->name}.";
+                break;
+        }
+
+        if (empty($recipientIds) || empty($notificationType)) {
+            Log::warning("No recipients or notification type for status change: {$oldStatus} -> {$newStatus}");
+            return;
+        }
+
+        Log::info("Sending notifications for ticket {$ticket->id}: {$oldStatus} -> {$newStatus}", [
+            'recipients' => $recipientIds,
+            'type' => $notificationType
+        ]);
+
+        // Create notifications for all recipients
+        $users = \App\Models\User::whereIn('id', $recipientIds)->get();
+        foreach ($users as $user) {
+            try {
+                \App\Models\Notification::create([
+                    'user_id' => $user->id,
+                    'type' => $notificationType,
+                    'notifiable_id' => $ticket->id,
+                    'notifiable_type' => Ticket::class,
+                    'title' => $title,
+                    'message' => $message,
+                    'data' => [
+                        'ticket_id' => $ticket->id,
+                        'ticket_number' => $ticket->ticket_number,
+                        'old_status' => $oldStatus,
+                        'new_status' => $newStatus,
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                Log::error("Failed to create notification for user {$user->id}: " . $e->getMessage());
+            }
+        }
+
+        // Broadcast event
+        try {
+            event(new \App\Events\TicketStatusChanged(
+                $ticket->fresh(), // Ensure we have the latest ticket data
+                $oldStatus,
+                $newStatus,
+                $triggeredBy,
+                $recipientIds,
+                $notificationType,
+                $title,
+                $message
+            ));
+            Log::info("Broadcast event sent for ticket {$ticket->id}");
+        } catch (\Exception $e) {
+            Log::error("Failed to broadcast event for ticket {$ticket->id}: " . $e->getMessage());
+        }
     }
 }

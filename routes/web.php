@@ -10,6 +10,10 @@ use App\Http\Controllers\MockupsController;
 use App\Http\Controllers\ProductionQueueController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -64,6 +68,19 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tickets/{ticket}', [TicketController::class, 'destroy'])->name('tickets.destroy');
     Route::patch('/tickets/{ticket}/update-status', [TicketController::class, 'updateStatus'])->name('tickets.update-status');
     Route::patch('/tickets/{ticket}/update-payment', [TicketController::class, 'updatePayment'])->name('tickets.update-payment');
+
+    // Notifications routes
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+
+    // Finance hub
+    Route::get('/finance', [FinanceController::class, 'index'])->middleware('role:admin,FrontDesk')->name('finance.index');
+    Route::post('/payments', [PaymentController::class, 'store'])->middleware('role:admin,FrontDesk')->name('payments.store');
+    Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->middleware('role:admin,FrontDesk')->name('payments.documents.download');
+    Route::post('/expenses', [ExpenseController::class, 'store'])->middleware('role:admin,FrontDesk')->name('expenses.store');
 
 
     // Customer routes - accessible to all authenticated users

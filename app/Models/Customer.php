@@ -19,6 +19,8 @@ class Customer extends Model
         'address',
     ];
 
+    protected $appends = ['full_name'];
+
     /**
      * Get the full name attribute.
      */
@@ -33,6 +35,11 @@ class Customer extends Model
     public function tickets()
     {
         return $this->hasMany(Ticket::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
     }
 }
 

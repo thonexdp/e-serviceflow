@@ -59,7 +59,10 @@ export default function TicketForm({
         balance: "",
         change: "",
         payment_method: "cash",
-        payment_status: "",
+        payment_status: "pending",
+        initial_payment_reference: "",
+        initial_payment_notes: "",
+        initial_payment_or: "",
         status: "pending",
         file: null,
     });
@@ -73,8 +76,10 @@ export default function TicketForm({
     });
     const [selectedSizeRateId, setSelectedSizeRateId] = useState(null);
 
-    const [selectedImages, setSelectedImages] = useState([]);
-    const [activeImageTab, setActiveImageTab] = useState(0);
+    const [ticketAttachments, setTicketAttachments] = useState([]);
+    const [activeAttachmentTab, setActiveAttachmentTab] = useState(0);
+    const [paymentProofs, setPaymentProofs] = useState([]);
+    const [activeProofTab, setActiveProofTab] = useState(0);
     const [enableDiscount, setEnableDiscount] = useState(false);
 
     // Get available job types based on selected category
@@ -135,6 +140,9 @@ export default function TicketForm({
                 payment_status: ticket.payment_status || "pending",
                 status: ticket.status || "pending",
                 file: null,
+                initial_payment_reference: "",
+                initial_payment_notes: "",
+                initial_payment_or: "",
             });
             setSizeDimensions(parsedSize);
             setEnableDiscount(parseFloat(ticket.discount) > 0);
@@ -192,24 +200,19 @@ export default function TicketForm({
     }, [selectedSizeRateId]);
 
     useEffect(() => {
-        if (
-            ticket &&
-            ticket.customer_files &&
-            ticket.customer_files.length > 0
-        ) {
+        if (ticket && ticket.customer_files && ticket.customer_files.length > 0) {
             const existingImages = ticket.customer_files.map((attachment) => ({
-                preview:
-                    attachment.file_path || `/storage/${attachment.filepath}`,
+                preview: attachment.file_path || `/storage/${attachment.filepath}`,
                 file: null,
                 existing: true,
                 id: attachment.id,
                 name: attachment.filename,
             }));
-            setSelectedImages(existingImages);
-            setActiveImageTab(0);
+            setTicketAttachments(existingImages);
+            setActiveAttachmentTab(0);
         } else {
-            setSelectedImages([]);
-            setActiveImageTab(0);
+            setTicketAttachments([]);
+            setActiveAttachmentTab(0);
         }
     }, [ticket]);
 
@@ -252,6 +255,14 @@ export default function TicketForm({
     const sizeRates = selectedJobType?.size_rates || [];
     const hasPriceTiers = priceTiers.length > 0;
     const hasSizeRates = sizeRates.length > 0;
+    const subtotalValue = parseFloat(formData.subtotal || 0);
+    const discountAmountValue = parseFloat(formData.discount_amount || 0);
+    const totalAmountValue = parseFloat(formData.total_amount || 0);
+    const downpaymentValue = parseFloat(formData.downpayment || 0);
+    const remainingAfterDownpayment = Math.max(
+        totalAmountValue - downpaymentValue,
+        0
+    );
     const currentSizeRate = hasSizeRates
         ? sizeRates.find(
               (rate) =>
@@ -366,56 +377,79 @@ export default function TicketForm({
     };
 
     const handleChange = (e) => {
-        const { name, value, type, files } = e.target;
+        const { name, value } = e.target;
 
-        if (type === "file") {
-            if (files && files.length > 0) {
-                const newImages = Array.from(files).map((file) => ({
-                    file,
-                    preview: URL.createObjectURL(file),
-                    existing: false,
-                }));
-                setSelectedImages((prev) => [...prev, ...newImages]);
-                // setFormData((prev) => ({
-                //     ...prev,
-                //     file: files[0],
-                // }));
-                e.target.value = "";
-            }
-            clearError(name);
-        } else {
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+
+        if (name === "category_id") {
             setFormData((prev) => ({
                 ...prev,
-                [name]: value,
+                job_type_id: "",
             }));
+            setSelectedJobType(null);
+            setSelectedSizeRateId(null);
+            setSizeDimensions({ width: "", height: "" });
+        }
 
-            // Reset job type when category changes
-            if (name === "category_id") {
-                setFormData((prev) => ({
-                    ...prev,
-                    job_type_id: "",
-                }));
-                setSelectedJobType(null);
-                setSelectedSizeRateId(null);
-                setSizeDimensions({ width: "", height: "" });
-            }
-
-            if (name === "job_type_id") {
-                setSelectedSizeRateId(null);
-                setSizeDimensions({ width: "", height: "" });
-            }
+        if (name === "job_type_id") {
+            setSelectedSizeRateId(null);
+            setSizeDimensions({ width: "", height: "" });
         }
 
         clearError(name);
     };
 
-    const removeImage = (index) => {
-        setSelectedImages((prev) => {
+    const handleTicketAttachmentUpload = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) {
+            return;
+        }
+        const uploads = files.map((file) => ({
+            file,
+            preview: URL.createObjectURL(file),
+            existing: false,
+            name: file.name,
+        }));
+        setTicketAttachments((prev) => [...prev, ...uploads]);
+        event.target.value = "";
+    };
+
+    const removeTicketAttachment = (index) => {
+        setTicketAttachments((prev) => {
             const updated = prev.filter((_, i) => i !== index);
-            if (activeImageTab >= updated.length && activeImageTab > 0) {
-                setActiveImageTab(updated.length - 1);
+            if (activeAttachmentTab >= updated.length && activeAttachmentTab > 0) {
+                setActiveAttachmentTab(updated.length - 1);
             } else if (updated.length === 0) {
-                setActiveImageTab(0);
+                setActiveAttachmentTab(0);
+            }
+            return updated;
+        });
+    };
+
+    const handlePaymentProofUpload = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) {
+            return;
+        }
+        const uploads = files.map((file) => ({
+            file,
+            preview: URL.createObjectURL(file),
+            name: file.name,
+        }));
+        setPaymentProofs((prev) => [...prev, ...uploads]);
+        event.target.value = "";
+    };
+
+    const removePaymentProof = (index) => {
+        setPaymentProofs((prev) => {
+            const updated = prev.filter((_, i) => i !== index);
+            if (activeProofTab >= updated.length && activeProofTab > 0) {
+                setActiveProofTab(updated.length - 1);
+            } else if (updated.length === 0) {
+                setActiveProofTab(0);
             }
             return updated;
         });
@@ -487,6 +521,10 @@ export default function TicketForm({
             size_rate_id: selectedSizeRateId,
             size_width: sizeDimensions.width,
             size_height: sizeDimensions.height,
+            ticketAttachments: ticketAttachments
+                .filter((attachment) => !attachment.existing && attachment.file)
+                .map((attachment) => attachment.file),
+            paymentProofs: paymentProofs.map((proof) => proof.file),
         };
 
         onSubmit(submitData);
@@ -553,12 +591,13 @@ export default function TicketForm({
                                             </span>
                                             <span className="font-weight-bold">
                                                 ₱
-                                                {parseFloat(
-                                                    formData.subtotal || 0
-                                                ).toLocaleString("en-US", {
+                                                {subtotalValue.toLocaleString(
+                                                    "en-US",
+                                                    {
                                                     minimumFractionDigits: 2,
                                                     maximumFractionDigits: 2,
-                                                })}
+                                                    }
+                                                )}
                                             </span>
                                         </div>
 
@@ -569,13 +608,13 @@ export default function TicketForm({
                                             </span>
                                             <span className="text-danger font-weight-bold">
                                                 -₱
-                                                {parseFloat(
-                                                    formData.discount_amount ||
-                                                        0
-                                                ).toLocaleString("en-US", {
+                                                {discountAmountValue.toLocaleString(
+                                                    "en-US",
+                                                    {
                                                     minimumFractionDigits: 2,
                                                     maximumFractionDigits: 2,
-                                                })}
+                                                    }
+                                                )}
                                             </span>
                                         </div>
 
@@ -589,14 +628,48 @@ export default function TicketForm({
                                                 className="font-weight-bold"
                                             >
                                                 ₱
-                                                {parseFloat(
-                                                    formData.total_amount || 0
-                                                ).toLocaleString("en-US", {
+                                                {totalAmountValue.toLocaleString(
+                                                    "en-US",
+                                                    {
                                                     minimumFractionDigits: 2,
                                                     maximumFractionDigits: 2,
-                                                })}
+                                                    }
+                                                )}
                                             </span>
                                         </div>
+
+                                        <div className="d-flex justify-content-between align-items-center py-2 border-top">
+                                            <span className="text-muted small text-uppercase font-weight-bold">
+                                                Downpayment
+                                            </span>
+                                            <span className="text-success font-weight-bold">
+                                                ₱
+                                                {downpaymentValue.toLocaleString(
+                                                    "en-US",
+                                                    {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    }
+                                                )}
+                                            </span>
+                                        </div>
+                                        {downpaymentValue > 0 && (
+                                            <div className="d-flex justify-content-between align-items-center py-2 border-top">
+                                                <span className="text-muted small text-uppercase font-weight-bold">
+                                                    Due After Downpayment
+                                                </span>
+                                                <span className="text-warning font-weight-bold">
+                                                    ₱
+                                                    {remainingAfterDownpayment.toLocaleString(
+                                                        "en-US",
+                                                        {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        }
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
 
                                         {/* Balance */}
                                         {/* {parseFloat(formData.balance || 0) > 0 && ( */}
@@ -913,6 +986,110 @@ export default function TicketForm({
                                 />
                             </div>
                         </div>
+                        <div className="row mt-3">
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Official Receipt #"
+                                    type="text"
+                                    name="initial_payment_or"
+                                    value={formData.initial_payment_or}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Payment Reference"
+                                    type="text"
+                                    name="initial_payment_reference"
+                                    value={formData.initial_payment_reference}
+                                    onChange={handleChange}
+                                    placeholder="GCash, bank trace, etc."
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Payment Notes"
+                                    type="text"
+                                    name="initial_payment_notes"
+                                    value={formData.initial_payment_notes}
+                                    onChange={handleChange}
+                                    placeholder="Optional note"
+                                />
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="mt-32">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Payment Proofs (GCash / bank receipts)
+                                </label>
+                                <input
+                                    type="file"
+                                    className="form-control"
+                                    accept="image/*,application/pdf"
+                                    multiple
+                                    onChange={handlePaymentProofUpload}
+                                />
+                                </div>
+                               
+                            </div>
+                            <div className="col-md-6">
+                            {paymentProofs.length > 0 ? (
+                                    <div className="mt-3">
+                                        {paymentProofs.length > 1 && (
+                                            <div className="nav nav-pills nav-fill gap-2 mb-3" role="tablist">
+                                                {paymentProofs.map((_, index) => (
+                                                    <button
+                                                        key={index}
+                                                        type="button"
+                                                        className={`nav-link btn-sm py-1 px-2 ${
+                                                            activeProofTab === index ? "active" : ""
+                                                        }`}
+                                                        onClick={() => setActiveProofTab(index)}
+                                                        style={{ fontSize: "0.75rem" }}
+                                                    >
+                                                        <i className="ti-receipt mr-1"></i>
+                                                        Proof {index + 1}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div
+                                            className="border rounded overflow-hidden bg-light d-flex align-items-center justify-content-center"
+                                            style={{ minHeight: "220px" }}
+                                        >
+                                            <img
+                                                src={paymentProofs[activeProofTab].preview}
+                                                alt={`Payment proof ${activeProofTab + 1}`}
+                                                className="img-fluid"
+                                                style={{
+                                                    maxHeight: "100%",
+                                                    maxWidth: "100%",
+                                                    objectFit: "contain",
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="text-muted small mt-2 text-center">
+                                            {activeProofTab + 1} of {paymentProofs.length}
+                                        </div>
+                                        <button
+                                            type="button"
+                        className="btn btn-sm btn-outline-danger w-100 mt-2"
+                                            onClick={() => removePaymentProof(activeProofTab)}
+                                        >
+                                            <i className="ti-trash mr-1"></i>Remove Proof
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="border rounded p-4 text-center text-muted bg-light mt-3">
+                                        <i className="ti-receipt" style={{ fontSize: "32px" }}></i>
+                                        <p className="mt-2 small mb-0">
+                                            Upload screenshots or PDFs of payment confirmations
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </Section>
 
                     {/* BILLING */}
@@ -1019,62 +1196,48 @@ export default function TicketForm({
                     <Section title="Attachments">
                         <div className="card shadow-sm border-0">
                             <div className="card-body">
-                                {/* <h6 className="card-title mb-3"> */}
-                                <i className="ti-image mr-2"></i>Attachments
-                                {/* </h6> */}
-                                <FormInput
+                                <div className="d-flex align-items-center mb-2">
+                                    <i className="ti-image mr-2"></i>
+                                    <span className="font-semibold">Attachments</span>
+                                </div>
+                                <input
                                     type="file"
-                                    name="file"
-                                    onChange={handleChange}
-                                    error={errors.file}
-                                    accept="image/*"
+                                    className="form-control"
+                                    accept="image/*,application/pdf"
                                     multiple
+                                    onChange={handleTicketAttachmentUpload}
                                 />
-                                {/* Image Tabs */}
-                                {selectedImages.length > 0 && (
+                                {ticketAttachments.length > 0 && (
                                     <div className="mt-3">
-                                        {selectedImages.length > 1 && (
+                                        {ticketAttachments.length > 1 && (
                                             <div
                                                 className="nav nav-pills nav-fill gap-2 mb-3"
                                                 role="tablist"
                                             >
-                                                {selectedImages.map(
-                                                    (_, index) => (
-                                                        <button
-                                                            key={index}
-                                                            type="button"
-                                                            className={`nav-link btn-sm py-1 px-2 ${
-                                                                activeImageTab ===
-                                                                index
-                                                                    ? "active"
-                                                                    : ""
-                                                            }`}
-                                                            onClick={() =>
-                                                                setActiveImageTab(
-                                                                    index
-                                                                )
-                                                            }
-                                                            style={{
-                                                                fontSize:
-                                                                    "0.75rem",
-                                                            }}
-                                                        >
-                                                            <i className="ti-image mr-1"></i>
-                                                            Image {index + 1}
-                                                            {selectedImages[
-                                                                index
-                                                            ].existing && (
-                                                                <span className="badge badge-success ml-1">
-                                                                    Existing
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                    )
-                                                )}
+                                                {ticketAttachments.map((_, index) => (
+                                                    <button
+                                                        key={index}
+                                                        type="button"
+                                                        className={`nav-link btn-sm py-1 px-2 ${
+                                                            activeAttachmentTab === index
+                                                                ? "active"
+                                                                : ""
+                                                        }`}
+                                                        onClick={() => setActiveAttachmentTab(index)}
+                                                        style={{ fontSize: "0.75rem" }}
+                                                    >
+                                                        <i className="ti-image mr-1"></i>
+                                                        File {index + 1}
+                                                        {ticketAttachments[index].existing && (
+                                                            <span className="badge badge-success ml-1">
+                                                                Existing
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                ))}
                                             </div>
                                         )}
 
-                                        {/* Image Preview */}
                                         <div
                                             className="border rounded overflow-hidden bg-light"
                                             style={{
@@ -1086,13 +1249,10 @@ export default function TicketForm({
                                         >
                                             <img
                                                 src={
-                                                    selectedImages[
-                                                        activeImageTab
-                                                    ].preview
+                                                    ticketAttachments[activeAttachmentTab]
+                                                        .preview
                                                 }
-                                                alt={`Preview ${
-                                                    activeImageTab + 1
-                                                }`}
+                                                alt={`Attachment ${activeAttachmentTab + 1}`}
                                                 className="img-fluid"
                                                 style={{
                                                     maxHeight: "100%",
@@ -1102,26 +1262,36 @@ export default function TicketForm({
                                             />
                                         </div>
 
-                                        {/* Image Counter */}
                                         <div className="text-muted small mt-2 text-center">
-                                            {activeImageTab + 1} of{" "}
-                                            {selectedImages.length}
+                                            {activeAttachmentTab + 1} of{" "}
+                                            {ticketAttachments.length}
                                         </div>
 
-                                        {/* Remove Button */}
                                         <button
                                             type="button"
                                             className="btn btn-sm btn-outline-danger w-100 mt-2"
                                             onClick={() =>
-                                                removeImage(activeImageTab)
+                                                removeTicketAttachment(activeAttachmentTab)
+                                            }
+                                            disabled={
+                                                ticketAttachments[activeAttachmentTab]
+                                                    ?.existing
+                                            }
+                                            title={
+                                                ticketAttachments[activeAttachmentTab]
+                                                    ?.existing
+                                                    ? "Existing files can be managed from the ticket view."
+                                                    : "Remove attachment"
                                             }
                                         >
                                             <i className="ti-trash mr-1"></i>
-                                            Remove Image
+                                            {ticketAttachments[activeAttachmentTab]?.existing
+                                                ? "Existing file"
+                                                : "Remove Attachment"}
                                         </button>
                                     </div>
                                 )}
-                                {selectedImages.length === 0 && (
+                                {ticketAttachments.length === 0 && (
                                     <div className="border rounded p-5 text-center text-muted bg-light">
                                         <i
                                             className="ti-image"

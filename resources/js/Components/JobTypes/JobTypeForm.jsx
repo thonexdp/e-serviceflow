@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import FormInput from "@/Components/Common/FormInput";
 
-export default function JobTypeForm({ jobType = null, categories = [], onSubmit, onCancel }) {
+export default function JobTypeForm({ jobType = null, allcategories = [], onSubmit, onCancel }) {
     const [formData, setFormData] = useState({
         category_id: "",
         name: "",
@@ -239,7 +239,7 @@ export default function JobTypeForm({ jobType = null, categories = [], onSubmit,
         { value: "length", label: "Per Length" },
     ];
 
-    const categoryOptions = categories.map(cat => ({
+    const categoryOptions = allcategories.map(cat => ({
         value: cat.id.toString(),
         label: cat.name
     }));
