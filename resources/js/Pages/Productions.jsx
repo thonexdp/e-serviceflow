@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
@@ -9,7 +8,7 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 
-export default function ProductionQueue({
+export default function Productions({
     user = {},
     notifications = [],
     messages = [],
@@ -808,7 +807,6 @@ export default function ProductionQueue({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

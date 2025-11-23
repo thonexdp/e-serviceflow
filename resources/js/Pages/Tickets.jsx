@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import CustomerForm from "@/Components/Customers/CustomerForm";
 import TicketForm from "@/Components/Tickets/TicketForm";
@@ -11,6 +10,9 @@ import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import axios from "axios";
+import PreviewModal from "@/Components/Main/PreviewModal";
+import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
+import { formatPeso } from "@/Utils/currency";
 
 export default function Tickets({
     user = {},
@@ -30,14 +32,19 @@ export default function Tickets({
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [_selectedCustomer, setSelectedCustomer] = useState(selectedCustomer);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [selectedID, setSelectedID] = useState(null);
+    const [openDeleteModal, setDeleteModalOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    // Status modal form state
+
+    const [show, setShow] = useState(false);
+    const [filepath, setFilepath] = useState("");
+
     const [statusFormData, setStatusFormData] = useState({
         status: "",
         notes: "",
     });
 
-    // Payment modal form state
     const [paymentFormData, setPaymentFormData] = useState({
         ticket_id: null,
         amount: "",
@@ -51,11 +58,6 @@ export default function Tickets({
     });
 
     const { flash, auth } = usePage().props;
-
-    const formatCurrency = (value) =>
-        `₱${parseFloat(value || 0).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-        })}`;
 
     const isAllowedToAddCustomer =
         auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
@@ -148,8 +150,15 @@ export default function Tickets({
         setStatusModalOpen(true);
     };
 
+    const handlePreviewFile = (payment) => {
+        setFilepath(payment?.documents[0]?.file_path);
+        setShow(true);
+    };
+
+
     // Open payment update modal
     const handleOpenPaymentModal = (ticket) => {
+        console.log(ticket);
         setSelectedTicket(ticket);
         setPaymentFormData({
             ticket_id: ticket.id,
@@ -252,20 +261,41 @@ export default function Tickets({
         setTicketModalOpen(true);
     };
 
-    const handleDeleteCustomer = (customerId) => {
-        if (confirm("Are you sure you want to delete this customer?")) {
-            router.delete(`/customers/${customerId}`, {
-                preserveScroll: true,
-            });
-        }
+    const handleConfirmDeleteTicket = () => {
+        if (!selectedID) return;
+        router.delete(`/tickets/${selectedID}`, {
+            preserveScroll: true,
+            preserveState: false,
+
+            onBefore: () => {
+                setLoading(true);
+            },
+            onSuccess: () => {
+                handleCloseModal();
+                setLoading(false);
+                toast.success(" Ticket deleted successfully.");
+            },
+            onError: (errors) => {
+                setLoading(false);
+                toast.error("Failed to delete ticket. Please try again.");
+            },
+
+            // Called always after success or error
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleCloseModal = () => {
+        setDeleteModalOpen(false);
+        setCustomerModalOpen(false);
+        setEditingCustomer(null);
     };
 
     const handleDeleteTicket = (ticketId) => {
-        if (confirm("Are you sure you want to delete this ticket?")) {
-            router.delete(`/tickets/${ticketId}`, {
-                preserveScroll: true,
-            });
-        }
+        setSelectedID(ticketId);
+        setDeleteModalOpen(true);
     };
 
     const closeCustomerModal = () => {
@@ -327,7 +357,6 @@ export default function Tickets({
         );
     };
 
-    // Define table columns
     const ticketColumns = [
         {
             label: "#",
@@ -378,14 +407,14 @@ export default function Tickets({
                 <div>
                     {getPaymentStatusBadge(row.payment_status)}
                     {/* {row.payment_status !== "paid" && ( */}
-                        <button
-                            onClick={() => handleOpenPaymentModal(row)}
-                            className="btn btn-sm ml-1"
-                            style={{ padding: "2px 8px", fontSize: "11px" }}
-                            title="Update Payment"
-                        >
-                            <i className={`ti-${row.payment_status === "paid" ? "eye" : "pencil"}`}></i>
-                        </button>
+                    <button
+                        onClick={() => handleOpenPaymentModal(row)}
+                        className="btn btn-sm btn-outline-primary ml-1"
+                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                        title="Update Payment"
+                    >
+                        <i className={`ti-${row.payment_status === "paid" ? "eye" : "pencil"}`}></i>
+                    </button>
                     {/* )} */}
                 </div>
             ),
@@ -411,9 +440,14 @@ export default function Tickets({
             ),
         },
     ];
-
     return (
         <>
+            <PreviewModal
+                isOpen={show}
+                onClose={() => setShow(false)}
+                fileUrl={filepath}
+                title="Document Preview"
+            />
             {/* Customer Modal */}
             <Modal
                 title={editingCustomer ? "Edit Customer" : "Add Customer"}
@@ -432,9 +466,8 @@ export default function Tickets({
 
             {/* Ticket Modal */}
             <Modal
-                title={`${editingTicket ? "Edit Ticket" : "Add Ticket"} - ${
-                    _selectedCustomer?.full_name
-                }`}
+                title={`${editingTicket ? "Edit Ticket" : "Add Ticket"} - ${_selectedCustomer?.full_name
+                    }`}
                 isOpen={openTicketModal}
                 onClose={closeTicketModal}
                 size="7xl"
@@ -445,6 +478,20 @@ export default function Tickets({
                     customerId={_selectedCustomer?.id}
                     onSubmit={handleTicketSubmit}
                     onCancel={closeTicketModal}
+                />
+            </Modal>
+            <Modal
+                title={"Delete Tickets"}
+                isOpen={openDeleteModal}
+                onClose={handleCloseModal}
+                size="md"
+                submitButtonText={null}
+            >
+                <DeleteConfirmation
+                    label=" ticket"
+                    loading={loading}
+                    onSubmit={handleConfirmDeleteTicket}
+                    onCancel={handleCloseModal}
                 />
             </Modal>
             <AdminLayout
@@ -620,26 +667,26 @@ export default function Tickets({
                                     <div className="col-md-6">
                                         <p className="m-b-5">
                                             <strong>Total Amount:</strong>{" "}
-                                            {formatCurrency(
+                                            {formatPeso(
                                                 selectedTicket.total_amount
                                             )}
                                         </p>
                                         <p className="m-b-5">
                                             <strong>Amount Paid:</strong>{" "}
-                                            {formatCurrency(
+                                            {formatPeso(
                                                 selectedTicket.amount_paid
                                             )}
                                         </p>
                                         <p className="m-b-0 text-danger font-bold">
                                             <strong>Balance:</strong>{" "}
-                                            {formatCurrency(
+                                            {formatPeso(
                                                 parseFloat(
                                                     selectedTicket.total_amount || 0
                                                 ) -
-                                                    parseFloat(
-                                                        selectedTicket.amount_paid ||
-                                                            0
-                                                    )
+                                                parseFloat(
+                                                    selectedTicket.amount_paid ||
+                                                    0
+                                                )
                                             )}
                                         </p>
                                     </div>
@@ -684,7 +731,6 @@ export default function Tickets({
                                             Credit Card
                                         </option>
                                         <option value="check">Check</option>
-                                        <option value="online">Online</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -792,7 +838,7 @@ export default function Tickets({
                                 <h5 className="m-b-3">Payment History</h5>
                                 <div className="border rounded p-3 payment-history">
                                     {selectedTicket?.payments &&
-                                    selectedTicket.payments.length ? (
+                                        selectedTicket.payments.length ? (
                                         selectedTicket.payments.map((payment) => (
                                             <div
                                                 key={payment.id}
@@ -800,7 +846,7 @@ export default function Tickets({
                                             >
                                                 <div className="d-flex justify-content-between">
                                                     <strong>
-                                                        {formatCurrency(payment.amount)}
+                                                        {formatPeso(payment.amount)}
                                                     </strong>
                                                     <span className="text-muted text-sm">
                                                         {new Date(
@@ -828,13 +874,24 @@ export default function Tickets({
                                                     </p>
                                                 )}
                                                 {payment.documents?.length ? (
-                                                    <span className="badge badge-success">
-                                                        {payment.documents.length}{" "}
-                                                        attachment
-                                                        {payment.documents.length > 1
-                                                            ? "s"
-                                                            : ""}
-                                                    </span>
+                                                    <>
+                                                        <span className="badge badge-success">
+                                                            {payment.documents.length}{" "}
+                                                            attachment
+                                                            {payment.documents.length > 1
+                                                                ? "s"
+                                                                : ""}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handlePreviewFile(payment)}
+                                                            className="btn btn-sm btn-outline-primary ml-1"
+                                                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                            title="Photo preview"
+                                                        >
+                                                            <i className="ti-eye"></i>
+                                                        </button>
+                                                    </>
+
                                                 ) : null}
                                             </div>
                                         ))
@@ -1040,7 +1097,6 @@ export default function Tickets({
                     </div>
                 </section>
 
-                <Footer />
             </AdminLayout>
         </>
     );

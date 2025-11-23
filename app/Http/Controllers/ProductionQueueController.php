@@ -23,6 +23,18 @@ class ProductionQueueController extends Controller
     public function index(Request $request)
     {
         // Get tickets that are approved by designer (ready for production)
+        $data = $this->getData($request);   
+        return Inertia::render('Productions', [
+            'tickets' => $data['tickets'],
+            'stockItems' => $data['stockItems'],
+            'filters' => $request->only(['search', 'status']),
+            'summary' => $data['summary'],
+        ]);
+    }
+
+
+    public function getData(Request $request)
+    {
         $query = Ticket::with([
             'jobType.category', 
             'jobType.stockRequirements.stockItem', 
@@ -59,11 +71,36 @@ class ProductionQueueController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Production-Queue', [
+        // Calculate summary statistics for today
+        $today = now()->startOfDay();
+        $baseQuery = Ticket::where('design_status', 'approved')
+            ->whereIn('status', ['pending', 'ready_to_print', 'in_production', 'completed']);
+
+        // Apply same filters for summary (except status filter to get all counts)
+        if ($request->has('search') && $request->search) {
+            $baseQuery->where(function ($q) use ($request) {
+                $q->where('ticket_number', 'like', '%' . $request->search . '%')
+                    ->orWhere('description', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        $summary = [
+            'total' => (clone $baseQuery)->count(),
+            'inProgress' => (clone $baseQuery)->where('status', 'in_production')->count(),
+            'finished' => (clone $baseQuery)->where('status', 'completed')->count(),
+            'delays' => (clone $baseQuery)
+                ->where('status', '!=', 'completed')
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<', $today)
+                ->count(),
+        ];
+
+        return [
             'tickets' => $tickets,
             'stockItems' => $stockItems,
             'filters' => $request->only(['search', 'status']),
-        ]);
+            'summary' => $summary,
+        ];
     }
 
     /**
@@ -243,6 +280,9 @@ class ProductionQueueController extends Controller
      */
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
+        try {
+            //code...
+       
         $triggeredBy = Auth::user();
         $recipientIds = [];
         $notificationType = '';
@@ -304,5 +344,10 @@ class ProductionQueueController extends Controller
             $title,
             $message
         ));
+    } catch (\Exception $e) {   
+        \Log::error("Error Notification: " . $e->getMessage());
+        \Log::error("Error trace: " . $e->getTraceAsString());
     }
+  }
+
 }

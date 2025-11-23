@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 
@@ -345,7 +344,6 @@ export default function PurchaseOrdersCreate({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

@@ -3,10 +3,10 @@ import { Head, router } from "@inertiajs/react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import DataTable from "@/Components/Common/DataTable";
 import Modal from "@/Components/Main/Modal";
-import Footer from "@/Components/Layouts/Footer";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import axios from "axios";
 import { formatPeso } from "@/Utils/currency";
+import PreviewModal from "@/Components/Main/PreviewModal";
 
 export default function PaymentsFinance({
     ledger,
@@ -44,6 +44,9 @@ export default function PaymentsFinance({
         notes: "",
         attachments: [],
     });
+
+    const [show, setShow] = useState(false);
+    const [filepath, setFilepath] = useState("");
 
     const [expenseForm, setExpenseForm] = useState({
         category: expenseCategories[0] || "supplies",
@@ -98,15 +101,19 @@ export default function PaymentsFinance({
         () =>
             openTickets.map((ticket) => ({
                 value: ticket.id,
-                label: `${ticket.ticket_number} - ${
-                    ticket.customer
-                        ? `${ticket.customer.firstname} ${ticket.customer.lastname}`
-                        : "Walk-in"
-                }`,
+                label: `${ticket.ticket_number} - ${ticket.customer
+                    ? `${ticket.customer.firstname} ${ticket.customer.lastname}`
+                    : "Walk-in"
+                    }`,
                 customer_id: ticket.customer_id,
             })),
         [openTickets]
     );
+
+    const handlePreviewFile = (payment) => {
+        setFilepath(payment?.documents[0]?.file_path);
+        setShow(true);
+    };
 
     const customerOptions = useMemo(
         () =>
@@ -217,11 +224,22 @@ export default function PaymentsFinance({
             label: "Proof",
             render: (row) =>
                 row.documents?.length ? (
-                    <span className="badge badge-success">
-                        {row.documents.length} file(s)
-                    </span>
+                    <>
+                        <span className="badge badge-success">
+                            {row.documents.length} file(s)
+                        </span>
+                        <button
+                            onClick={() => handlePreviewFile(row)}
+                            className="btn btn-sm btn-outline-primary ml-1"
+                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                            title="Photo preview"
+                        >
+                            <i className="ti-eye"></i>
+                        </button>
+                    </>
+
                 ) : (
-                    <span className="badge badge-light">None</span>
+                    <span className="badge badge-light text-muted">None</span>
                 ),
         },
     ];
@@ -302,11 +320,10 @@ export default function PaymentsFinance({
                     <div className="card-body">
                         <h5>Net Cash Flow</h5>
                         <h2
-                            className={`m-b-0 ${
-                                summary.net_cash_flow_month >= 0
-                                    ? "text-success"
-                                    : "text-danger"
-                            }`}
+                            className={`m-b-0 ${summary.net_cash_flow_month >= 0
+                                ? "text-success"
+                                : "text-danger"
+                                }`}
                         >
                             {formatPeso(summary.net_cash_flow_month)}
                         </h2>
@@ -419,11 +436,10 @@ export default function PaymentsFinance({
                                                 </td>
                                                 <td>
                                                     <span
-                                                        className={`badge ${
-                                                            entry.type === "inflow"
-                                                                ? "badge-success"
-                                                                : "badge-danger"
-                                                        }`}
+                                                        className={`badge ${entry.type === "inflow"
+                                                            ? "badge-success"
+                                                            : "badge-danger"
+                                                            }`}
                                                     >
                                                         {entry.type}
                                                     </span>
@@ -891,55 +907,62 @@ export default function PaymentsFinance({
     );
 
     return (
-        <AdminLayout user={user} notifications={notifications} messages={messages}>
-            <Head title="Payments & Finance" />
-            <section id="main-content">
-                <div className="row">
-                    <div className="col-lg-12 p-3">
-                        <h2>Payments & Finance</h2>
-                        <p className="text-muted">
-                            Track every peso coming in and out – payments, receivables,
-                            expenses, and cash flow snapshots.
-                        </p>
-                        {flash?.success && (
-                            <FlashMessage type="success" message={flash.success} />
-                        )}
-                        {flash?.error && (
-                            <FlashMessage type="error" message={flash.error} />
-                        )}
+        <>
+            <PreviewModal
+                isOpen={show}
+                onClose={() => setShow(false)}
+                fileUrl={filepath}
+                title="Document Preview"
+            />
+
+            <AdminLayout user={user} notifications={notifications} messages={messages}>
+                <Head title="Payments & Finance" />
+                <section id="main-content">
+                    <div className="row">
+                        <div className="col-lg-12 p-3">
+                            <h2>Payments & Finance</h2>
+                            <p className="text-muted">
+                                Track every peso coming in and out – payments, receivables,
+                                expenses, and cash flow snapshots.
+                            </p>
+                            {flash?.success && (
+                                <FlashMessage type="success" message={flash.success} />
+                            )}
+                            {flash?.error && (
+                                <FlashMessage type="error" message={flash.error} />
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                {renderSummaryCards()}
+                    {renderSummaryCards()}
 
-                <div className="card">
-                    <div className="card-body">
-                        <div className="tabs">
-                            <div className="tab-control">
-                                {tabs.map((tab) => (
-                                    <button
-                                        key={tab.key}
-                                        className={`btn btn-sm m-r-3 ${
-                                            activeTab === tab.key ? "btn-primary" : "btn-light"
-                                        }`}
-                                        onClick={() => setActiveTab(tab.key)}
-                                    >
-                                        {tab.label}
-                                    </button>
-                                ))}
+                    <div className="card">
+                        <div className="card-body">
+                            <div className="tabs">
+                                <div className="tab-control">
+                                    {tabs.map((tab) => (
+                                        <button
+                                            key={tab.key}
+                                            className={`btn btn-sm m-r-3 ${activeTab === tab.key ? "btn-primary" : "btn-light"
+                                                }`}
+                                            onClick={() => setActiveTab(tab.key)}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="m-t-10">{renderTabContent()}</div>
+                    <div className="m-t-10">{renderTabContent()}</div>
 
-                <Footer />
-            </section>
+                </section>
 
-            {renderPaymentModal()}
-            {renderExpenseModal()}
-        </AdminLayout>
+                {renderPaymentModal()}
+                {renderExpenseModal()}
+            </AdminLayout>
+        </>
     );
 }
 

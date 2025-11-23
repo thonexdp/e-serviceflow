@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import JobTypeForm from "@/Components/JobTypes/JobTypeForm";
 import JobCategoryForm from "@/Components/JobCategories/JobCategoryForm";
@@ -423,7 +422,6 @@ export default function JobTypes({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

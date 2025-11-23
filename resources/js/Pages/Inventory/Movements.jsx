@@ -1,7 +1,6 @@
 import React from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import DataTable from "@/Components/Common/DataTable";
 import { formatDate } from "@/Utils/formatDate";
 
@@ -47,8 +46,8 @@ export default function InventoryMovements({
             label: "Quantity",
             key: "quantity",
             render: (row) => (
-                <span className={row.movement_type === "in" ? "text-success" : "text-danger"}>
-                    {row.movement_type === "in" ? "+" : "-"}
+                <span className={row.movement_type === "in" || row.movement_type === "adjustment" ? "text-success" : "text-danger"}>
+                    {row.movement_type === "in" || row.movement_type === "adjustment" ? "+" : "-"}
                     {parseFloat(row.quantity).toFixed(2)} {stockItem.base_unit_of_measure}
                 </span>
             ),
@@ -162,7 +161,6 @@ export default function InventoryMovements({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

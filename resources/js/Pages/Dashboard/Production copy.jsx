@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head } from "@inertiajs/react";
+import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 
 export default function Dashboard({
@@ -8,7 +9,6 @@ export default function Dashboard({
     notifications = [],
     messages = [],
 }) {
-    
     const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
     const handleSave = () => {
@@ -138,69 +138,70 @@ export default function Dashboard({
 
             <section id="main-content">
                 <div className="row">
-                    {/* New Tickets */}
+                    {/* Ready to Print */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-primary">
-                                    <i className="ti-ticket"></i>
+                                    <i className="ti-printer"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">18</div>
-
-                                    <div className="stat-text">
-                                        New Tickets
+                                    <div className="stat-digit">
+                                        <b>34</b>
                                     </div>
+                                    <div className="stat-text">
+                                        Ready to Print
+                                    </div>
+                                    
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Payment Pending */}
+                    {/* In Production */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-warning">
-                                    <i className="ti-wallet"></i>
+                                    <i className="ti-reload"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">6</div>
+                                    <div className="stat-digit"><b>7</b></div>
+
                                     <div className="stat-text">
-                                        Payment Pending
+                                        In Production
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Completed Tickets */}
+                    {/* Completed */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-success">
-                                    <i className="ti-check"></i>
+                                    <i className="ti-check-box"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">23</div>
-                                    <div className="stat-text">
-                                        Completed Tickets
-                                    </div>
+                                    <div className="stat-digit"><b>5</b></div>
+                                    <div className="stat-text">Completed</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* In Progress */}
+                    {/* Total Items Produced Today */}
                     <div className="col-lg-3">
                         <div className="card p-0">
                             <div className="stat-widget-three home-widget-three">
                                 <div className="stat-icon bg-info">
-                                    <i className="ti-time"></i>
+                                    <i className="ti-package"></i>
                                 </div>
                                 <div className="stat-content">
-                                    <div className="stat-digit">11</div>
+                                    <div className="stat-digit"><b>120</b></div>
                                     <div className="stat-text">
-                                        In Progress
+                                        Total Items Produced Today
                                     </div>
                                 </div>
                             </div>
@@ -208,7 +209,7 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                <div className="row">
+                {/* <div className="row">
                     <div className="col-lg-3">
                         <div className="card">
                             <div className="card-body">
@@ -216,37 +217,62 @@ export default function Dashboard({
                                     <table className="table w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-center">
-                                                    Pending Payment
-                                                </th>
+                                                <th className="text-center">Pending Payment</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>
-                                                    {" "}
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        {" "}
-                                                        #3424234243
-                                                    </a>
-                                                </th>
+                                                <th> <a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                > #3424234243</a></th>
                                             </tr>
                                             <tr>
-                                                <th>
+                                                <th> 
                                                     <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #3424234243
-                                                    </a>
-                                                </th>
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >
+                                                    #3424234243
+                                                </a></th>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    <div className="col-lg-3">
+                        <div className="card">
+                            <div className="card-body">
+                                <div className="table-responsive">
+                                    <table className="table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th className="text-center">In Progress</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#TRE234FDF34</a></th>
+                                            </tr>
+                                            <tr>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#ERTEW235346</a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -256,44 +282,30 @@ export default function Dashboard({
                     </div>
                     <div className="col-lg-3">
                         <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-center">
-                                                    In Progress
-                                                </th>
+                                                <th className="text-center">Ready for Pick Up</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #TRE234FDF34
-                                                    </a>
-                                                </th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#FGDG6456DFD</a></th>
                                             </tr>
                                             <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #ERTEW235346
-                                                    </a>
-                                                </th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#SDFSDFSD35345</a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -303,44 +315,30 @@ export default function Dashboard({
                     </div>
                     <div className="col-lg-3">
                         <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-center">
-                                                    Ready for Pick Up
-                                                </th>
+                                                <th className="text-center">Completed</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #FGDG6456DFD
-                                                    </a>
-                                                </th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#345345DSFSD</a></th>
                                             </tr>
                                             <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #SDFSDFSD35345
-                                                    </a>
-                                                </th>
+                                                <th><a
+                                                    href="/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 underline"
+                                                >#DFGDFG3253</a></th>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -348,54 +346,7 @@ export default function Dashboard({
                             </div>
                         </div>
                     </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Completed
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #345345DSFSD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #DFGDFG3253
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                </div> */}
                 <div className="row">
                     <div className="col-lg-12">
                         <div className="card">
@@ -411,8 +362,12 @@ export default function Dashboard({
                                                 <th>Customer</th>
                                                 <th>Description</th>
                                                 <th>Due Date</th>
+                                                <th>
+                                                    Quantity
+                                                    <br />
+                                                    Done / Total
+                                                </th>
                                                 <th>Status</th>
-                                                <th>Payment</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -422,12 +377,13 @@ export default function Dashboard({
                                                 <td>Print 30 tshirt</td>
                                                 <td>Sept. 23, 2025</td>
                                                 <td>
-                                                    <span className="badge badge-primary">
-                                                        Pending Design Verification
-                                                    </span>
+                                                    {" "}
+                                                    <b>0 / 50</b>{" "}
                                                 </td>
                                                 <td>
-                                                    <b>P 2400.00</b>
+                                                    <span className="badge badge-primary">
+                                                        Ready
+                                                    </span>
                                                 </td>
                                             </tr>
                                             <tr>
@@ -436,12 +392,13 @@ export default function Dashboard({
                                                 <td>Print Mugs</td>
                                                 <td>Sept. 30, 2025</td>
                                                 <td>
-                                                    <span className="badge badge-warning">
-                                                        Payment Pending
-                                                    </span>
+                                                    {" "}
+                                                    <b>10 / 30</b>{" "}
                                                 </td>
                                                 <td>
-                                                    <b> P 335.00</b>
+                                                    <span className="badge badge-warning">
+                                                        In Progress
+                                                    </span>
                                                 </td>
                                             </tr>
                                             <tr>
@@ -450,26 +407,13 @@ export default function Dashboard({
                                                 <td>Print 30 tshirt</td>
                                                 <td>Sept. 23, 2025</td>
                                                 <td>
-                                                    <span className="badge badge-info badge-outline">
-                                                        Ready for Production
+                                                    {" "}
+                                                    <b>20 / 20</b>{" "}
+                                                </td>
+                                                <td>
+                                                    <span className="badge badge-success badge-outline">
+                                                        Done
                                                     </span>
-                                                </td>
-                                                <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2436754</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-success">
-                                                        Completed
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -479,69 +423,7 @@ export default function Dashboard({
                         </div>
                     </div>
                 </div>
-                <div className="row">
-                    <div className="col-lg-12">
-                        <div className="card">
-                            <div className="card-title pr">
-                                <h4>Payments</h4>
-                            </div>
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table student-data-table m-t-20">
-                                        <thead>
-                                            <tr>
-                                                <th>Ticket ID</th>
-                                                <th>Customer</th>
-                                                <th>Amount Due</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
-                                                <th>Payment Date</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>John Doe</td>
-                                                <td>P 4500.00</td>
-                                                <td>Oct. 05, 2025</td>
-                                                <td>Pending</td>
-                                                <td>-</td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-default btn-sm btn-outline m-b-10"
-                                                        onClick={() =>
-                                                            setPaymentModalOpen(
-                                                                true
-                                                            )
-                                                        }
-                                                    >
-                                                        <span className="ti-credit-card"></span>{" "}
-                                                        Payment
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>John Doe</td>
-                                                <td>P 4500.00</td>
-                                                <td>Oct. 05, 2025</td>
-                                                <td>
-                                                    <b className="text-success">
-                                                        PAID
-                                                    </b>
-                                                </td>
-                                                <td>2025-09-11</td>
-                                                <td></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
                 {/* <div className="row">
                     <div className="col-lg-4">
                         <div className="card">
@@ -700,8 +582,64 @@ export default function Dashboard({
                         </div>
                     </div>
                 </div> */}
+
+                <div class="w-full bg-white rounded-2xl shadow-lg p-4 space-y-3 border border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                        <span class="ti-bell text-blue-500 text-xl"></span>
+                        Notifications / Alerts
+                    </h2>
+
+                    <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
+                        <div class="flex-shrink-0 mt-1">
+                            <span class="ti-timer text-orange-500 text-lg"></span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-700">
+                                <span class="font-semibold">Job #4534DFD</span>{" "}
+                                has been in production for <b>3 hours</b>.
+                            </p>
+                            <p class="text-xs text-gray-400">
+                                Updated 10 mins ago
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
+                        <div class="flex-shrink-0 mt-1">
+                            <span class="ti-calendar text-red-500 text-lg"></span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-700">
+                                <span class="font-semibold">2 Jobs</span> have
+                                deadlines today.
+                            </p>
+                            <p class="text-xs text-gray-400">Check schedule</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
+                        <div class="flex-shrink-0 mt-1">
+                            <span class="ti-check-box text-green-600 text-lg"></span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-700">
+                                Mock-up approved for{" "}
+                                <span class="font-semibold">Job #6543ERT</span>{" "}
+                                → <b>Ready to Print</b>.
+                            </p>
+                            <p class="text-xs text-gray-400">1 hour ago</p>
+                        </div>
+                    </div>
+
+                    <div class="text-right">
+                        <button class="text-blue-500 text-sm hover:underline">
+                            View All
+                        </button>
+                    </div>
+                </div>
             </section>
 
+            <Footer />
         </AdminLayout>
     );
 }

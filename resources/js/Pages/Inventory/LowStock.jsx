@@ -1,7 +1,6 @@
 import React from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import DataTable from "@/Components/Common/DataTable";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import { usePage } from "@inertiajs/react";
@@ -148,7 +147,6 @@ export default function InventoryLowStock({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

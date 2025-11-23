@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,6 +34,13 @@ class PasswordResetLinkController extends Controller
             'email' => 'required|email',
         ]);
 
+        // Log password reset attempt for security monitoring
+        Log::info('Password reset link requested', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
         // We will send the password reset link to this user. Once we have attempted
         // to send the link, we will examine the response then see the message we
         // need to show to the user. Finally, we'll send out a proper response.
@@ -41,8 +49,19 @@ class PasswordResetLinkController extends Controller
         );
 
         if ($status == Password::RESET_LINK_SENT) {
+            Log::info('Password reset link sent successfully', [
+                'email' => $request->email,
+            ]);
+
             return back()->with('status', __($status));
         }
+
+        // Log failed attempt (but don't reveal if email exists)
+        Log::warning('Password reset link request failed', [
+            'email' => $request->email,
+            'status' => $status,
+            'ip' => $request->ip(),
+        ]);
 
         throw ValidationException::withMessages([
             'email' => [trans($status)],

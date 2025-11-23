@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import CustomerForm from "@/Components/Customers/CustomerForm";
 import DataTable from "@/Components/Common/DataTable";
@@ -267,7 +266,6 @@ export default function Customers({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

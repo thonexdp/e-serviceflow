@@ -11,11 +11,31 @@ export default function Header({
     const { auth } = usePage().props;
 
     const userName = auth?.user?.name || "Guest";
-    const userAvatar = auth?.user?.avatar || "images/avatar/default.jpg";
+    const userAvatar = auth?.user?.avatar || "images/icons/chat.png";
     const [notificationList, setNotificationList] = useState(notifications || []);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const echoInitialized = useRef(false);
+    const notificationDropdownRef = useRef(null);
+    const profileDropdownRef = useRef(null);
+
+    // Handle clicks outside dropdowns to close them
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+                setIsProfileDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
         // Fetch initial notifications and unread count
@@ -138,6 +158,7 @@ export default function Header({
         e.preventDefault();
         e.stopPropagation();
 
+        console.log('MarkAsRead notificationId:', notificationId);
         try {
             await axios.patch(`/notifications/${notificationId}/read`);
             
@@ -161,6 +182,7 @@ export default function Header({
         e.preventDefault();
         e.stopPropagation();
 
+        console.log('MarkAllAsRead');
         try {
             await axios.patch('/notifications/read-all');
             
@@ -231,6 +253,7 @@ export default function Header({
 
     const handleBellClick = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDropdownOpen(!isDropdownOpen);
         
         // Refresh notifications when opening dropdown
@@ -238,6 +261,12 @@ export default function Header({
             fetchNotifications();
             fetchUnreadCount();
         }
+    };
+
+    const handleProfileClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsProfileDropdownOpen(!isProfileDropdownOpen);
     };
 
     return (
@@ -256,13 +285,9 @@ export default function Header({
                             </div>
                         </div>
                         <div className="float-right">
-                            <div className="dropdown dib">
-                                <a href="#" onClick={handleLogout}>
-                                    Logout
-                                </a>
+                            <div className="dropdown dib" ref={notificationDropdownRef} style={{ position: 'relative' }}>
                                 <div 
                                     className="header-icon" 
-                                    data-toggle="dropdown"
                                     onClick={handleBellClick}
                                     style={{ position: 'relative', cursor: 'pointer' }}
                                 >
@@ -280,6 +305,7 @@ export default function Header({
                                                 width: '18px',
                                                 height: '18px',
                                                 fontSize: '11px',
+                                                padding: "10px",
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -290,7 +316,19 @@ export default function Header({
                                             {unreadCount > 99 ? '99+' : unreadCount}
                                         </span>
                                     )}
-                                    <div className="drop-down dropdown-menu dropdown-menu-right w-72">
+                                </div>
+                                {isDropdownOpen && (
+                                    <div 
+                                        className="drop-down dropdown-menu dropdown-menu-right w-72"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            display: 'block',
+                                            position: 'absolute',
+                                            top: '100%',
+                                            right: 0,
+                                            zIndex: 1000,
+                                        }}
+                                    >
                                         <div className="dropdown-content-heading">
                                             <span className="text-left">Recent Notifications</span>
                                             {unreadCount > 0 && (
@@ -335,13 +373,13 @@ export default function Header({
                                                                 }}
                                                             >
                                                                 <img 
-                                                                    className="pull-left m-r-10 avatar-img" 
+                                                                    className="pull-left m-r-10" 
                                                                     src={userAvatar} 
                                                                     alt="" 
                                                                     style={{
-                                                                        width: '40px',
-                                                                        height: '40px',
-                                                                        borderRadius: '50%',
+                                                                        width: '30px',
+                                                                        height: '30px',
+                                                                        // borderRadius: '10%',
                                                                         marginRight: '10px',
                                                                     }}
                                                                 />
@@ -379,56 +417,70 @@ export default function Header({
                                                                         <button
                                                                             onClick={(e) => handleMarkAsRead(notification.id, e)}
                                                                             className="btn btn-xs btn-link"
+                                                                            style={{
+                                                                                padding: '2px 5px',
+                                                                                fontSize: '11px',
+                                                                                marginTop: '5px',
+                                                                                color: '#007bff',
+                                                                            }}
+                                                                        >
+                                                                            Mark as read
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </a>
+                                                        </li>
+                                                    ))}
+                                                    <li className="text-center" style={{ padding: '10px' }}>
+                                                        <a 
+                                                            href="/tickets" 
+                                                            className="more-link"
                                                             style={{
-                                                                padding: '2px 5px',
-                                                                fontSize: '11px',
-                                                                marginTop: '5px',
                                                                 color: '#007bff',
+                                                                textDecoration: 'none',
                                                             }}
                                                         >
-                                                            Mark as read
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </a>
-                                        </li>
-                                    ))}
-                                    <li className="text-center" style={{ padding: '10px' }}>
-                                        <a 
-                                            href="/tickets" 
-                                            className="more-link"
-                                            style={{
-                                                color: '#007bff',
-                                                textDecoration: 'none',
-                                            }}
-                                        >
-                                            See All Notifications
-                                        </a>
-                                    </li>
-                                </ul>
-                            )}
-                        </div>
+                                                            See All Notifications
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
-                            <div className="dropdown dib">
+                            <div className="dropdown dib" ref={profileDropdownRef} style={{ position: 'relative' }}>
                                 <div
                                     className="header-icon"
-                                    data-toggle="dropdown"
+                                    onClick={handleProfileClick}
+                                    style={{ cursor: 'pointer' }}
                                 >
                                     <span className="user-avatar">
                                         {userName}{" "}
                                         <i className="ti-angle-down f-s-10"></i>
                                     </span>
-                                    <div className="drop-down dropdown-profile dropdown-menu dropdown-menu-right">
-                                        <div className="dropdown-content-heading">
+                                </div>
+                                {isProfileDropdownOpen && (
+                                    <div 
+                                        className="drop-down dropdown-profile dropdown-menu dropdown-menu-right"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            display: 'block',
+                                            position: 'absolute',
+                                            top: '100%',
+                                            right: 0,
+                                            marginTop: '40px',
+                                            zIndex: 1000,
+                                        }}
+                                    >
+                                        {/* <div className="dropdown-content-heading">
                                             <span className="text-left">
                                                 Upgrade Now
                                             </span>
                                             <p className="trial-day">
                                                 30 Days Trail
                                             </p>
-                                        </div>
+                                        </div> */}
                                         <div className="dropdown-content-body">
                                             <ul>
                                                 <li>
@@ -444,7 +496,7 @@ export default function Header({
                                             </ul>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
