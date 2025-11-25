@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers;
 
 use App\Models\Ticket;
@@ -12,6 +13,7 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Services\PaymentRecorder;
 use App\Events\TicketStatusChanged;
+use App\Http\Controllers\Traits\HasRoleBasedRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +22,8 @@ use Illuminate\Support\Str;
 
 class TicketController extends BaseCrudController
 {
+    use HasRoleBasedRoutes;
+
     protected $model = Ticket::class;
     protected $resourceName = 'tickets';
     protected $viewPath = 'Tickets';
@@ -195,8 +199,7 @@ class TicketController extends BaseCrudController
             $this->notifyTicketCreated($ticket);
         }
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket created successfully.');
     }
 
@@ -281,8 +284,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket updated successfully.');
     }
 
@@ -300,8 +302,7 @@ class TicketController extends BaseCrudController
 
         $ticket->delete();
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket deleted successfully.');
     }
 

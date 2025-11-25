@@ -34,7 +34,7 @@ export default function Sidebar({ isCollapsed }) {
                                 src="/images/logo.jpg"
                                 alt="RC PrintShoppe Logo"
                                 className="w-16 h-16 object-contain mb-2"
-                                // className="w-16 h-16 rounded-full shadow-md bg-white p-1"
+                            // className="w-16 h-16 rounded-full shadow-md bg-white p-1"
                             />
                             <span className="text-lg font-semibold">
                                 RC PrintShoppe
@@ -48,27 +48,27 @@ export default function Sidebar({ isCollapsed }) {
                     {role === "FrontDesk" ? (
                         <ul>
                             <li>
-                                <Link href="/">
+                                <Link href="/frontdesk/">
                                     <i className="ti-calendar"></i> Dashboard
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/tickets">
+                                <Link href="/frontdesk/tickets">
                                     <i className="ti-email"></i> Tickets
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/finance">
+                                <Link href="/frontdesk/finance">
                                     <i className="ti-credit-card"></i> Payments & Finance
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/customers">
+                                <Link href="/frontdesk/customers">
                                     <i className="ti-user"></i> Customers
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/inventory">
+                                <Link href="/frontdesk/inventory">
                                     <i className="ti-package"></i> Inventory
                                 </Link>
                             </li>
@@ -76,7 +76,7 @@ export default function Sidebar({ isCollapsed }) {
                     ) : role === "Designer" ? (
                         <ul>
                             <li>
-                                <Link href="/">
+                                <Link href="/designer/">
                                     <i className="ti-calendar"></i> Dashboard
                                 </Link>
                             </li>
@@ -86,7 +86,7 @@ export default function Sidebar({ isCollapsed }) {
                                     </Link>
                                 </li> */}
                             <li>
-                                <Link href="/mock-ups">
+                                <Link href="/designer/mock-ups">
                                     <i className="ti-user"></i> Mock-Ups
                                 </Link>
                             </li>
@@ -94,7 +94,7 @@ export default function Sidebar({ isCollapsed }) {
                     ) : role === "Production" ? (
                         <ul>
                             <li>
-                                <Link href="/">
+                                <Link href="/production/">
                                     <i className="ti-calendar"></i> Dashboard
                                 </Link>
                             </li>
@@ -104,17 +104,17 @@ export default function Sidebar({ isCollapsed }) {
                                     </Link>
                                 </li> */}
                             <li>
-                                <Link href="/production">
+                                <Link href="/production/queue">
                                     <i className="ti-user"></i> Production Queue
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/inventory">
+                                <Link href="/production/inventory">
                                     <i className="ti-package"></i> Inventory
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/purchase-orders">
+                                <Link href="/production/purchase-orders">
                                     <i className="ti-shopping-cart"></i>{" "}
                                     Purchase Orders
                                 </Link>
@@ -124,60 +124,60 @@ export default function Sidebar({ isCollapsed }) {
                         role === "admin" && (
                             <ul>
                                 <li>
-                                    <Link href="/">
+                                    <Link href="/admin/">
                                         <i className="ti-calendar"></i>{" "}
                                         Dashboard
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/customers">
+                                    <Link href="/admin/customers">
                                         <i className="ti-user"></i> Clients
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/tickets">
+                                    <Link href="/admin/tickets">
                                         <i className="ti-ticket"></i> Job
                                         Tickets
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/job-types">
+                                    <Link href="/admin/job-types">
                                         <i className="ti-stamp"></i> Job Types &
                                         Pricing
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/inventory">
+                                    <Link href="/admin/inventory">
                                         <i className="ti-package"></i> Inventory
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/purchase-orders">
+                                    <Link href="/admin/purchase-orders">
                                         <i className="ti-shopping-cart"></i>{" "}
                                         Purchase Orders
                                     </Link>
                                 </li>
-                              
+
                                 <li>
-                                <Link href="/finance">
+                                    <Link href="/admin/finance">
                                         <i className="ti-credit-card"></i>{" "}
                                         Payments & Finance
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/tickets">
+                                    <Link href="/admin/tickets">
                                         <i className="ti-user"></i> Users
                                         Management
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/customers">
+                                    <Link href="/admin/customers">
                                         <i className="ti-stats-up"></i> Reports
                                         & Analytics
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/settings">
+                                    <Link href="/admin/settings">
                                         <i className="ti-settings"></i> System
                                         Settings
                                     </Link>

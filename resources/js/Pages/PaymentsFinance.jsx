@@ -4,9 +4,9 @@ import AdminLayout from "@/Components/Layouts/AdminLayout";
 import DataTable from "@/Components/Common/DataTable";
 import Modal from "@/Components/Main/Modal";
 import FlashMessage from "@/Components/Common/FlashMessage";
-import axios from "axios";
 import { formatPeso } from "@/Utils/currency";
 import PreviewModal from "@/Components/Main/PreviewModal";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function PaymentsFinance({
     ledger,
@@ -44,6 +44,7 @@ export default function PaymentsFinance({
         notes: "",
         attachments: [],
     });
+    const { api } = useRoleApi();
 
     const [show, setShow] = useState(false);
     const [filepath, setFilepath] = useState("");
@@ -145,7 +146,7 @@ export default function PaymentsFinance({
 
         setIsSubmitting(true);
         try {
-            await axios.post("/payments", formData, {
+            await api.post("/payments", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             setPaymentModalOpen(false);
@@ -167,7 +168,7 @@ export default function PaymentsFinance({
 
         setIsExpenseSubmitting(true);
         try {
-            await axios.post("/expenses", expenseForm);
+            await api.post("/expenses", expenseForm);
             setExpenseModalOpen(false);
             resetExpenseForm();
             router.reload({ preserveScroll: true });

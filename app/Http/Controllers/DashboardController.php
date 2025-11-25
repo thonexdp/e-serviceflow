@@ -20,15 +20,16 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+        $data = [];
+
         if (!$user) {
             return redirect()->route('login');
         }
-        // Render dashboard based on user role
-        $productionQueueData = $this->productionQueue->getData($request);   
+        if (strtolower(trim($user->role)) === "production") {
+            $data = $this->productionQueue->getData($request);
+        }
 
-
-        return match($user->role) {
+        return match ($user->role) {
             'admin' => Inertia::render('Dashboard/Admin', [
                 'user' => $user,
             ]),
@@ -39,10 +40,10 @@ class DashboardController extends Controller
                 'user' => $user,
             ]),
             'Production' => Inertia::render('Dashboard/Production', [
-                'tickets' => $productionQueueData['tickets']    ,
-                'stockItems' => $productionQueueData['stockItems'],
+                'tickets' => $data['tickets'],
+                'stockItems' => $data['stockItems'],
                 'filters' => $request->only(['search', 'status']),
-                'summary' => $productionQueueData['summary'],
+                'summary' => $data['summary'],
             ]),
             default => Inertia::render('Dashboard/FrontDesk', [
                 'user' => $user,
@@ -50,4 +51,3 @@ class DashboardController extends Controller
         };
     }
 }
-

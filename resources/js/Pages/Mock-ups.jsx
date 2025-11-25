@@ -6,6 +6,7 @@ import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Mockups({
     user = {},
@@ -22,6 +23,7 @@ export default function Mockups({
     const [notes, setNotes] = useState("");
     const [loading, setLoading] = useState(false);
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
     const handleReview = (ticket) => {
         setSelectedTicket(ticket);
@@ -53,9 +55,9 @@ export default function Mockups({
 
     const handleApprove = () => {
         if (!selectedTicket) return;
-        
+
         setLoading(true);
-        router.post(`/mock-ups/${selectedTicket.id}/approve`, {
+        router.post(buildUrl(`/mock-ups/${selectedTicket.id}/approve`), {
             notes: notes,
         }, {
             preserveScroll: true,
@@ -77,7 +79,7 @@ export default function Mockups({
         }
 
         setLoading(true);
-        router.post(`/mock-ups/${selectedTicket.id}/revision`, {
+        router.post(buildUrl(`/mock-ups/${selectedTicket.id}/revision`), {
             notes: notes,
         }, {
             preserveScroll: true,
@@ -107,7 +109,7 @@ export default function Mockups({
             formData.append("notes", notes);
         }
 
-        router.post(`/mock-ups/${selectedTicket.id}/upload`, formData, {
+        router.post(buildUrl(`/mock-ups/${selectedTicket.id}/upload`), formData, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -121,7 +123,7 @@ export default function Mockups({
     };
 
     const handleDownload = (fileId, filename) => {
-        window.open(`/mock-ups/files/${fileId}/download`, '_blank');
+        window.open(buildUrl(`/mock-ups/files/${fileId}/download`), '_blank');
     };
 
     const handlePreview = (filepath) => {
@@ -651,7 +653,7 @@ export default function Mockups({
                                                         name="design_status"
                                                         value={filters.design_status || "all"}
                                                         onChange={(e) => {
-                                                            router.get("/mock-ups", {
+                                                            router.get(buildUrl("/mock-ups"), {
                                                                 ...filters,
                                                                 design_status: e.target.value === "all" ? null : e.target.value
                                                             }, {

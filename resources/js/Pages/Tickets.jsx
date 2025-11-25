@@ -13,6 +13,7 @@ import axios from "axios";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Tickets({
     user = {},
@@ -35,6 +36,7 @@ export default function Tickets({
     const [selectedID, setSelectedID] = useState(null);
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const { api, buildUrl } = useRoleApi();
 
 
     const [show, setShow] = useState(false);
@@ -62,9 +64,10 @@ export default function Tickets({
     const isAllowedToAddCustomer =
         auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
 
+
     const handleCustomerSubmit = async (formData) => {
         try {
-            const { data } = await axios.post("/customers", formData);
+            const { data } = await api.post(`/customers`, formData);
 
             if (data.success) {
                 setSelectedCustomer({
@@ -123,7 +126,7 @@ export default function Tickets({
 
         if (editingTicket) {
             formData.append("_method", "PUT");
-            router.post(`/tickets/${editingTicket.id}`, formData, {
+            router.post(buildUrl(`tickets/${editingTicket.id}`), formData, {
                 onSuccess: () => {
                     setTicketModalOpen(false);
                     setEditingTicket(null);
@@ -131,7 +134,7 @@ export default function Tickets({
                 preserveScroll: true,
             });
         } else {
-            router.post("/tickets", formData, {
+            router.post(buildUrl("tickets"), formData, {
                 onSuccess: () => {
                     setTicketModalOpen(false);
                 },
@@ -183,7 +186,7 @@ export default function Tickets({
 
         setIsUpdating(true);
         try {
-            await axios.patch(
+            await api.patch(
                 `/tickets/${selectedTicket.id}/update-status`,
                 statusFormData
             );
@@ -236,7 +239,7 @@ export default function Tickets({
 
         setIsUpdating(true);
         try {
-            await axios.post("/payments", formData, {
+            await api.post("/payments", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             setPaymentModalOpen(false);
@@ -263,7 +266,7 @@ export default function Tickets({
 
     const handleConfirmDeleteTicket = () => {
         if (!selectedID) return;
-        router.delete(`/tickets/${selectedID}`, {
+        router.delete(buildUrl(`tickets/${selectedID}`), {
             preserveScroll: true,
             preserveState: false,
 

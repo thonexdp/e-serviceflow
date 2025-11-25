@@ -4,6 +4,7 @@ import { Head, router, usePage } from "@inertiajs/react";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import { formatDate } from "@/Utils/formatDate";
 import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function PurchaseOrdersShow({
     user = {},
@@ -12,10 +13,11 @@ export default function PurchaseOrdersShow({
     purchaseOrder = {},
 }) {
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
     const handleApprove = () => {
         if (!confirm("Approve this purchase order?")) return;
-        router.post(`/purchase-orders/${purchaseOrder.id}/approve`, {}, {
+        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/approve`), {}, {
             preserveState: false,
             preserveScroll: true,
         });
@@ -23,7 +25,7 @@ export default function PurchaseOrdersShow({
 
     const handleMarkOrdered = () => {
         if (!confirm("Mark this purchase order as ordered?")) return;
-        router.post(`/purchase-orders/${purchaseOrder.id}/mark-ordered`, {}, {
+        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/mark-ordered`), {}, {
             preserveState: false,
             preserveScroll: true,
         });
@@ -31,7 +33,7 @@ export default function PurchaseOrdersShow({
 
     const handleCancel = () => {
         if (!confirm("Cancel this purchase order?")) return;
-        router.post(`/purchase-orders/${purchaseOrder.id}/cancel`, {}, {
+        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/cancel`), {}, {
             preserveState: false,
             preserveScroll: true,
         });
@@ -222,7 +224,7 @@ export default function PurchaseOrdersShow({
                                                 <button
                                                     type="button"
                                                     className="btn btn-secondary"
-                                                    onClick={() => router.get("/purchase-orders")}
+                                                    onClick={() => router.get(buildUrl("/purchase-orders"))}
                                                 >
                                                     Back to List
                                                 </button>
@@ -232,7 +234,7 @@ export default function PurchaseOrdersShow({
                                                         className="btn btn-success"
                                                         onClick={() => {
                                                             // Navigate to index with receive parameter
-                                                            router.get(`/purchase-orders?receive_po_id=${purchaseOrder.id}`);
+                                                            router.get(buildUrl(`/purchase-orders?receive_po_id=${purchaseOrder.id}`));
                                                         }}
                                                     >
                                                         <i className="ti-check"></i> Receive Items

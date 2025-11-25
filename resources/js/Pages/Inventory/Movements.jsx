@@ -3,6 +3,7 @@ import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router } from "@inertiajs/react";
 import DataTable from "@/Components/Common/DataTable";
 import { formatDate } from "@/Utils/formatDate";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function InventoryMovements({
     user = {},
@@ -11,6 +12,8 @@ export default function InventoryMovements({
     stockItem = {},
     movements = { data: [] },
 }) {
+    const { buildUrl } = useRoleApi();
+
     const getMovementTypeBadge = (type) => {
         const classes = {
             in: "badge-success",
@@ -128,7 +131,7 @@ export default function InventoryMovements({
                                             </h4>
                                             <button
                                                 className="btn btn-secondary btn-sm"
-                                                onClick={() => router.get("/inventory")}
+                                                onClick={() => router.get(buildUrl("/inventory"))}
                                             >
                                                 <i className="ti-arrow-left"></i> Back to Inventory
                                             </button>

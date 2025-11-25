@@ -8,6 +8,7 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function PurchaseOrdersIndex({
     user = {},
@@ -20,9 +21,10 @@ export default function PurchaseOrdersIndex({
     const [selectedPO, setSelectedPO] = useState(null);
     const [receivedItems, setReceivedItems] = useState({});
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
     const handleView = (po) => {
-        router.get(`/purchase-orders/${po.id}`);
+        router.get(buildUrl(`/purchase-orders/${po.id}`));
     };
 
     const handleOpenReceiveModal = (po) => {
@@ -51,7 +53,7 @@ export default function PurchaseOrdersIndex({
             if (po) {
                 handleOpenReceiveModal(po);
                 // Clean URL
-                window.history.replaceState({}, "", "/purchase-orders");
+                window.history.replaceState({}, "", buildUrl("/purchase-orders"));
             }
         }
     }, [purchaseOrders.data]);
@@ -79,7 +81,7 @@ export default function PurchaseOrdersIndex({
         }
 
         router.post(
-            `/purchase-orders/${selectedPO.id}/receive`,
+            buildUrl(`/purchase-orders/${selectedPO.id}/receive`),
             {
                 received_items: receivedItemsArray,
             },
@@ -240,9 +242,9 @@ export default function PurchaseOrdersIndex({
                                         const remainingQty = Math.max(
                                             0,
                                             parseFloat(item.quantity) -
-                                                parseFloat(
-                                                    item.received_quantity || 0
-                                                )
+                                            parseFloat(
+                                                item.received_quantity || 0
+                                            )
                                         );
 
                                         return (
@@ -264,7 +266,7 @@ export default function PurchaseOrdersIndex({
                                                 <td>
                                                     {parseFloat(
                                                         item.received_quantity ||
-                                                            0
+                                                        0
                                                     ).toFixed(2)}
                                                 </td>
                                                 <td>
@@ -279,7 +281,7 @@ export default function PurchaseOrdersIndex({
                                                         max={remainingQty}
                                                         value={
                                                             receivedItems[
-                                                                item.id
+                                                            item.id
                                                             ] ?? 0
                                                         }
                                                         onChange={(e) =>
@@ -295,7 +297,7 @@ export default function PurchaseOrdersIndex({
                                                                                     .target
                                                                                     .value
                                                                             ) ||
-                                                                                0
+                                                                            0
                                                                         )
                                                                     ),
                                                             })
@@ -336,9 +338,7 @@ export default function PurchaseOrdersIndex({
                                             <button
                                                 className="btn btn-primary btn-sm"
                                                 onClick={() =>
-                                                    router.get(
-                                                        "/purchase-orders/create"
-                                                    )
+                                                    router.get(buildUrl("/purchase-orders/create"))
                                                 }
                                             >
                                                 <i className="ti-plus"></i>{" "}
@@ -366,18 +366,17 @@ export default function PurchaseOrdersIndex({
                                                             "all"
                                                         }
                                                         onChange={(e) => {
-                                                            router.get(
-                                                                "/purchase-orders",
+                                                            router.get(buildUrl("/purchase-orders"),
                                                                 {
                                                                     ...filters,
                                                                     status:
                                                                         e.target
                                                                             .value ===
-                                                                        "all"
+                                                                            "all"
                                                                             ? null
                                                                             : e
-                                                                                  .target
-                                                                                  .value,
+                                                                                .target
+                                                                                .value,
                                                                 },
                                                                 {
                                                                     preserveState: false,

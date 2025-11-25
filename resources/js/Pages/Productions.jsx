@@ -7,6 +7,7 @@ import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Productions({
     user = {},
@@ -24,6 +25,7 @@ export default function Productions({
     const [stockConsumptions, setStockConsumptions] = useState([]);
     const [loading, setLoading] = useState(false);
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
     const handleView = (ticket) => {
         setSelectedTicket(ticket);
@@ -47,7 +49,7 @@ export default function Productions({
 
     const handleStartProduction = (ticketId) => {
         setLoading(true);
-        router.post(`/production/${ticketId}/start`, {}, {
+        router.post(buildUrl(`/production/${ticketId}/start`), {}, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -71,7 +73,7 @@ export default function Productions({
         setLoading(true);
         const status = quantity >= selectedTicket.quantity ? 'completed' : 'in_production';
 
-        router.post(`/production/${selectedTicket.id}/update`, {
+        router.post(buildUrl(`/production/${selectedTicket.id}/update`), {
             produced_quantity: quantity,
             status: status,
         }, {
@@ -91,7 +93,7 @@ export default function Productions({
         if (!confirm("Mark this ticket as completed? Stock will be automatically deducted.")) return;
 
         setLoading(true);
-        router.post(`/production/${ticketId}/complete`, {}, {
+        router.post(buildUrl(`/production/${ticketId}/complete`), {}, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -105,7 +107,7 @@ export default function Productions({
 
     const handleOpenStockModal = (ticket) => {
         setSelectedTicket(ticket);
-        
+
         // Pre-populate with suggested stocks based on job type requirements
         const initialConsumptions = [];
         if (ticket.job_type?.stock_requirements) {
@@ -118,7 +120,7 @@ export default function Productions({
                 });
             });
         }
-        
+
         // If no requirements, add one empty row
         if (initialConsumptions.length === 0) {
             initialConsumptions.push({
@@ -127,7 +129,7 @@ export default function Productions({
                 notes: '',
             });
         }
-        
+
         setStockConsumptions(initialConsumptions);
         setStockModalOpen(true);
     };
@@ -164,7 +166,7 @@ export default function Productions({
         }
 
         setLoading(true);
-        router.post(`/production/${selectedTicket.id}/record-stock`, {
+        router.post(buildUrl(`/production/${selectedTicket.id}/record-stock`), {
             stock_consumptions: validConsumptions.map(c => ({
                 stock_item_id: parseInt(c.stock_item_id),
                 quantity: parseFloat(c.quantity),
@@ -490,11 +492,10 @@ export default function Productions({
                                     </h3>
                                     <div className="progress mt-2" style={{ height: "25px" }}>
                                         <div
-                                            className={`progress-bar ${
-                                                producedQuantity >= selectedTicket.quantity
+                                            className={`progress-bar ${producedQuantity >= selectedTicket.quantity
                                                     ? "bg-success"
                                                     : "bg-warning"
-                                            }`}
+                                                }`}
                                             role="progressbar"
                                             style={{
                                                 width: `${(producedQuantity / selectedTicket.quantity) * 100}%`,
@@ -772,7 +773,7 @@ export default function Productions({
                                                         name="status"
                                                         value={filters.status || "all"}
                                                         onChange={(e) => {
-                                                            router.get("/production", {
+                                                            router.get(buildUrl("/production"), {
                                                                 ...filters,
                                                                 status: e.target.value === "all" ? null : e.target.value
                                                             }, {

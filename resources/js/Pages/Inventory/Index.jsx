@@ -8,6 +8,7 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 import FormInput from "@/Components/Common/FormInput";
 import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function InventoryIndex({
     user = {},
@@ -31,7 +32,7 @@ export default function InventoryIndex({
     const { flash, auth } = usePage().props;
 
     const isAdmin = auth?.user?.role === "admin";
-
+    const { buildUrl } = useRoleApi();
     const handleOpenModal = (stockItem = null) => {
         setEditingStockItem(stockItem);
         setIsAreaBased(stockItem?.is_area_based || false);
@@ -81,7 +82,7 @@ export default function InventoryIndex({
         }
 
         if (editingStockItem) {
-            router.put(`/inventory/${editingStockItem.id}`, data, {
+            router.put(buildUrl(`/inventory/${editingStockItem.id}`), data, {
                 onSuccess: () => {
                     handleCloseModal();
                 },
@@ -89,7 +90,7 @@ export default function InventoryIndex({
                 preserveScroll: true,
             });
         } else {
-            router.post("/inventory", data, {
+            router.post(buildUrl("/inventory"), data, {
                 onSuccess: () => {
                     handleCloseModal();
                 },
@@ -104,7 +105,7 @@ export default function InventoryIndex({
         if (!selectedStockItem) return;
 
         router.post(
-            `/inventory/${selectedStockItem.id}/adjust`,
+            buildUrl(`/inventory/${selectedStockItem.id}/adjust`),
             {
                 quantity: parseFloat(adjustQuantity),
                 notes: adjustNotes,
@@ -269,7 +270,7 @@ export default function InventoryIndex({
                         type="button"
                         className="btn btn-link btn-sm text-blue-500"
                         onClick={() =>
-                            router.get(`/inventory/${row.id}/movements`)
+                            router.get(buildUrl(`/inventory/${row.id}/movements`))
                         }
                     >
                         <i className="ti-eye"></i> Movements
@@ -698,8 +699,7 @@ export default function InventoryIndex({
                                                             ""
                                                         }
                                                         onChange={(e) => {
-                                                            router.get(
-                                                                "/inventory",
+                                                            router.get(buildUrl("/inventory"),
                                                                 {
                                                                     ...filters,
                                                                     job_type_id:
@@ -737,8 +737,7 @@ export default function InventoryIndex({
                                                             ""
                                                         }
                                                         onChange={(e) => {
-                                                            router.get(
-                                                                "/inventory",
+                                                            router.get(buildUrl("/inventory"),
                                                                 {
                                                                     ...filters,
                                                                     stock_status:

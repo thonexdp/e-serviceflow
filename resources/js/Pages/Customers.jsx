@@ -8,6 +8,7 @@ import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Customers({
     user = {},
@@ -23,6 +24,8 @@ export default function Customers({
 
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
+
 
     const handleOpenModal = (customer = null) => {
         setEditingCustomer(customer);
@@ -38,7 +41,7 @@ export default function Customers({
     const handleCustomerSubmit = (data) => {
         console.log('handleCustomerSubmit', data);
         if (editingCustomer) {
-            router.put(`/customers/${editingCustomer.id}`, data, {
+            router.put(buildUrl(`/customers/${editingCustomer.id}`), data, {
                 onSuccess: () => {
                     handleCloseModal();
                 },
@@ -46,7 +49,7 @@ export default function Customers({
                 preserveScroll: true,
             });
         } else {
-            router.post("/customers", data, {
+            router.post(buildUrl("/customers"), data, {
                 onSuccess: () => {
                     handleCloseModal();
                 },
@@ -63,9 +66,9 @@ export default function Customers({
 
     const handleDeleteCustomer = () => {
         if (!selectedID) return;
-        router.delete(`/customers/${selectedID}`, {
+        router.delete(buildUrl(`/customers/${selectedID}`), {
             preserveScroll: true,
-             preserveState: false,
+            preserveState: false,
 
             onBefore: () => {
                 setLoading(true);
@@ -219,7 +222,7 @@ export default function Customers({
                                                         initialValue={
                                                             filters.search || ""
                                                         }
-                                                        route="/customers"
+                                                        route={buildUrl("/customers")}
                                                     />
                                                 </div>
 
@@ -227,7 +230,7 @@ export default function Customers({
                                                     <button
                                                         type="button"
                                                         onClick={() =>
-                                                            router.replace("/customers")
+                                                            router.replace(buildUrl("/customers"))
                                                         }
                                                         className="px-3 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
                                                     >
