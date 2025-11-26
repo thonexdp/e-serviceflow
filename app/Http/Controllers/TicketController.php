@@ -80,7 +80,7 @@ class TicketController extends BaseCrudController
         // Get job categories and types for ticket form
         $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
             $query->where('is_active', true)
-                ->with(['priceTiers', 'sizeRates'])
+                ->with(['priceTiers', 'sizeRates', 'promoRules'])
                 ->orderBy('sort_order')
                 ->orderBy('name');
         }])->orderBy('name')->get();
@@ -105,6 +105,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -216,6 +217,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -454,6 +456,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -8,6 +8,17 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+
+const WORKFLOW_STEPS = [
+    { key: 'design', label: 'Design', icon: 'ti-pencil-alt', color: '#9C27B0' },
+    { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
+    { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
+    { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
+    { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
+    { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
+    // { key: 'assembly', label: 'Assembly', icon: 'ti-package', color: '#009688' },
+    // { key: 'quality_check', label: 'Quality Check', icon: 'ti-check-box', color: '#4CAF50' },
+];
 
 export default function Productions({
     user = {},
@@ -22,10 +33,55 @@ export default function Productions({
     const [openStockModal, setStockModalOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [producedQuantity, setProducedQuantity] = useState(0);
+    const [currentWorkflowStep, setCurrentWorkflowStep] = useState(null);
     const [stockConsumptions, setStockConsumptions] = useState([]);
     const [loading, setLoading] = useState(false);
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
+
+    // WebSocket real-time updates for production queue
+    useEffect(() => {
+        if (!window.Echo) {
+            console.warn('Echo not initialized. Real-time updates disabled.');
+            return;
+        }
+
+        if (!auth?.user?.id) {
+            console.warn('User ID not available for WebSocket connection');
+            return;
+        }
+
+        console.log('🔌 Setting up production queue real-time updates...');
+
+        // Subscribe to user's private channel
+        const channel = window.Echo.private(`user.${auth.user.id}`);
+
+        // Listen for ticket status changes
+        const handleTicketUpdate = (data) => {
+            console.log('📬 Production queue update received:', data);
+
+            // Refresh the tickets data
+            router.reload({
+                only: ['tickets'],
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    console.log('✅ Production queue refreshed');
+                }
+            });
+        };
+
+        // Listen for the ticket status changed event
+        channel.listen('.ticket.status.changed', handleTicketUpdate);
+
+        // Cleanup on unmount
+        return () => {
+            console.log('🔌 Cleaning up production queue WebSocket...');
+            if (channel) {
+                channel.stopListening('.ticket.status.changed');
+            }
+        };
+    }, []); // Run once on mount
 
     const handleView = (ticket) => {
         setSelectedTicket(ticket);
@@ -35,7 +91,35 @@ export default function Productions({
     const handleUpdate = (ticket) => {
         setSelectedTicket(ticket);
         setProducedQuantity(ticket.produced_quantity || 0);
+        setCurrentWorkflowStep(ticket.current_workflow_step || getFirstWorkflowStep(ticket));
         setUpdateModalOpen(true);
+    };
+
+    const getFirstWorkflowStep = (ticket) => {
+        if (!ticket?.job_type?.workflow_steps) return null;
+        const workflowSteps = ticket.job_type.workflow_steps;
+        const firstStep = WORKFLOW_STEPS.find(step => workflowSteps[step.key]);
+        return firstStep?.key || null;
+    };
+
+    const getActiveWorkflowSteps = (ticket) => {
+        if (!ticket?.job_type?.workflow_steps) return [];
+        const workflowSteps = ticket.job_type.workflow_steps;
+        return WORKFLOW_STEPS.filter(step => workflowSteps[step.key]);
+    };
+
+    const getNextWorkflowStep = (ticket, currentStep) => {
+        const activeSteps = getActiveWorkflowSteps(ticket);
+        const currentIndex = activeSteps.findIndex(step => step.key === currentStep);
+        if (currentIndex === -1 || currentIndex === activeSteps.length - 1) return null;
+        return activeSteps[currentIndex + 1]?.key || null;
+    };
+
+    const getPreviousWorkflowStep = (ticket, currentStep) => {
+        const activeSteps = getActiveWorkflowSteps(ticket);
+        const currentIndex = activeSteps.findIndex(step => step.key === currentStep);
+        if (currentIndex <= 0) return null;
+        return activeSteps[currentIndex - 1]?.key || null;
     };
 
     const handleCloseModals = () => {
@@ -49,7 +133,7 @@ export default function Productions({
 
     const handleStartProduction = (ticketId) => {
         setLoading(true);
-        router.post(buildUrl(`/production/${ticketId}/start`), {}, {
+        router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -59,22 +143,30 @@ export default function Productions({
                 setLoading(false);
             },
         });
+        setLoading(false);
     };
 
     const handleUpdateProgress = () => {
         if (!selectedTicket) return;
 
         const quantity = parseInt(producedQuantity) || 0;
-        if (quantity < 0 || quantity > selectedTicket.quantity) {
-            alert(`Quantity must be between 0 and ${selectedTicket.quantity}`);
+        const maxQuantity = selectedTicket.total_quantity || selectedTicket.quantity;
+        if (quantity < 0 || quantity > maxQuantity) {
+            alert(`Quantity must be between 0 and ${maxQuantity}`);
             return;
         }
 
         setLoading(true);
-        const status = quantity >= selectedTicket.quantity ? 'completed' : 'in_production';
 
-        router.post(buildUrl(`/production/${selectedTicket.id}/update`), {
+        // Determine status based on workflow completion
+        const activeSteps = getActiveWorkflowSteps(selectedTicket);
+        const currentStepIndex = activeSteps.findIndex(step => step.key === currentWorkflowStep);
+        const isLastStep = currentStepIndex === activeSteps.length - 1;
+        const status = (quantity >= maxQuantity && isLastStep) ? 'completed' : 'in_production';
+
+        router.post(buildUrl(`/queue/${selectedTicket.id}/update`), {
             produced_quantity: quantity,
+            current_workflow_step: currentWorkflowStep,
             status: status,
         }, {
             preserveScroll: true,
@@ -87,13 +179,14 @@ export default function Productions({
                 setLoading(false);
             },
         });
+        setLoading(false);
     };
 
     const handleMarkCompleted = (ticketId) => {
         if (!confirm("Mark this ticket as completed? Stock will be automatically deducted.")) return;
 
         setLoading(true);
-        router.post(buildUrl(`/production/${ticketId}/complete`), {}, {
+        router.post(buildUrl(`/queue/${ticketId}/complete`), {}, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -103,6 +196,7 @@ export default function Productions({
                 setLoading(false);
             },
         });
+        setLoading(false);
     };
 
     const handleOpenStockModal = (ticket) => {
@@ -112,7 +206,7 @@ export default function Productions({
         const initialConsumptions = [];
         if (ticket.job_type?.stock_requirements) {
             ticket.job_type.stock_requirements.forEach(req => {
-                const requiredQty = parseFloat(req.quantity_per_unit) * ticket.quantity;
+                const requiredQty = parseFloat(req.quantity_per_unit) * (ticket.total_quantity || ticket.quantity);
                 initialConsumptions.push({
                     stock_item_id: req.stock_item_id,
                     quantity: requiredQty.toFixed(2),
@@ -166,7 +260,7 @@ export default function Productions({
         }
 
         setLoading(true);
-        router.post(buildUrl(`/production/${selectedTicket.id}/record-stock`), {
+        router.post(buildUrl(`/queue/${selectedTicket.id}/record-stock`), {
             stock_consumptions: validConsumptions.map(c => ({
                 stock_item_id: parseInt(c.stock_item_id),
                 quantity: parseFloat(c.quantity),
@@ -183,11 +277,13 @@ export default function Productions({
                 setLoading(false);
             },
         });
+        setLoading(false);
     };
 
     const handleQuickAdd = (amount) => {
         const current = parseInt(producedQuantity) || 0;
-        const newValue = Math.min(current + amount, selectedTicket?.quantity || 0);
+        const maxQuantity = selectedTicket?.total_quantity || selectedTicket?.quantity || 0;
+        const newValue = Math.min(current + amount, maxQuantity);
         setProducedQuantity(newValue);
     };
 
@@ -242,7 +338,7 @@ export default function Productions({
                     >
                         <i className="ti-pencil"></i> Update
                     </button>
-                    {ticket.produced_quantity >= ticket.quantity && (
+                    {ticket.produced_quantity >= (ticket.total_quantity || ticket.quantity) && (
                         <button
                             type="button"
                             className="btn btn-link btn-sm text-success"
@@ -293,11 +389,11 @@ export default function Productions({
             key: "quantity",
             render: (row) => (
                 <span>
-                    <b className={row.produced_quantity >= row.quantity ? "text-success" : "text-warning"}>
+                    <b className={row.produced_quantity >= (row.total_quantity || row.quantity) ? "text-success" : "text-warning"}>
                         {row.produced_quantity || 0}
                     </b>
                     {" / "}
-                    <b>{row.quantity}</b>
+                    <b>{row.total_quantity || row.quantity}</b>
                 </span>
             ),
         },
@@ -384,7 +480,7 @@ export default function Productions({
                             </div>
                             <div className="col-md-6">
                                 <p>
-                                    <strong>Quantity:</strong> {selectedTicket.produced_quantity || 0} / {selectedTicket.quantity}
+                                    <strong>Quantity:</strong> {selectedTicket.produced_quantity || 0} / {selectedTicket.total_quantity || selectedTicket.quantity}
                                 </p>
                                 <p>
                                     <strong>Due Date:</strong> {selectedTicket.due_date ? new Date(selectedTicket.due_date).toLocaleDateString() : "N/A"}
@@ -466,47 +562,146 @@ export default function Productions({
                 title={`Update Production - Ticket #${selectedTicket?.ticket_number}`}
                 isOpen={openUpdateModal}
                 onClose={handleCloseModals}
-                size="4xl"
+                size="5xl"
             >
                 {selectedTicket && (
                     <div>
                         <div className="mb-4">
-                            <h4>
-                                Description: <b>{selectedTicket.description}</b>
-                            </h4>
-                            <p>
-                                Status: {getStatusBadge(selectedTicket.status)}
-                            </p>
-                        </div>
-
-                        <hr className="my-3" />
-
-                        <div className="mb-4">
-                            <div className="row align-items-center">
-                                <div className="col-md-12 mb-3">
-                                    <h3 className="text-lg font-semibold">
-                                        Produced so far:{" "}
-                                        <span className={producedQuantity >= selectedTicket.quantity ? "text-success" : "text-warning"}>
-                                            {producedQuantity} / {selectedTicket.quantity}
+                            <div className="row">
+                                <div className="col-md-8">
+                                    <h4 className="mb-2">
+                                        <strong>{selectedTicket.description}</strong>
+                                    </h4>
+                                    <p className="text-muted mb-1">
+                                        <strong>Job Type:</strong> {selectedTicket.job_type?.name || 'N/A'}
+                                    </p>
+                                    <p className="mb-0">
+                                        <strong>Status:</strong> {getStatusBadge(selectedTicket.status)}
+                                    </p>
+                                </div>
+                                <div className="col-md-4 text-right">
+                                    <h3 className="mb-1">
+                                        <span className={producedQuantity >= (selectedTicket.total_quantity || selectedTicket.quantity) ? "text-success" : "text-warning"}>
+                                            {producedQuantity} / {selectedTicket.total_quantity || selectedTicket.quantity}
                                         </span>
                                     </h3>
-                                    <div className="progress mt-2" style={{ height: "25px" }}>
+                                    <small className="text-muted">Items Produced</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr className="my-4" />
+
+                        {/* Workflow Steps Progress */}
+                        {getActiveWorkflowSteps(selectedTicket).length > 0 && (
+                            <div className="mb-4">
+                                <h5 className="mb-3 font-weight-bold">
+                                    <i className="ti-layout-list-thumb mr-2"></i>Production Workflow
+                                </h5>
+                                <div className="workflow-stepper">
+                                    <div className="d-flex align-items-center justify-content-between position-relative" style={{ padding: '20px 0' }}>
+                                        {/* Progress Line */}
                                         <div
-                                            className={`progress-bar ${producedQuantity >= selectedTicket.quantity
-                                                    ? "bg-success"
-                                                    : "bg-warning"
-                                                }`}
-                                            role="progressbar"
+                                            className="position-absolute"
                                             style={{
-                                                width: `${(producedQuantity / selectedTicket.quantity) * 100}%`,
+                                                top: '50%',
+                                                left: '0',
+                                                right: '0',
+                                                height: '4px',
+                                                backgroundColor: '#e0e0e0',
+                                                zIndex: 0,
+                                                transform: 'translateY(-50%)'
                                             }}
                                         >
-                                            {Math.round((producedQuantity / selectedTicket.quantity) * 100)}%
+                                            <div
+                                                style={{
+                                                    height: '100%',
+                                                    backgroundColor: '#4CAF50',
+                                                    width: `${(getActiveWorkflowSteps(selectedTicket).findIndex(s => s.key === currentWorkflowStep) / (getActiveWorkflowSteps(selectedTicket).length - 1)) * 100}%`,
+                                                    transition: 'width 0.3s ease'
+                                                }}
+                                            />
                                         </div>
+
+                                        {getActiveWorkflowSteps(selectedTicket).map((step, index) => {
+                                            const isCurrent = step.key === currentWorkflowStep;
+                                            const isPast = getActiveWorkflowSteps(selectedTicket).findIndex(s => s.key === currentWorkflowStep) > index;
+                                            const stepColor = isCurrent ? step.color : (isPast ? '#4CAF50' : '#ccc');
+
+                                            return (
+                                                <div
+                                                    key={step.key}
+                                                    className="text-center position-relative"
+                                                    style={{ flex: 1, zIndex: 1 }}
+                                                >
+                                                    <div
+                                                        className="d-inline-flex align-items-center justify-content-center rounded-circle shadow-sm mb-2"
+                                                        style={{
+                                                            width: '60px',
+                                                            height: '60px',
+                                                            backgroundColor: stepColor,
+                                                            border: isCurrent ? '4px solid #fff' : 'none',
+                                                            boxShadow: isCurrent ? `0 0 0 4px ${step.color}40` : '0 2px 4px rgba(0,0,0,0.1)',
+                                                            transition: 'all 0.3s ease',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        onClick={() => setCurrentWorkflowStep(step.key)}
+                                                    >
+                                                        <i className={`${step.icon} text-white`} style={{ fontSize: '1.5rem' }}></i>
+                                                    </div>
+                                                    <div>
+                                                        <small
+                                                            className={`d-block font-weight-bold ${isCurrent ? 'text-dark' : 'text-muted'}`}
+                                                            style={{ fontSize: '0.85rem' }}
+                                                        >
+                                                            {step.label}
+                                                        </small>
+                                                        {isCurrent && (
+                                                            <span className="badge badge-primary badge-pill mt-1" style={{ fontSize: '0.7rem' }}>
+                                                                Current
+                                                            </span>
+                                                        )}
+                                                        {isPast && (
+                                                            <i className="ti-check text-success d-block mt-1"></i>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
-                                <div className="col-md-5">
+                                {/* Workflow Navigation Buttons */}
+                                <div className="d-flex justify-content-center gap-2 mt-4">
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary"
+                                        onClick={() => setCurrentWorkflowStep(getPreviousWorkflowStep(selectedTicket, currentWorkflowStep))}
+                                        disabled={!getPreviousWorkflowStep(selectedTicket, currentWorkflowStep)}
+                                    >
+                                        <i className="ti-arrow-left"></i> Previous Step
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-primary"
+                                        onClick={() => setCurrentWorkflowStep(getNextWorkflowStep(selectedTicket, currentWorkflowStep))}
+                                        disabled={!getNextWorkflowStep(selectedTicket, currentWorkflowStep)}
+                                    >
+                                        Next Step <i className="ti-arrow-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <hr className="my-4" />
+
+                        {/* Quantity Input */}
+                        <div className="mb-4">
+                            <h5 className="mb-3 font-weight-bold">
+                                <i className="ti-package mr-2"></i>Production Quantity
+                            </h5>
+                            <div className="row align-items-center">
+                                <div className="col-md-4">
                                     <FormInput
                                         label="Produced Quantity"
                                         type="number"
@@ -514,31 +709,24 @@ export default function Productions({
                                         value={producedQuantity}
                                         onChange={(e) => {
                                             const val = parseInt(e.target.value) || 0;
-                                            setProducedQuantity(Math.min(val, selectedTicket.quantity));
+                                            setProducedQuantity(Math.min(val, selectedTicket.total_quantity || selectedTicket.quantity));
                                         }}
                                         placeholder="0"
                                         min="0"
-                                        max={selectedTicket.quantity}
+                                        max={selectedTicket.total_quantity || selectedTicket.quantity}
                                         required
                                     />
                                 </div>
 
-                                <div className="col-md-7">
+                                <div className="col-md-8">
                                     <label className="block text-sm font-medium mb-2">Quick Add:</label>
-                                    <div className="flex gap-2">
+                                    <div className="d-flex flex-wrap gap-2">
                                         <button
                                             type="button"
                                             className="btn btn-outline-primary btn-sm"
                                             onClick={() => handleQuickAdd(1)}
                                         >
                                             <i className="ti-plus"></i> +1
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-primary btn-sm"
-                                            onClick={() => handleQuickAdd(2)}
-                                        >
-                                            <i className="ti-plus"></i> +2
                                         </button>
                                         <button
                                             type="button"
@@ -556,54 +744,97 @@ export default function Productions({
                                         </button>
                                         <button
                                             type="button"
-                                            className="btn btn-outline-secondary btn-sm"
-                                            onClick={() => setProducedQuantity(selectedTicket.quantity)}
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(50)}
                                         >
-                                            Set to Max
+                                            <i className="ti-plus"></i> +50
                                         </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-secondary btn-sm"
+                                            onClick={() => setProducedQuantity(selectedTicket.total_quantity || selectedTicket.quantity)}
+                                        >
+                                            <i className="ti-check"></i> Set to Max
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="mt-3">
+                                <div className="d-flex justify-content-between mb-1">
+                                    <span className="text-muted small">Production Progress</span>
+                                    <span className="font-weight-bold">
+                                        {Math.round((producedQuantity / (selectedTicket.total_quantity || selectedTicket.quantity)) * 100)}%
+                                    </span>
+                                </div>
+                                <div className="progress" style={{ height: "20px" }}>
+                                    <div
+                                        className={`progress-bar ${producedQuantity >= (selectedTicket.total_quantity || selectedTicket.quantity)
+                                            ? "bg-success"
+                                            : "bg-warning"
+                                            }`}
+                                        role="progressbar"
+                                        style={{
+                                            width: `${(producedQuantity / (selectedTicket.total_quantity || selectedTicket.quantity)) * 100}%`,
+                                        }}
+                                    >
+                                        {Math.round((producedQuantity / (selectedTicket.total_quantity || selectedTicket.quantity)) * 100)}%
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <hr className="my-3" />
+                        <hr className="my-4" />
 
-                        <div className="d-flex justify-content-end gap-2">
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleUpdateProgress}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <span>
-                                        <i className="ti-reload mr-2 animate-spin"></i> Saving...
-                                    </span>
-                                ) : (
-                                    <span>
-                                        <i className="ti-save"></i> Save Progress
+                        {/* Action Buttons */}
+                        <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                                {currentWorkflowStep && (
+                                    <span className="text-muted">
+                                        <i className="ti-info-alt mr-1"></i>
+                                        Currently at: <strong>{WORKFLOW_STEPS.find(s => s.key === currentWorkflowStep)?.label}</strong>
                                     </span>
                                 )}
-                            </button>
-                            {producedQuantity >= selectedTicket.quantity && (
+                            </div>
+                            <div className="d-flex gap-2">
                                 <button
                                     type="button"
-                                    className="btn btn-success"
-                                    onClick={() => {
-                                        handleMarkCompleted(selectedTicket.id)
-                                    }}
+                                    className="btn btn-secondary"
+                                    onClick={handleCloseModals}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleUpdateProgress}
                                     disabled={loading}
                                 >
-                                    <i className="ti-check"></i> Mark Completed
+                                    {loading ? (
+                                        <span>
+                                            <i className="ti-reload mr-2 animate-spin"></i> Saving...
+                                        </span>
+                                    ) : (
+                                        <span>
+                                            <i className="ti-save mr-2"></i> Save Progress
+                                        </span>
+                                    )}
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={handleCloseModals}
-                            >
-                                Cancel
-                            </button>
+                                {producedQuantity >= selectedTicket.quantity &&
+                                    currentWorkflowStep === getActiveWorkflowSteps(selectedTicket)[getActiveWorkflowSteps(selectedTicket).length - 1]?.key && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-success"
+                                            onClick={() => {
+                                                handleMarkCompleted(selectedTicket.id)
+                                            }}
+                                            disabled={loading}
+                                        >
+                                            <i className="ti-check mr-2"></i> Mark Completed
+                                        </button>
+                                    )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -763,7 +994,7 @@ export default function Productions({
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
-                                                        route="/production"
+                                                        route={buildUrl("/queue")}
                                                     />
                                                 </div>
                                                 <div className="col-md-4">
@@ -773,7 +1004,7 @@ export default function Productions({
                                                         name="status"
                                                         value={filters.status || "all"}
                                                         onChange={(e) => {
-                                                            router.get(buildUrl("/production"), {
+                                                            router.get(buildUrl("/queue"), {
                                                                 ...filters,
                                                                 status: e.target.value === "all" ? null : e.target.value
                                                             }, {

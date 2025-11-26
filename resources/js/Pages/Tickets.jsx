@@ -380,7 +380,17 @@ export default function Tickets({
         {
             label: "Qty",
             key: "quantity",
-            render: (row) => `${row.quantity} Pcs`,
+            render: (row) => (
+                <div>
+                    {row.quantity} Pcs
+                    {row.free_quantity > 0 && (
+                        <div className="text-success small">
+                            <i className="ti-gift mr-1"></i>
+                            + {row.free_quantity} Free
+                        </div>
+                    )}
+                </div>
+            ),
         },
         {
             label: "Due Date",

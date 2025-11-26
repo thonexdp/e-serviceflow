@@ -59,7 +59,12 @@ Route::get('/about', function () {
 })->name('about');
 
 
-
+// // Notifications
+// Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+// Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+// Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+// Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+// Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
 Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->group(function () {
     // Admin Dashboard

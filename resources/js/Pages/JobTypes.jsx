@@ -147,12 +147,32 @@ export default function JobTypes({
             label: "Pricing",
             key: "price",
             render: (row) => {
+                const badges = [];
+
+                if (row.promo_rules?.length > 0) {
+                    badges.push(
+                        <div key="promo" className="badge badge-success mr-1">
+                            <i className="ti-gift"></i> Has Promos
+                        </div>
+                    );
+                }
+
                 if (row.price_tiers?.length > 0) {
-                    return <div className="badge badge-info">Tiered by Qty</div>;
+                    badges.push(
+                        <div key="tiered" className="badge badge-info mr-1">Tiered by Qty</div>
+                    );
                 }
+
                 if (row.size_rates?.length > 0) {
-                    return <div className="badge badge-primary">Size-Based</div>;
+                    badges.push(
+                        <div key="size" className="badge badge-primary mr-1">Size-Based</div>
+                    );
                 }
+
+                if (badges.length > 0) {
+                    return <div className="d-flex flex-wrap gap-1">{badges}</div>;
+                }
+
                 return `${formatPeso(parseFloat(row.price).toFixed(2))} / ${row.price_by}`;
             },
         },
@@ -401,8 +421,8 @@ export default function JobTypes({
                                                         <button
                                                             key={tab.key}
                                                             className={`btn btn-sm m-r-3 ${activeTab === tab.key
-                                                                    ? "btn-primary"
-                                                                    : "btn-light"
+                                                                ? "btn-primary"
+                                                                : "btn-light"
                                                                 }`}
                                                             onClick={() => setActiveTab(tab.key)}
                                                         >

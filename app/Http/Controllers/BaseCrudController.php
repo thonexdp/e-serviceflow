@@ -167,3 +167,5 @@ abstract class BaseCrudController extends Controller
         return Str::studly($this->resourceName);
     }
 }
+
+

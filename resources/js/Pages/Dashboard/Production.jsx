@@ -6,6 +6,7 @@ import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
+import ProductionBoard from "@/Components/Production/ProductionBoard";
 import { formatDate } from "@/Utils/formatDate";
 
 export default function Productions({
@@ -17,6 +18,7 @@ export default function Productions({
     filters = {},
     summary = {},
 }) {
+    const [activeView, setActiveView] = useState("table"); // "table" or "board"
     const [openViewModal, setViewModalOpen] = useState(false);
     const [openUpdateModal, setUpdateModalOpen] = useState(false);
     const [openStockModal, setStockModalOpen] = useState(false);
@@ -25,7 +27,7 @@ export default function Productions({
     const [stockConsumptions, setStockConsumptions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
 
     // Calculate summary statistics from tickets data
     const calculateSummary = () => {
@@ -76,7 +78,111 @@ export default function Productions({
         };
     }, [isFullscreen]);
 
+    // WebSocket real-time updates
+    useEffect(() => {
+        if (!window.Echo) {
+            console.warn('Echo not initialized. Real-time updates disabled.');
+            return;
+        }
+
+
+        if (!auth?.user?.id) {
+            console.warn('User ID not available for WebSocket connection');
+            return;
+        }
+
+        console.log('🔌 Setting up production board real-time updates...');
+
+        // Subscribe to user's private channel for production updates
+        const channel = window.Echo.private(`user.${auth.user.id}`);
+
+        // Listen for ticket status changes
+        const handleTicketUpdate = (data) => {
+            console.log('📬 Production update received:', data);
+
+            // Refresh the page data to get updated tickets
+            router.reload({
+                only: ['tickets', 'summary'],
+                preserveScroll: true,
+                preserveState: true,
+            });
+
+            // Show a subtle notification in fullscreen mode
+            if (isFullscreen) {
+                const notification = document.createElement('div');
+                notification.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        top: 80px;
+                        right: 20px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 12px 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        z-index: 10000;
+                        animation: slideInRight 0.3s ease-out;
+                        font-size: 14px;
+                        font-weight: 500;
+                    ">
+                        <i class="ti-bell mr-2"></i>${data.notification?.message || 'Production updated'}
+                    </div>
+                `;
+                document.body.appendChild(notification);
+
+                // Remove notification after 3 seconds
+                setTimeout(() => {
+                    notification.style.animation = 'slideOutRight 0.3s ease-in';
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+        };
+
+        // Listen for the ticket status changed event
+        channel.listen('.ticket.status.changed', handleTicketUpdate);
+
+        // Add CSS animation if not already present
+        if (!document.getElementById('production-animations')) {
+            const style = document.createElement('style');
+            style.id = 'production-animations';
+            style.innerHTML = `
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                @keyframes slideOutRight {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Cleanup on unmount
+        return () => {
+            console.log('🔌 Cleaning up production board WebSocket...');
+            if (channel) {
+                channel.stopListening('.ticket.status.changed');
+            }
+        };
+    }, [isFullscreen]); // Re-run when fullscreen changes
+
     const toggleFullscreen = () => {
+        if (!isFullscreen) {
+            setActiveView("board");
+        }
         setIsFullscreen(!isFullscreen);
     };
 
@@ -516,8 +622,8 @@ export default function Productions({
                     <div
                         className="card p-0 shadow-sm border-0"
                         onMouseEnter={(e) =>
-                            (e.currentTarget.style.transform =
-                                "translateY(-5px)")
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
                         }
                         onMouseLeave={(e) =>
                             (e.currentTarget.style.transform = "translateY(0)")
@@ -542,8 +648,8 @@ export default function Productions({
                     <div
                         className="card shadow-sm border-0 p-0"
                         onMouseEnter={(e) =>
-                            (e.currentTarget.style.transform =
-                                "translateY(-5px)")
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
                         }
                         onMouseLeave={(e) =>
                             (e.currentTarget.style.transform = "translateY(0)")
@@ -566,8 +672,8 @@ export default function Productions({
                     <div
                         className="card shadow-sm border-0 p-0"
                         onMouseEnter={(e) =>
-                            (e.currentTarget.style.transform =
-                                "translateY(-5px)")
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
                         }
                         onMouseLeave={(e) =>
                             (e.currentTarget.style.transform = "translateY(0)")
@@ -590,8 +696,8 @@ export default function Productions({
                     <div
                         className="card shadow-sm border-0 p-0"
                         onMouseEnter={(e) =>
-                            (e.currentTarget.style.transform =
-                                "translateY(-5px)")
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
                         }
                         onMouseLeave={(e) =>
                             (e.currentTarget.style.transform = "translateY(0)")
@@ -675,15 +781,15 @@ export default function Productions({
                         </p>
                     </div>
                     <div className="col-12">
-                    <div
-                                        className="alert alert-info"
-                                        role="alert"
-                                    >
-                                        <i className="fa fa-info-circle"></i>{" "}
-                                        <strong>Quick Update:</strong> Click the
-                                        pencil icon next to status or payment
-                                        status to update them quickly.
-                                    </div>
+                        <div
+                            className="alert alert-info"
+                            role="alert"
+                        >
+                            <i className="fa fa-info-circle"></i>{" "}
+                            <strong>Quick Update:</strong> Click the
+                            pencil icon next to status or payment
+                            status to update them quickly.
+                        </div>
                     </div>
                 </div>
             )}
@@ -718,11 +824,29 @@ export default function Productions({
                                     >
                                         {!isFullscreen && (
                                             <div className="card-title mt-3 px-4">
-                                                <h4>Production Queue</h4>
+                                                <div className="d-flex justify-content-between align-items-center">
+                                                    <h4>Production Queue</h4>
+                                                    <div className="btn-group" role="group">
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${activeView === 'table' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                                            onClick={() => setActiveView('table')}
+                                                        >
+                                                            <i className="ti-view-list"></i> Table View
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${activeView === 'board' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                                            onClick={() => setActiveView('board')}
+                                                        >
+                                                            <i className="ti-layout-grid2"></i> Board View
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                         <div className="card-body">
-                                            {!isFullscreen && (
+                                            {!isFullscreen && activeView === 'table' && (
                                                 <div className="row mt-4 align-items-center">
                                                     <div className="col-md-5">
                                                         <SearchBox
@@ -752,11 +876,11 @@ export default function Productions({
                                                                             e
                                                                                 .target
                                                                                 .value ===
-                                                                            "all"
+                                                                                "all"
                                                                                 ? null
                                                                                 : e
-                                                                                      .target
-                                                                                      .value,
+                                                                                    .target
+                                                                                    .value,
                                                                     },
                                                                     {
                                                                         preserveState: false,
@@ -789,19 +913,23 @@ export default function Productions({
 
                                             <div
                                                 className={
-                                                    isFullscreen
+                                                    isFullscreen || activeView === 'board'
                                                         ? "mt-4"
                                                         : "mt-4"
                                                 }
                                             >
-                                                <div>
-                                                    <DataTable
-                                                        columns={ticketColumns}
-                                                        data={tickets.data}
-                                                        pagination={tickets}
-                                                        emptyMessage="No tickets ready for production."
-                                                    />
-                                                </div>
+                                                {activeView === 'board' ? (
+                                                    <ProductionBoard tickets={tickets.data} />
+                                                ) : (
+                                                    <div>
+                                                        <DataTable
+                                                            columns={ticketColumns}
+                                                            data={tickets.data}
+                                                            pagination={tickets}
+                                                            emptyMessage="No tickets ready for production."
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
