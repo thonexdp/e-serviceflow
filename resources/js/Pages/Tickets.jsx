@@ -1,5 +1,5 @@
 // Pages/Tickets.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -38,6 +38,39 @@ export default function Tickets({
     const [loading, setLoading] = useState(false);
     const { api, buildUrl } = useRoleApi();
 
+    useEffect(() => {
+        setSelectedCustomer(selectedCustomer);
+    }, [selectedCustomer]);
+
+    const [localSearch, setLocalSearch] = useState(filters.search || "");
+
+    useEffect(() => {
+        setLocalSearch(filters.search || "");
+    }, [filters.search]);
+
+    const handleFilterChange = (key, value) => {
+        const newFilters = {
+            search: filters.search,
+            status: filters.status,
+            payment_status: filters.payment_status,
+            customer_id: _selectedCustomer?.id,
+            [key]: value,
+        };
+
+        // Clean up empty values
+        Object.keys(newFilters).forEach(k => {
+            if (newFilters[k] === '' || newFilters[k] === null || newFilters[k] === undefined) {
+                delete newFilters[k];
+            }
+        });
+
+        router.get(buildUrl("tickets"), newFilters, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    };
+
 
     const [show, setShow] = useState(false);
     const [filepath, setFilepath] = useState("");
@@ -60,6 +93,13 @@ export default function Tickets({
     });
 
     const { flash, auth } = usePage().props;
+
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
+
+
 
     const isAllowedToAddCustomer =
         auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
@@ -975,11 +1015,10 @@ export default function Tickets({
                                                     already registered.
                                                 </p>
                                                 <CustomerSearchBox
-                                                    onSelect={(customer) =>
-                                                        setSelectedCustomer(
-                                                            customer
-                                                        )
-                                                    }
+                                                    onSelect={(customer) => {
+                                                        setSelectedCustomer(customer);
+                                                        handleFilterChange('customer_id', customer.id);
+                                                    }}
                                                     _selectedCustomer={
                                                         _selectedCustomer
                                                     }
@@ -1065,13 +1104,15 @@ export default function Tickets({
                                 <div className="card-title">
                                     <h4>Tickets</h4>
                                     <div className="button-list float-end">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setTicketModalOpen(true)
-                                            }
-                                            disabled={!_selectedCustomer}
-                                            className="
+                                        {hasPermission('tickets', 'create') && (
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setTicketModalOpen(true)
+                                                }
+                                                disabled={!_selectedCustomer}
+                                                className="
                                                 px-3 mb-2 py-2.5 text-sm font-medium rounded-md transition
                                                 text-white bg-blue-700 hover:bg-blue-500
                                                 focus:outline-none focus:ring-2 focus:ring-blue-300
@@ -1080,13 +1121,74 @@ export default function Tickets({
                                                 disabled:cursor-not-allowed
                                                 disabled:hover:bg-gray-300
                                             "
-                                        >
-                                            <i className="ti-plus"></i> Add
-                                            Tickets
-                                        </button>
+                                            >
+                                                <i className="ti-plus"></i> Add
+                                                Tickets
+                                            </button>
+                                        )}
+
                                     </div>
                                 </div>
                                 <div className="card-body">
+                                    <div className="row mb-4">
+                                        <div className="col-md-4">
+                                            <div className="input-group">
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    placeholder="Search tickets..."
+                                                    value={localSearch}
+                                                    onChange={(e) => setLocalSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleFilterChange('search', localSearch)}
+                                                    onBlur={() => handleFilterChange('search', localSearch)}
+                                                />
+                                                <div className="input-group-append">
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        type="button"
+                                                        onClick={() => handleFilterChange('search', localSearch)}
+                                                        style={{ height: '42px' }}
+                                                    >
+                                                        <i className="ti-search"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="col-md-3">
+                                            <select
+                                                className="form-control"
+                                                value={filters.status || ''}
+                                                onChange={(e) => handleFilterChange('status', e.target.value)}
+                                            >
+                                                <option value="">All Status</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="in_production">In Production</option>
+                                                <option value="completed">Completed</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-3">
+                                            <select
+                                                className="form-control"
+                                                value={filters.payment_status || ''}
+                                                onChange={(e) => handleFilterChange('payment_status', e.target.value)}
+                                            >
+                                                <option value="">All Payment Status</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="partial">Partial</option>
+                                                <option value="paid">Paid</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-2">
+                                            <button
+                                                className="btn btn-outline-secondary btn-block"
+                                                onClick={() => router.get(buildUrl("tickets"))}
+                                                style={{ height: '42px' }}
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div
                                         className="alert alert-info"
                                         role="alert"

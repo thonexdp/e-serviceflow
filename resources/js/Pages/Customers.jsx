@@ -23,9 +23,13 @@ export default function Customers({
     const [loading, setLoading] = useState(false);
 
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
 
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
 
     const handleOpenModal = (customer = null) => {
         setEditingCustomer(customer);
@@ -237,16 +241,18 @@ export default function Customers({
                                                         <i className="ti-reload"></i>
                                                     </button>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handleOpenModal()
-                                                        }
-                                                        className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
-                                                    >
-                                                        <i className="ti-plus"></i>{" "}
-                                                        Add Customer
-                                                    </button>
+                                                    {hasPermission('customers', 'create') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleOpenModal()
+                                                            }
+                                                            className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+                                                        >
+                                                            <i className="ti-plus"></i>{" "}
+                                                            Add Customer
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -255,8 +261,8 @@ export default function Customers({
                                                     columns={customerColumns}
                                                     data={customers.data}
                                                     pagination={customers}
-                                                    onEdit={handleOpenModal}
-                                                    onDelete={handleDelete}
+                                                    onEdit={hasPermission('customers', 'update') ? handleOpenModal : null}
+                                                    onDelete={hasPermission('customers', 'delete') ? handleDelete : null}
                                                     emptyMessage="No customers found."
                                                 />
                                             </div>

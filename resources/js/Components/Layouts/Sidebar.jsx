@@ -165,8 +165,8 @@ export default function Sidebar({ isCollapsed }) {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/admin/tickets">
-                                        <i className="ti-user"></i> Users
+                                    <Link href="/admin/users">
+                                        <i className="ti-id-badge"></i> Users
                                         Management
                                     </Link>
                                 </li>

@@ -62,6 +62,11 @@ class TicketController extends BaseCrudController
             $query->where('payment_status', $request->payment_status);
         }
 
+        // Filter by customer
+        if ($request->has('customer_id') && $request->customer_id) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
         $tickets = $query->with('jobType.category')
             ->orderByRaw("
                 CASE status
