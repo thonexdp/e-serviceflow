@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import { LineChart } from "@mui/x-charts/LineChart";
 import {
@@ -923,7 +922,6 @@ export default function Dashboard({
                 </div> */}
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

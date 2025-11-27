@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use App\Traits\HasWorkflowSteps;
 
 
 class Ticket extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasWorkflowSteps;
 
     protected $fillable = [
         'ticket_number',
@@ -19,6 +20,7 @@ class Ticket extends Model
         'job_type',
         'job_type_id',
         'quantity',
+        'free_quantity',
         'produced_quantity',
         'size_value',
         'size_unit',
@@ -29,6 +31,7 @@ class Ticket extends Model
         'downpayment',
         'payment_method',
         'status',
+        'current_workflow_step',
         'design_status',
         'design_notes',
         'payment_status',
@@ -43,7 +46,12 @@ class Ticket extends Model
         'downpayment' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'quantity' => 'integer',
+        'free_quantity' => 'integer',
         'produced_quantity' => 'integer',
+    ];
+
+    protected $appends = [
+        'total_quantity',
     ];
 
     /**
@@ -73,7 +81,7 @@ class Ticket extends Model
 
         $last = static::orderBy('id', 'desc')->first();
         $num = $last ? $last->id + 1 : 1;
-    
+
         return 'TKT-' . str_pad($num, 6, '0', STR_PAD_LEFT);
     }
 
@@ -195,7 +203,7 @@ class Ticket extends Model
 
         // Parse "width x height" format (e.g., "10 x 20" or "10x20")
         $parts = preg_split('/\s*x\s*/i', $this->size_value);
-        
+
         if (count($parts) >= 2) {
             $width = (float) preg_replace('/[^\d.]/', '', $parts[0]);
             $height = (float) preg_replace('/[^\d.]/', '', $parts[1]);
@@ -222,17 +230,17 @@ class Ticket extends Model
     public function calculateTotalArea(): ?float
     {
         $dimensions = $this->parseSizeDimensions();
-        
+
         if (!$dimensions['width'] || !$dimensions['height']) {
             return null;
         }
 
         $width = $dimensions['width'];
         $height = $dimensions['height'];
-        
+
         // Calculate area per piece
         $areaPerPiece = $width * $height;
-        
+
         // Convert to square meters if needed (assuming size_unit might indicate the unit)
         // For now, assume dimensions are already in meters if size_unit contains 'm' or 'sqm'
         // Otherwise, assume they're in the same unit and calculate directly
@@ -259,13 +267,13 @@ class Ticket extends Model
     public function calculateTotalLength(): ?float
     {
         $dimensions = $this->parseSizeDimensions();
-        
+
         if (!$dimensions['width']) {
             return null;
         }
 
         $length = $dimensions['width'];
-        
+
         // Convert to meters if needed
         if ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
             // Convert from cm to m
@@ -278,10 +286,12 @@ class Ticket extends Model
             return $length * $this->quantity;
         }
     }
+
+    /**
+     * Get the total quantity (paid + free).
+     */
+    public function getTotalQuantityAttribute(): int
+    {
+        return (int)($this->quantity ?? 0) + (int)($this->free_quantity ?? 0);
+    }
 }
-
-
-
-
-
-

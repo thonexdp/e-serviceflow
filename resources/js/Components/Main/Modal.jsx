@@ -24,9 +24,19 @@ export default function Modal({
         "7xl": "max-w-7xl",
     };
 
+    // Prevent closing if a higher z-index modal is open
+    const handleClose = () => {
+        // Check if PreviewModal (z-60) is open by checking if there's a dialog with higher z-index
+        const higherZIndexDialog = document.querySelector('.z-\\[60\\]');
+        if (higherZIndexDialog) {
+            return; // Don't close if PreviewModal is open
+        }
+        onClose();
+    };
+
     return (
         <Transition show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-50" onClose={onClose}>
+            <Dialog as="div" className="relative z-50" onClose={handleClose}>
                 <Transition.Child
                     as={Fragment}
                     enter="ease-out duration-200"

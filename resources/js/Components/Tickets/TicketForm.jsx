@@ -45,6 +45,7 @@ export default function TicketForm({
         category_id: "",
         job_type_id: "",
         quantity: "",
+        free_quantity: 0,
         size_value: "",
         size_unit: "",
         size_rate_id: "",
@@ -120,6 +121,7 @@ export default function TicketForm({
                 category_id: categoryId,
                 job_type_id: jobTypeId,
                 quantity: ticket.quantity || 1,
+                free_quantity: ticket.free_quantity || 0,
                 size_value: ticket.size_value || "",
                 size_unit: ticket.size_unit || "",
                 size_rate_id: "",
@@ -265,11 +267,11 @@ export default function TicketForm({
     );
     const currentSizeRate = hasSizeRates
         ? sizeRates.find(
-              (rate) =>
-                  rate.id?.toString() === (selectedSizeRateId || "").toString()
-          ) ||
-          sizeRates.find((rate) => rate.is_default) ||
-          sizeRates[0]
+            (rate) =>
+                rate.id?.toString() === (selectedSizeRateId || "").toString()
+        ) ||
+        sizeRates.find((rate) => rate.is_default) ||
+        sizeRates[0]
         : null;
 
     useEffect(() => {
@@ -358,6 +360,49 @@ export default function TicketForm({
 
             return changed ? updated : prev;
         });
+
+        // Calculate Free Quantity based on Promo Rules
+        if (selectedJobType?.promo_rules?.length > 0) {
+            const qty = parseFloat(formData.quantity) || 0;
+            let totalFree = 0;
+            let promoDescription = "";
+
+            // Sort rules by buy_quantity descending to apply largest rules first
+            const rules = [...selectedJobType.promo_rules]
+                .filter(r => r.is_active)
+                .sort((a, b) => b.buy_quantity - a.buy_quantity);
+
+            // Simple implementation: Find the best matching rule
+            // Or cumulative? "Buy 12 get 1 free" -> Buy 24 get 2 free.
+            // Usually it's floor(quantity / buy_quantity) * free_quantity
+
+            // Let's assume cumulative for the best matching rule
+            // e.g. Rule: Buy 12 Get 1. Qty 25 -> 2 free.
+
+            // Find the rule with the highest buy_quantity that fits
+            const applicableRule = rules.find(r => qty >= r.buy_quantity);
+
+            if (applicableRule) {
+                const sets = Math.floor(qty / applicableRule.buy_quantity);
+                totalFree = sets * applicableRule.free_quantity;
+                promoDescription = applicableRule.description;
+            }
+
+            setFormData(prev => {
+                if (prev.free_quantity !== totalFree) {
+                    return { ...prev, free_quantity: totalFree };
+                }
+                return prev;
+            });
+        } else {
+            setFormData(prev => {
+                if (prev.free_quantity !== 0) {
+                    return { ...prev, free_quantity: 0 };
+                }
+                return prev;
+            });
+        }
+
     }, [
         selectedJobType,
         formData.quantity,
@@ -514,6 +559,7 @@ export default function TicketForm({
         const submitData = {
             ...formData,
             quantity: parseInt(formData.quantity),
+            free_quantity: parseInt(formData.free_quantity),
             subtotal: parseFloat(formData.subtotal) || 0,
             discount: enableDiscount ? parseFloat(formData.discount) || 0 : 0,
             total_amount: parseFloat(formData.total_amount) || 0,
@@ -594,8 +640,8 @@ export default function TicketForm({
                                                 {subtotalValue.toLocaleString(
                                                     "en-US",
                                                     {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
                                                     }
                                                 )}
                                             </span>
@@ -611,8 +657,8 @@ export default function TicketForm({
                                                 {discountAmountValue.toLocaleString(
                                                     "en-US",
                                                     {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
                                                     }
                                                 )}
                                             </span>
@@ -631,8 +677,8 @@ export default function TicketForm({
                                                 {totalAmountValue.toLocaleString(
                                                     "en-US",
                                                     {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
                                                     }
                                                 )}
                                             </span>
@@ -786,17 +832,39 @@ export default function TicketForm({
                         </div>
 
                         {/* Promo Display */}
-                        {selectedJobType?.promo_text && (
+                        {(selectedJobType?.promo_rules?.length > 0 || selectedJobType?.promo_text) && (
                             <div className="row mb-3">
                                 <div className="col-md-12">
-                                    <div
-                                        className="alert alert-info"
-                                        role="alert"
-                                    >
-                                        <i className="ti-gift mr-2"></i>
-                                        <strong>Promo:</strong>{" "}
-                                        {selectedJobType.promo_text}
-                                    </div>
+                                    {formData.free_quantity > 0 ? (
+                                        <div className="alert alert-success">
+                                            <div className="d-flex align-items-center">
+                                                <i className="ti-gift mr-2 text-xl"></i>
+                                                <div>
+                                                    <strong>Promo Applied!</strong>
+                                                    <div>
+                                                        You get <strong>{formData.free_quantity} free item(s)</strong> based on your quantity.
+                                                        <br />
+                                                        Total to produce: <strong>{parseInt(formData.quantity) + parseInt(formData.free_quantity)} pcs</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="alert alert-info">
+                                            <i className="ti-gift mr-2"></i>
+                                            <strong>Available Promo:</strong>
+                                            <ul className="mb-0 pl-4 mt-1">
+                                                {selectedJobType.promo_rules?.map((rule, idx) => (
+                                                    <li key={idx}>
+                                                        {rule.description || `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
+                                                    </li>
+                                                ))}
+                                                {selectedJobType.promo_text && !selectedJobType.promo_rules?.length && (
+                                                    <li>{selectedJobType.promo_text}</li>
+                                                )}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -806,7 +874,7 @@ export default function TicketForm({
                         <div className="alert alert-light border mt-3">
                             <div className="alert alert-info" role="alert">
                                 <i className="fa fa-info-circle"></i>{" "}
-                                <strong>Promo:</strong> Bulk Pricing for 
+                                <strong>Promo:</strong> Bulk Pricing for
                             </div>
                             <div className="table-responsive">
                                 <table className="table table-sm mb-0">
@@ -867,25 +935,22 @@ export default function TicketForm({
                                         }
                                         options={sizeRates.map((rate) => ({
                                             value: rate.id?.toString(),
-                                            label: `${
-                                                rate.variant_name || "Variant"
-                                            } - ₱${parseFloat(
-                                                rate.rate
-                                            ).toFixed(2)} per ${
-                                                rate.calculation_method ===
-                                                "length"
+                                            label: `${rate.variant_name || "Variant"
+                                                } - ₱${parseFloat(
+                                                    rate.rate
+                                                ).toFixed(2)} per ${rate.calculation_method ===
+                                                    "length"
                                                     ? rate.dimension_unit
                                                     : `${rate.dimension_unit}²`
-                                            }`,
+                                                }`,
                                         }))}
                                     />
                                 </div>
                                 <div className="col-md-4">
                                     <FormInput
-                                        label={`Width (${
-                                            currentSizeRate?.dimension_unit ||
+                                        label={`Width (${currentSizeRate?.dimension_unit ||
                                             "unit"
-                                        })`}
+                                            })`}
                                         type="number"
                                         name="size_width"
                                         value={sizeDimensions.width}
@@ -904,29 +969,28 @@ export default function TicketForm({
                                 </div>
                                 {currentSizeRate?.calculation_method !==
                                     "length" && (
-                                    <div className="col-md-4">
-                                        <FormInput
-                                            label={`Height (${
-                                                currentSizeRate?.dimension_unit ||
-                                                "unit"
-                                            })`}
-                                            type="number"
-                                            name="size_height"
-                                            value={sizeDimensions.height}
-                                            onChange={(e) => {
-                                                setSizeDimensions((prev) => ({
-                                                    ...prev,
-                                                    height: e.target.value,
-                                                }));
-                                                clearError("size_height");
-                                            }}
-                                            error={errors.size_height}
-                                            min="0"
-                                            step="0.01"
-                                            placeholder="Height"
-                                        />
-                                    </div>
-                                )}
+                                        <div className="col-md-4">
+                                            <FormInput
+                                                label={`Height (${currentSizeRate?.dimension_unit ||
+                                                    "unit"
+                                                    })`}
+                                                type="number"
+                                                name="size_height"
+                                                value={sizeDimensions.height}
+                                                onChange={(e) => {
+                                                    setSizeDimensions((prev) => ({
+                                                        ...prev,
+                                                        height: e.target.value,
+                                                    }));
+                                                    clearError("size_height");
+                                                }}
+                                                error={errors.size_height}
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="Height"
+                                            />
+                                        </div>
+                                    )}
                             </div>
                             {currentSizeRate && (
                                 <p className="text-muted text-sm mt-2">
@@ -936,7 +1000,7 @@ export default function TicketForm({
                                     )}{" "}
                                     per{" "}
                                     {currentSizeRate.calculation_method ===
-                                    "length"
+                                        "length"
                                         ? currentSizeRate.dimension_unit
                                         : `${currentSizeRate.dimension_unit}²`}
                                 </p>
@@ -1020,21 +1084,21 @@ export default function TicketForm({
                         <div className="row">
                             <div className="col-md-6">
                                 <div className="mt-32">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Payment Proofs (GCash / bank receipts)
-                                </label>
-                                <input
-                                    type="file"
-                                    className="form-control"
-                                    accept="image/*,application/pdf"
-                                    multiple
-                                    onChange={handlePaymentProofUpload}
-                                />
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Payment Proofs (GCash / bank receipts)
+                                    </label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        accept="image/*,application/pdf"
+                                        multiple
+                                        onChange={handlePaymentProofUpload}
+                                    />
                                 </div>
-                               
+
                             </div>
                             <div className="col-md-6">
-                            {paymentProofs.length > 0 ? (
+                                {paymentProofs.length > 0 ? (
                                     <div className="mt-3">
                                         {paymentProofs.length > 1 && (
                                             <div className="nav nav-pills nav-fill gap-2 mb-3" role="tablist">
@@ -1042,9 +1106,8 @@ export default function TicketForm({
                                                     <button
                                                         key={index}
                                                         type="button"
-                                                        className={`nav-link btn-sm py-1 px-2 ${
-                                                            activeProofTab === index ? "active" : ""
-                                                        }`}
+                                                        className={`nav-link btn-sm py-1 px-2 ${activeProofTab === index ? "active" : ""
+                                                            }`}
                                                         onClick={() => setActiveProofTab(index)}
                                                         style={{ fontSize: "0.75rem" }}
                                                     >
@@ -1074,7 +1137,7 @@ export default function TicketForm({
                                         </div>
                                         <button
                                             type="button"
-                        className="btn btn-sm btn-outline-danger w-100 mt-2"
+                                            className="btn btn-sm btn-outline-danger w-100 mt-2"
                                             onClick={() => removePaymentProof(activeProofTab)}
                                         >
                                             <i className="ti-trash mr-1"></i>Remove Proof
@@ -1218,11 +1281,10 @@ export default function TicketForm({
                                                     <button
                                                         key={index}
                                                         type="button"
-                                                        className={`nav-link btn-sm py-1 px-2 ${
-                                                            activeAttachmentTab === index
+                                                        className={`nav-link btn-sm py-1 px-2 ${activeAttachmentTab === index
                                                                 ? "active"
                                                                 : ""
-                                                        }`}
+                                                            }`}
                                                         onClick={() => setActiveAttachmentTab(index)}
                                                         style={{ fontSize: "0.75rem" }}
                                                     >

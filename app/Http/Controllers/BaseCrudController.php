@@ -1,13 +1,17 @@
 <?php
 
+
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Traits\HasRoleBasedRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
 
 abstract class BaseCrudController extends Controller
 {
+    use HasRoleBasedRoutes;
+
     protected $model;
     protected $resourceName;
     protected $viewPath;
@@ -61,8 +65,7 @@ abstract class BaseCrudController extends Controller
 
         $item = $this->model::create($validated);
 
-        return redirect()
-            ->route($this->resourceName . '.index')
+        return $this->redirectToRoleRoute($this->resourceName . '.index')
             ->with('success', ucfirst($this->resourceName) . ' created successfully.');
     }
 
@@ -102,8 +105,7 @@ abstract class BaseCrudController extends Controller
 
         $item->update($validated);
 
-        return redirect()
-            ->route($this->resourceName . '.index')
+        return $this->redirectToRoleRoute($this->resourceName . '.index')
             ->with('success', ucfirst($this->resourceName) . ' updated successfully.');
     }
 
@@ -115,8 +117,7 @@ abstract class BaseCrudController extends Controller
         $item = $this->model::findOrFail($id);
         $item->delete();
 
-        return redirect()
-            ->route($this->resourceName . '.index')
+        return $this->redirectToRoleRoute($this->resourceName . '.index')
             ->with('success', ucfirst($this->resourceName) . ' deleted successfully.');
     }
 
@@ -166,21 +167,5 @@ abstract class BaseCrudController extends Controller
         return Str::studly($this->resourceName);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

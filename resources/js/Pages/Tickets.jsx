@@ -1,8 +1,7 @@
 // Pages/Tickets.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import CustomerForm from "@/Components/Customers/CustomerForm";
 import TicketForm from "@/Components/Tickets/TicketForm";
@@ -11,6 +10,10 @@ import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import axios from "axios";
+import PreviewModal from "@/Components/Main/PreviewModal";
+import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
+import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Tickets({
     user = {},
@@ -30,14 +33,53 @@ export default function Tickets({
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [_selectedCustomer, setSelectedCustomer] = useState(selectedCustomer);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [selectedID, setSelectedID] = useState(null);
+    const [openDeleteModal, setDeleteModalOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const { api, buildUrl } = useRoleApi();
 
-    // Status modal form state
+    useEffect(() => {
+        setSelectedCustomer(selectedCustomer);
+    }, [selectedCustomer]);
+
+    const [localSearch, setLocalSearch] = useState(filters.search || "");
+
+    useEffect(() => {
+        setLocalSearch(filters.search || "");
+    }, [filters.search]);
+
+    const handleFilterChange = (key, value) => {
+        const newFilters = {
+            search: filters.search,
+            status: filters.status,
+            payment_status: filters.payment_status,
+            customer_id: _selectedCustomer?.id,
+            [key]: value,
+        };
+
+        // Clean up empty values
+        Object.keys(newFilters).forEach(k => {
+            if (newFilters[k] === '' || newFilters[k] === null || newFilters[k] === undefined) {
+                delete newFilters[k];
+            }
+        });
+
+        router.get(buildUrl("tickets"), newFilters, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    };
+
+
+    const [show, setShow] = useState(false);
+    const [filepath, setFilepath] = useState("");
+
     const [statusFormData, setStatusFormData] = useState({
         status: "",
         notes: "",
     });
 
-    // Payment modal form state
     const [paymentFormData, setPaymentFormData] = useState({
         ticket_id: null,
         amount: "",
@@ -52,17 +94,20 @@ export default function Tickets({
 
     const { flash, auth } = usePage().props;
 
-    const formatCurrency = (value) =>
-        `₱${parseFloat(value || 0).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-        })}`;
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
+
+
 
     const isAllowedToAddCustomer =
         auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
 
+
     const handleCustomerSubmit = async (formData) => {
         try {
-            const { data } = await axios.post("/customers", formData);
+            const { data } = await api.post(`/customers`, formData);
 
             if (data.success) {
                 setSelectedCustomer({
@@ -121,7 +166,7 @@ export default function Tickets({
 
         if (editingTicket) {
             formData.append("_method", "PUT");
-            router.post(`/tickets/${editingTicket.id}`, formData, {
+            router.post(buildUrl(`tickets/${editingTicket.id}`), formData, {
                 onSuccess: () => {
                     setTicketModalOpen(false);
                     setEditingTicket(null);
@@ -129,7 +174,7 @@ export default function Tickets({
                 preserveScroll: true,
             });
         } else {
-            router.post("/tickets", formData, {
+            router.post(buildUrl("tickets"), formData, {
                 onSuccess: () => {
                     setTicketModalOpen(false);
                 },
@@ -148,8 +193,15 @@ export default function Tickets({
         setStatusModalOpen(true);
     };
 
+    const handlePreviewFile = (payment) => {
+        setFilepath(payment?.documents[0]?.file_path);
+        setShow(true);
+    };
+
+
     // Open payment update modal
     const handleOpenPaymentModal = (ticket) => {
+        console.log(ticket);
         setSelectedTicket(ticket);
         setPaymentFormData({
             ticket_id: ticket.id,
@@ -174,7 +226,7 @@ export default function Tickets({
 
         setIsUpdating(true);
         try {
-            await axios.patch(
+            await api.patch(
                 `/tickets/${selectedTicket.id}/update-status`,
                 statusFormData
             );
@@ -227,7 +279,7 @@ export default function Tickets({
 
         setIsUpdating(true);
         try {
-            await axios.post("/payments", formData, {
+            await api.post("/payments", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             setPaymentModalOpen(false);
@@ -252,20 +304,41 @@ export default function Tickets({
         setTicketModalOpen(true);
     };
 
-    const handleDeleteCustomer = (customerId) => {
-        if (confirm("Are you sure you want to delete this customer?")) {
-            router.delete(`/customers/${customerId}`, {
-                preserveScroll: true,
-            });
-        }
+    const handleConfirmDeleteTicket = () => {
+        if (!selectedID) return;
+        router.delete(buildUrl(`tickets/${selectedID}`), {
+            preserveScroll: true,
+            preserveState: false,
+
+            onBefore: () => {
+                setLoading(true);
+            },
+            onSuccess: () => {
+                handleCloseModal();
+                setLoading(false);
+                toast.success(" Ticket deleted successfully.");
+            },
+            onError: (errors) => {
+                setLoading(false);
+                toast.error("Failed to delete ticket. Please try again.");
+            },
+
+            // Called always after success or error
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleCloseModal = () => {
+        setDeleteModalOpen(false);
+        setCustomerModalOpen(false);
+        setEditingCustomer(null);
     };
 
     const handleDeleteTicket = (ticketId) => {
-        if (confirm("Are you sure you want to delete this ticket?")) {
-            router.delete(`/tickets/${ticketId}`, {
-                preserveScroll: true,
-            });
-        }
+        setSelectedID(ticketId);
+        setDeleteModalOpen(true);
     };
 
     const closeCustomerModal = () => {
@@ -327,7 +400,6 @@ export default function Tickets({
         );
     };
 
-    // Define table columns
     const ticketColumns = [
         {
             label: "#",
@@ -348,7 +420,17 @@ export default function Tickets({
         {
             label: "Qty",
             key: "quantity",
-            render: (row) => `${row.quantity} Pcs`,
+            render: (row) => (
+                <div>
+                    {row.quantity} Pcs
+                    {row.free_quantity > 0 && (
+                        <div className="text-success small">
+                            <i className="ti-gift mr-1"></i>
+                            + {row.free_quantity} Free
+                        </div>
+                    )}
+                </div>
+            ),
         },
         {
             label: "Due Date",
@@ -378,14 +460,14 @@ export default function Tickets({
                 <div>
                     {getPaymentStatusBadge(row.payment_status)}
                     {/* {row.payment_status !== "paid" && ( */}
-                        <button
-                            onClick={() => handleOpenPaymentModal(row)}
-                            className="btn btn-sm ml-1"
-                            style={{ padding: "2px 8px", fontSize: "11px" }}
-                            title="Update Payment"
-                        >
-                            <i className={`ti-${row.payment_status === "paid" ? "eye" : "pencil"}`}></i>
-                        </button>
+                    <button
+                        onClick={() => handleOpenPaymentModal(row)}
+                        className="btn btn-sm btn-outline-primary ml-1"
+                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                        title="Update Payment"
+                    >
+                        <i className={`ti-${row.payment_status === "paid" ? "eye" : "pencil"}`}></i>
+                    </button>
                     {/* )} */}
                 </div>
             ),
@@ -411,9 +493,14 @@ export default function Tickets({
             ),
         },
     ];
-
     return (
         <>
+            <PreviewModal
+                isOpen={show}
+                onClose={() => setShow(false)}
+                fileUrl={filepath}
+                title="Document Preview"
+            />
             {/* Customer Modal */}
             <Modal
                 title={editingCustomer ? "Edit Customer" : "Add Customer"}
@@ -432,9 +519,8 @@ export default function Tickets({
 
             {/* Ticket Modal */}
             <Modal
-                title={`${editingTicket ? "Edit Ticket" : "Add Ticket"} - ${
-                    _selectedCustomer?.full_name
-                }`}
+                title={`${editingTicket ? "Edit Ticket" : "Add Ticket"} - ${_selectedCustomer?.full_name
+                    }`}
                 isOpen={openTicketModal}
                 onClose={closeTicketModal}
                 size="7xl"
@@ -445,6 +531,20 @@ export default function Tickets({
                     customerId={_selectedCustomer?.id}
                     onSubmit={handleTicketSubmit}
                     onCancel={closeTicketModal}
+                />
+            </Modal>
+            <Modal
+                title={"Delete Tickets"}
+                isOpen={openDeleteModal}
+                onClose={handleCloseModal}
+                size="md"
+                submitButtonText={null}
+            >
+                <DeleteConfirmation
+                    label=" ticket"
+                    loading={loading}
+                    onSubmit={handleConfirmDeleteTicket}
+                    onCancel={handleCloseModal}
                 />
             </Modal>
             <AdminLayout
@@ -620,26 +720,26 @@ export default function Tickets({
                                     <div className="col-md-6">
                                         <p className="m-b-5">
                                             <strong>Total Amount:</strong>{" "}
-                                            {formatCurrency(
+                                            {formatPeso(
                                                 selectedTicket.total_amount
                                             )}
                                         </p>
                                         <p className="m-b-5">
                                             <strong>Amount Paid:</strong>{" "}
-                                            {formatCurrency(
+                                            {formatPeso(
                                                 selectedTicket.amount_paid
                                             )}
                                         </p>
                                         <p className="m-b-0 text-danger font-bold">
                                             <strong>Balance:</strong>{" "}
-                                            {formatCurrency(
+                                            {formatPeso(
                                                 parseFloat(
                                                     selectedTicket.total_amount || 0
                                                 ) -
-                                                    parseFloat(
-                                                        selectedTicket.amount_paid ||
-                                                            0
-                                                    )
+                                                parseFloat(
+                                                    selectedTicket.amount_paid ||
+                                                    0
+                                                )
                                             )}
                                         </p>
                                     </div>
@@ -684,7 +784,6 @@ export default function Tickets({
                                             Credit Card
                                         </option>
                                         <option value="check">Check</option>
-                                        <option value="online">Online</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -792,7 +891,7 @@ export default function Tickets({
                                 <h5 className="m-b-3">Payment History</h5>
                                 <div className="border rounded p-3 payment-history">
                                     {selectedTicket?.payments &&
-                                    selectedTicket.payments.length ? (
+                                        selectedTicket.payments.length ? (
                                         selectedTicket.payments.map((payment) => (
                                             <div
                                                 key={payment.id}
@@ -800,7 +899,7 @@ export default function Tickets({
                                             >
                                                 <div className="d-flex justify-content-between">
                                                     <strong>
-                                                        {formatCurrency(payment.amount)}
+                                                        {formatPeso(payment.amount)}
                                                     </strong>
                                                     <span className="text-muted text-sm">
                                                         {new Date(
@@ -828,13 +927,24 @@ export default function Tickets({
                                                     </p>
                                                 )}
                                                 {payment.documents?.length ? (
-                                                    <span className="badge badge-success">
-                                                        {payment.documents.length}{" "}
-                                                        attachment
-                                                        {payment.documents.length > 1
-                                                            ? "s"
-                                                            : ""}
-                                                    </span>
+                                                    <>
+                                                        <span className="badge badge-success">
+                                                            {payment.documents.length}{" "}
+                                                            attachment
+                                                            {payment.documents.length > 1
+                                                                ? "s"
+                                                                : ""}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handlePreviewFile(payment)}
+                                                            className="btn btn-sm btn-outline-primary ml-1"
+                                                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                            title="Photo preview"
+                                                        >
+                                                            <i className="ti-eye"></i>
+                                                        </button>
+                                                    </>
+
                                                 ) : null}
                                             </div>
                                         ))
@@ -905,11 +1015,10 @@ export default function Tickets({
                                                     already registered.
                                                 </p>
                                                 <CustomerSearchBox
-                                                    onSelect={(customer) =>
-                                                        setSelectedCustomer(
-                                                            customer
-                                                        )
-                                                    }
+                                                    onSelect={(customer) => {
+                                                        setSelectedCustomer(customer);
+                                                        handleFilterChange('customer_id', customer.id);
+                                                    }}
                                                     _selectedCustomer={
                                                         _selectedCustomer
                                                     }
@@ -995,13 +1104,15 @@ export default function Tickets({
                                 <div className="card-title">
                                     <h4>Tickets</h4>
                                     <div className="button-list float-end">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setTicketModalOpen(true)
-                                            }
-                                            disabled={!_selectedCustomer}
-                                            className="
+                                        {hasPermission('tickets', 'create') && (
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setTicketModalOpen(true)
+                                                }
+                                                disabled={!_selectedCustomer}
+                                                className="
                                                 px-3 mb-2 py-2.5 text-sm font-medium rounded-md transition
                                                 text-white bg-blue-700 hover:bg-blue-500
                                                 focus:outline-none focus:ring-2 focus:ring-blue-300
@@ -1010,13 +1121,74 @@ export default function Tickets({
                                                 disabled:cursor-not-allowed
                                                 disabled:hover:bg-gray-300
                                             "
-                                        >
-                                            <i className="ti-plus"></i> Add
-                                            Tickets
-                                        </button>
+                                            >
+                                                <i className="ti-plus"></i> Add
+                                                Tickets
+                                            </button>
+                                        )}
+
                                     </div>
                                 </div>
                                 <div className="card-body">
+                                    <div className="row mb-4">
+                                        <div className="col-md-4">
+                                            <div className="input-group">
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    placeholder="Search tickets..."
+                                                    value={localSearch}
+                                                    onChange={(e) => setLocalSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleFilterChange('search', localSearch)}
+                                                    onBlur={() => handleFilterChange('search', localSearch)}
+                                                />
+                                                <div className="input-group-append">
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        type="button"
+                                                        onClick={() => handleFilterChange('search', localSearch)}
+                                                        style={{ height: '42px' }}
+                                                    >
+                                                        <i className="ti-search"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="col-md-3">
+                                            <select
+                                                className="form-control"
+                                                value={filters.status || ''}
+                                                onChange={(e) => handleFilterChange('status', e.target.value)}
+                                            >
+                                                <option value="">All Status</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="in_production">In Production</option>
+                                                <option value="completed">Completed</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-3">
+                                            <select
+                                                className="form-control"
+                                                value={filters.payment_status || ''}
+                                                onChange={(e) => handleFilterChange('payment_status', e.target.value)}
+                                            >
+                                                <option value="">All Payment Status</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="partial">Partial</option>
+                                                <option value="paid">Paid</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-2">
+                                            <button
+                                                className="btn btn-outline-secondary btn-block"
+                                                onClick={() => router.get(buildUrl("tickets"))}
+                                                style={{ height: '42px' }}
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div
                                         className="alert alert-info"
                                         role="alert"
@@ -1040,7 +1212,6 @@ export default function Tickets({
                     </div>
                 </section>
 
-                <Footer />
             </AdminLayout>
         </>
     );

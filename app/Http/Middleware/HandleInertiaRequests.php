@@ -37,11 +37,18 @@ class HandleInertiaRequests extends Middleware
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'role' => $request->user()->role,
+                    'permissions' => $request->user()->isAdmin()
+                        ? ['*']
+                        : $request->user()->permissions()
+                        ->wherePivot('granted', true)
+                        ->get()
+                        ->map(fn($p) => $p->module . '.' . $p->feature)
+                        ->toArray(),
                 ] : null,
             ],
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
+                'success' => fn() => $request->session()->get('success'),
+                'error'   => fn() => $request->session()->get('error'),
             ],
         ];
     }

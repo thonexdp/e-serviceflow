@@ -45,6 +45,15 @@ class JobTypeRequest extends FormRequest
             'size_rates.*.min_height' => 'nullable|numeric|min:0',
             'size_rates.*.max_height' => 'nullable|numeric|min:0',
             'size_rates.*.is_default' => 'boolean',
+
+            // Promo rules
+            'promo_rules' => 'nullable|array',
+            'promo_rules.*.buy_quantity' => 'required_with:promo_rules.*.free_quantity|integer|min:1',
+            'promo_rules.*.free_quantity' => 'required_with:promo_rules.*.buy_quantity|integer|min:1',
+            'promo_rules.*.description' => 'nullable|string|max:255',
+            'promo_rules.*.is_active' => 'boolean',
+
+            'workflow_steps' => 'nullable|array',
         ];
     }
 

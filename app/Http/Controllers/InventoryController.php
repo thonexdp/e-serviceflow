@@ -7,7 +7,6 @@ use App\Models\StockMovement;
 use App\Services\StockManagementService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
@@ -23,7 +22,7 @@ class InventoryController extends Controller
      */
     public function index(Request $request)
     {
-        $query = StockItem::with(['jobType', 'productionConsumptions' => function($q) {
+        $query = StockItem::with(['jobType', 'productionConsumptions' => function ($q) {
             $q->latest()->limit(5); // Get recent consumptions
         }]);
 
@@ -60,10 +59,10 @@ class InventoryController extends Controller
         }
 
         $stockItems = $query->orderBy('name')->paginate($request->get('per_page', 15));
-        
+
         // Load production consumptions for each stock item (for display)
         foreach ($stockItems->items() as $stockItem) {
-            $stockItem->load(['productionConsumptions' => function($q) {
+            $stockItem->load(['productionConsumptions' => function ($q) {
                 $q->with('ticket')->latest()->limit(3);
             }]);
         }
@@ -201,7 +200,7 @@ class InventoryController extends Controller
     public function movements($id, Request $request)
     {
         $stockItem = StockItem::findOrFail($id);
-        
+
         $movements = StockMovement::where('stock_item_id', $id)
             ->with('user')
             ->orderBy('created_at', 'desc')
@@ -225,4 +224,3 @@ class InventoryController extends Controller
         ]);
     }
 }
-

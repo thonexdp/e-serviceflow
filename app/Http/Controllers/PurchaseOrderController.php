@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Traits\HasRoleBasedRoutes;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\StockItem;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderController extends Controller
 {
+    use HasRoleBasedRoutes;
     protected $stockService;
 
     public function __construct(StockManagementService $stockService)
@@ -111,7 +113,7 @@ class PurchaseOrderController extends Controller
 
             $purchaseOrder->calculateTotals();
 
-            return redirect()->route('purchase-orders.show', $purchaseOrder->id)
+            return $this->redirectToRoleRoute('purchase-orders.show', $purchaseOrder->id)
                 ->with('success', 'Purchase order created successfully.');
         });
     }
@@ -257,8 +259,7 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrder->delete();
 
-        return redirect()->route('purchase-orders.index')
+        return $this->redirectToRoleRoute('purchase-orders.index')
             ->with('success', 'Purchase order deleted successfully.');
     }
 }
-

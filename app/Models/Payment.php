@@ -11,7 +11,7 @@ class Payment extends Model
     use HasFactory, SoftDeletes;
 
     public const TYPES = ['collection', 'refund', 'adjustment'];
-    public const METHODS = ['cash', 'gcash', 'bank_transfer', 'credit_card', 'check', 'online'];
+    public const METHODS = ['cash', 'gcash', 'bank_transfer', 'credit_card', 'check'];
     public const ALLOCATIONS = ['downpayment', 'balance', 'full'];
 
     protected $fillable = [

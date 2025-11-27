@@ -1,0 +1,18 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 6001
+  },
+  "app_key": "${SOKETI_APP_KEY}",
+  "app_secret": "${SOKETI_APP_SECRET}",
+  "redis": {
+    "servers": [
+      {
+        "url": "${SOKETI_REDIS_URL}"
+      }
+    ]
+  },
+  "client": {
+    "verify_origin": false
+  }
+}

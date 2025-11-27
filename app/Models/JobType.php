@@ -20,6 +20,7 @@ class JobType extends Model
         'promo_text',
         'is_active',
         'sort_order',
+        'workflow_steps',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class JobType extends Model
         'discount' => 'decimal:2',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'workflow_steps' => 'array',
     ];
 
     /**
@@ -53,6 +55,22 @@ class JobType extends Model
     public function stockRequirements()
     {
         return $this->hasMany(JobTypeStockRequirement::class);
+    }
+
+    /**
+     * Get promo rules for this job type.
+     */
+    public function promoRules()
+    {
+        return $this->hasMany(JobTypePromoRule::class)->orderBy('buy_quantity');
+    }
+
+    /**
+     * Get only active promo rules for this job type.
+     */
+    public function activePromoRules()
+    {
+        return $this->hasMany(JobTypePromoRule::class)->where('is_active', true)->orderBy('buy_quantity');
     }
 
     /**

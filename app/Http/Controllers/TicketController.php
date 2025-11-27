@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers;
 
 use App\Models\Ticket;
@@ -12,6 +13,7 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Services\PaymentRecorder;
 use App\Events\TicketStatusChanged;
+use App\Http\Controllers\Traits\HasRoleBasedRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +22,8 @@ use Illuminate\Support\Str;
 
 class TicketController extends BaseCrudController
 {
+    use HasRoleBasedRoutes;
+
     protected $model = Ticket::class;
     protected $resourceName = 'tickets';
     protected $viewPath = 'Tickets';
@@ -58,6 +62,11 @@ class TicketController extends BaseCrudController
             $query->where('payment_status', $request->payment_status);
         }
 
+        // Filter by customer
+        if ($request->has('customer_id') && $request->customer_id) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
         $tickets = $query->with('jobType.category')
             ->orderByRaw("
                 CASE status
@@ -76,7 +85,7 @@ class TicketController extends BaseCrudController
         // Get job categories and types for ticket form
         $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
             $query->where('is_active', true)
-                ->with(['priceTiers', 'sizeRates'])
+                ->with(['priceTiers', 'sizeRates', 'promoRules'])
                 ->orderBy('sort_order')
                 ->orderBy('name');
         }])->orderBy('name')->get();
@@ -101,6 +110,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -195,8 +205,7 @@ class TicketController extends BaseCrudController
             $this->notifyTicketCreated($ticket);
         }
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket created successfully.');
     }
 
@@ -213,6 +222,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -281,8 +291,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket updated successfully.');
     }
 
@@ -300,8 +309,7 @@ class TicketController extends BaseCrudController
 
         $ticket->delete();
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket deleted successfully.');
     }
 
@@ -453,6 +461,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',

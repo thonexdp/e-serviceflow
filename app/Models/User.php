@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Notifications\CustomResetPasswordNotification;
 
 class User extends Authenticatable
 {
@@ -51,6 +52,17 @@ class User extends Authenticatable
     const ROLE_FRONTDESK = 'FrontDesk';
     const ROLE_DESIGNER = 'Designer';
     const ROLE_PRODUCTION = 'Production';
+
+    /**
+     * Send the password reset notification.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new CustomResetPasswordNotification($token));
+    }
 
     /**
      * Check if user has a specific role
@@ -106,5 +118,69 @@ class User extends Authenticatable
     public function unreadNotifications()
     {
         return $this->hasMany(\App\Models\Notification::class)->where('read', false);
+    }
+
+    /**
+     * Get the permissions for the user.
+     */
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class, 'user_permissions')
+            ->withPivot('granted')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if user has a specific permission
+     * 
+     * @param string $module The module name (e.g., 'tickets', 'customers')
+     * @param string $feature The feature name (e.g., 'read', 'create', 'update', 'delete', 'price_edit')
+     * @return bool
+     */
+    public function hasPermission(string $module, string $feature): bool
+    {
+        // Admin has all permissions
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // Check if user has the specific permission
+        return $this->permissions()
+            ->where('module', $module)
+            ->where('feature', $feature)
+            ->wherePivot('granted', true)
+            ->exists();
+    }
+
+    /**
+     * Grant a permission to the user
+     */
+    public function grantPermission($permissionId, $granted = true)
+    {
+        $this->permissions()->syncWithoutDetaching([
+            $permissionId => ['granted' => $granted]
+        ]);
+    }
+
+    /**
+     * Revoke a permission from the user
+     */
+    public function revokePermission($permissionId)
+    {
+        $this->permissions()->detach($permissionId);
+    }
+
+    /**
+     * Sync user permissions
+     * 
+     * @param array $permissions Array of permission IDs with granted status
+     */
+    public function syncPermissions(array $permissions)
+    {
+        $sync = [];
+        foreach ($permissions as $permissionId => $granted) {
+            $sync[$permissionId] = ['granted' => $granted];
+        }
+        $this->permissions()->sync($sync);
     }
 }

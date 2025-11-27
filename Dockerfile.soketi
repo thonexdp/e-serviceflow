@@ -1,0 +1,15 @@
+FROM node:18-alpine
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /srv
+RUN npm i -g @soketi/soketi
+
+# Copy optional config file (if you use one)
+COPY soketi.config.json /srv/soketi.config.json
+
+ENV PORT=6001
+EXPOSE 6001
+
+# Use env vars: SOKETI_REDIS_URL and SOKETI_REDIS_PASSWORD if needed
+CMD ["soketi", "start", "--config", "/srv/soketi.config.json"]

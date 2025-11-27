@@ -23,14 +23,29 @@ class ProductionQueueController extends Controller
     public function index(Request $request)
     {
         // Get tickets that are approved by designer (ready for production)
+        $data = $this->getData($request);
+        return Inertia::render('Productions', [
+            'tickets' => $data['tickets'],
+            'stockItems' => $data['stockItems'],
+            'filters' => $request->only(['search', 'status']),
+            'summary' => $data['summary'],
+        ]);
+    }
+
+
+    public function getData(Request $request)
+    {
         $query = Ticket::with([
-            'jobType.category', 
-            'jobType.stockRequirements.stockItem', 
-            'mockupFiles', 
+            'jobType.category',
+            'jobType.stockRequirements.stockItem',
+            'mockupFiles',
             'stockConsumptions.stockItem'
         ])
-            ->where('design_status', 'approved')
-            ->whereIn('status', ['pending', 'ready_to_print', 'in_production', 'completed']);
+            ->whereIn('status', ['ready_to_print', 'in_production', 'completed'])
+            ->where(function ($q) {
+                $q->where('design_status', 'approved')
+                    ->orWhereNull('design_status');
+            });
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -59,11 +74,39 @@ class ProductionQueueController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Production-Queue', [
+        // Calculate summary statistics for today
+        $today = now()->startOfDay();
+        $baseQuery = Ticket::whereIn('status', ['ready_to_print', 'in_production', 'completed'])
+            ->where(function ($q) {
+                $q->where('design_status', 'approved')
+                    ->orWhereNull('design_status');
+            });
+
+        // Apply same filters for summary (except status filter to get all counts)
+        if ($request->has('search') && $request->search) {
+            $baseQuery->where(function ($q) use ($request) {
+                $q->where('ticket_number', 'like', '%' . $request->search . '%')
+                    ->orWhere('description', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        $summary = [
+            'total' => (clone $baseQuery)->count(),
+            'inProgress' => (clone $baseQuery)->where('status', 'in_production')->count(),
+            'finished' => (clone $baseQuery)->where('status', 'completed')->count(),
+            'delays' => (clone $baseQuery)
+                ->where('status', '!=', 'completed')
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<', $today)
+                ->count(),
+        ];
+
+        return [
             'tickets' => $tickets,
             'stockItems' => $stockItems,
             'filters' => $request->only(['search', 'status']),
-        ]);
+            'summary' => $summary,
+        ];
     }
 
     /**
@@ -71,7 +114,7 @@ class ProductionQueueController extends Controller
      */
     public function startProduction($id)
     {
-        $ticket = Ticket::findOrFail($id);
+        $ticket = Ticket::with('jobType')->findOrFail($id);
         $oldStatus = $ticket->status;
 
         if ($ticket->design_status !== 'approved') {
@@ -81,6 +124,9 @@ class ProductionQueueController extends Controller
         $ticket->update([
             'status' => 'in_production',
         ]);
+
+        // Initialize workflow step
+        $ticket->initializeWorkflow();
 
         // Notify FrontDesk (optional)
         $this->notifyStatusChange($ticket, $oldStatus, 'in_production');
@@ -102,25 +148,36 @@ class ProductionQueueController extends Controller
         $validated = $request->validate([
             'produced_quantity' => 'required|integer|min:0|max:' . $ticket->quantity,
             'status' => 'nullable|string|in:in_production,completed',
+            'current_workflow_step' => 'nullable|string',
         ]);
 
         $oldStatus = $ticket->status;
+        $oldWorkflowStep = $ticket->current_workflow_step;
+        $oldQuantity = $ticket->produced_quantity;
+
         $newStatus = $validated['status'] ?? ($validated['produced_quantity'] >= $ticket->quantity ? 'completed' : 'in_production');
         $wasCompleted = $ticket->status === 'completed';
         $isNowCompleted = $newStatus === 'completed';
 
         try {
             \DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted, $oldStatus) {
-        $ticket->update([
-            'produced_quantity' => $validated['produced_quantity'],
+                $updateData = [
+                    'produced_quantity' => $validated['produced_quantity'],
                     'status' => $newStatus,
-                ]);
+                ];
+
+                // Update workflow step if provided
+                if (isset($validated['current_workflow_step'])) {
+                    $updateData['current_workflow_step'] = $validated['current_workflow_step'];
+                }
+
+                $ticket->update($updateData);
 
                 // Auto-consume stock if just marked as completed (and wasn't already completed)
                 if ($isNowCompleted && !$wasCompleted) {
                     // Refresh ticket to ensure we have latest data
                     $ticket->refresh();
-                    
+
                     // Automatically consume stock based on job type requirements
                     $this->stockService->autoConsumeStockForProduction($ticket);
                 }
@@ -137,14 +194,24 @@ class ProductionQueueController extends Controller
             } elseif ($oldStatus !== $newStatus && $newStatus === 'in_production') {
                 // Notify when status changes to in_production
                 $this->notifyStatusChange($ticket, $oldStatus, 'in_production');
+            } else {
+                // Notify for workflow step or quantity changes (even if status didn't change)
+                $workflowStepChanged = isset($validated['current_workflow_step']) &&
+                    $validated['current_workflow_step'] !== $oldWorkflowStep;
+                $quantityChanged = $validated['produced_quantity'] !== $oldQuantity;
+
+                if ($workflowStepChanged || $quantityChanged) {
+                    $this->notifyProductionUpdate($ticket, $oldWorkflowStep, $oldQuantity);
+                }
             }
 
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
             \Log::error("Update progress failed for ticket {$id}: " . $e->getMessage());
             \Log::error("Stack trace: " . $e->getTraceAsString());
-            
-            return redirect()->back()->with('warning', 
+
+            return redirect()->back()->with(
+                'warning',
                 'Production progress updated, but automatic stock deduction failed: ' . $e->getMessage()
             );
         }
@@ -166,10 +233,10 @@ class ProductionQueueController extends Controller
         try {
             \DB::transaction(function () use ($ticket) {
                 // Update ticket status first
-        $ticket->update([
-            'status' => 'completed',
-            'produced_quantity' => $ticket->quantity,
-        ]);
+                $ticket->update([
+                    'status' => 'completed',
+                    'produced_quantity' => $ticket->quantity,
+                ]);
 
                 // Refresh ticket to ensure we have latest data
                 $ticket->refresh();
@@ -177,9 +244,9 @@ class ProductionQueueController extends Controller
                 // Automatically consume stock based on job type requirements
                 $consumptions = $this->stockService->autoConsumeStockForProduction($ticket);
             });
-            
+
             $message = 'Ticket marked as completed successfully.';
-            
+
             // Check if consumptions were created
             $consumptionCount = \App\Models\ProductionStockConsumption::where('ticket_id', $ticket->id)->count();
             if ($consumptionCount > 0) {
@@ -196,10 +263,11 @@ class ProductionQueueController extends Controller
             // If auto-consumption fails, still mark as completed but show warning
             \Log::error("Auto-consumption failed for ticket {$id}: " . $e->getMessage());
             \Log::error("Stack trace: " . $e->getTraceAsString());
-            
-            return redirect()->back()->with('warning', 
-                'Ticket marked as completed, but automatic stock deduction failed: ' . $e->getMessage() . 
-                ' Please manually record stock consumption.'
+
+            return redirect()->back()->with(
+                'warning',
+                'Ticket marked as completed, but automatic stock deduction failed: ' . $e->getMessage() .
+                    ' Please manually record stock consumption.'
             );
         }
     }
@@ -243,66 +311,151 @@ class ProductionQueueController extends Controller
      */
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
-        $triggeredBy = Auth::user();
-        $recipientIds = [];
-        $notificationType = '';
-        $title = '';
-        $message = '';
+        try {
+            //code...
 
-        // Determine recipients and notification content based on status change
-        switch ($newStatus) {
-            case 'in_production':
-                // Notify FrontDesk (optional)
-                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
-                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
-                $notificationType = 'ticket_in_production';
-                $title = 'Ticket In Production';
-                $message = "Ticket {$ticket->ticket_number} is now in production.";
-                break;
+            $triggeredBy = Auth::user();
+            $recipientIds = [];
+            $notificationType = '';
+            $title = '';
+            $message = '';
 
-            case 'completed':
-                // Notify FrontDesk (optional)
-                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
-                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
-                $notificationType = 'ticket_completed';
-                $title = 'Ticket Completed';
-                $message = "Ticket {$ticket->ticket_number} has been completed.";
-                break;
+            // Determine recipients and notification content based on status change
+            switch ($newStatus) {
+                case 'in_production':
+                    // Notify FrontDesk AND Production users
+                    $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                    $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+
+                    // Merge both user collections and get unique IDs
+                    $allUsers = $frontDeskUsers->merge($productionUsers);
+                    $recipientIds = $allUsers->pluck('id')->unique()->toArray();
+
+                    $notificationType = 'ticket_in_production';
+                    $title = 'Ticket In Production';
+                    $message = "Ticket {$ticket->ticket_number} is now in production.";
+                    break;
+
+                case 'completed':
+                    // Notify FrontDesk AND Production users
+                    $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                    $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+
+                    // Merge both user collections and get unique IDs
+                    $allUsers = $frontDeskUsers->merge($productionUsers);
+                    $recipientIds = $allUsers->pluck('id')->unique()->toArray();
+
+                    $notificationType = 'ticket_completed';
+                    $title = 'Ticket Completed';
+                    $message = "Ticket {$ticket->ticket_number} has been completed.";
+                    break;
+            }
+
+            if (empty($recipientIds) || empty($notificationType)) {
+                return;
+            }
+
+            // Create notifications for all recipients
+            $users = \App\Models\User::whereIn('id', $recipientIds)->get();
+            foreach ($users as $user) {
+                \App\Models\Notification::create([
+                    'user_id' => $user->id,
+                    'type' => $notificationType,
+                    'notifiable_id' => $ticket->id,
+                    'notifiable_type' => Ticket::class,
+                    'title' => $title,
+                    'message' => $message,
+                    'data' => [
+                        'ticket_id' => $ticket->id,
+                        'ticket_number' => $ticket->ticket_number,
+                        'old_status' => $oldStatus,
+                        'new_status' => $newStatus,
+                    ],
+                ]);
+            }
+
+            // Broadcast event
+            event(new \App\Events\TicketStatusChanged(
+                $ticket,
+                $oldStatus,
+                $newStatus,
+                $triggeredBy,
+                $recipientIds,
+                $notificationType,
+                $title,
+                $message
+            ));
+        } catch (\Exception $e) {
+            \Log::error("Error Notification: " . $e->getMessage());
+            \Log::error("Error trace: " . $e->getTraceAsString());
         }
+    }
 
-        if (empty($recipientIds) || empty($notificationType)) {
-            return;
+    /**
+     * Notify users about production updates (workflow step or quantity changes)
+     */
+    protected function notifyProductionUpdate(Ticket $ticket, ?string $oldWorkflowStep, ?int $oldQuantity): void
+    {
+        try {
+            $triggeredBy = Auth::user();
+
+            // Notify ALL production users AND frontdesk
+            $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+            $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+
+            $allUsers = $frontDeskUsers->merge($productionUsers);
+            $recipientIds = $allUsers->pluck('id')->unique()->toArray();
+
+            // Build message based on what changed
+            $changes = [];
+            if ($ticket->current_workflow_step !== $oldWorkflowStep) {
+                $stepLabel = ucfirst(str_replace('_', ' ', $ticket->current_workflow_step ?? 'unknown'));
+                $changes[] = "moved to {$stepLabel}";
+            }
+            if ($ticket->produced_quantity !== $oldQuantity) {
+                $changes[] = "quantity updated to {$ticket->produced_quantity}/{$ticket->quantity}";
+            }
+
+            $message = "Ticket {$ticket->ticket_number} " . implode(', ', $changes) . ".";
+
+            $notificationType = 'ticket_production_updated';
+            $title = 'Production Update';
+
+            // Create notifications for all recipients
+            $users = \App\Models\User::whereIn('id', $recipientIds)->get();
+            foreach ($users as $user) {
+                \App\Models\Notification::create([
+                    'user_id' => $user->id,
+                    'type' => $notificationType,
+                    'notifiable_id' => $ticket->id,
+                    'notifiable_type' => Ticket::class,
+                    'title' => $title,
+                    'message' => $message,
+                    'data' => [
+                        'ticket_id' => $ticket->id,
+                        'ticket_number' => $ticket->ticket_number,
+                        'old_workflow_step' => $oldWorkflowStep,
+                        'new_workflow_step' => $ticket->current_workflow_step,
+                        'old_quantity' => $oldQuantity,
+                        'new_quantity' => $ticket->produced_quantity,
+                    ],
+                ]);
+            }
+
+            // Broadcast event to all production users
+            event(new \App\Events\TicketStatusChanged(
+                $ticket,
+                $ticket->status, // Status didn't change
+                $ticket->status, // Status didn't change
+                $triggeredBy,
+                $recipientIds,
+                $notificationType,
+                $title,
+                $message
+            ));
+        } catch (\Exception $e) {
+            \Log::error("Error Production Update Notification: " . $e->getMessage());
+            \Log::error("Error trace: " . $e->getTraceAsString());
         }
-
-        // Create notifications for all recipients
-        $users = \App\Models\User::whereIn('id', $recipientIds)->get();
-        foreach ($users as $user) {
-            \App\Models\Notification::create([
-                'user_id' => $user->id,
-                'type' => $notificationType,
-                'notifiable_id' => $ticket->id,
-                'notifiable_type' => Ticket::class,
-                'title' => $title,
-                'message' => $message,
-                'data' => [
-                    'ticket_id' => $ticket->id,
-                    'ticket_number' => $ticket->ticket_number,
-                    'old_status' => $oldStatus,
-                    'new_status' => $newStatus,
-                ],
-            ]);
-        }
-
-        // Broadcast event
-        event(new \App\Events\TicketStatusChanged(
-            $ticket,
-            $oldStatus,
-            $newStatus,
-            $triggeredBy,
-            $recipientIds,
-            $notificationType,
-            $title,
-            $message
-        ));
     }
 }
