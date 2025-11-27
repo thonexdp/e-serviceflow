@@ -16,8 +16,9 @@ FROM php:8.2-fpm
 # install system deps
 RUN apt-get update && apt-get install -y \
     git curl unzip libzip-dev libonig-dev libpng-dev libjpeg-dev libxml2-dev \
-    nginx supervisor ca-certificates \
-    && docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd
+    nginx supervisor ca-certificates libicu-dev \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd intl
 
 # install composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
