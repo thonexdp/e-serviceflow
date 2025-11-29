@@ -16,15 +16,13 @@ RUN npm config set fetch-retry-maxtimeout 120000 && \
 ENV PORT=8080
 EXPOSE 8080
 
-# Use shell form to allow env var substitution
-CMD echo "Starting Soketi with PORT=$PORT DEBUG=$SOKETI_DEBUG" && \
-    soketi start \
-  --host=0.0.0.0 \
-  --port=${PORT} \
-  --debug=${SOKETI_DEBUG:-0} \
-  --adapter.driver=memory \
-  --app-manager.array.apps.0.id=${SOKETI_DEFAULT_APP_ID} \
-  --app-manager.array.apps.0.key=${SOKETI_DEFAULT_APP_KEY} \
-  --app-manager.array.apps.0.secret=${SOKETI_DEFAULT_APP_SECRET} \
-  --app-manager.array.apps.0.enable_client_messages=true \
-  --app-manager.array.apps.0.enabled=true
+# Set default environment variables
+ENV SOKETI_DEBUG=1
+ENV SOKETI_PORT=8080
+ENV SOKETI_ADAPTER_DRIVER=memory
+ENV SOKETI_DEFAULT_APP_ID=app-id
+ENV SOKETI_DEFAULT_APP_KEY=app-key
+ENV SOKETI_DEFAULT_APP_SECRET=app-secret
+
+# Start Soketi using the environment variables
+CMD ["sh", "-c", "soketi start"]
