@@ -1,0 +1,20 @@
+{
+  "debug": true,
+  "port": 8080,
+  "adapter": {
+    "driver": "memory"
+  },
+  "appManager": {
+    "array": {
+      "apps": [
+        {
+          "id": "SOKETI_DEFAULT_APP_ID_PLACEHOLDER",
+          "key": "SOKETI_DEFAULT_APP_KEY_PLACEHOLDER",
+          "secret": "SOKETI_DEFAULT_APP_SECRET_PLACEHOLDER",
+          "enableClientMessages": true,
+          "enabled": true
+        }
+      ]
+    }
+  }
+}

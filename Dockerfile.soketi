@@ -24,26 +24,12 @@ ENV SOKETI_DEFAULT_APP_ID=app-id
 ENV SOKETI_DEFAULT_APP_KEY=app-key
 ENV SOKETI_DEFAULT_APP_SECRET=app-secret
 
-# Generate config.json and start Soketi
-CMD echo '{\
-  "debug": true,\
-  "port": '$PORT',\
-  "adapter": {\
-    "driver": "memory"\
-  },\
-  "appManager": {\
-    "array": {\
-      "apps": [\
-        {\
-          "id": "'"$SOKETI_DEFAULT_APP_ID"'",\
-          "key": "'"$SOKETI_DEFAULT_APP_KEY"'",\
-          "secret": "'"$SOKETI_DEFAULT_APP_SECRET"'",\
-          "enableClientMessages": true,\
-          "enabled": true\
-        }\
-      ]\
-    }\
-  }\
-}' > /srv/config.json && \
-cat /srv/config.json && \
-soketi start --config=/srv/config.json
+COPY soketi.json.template /srv/soketi.json.template
+
+# Generate config.json from template and start Soketi
+CMD sed -e "s/SOKETI_DEFAULT_APP_ID_PLACEHOLDER/$SOKETI_DEFAULT_APP_ID/g" \
+        -e "s/SOKETI_DEFAULT_APP_KEY_PLACEHOLDER/$SOKETI_DEFAULT_APP_KEY/g" \
+        -e "s/SOKETI_DEFAULT_APP_SECRET_PLACEHOLDER/$SOKETI_DEFAULT_APP_SECRET/g" \
+        /srv/soketi.json.template > /srv/config.json && \
+    cat /srv/config.json && \
+    soketi start --config=/srv/config.json
