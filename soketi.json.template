@@ -3,7 +3,10 @@
   "port": 8080,
   "mode": "full",
   "adapter": {
-    "driver": "local"
+    "driver": "memory"
+  },
+  "wsHandler": {
+    "driver": "socket.io"
   },
   "cache": {
     "driver": "memory"
