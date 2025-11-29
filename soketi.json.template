@@ -1,10 +1,18 @@
 {
   "debug": true,
   "port": 8080,
+  "mode": "full",
   "adapter": {
+    "driver": "local"
+  },
+  "cache": {
     "driver": "memory"
   },
+  "queue": {
+    "driver": "sync"
+  },
   "appManager": {
+    "driver": "array",
     "array": {
       "apps": [
         {
