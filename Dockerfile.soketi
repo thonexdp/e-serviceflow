@@ -24,5 +24,26 @@ ENV SOKETI_DEFAULT_APP_ID=app-id
 ENV SOKETI_DEFAULT_APP_KEY=app-key
 ENV SOKETI_DEFAULT_APP_SECRET=app-secret
 
-# Start Soketi using the environment variables
-CMD ["sh", "-c", "soketi start"]
+# Generate config.json and start Soketi
+CMD echo '{\
+  "debug": true,\
+  "port": '$PORT',\
+  "adapter": {\
+    "driver": "memory"\
+  },\
+  "appManager": {\
+    "array": {\
+      "apps": [\
+        {\
+          "id": "'"$SOKETI_DEFAULT_APP_ID"'",\
+          "key": "'"$SOKETI_DEFAULT_APP_KEY"'",\
+          "secret": "'"$SOKETI_DEFAULT_APP_SECRET"'",\
+          "enableClientMessages": true,\
+          "enabled": true\
+        }\
+      ]\
+    }\
+  }\
+}' > /srv/config.json && \
+cat /srv/config.json && \
+soketi start --config=/srv/config.json
