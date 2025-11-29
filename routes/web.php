@@ -42,6 +42,37 @@ Route::get('/', function () {
     return Inertia::render('Public/Home');
 })->name('home');
 
+// Debug route to test database connection
+Route::get('/testdb', function () {
+    try {
+        $dbConfig = [
+            'DB_CONNECTION' => config('database.default'),
+            'DB_HOST' => config('database.connections.mysql.host'),
+            'DB_PORT' => config('database.connections.mysql.port'),
+            'DB_DATABASE' => config('database.connections.mysql.database'),
+            'DB_USERNAME' => config('database.connections.mysql.username'),
+            'DB_SOCKET' => config('database.connections.mysql.unix_socket'),
+            'APP_ENV' => config('app.env'),
+        ];
+
+        // Test connection
+        \DB::connection()->getPdo();
+        $tables = \DB::select('SHOW TABLES');
+
+        return response()->json([
+            'status' => 'Connected successfully!',
+            'config' => $dbConfig,
+            'tables' => $tables,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'Connection failed',
+            'error' => $e->getMessage(),
+            'config' => $dbConfig ?? [],
+        ], 500);
+    }
+});
+
 // Order tracking (public)
 Route::get('/track', function () {
     return view('tracking');
