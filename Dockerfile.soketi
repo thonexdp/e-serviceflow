@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates git
 
 WORKDIR /srv
 
