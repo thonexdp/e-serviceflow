@@ -16,8 +16,17 @@ RUN npm config set fetch-retry-maxtimeout 120000 && \
 ENV PORT=8080
 EXPOSE 8080
 
-# Soketi will read these from environment:
-# PORT, SOKETI_DEBUG, SOKETI_DEFAULT_APP_ID, SOKETI_DEFAULT_APP_KEY, 
-# SOKETI_DEFAULT_APP_SECRET, SOKETI_ADAPTER_DRIVER, SOKETI_ADAPTER_REDIS_*
-
-CMD ["sh", "-c", "soketi start --host=0.0.0.0 --port=$PORT"]
+# Use shell form to allow env var substitution
+CMD soketi start \
+  --host=0.0.0.0 \
+  --port=${PORT} \
+  --debug=${SOKETI_DEBUG:-0} \
+  --adapter.driver=redis \
+  --adapter.redis.prefix=soketi \
+  --adapter.redis.host=${REDIS_HOST:-127.0.0.1} \
+  --adapter.redis.port=${REDIS_PORT:-6379} \
+  --app-manager.array.apps.0.id=${SOKETI_DEFAULT_APP_ID} \
+  --app-manager.array.apps.0.key=${SOKETI_DEFAULT_APP_KEY} \
+  --app-manager.array.apps.0.secret=${SOKETI_DEFAULT_APP_SECRET} \
+  --app-manager.array.apps.0.enable_client_messages=true \
+  --app-manager.array.apps.0.enabled=true
