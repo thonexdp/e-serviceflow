@@ -89,8 +89,6 @@ jobs:
             SOKETI_DEFAULT_APP_ID=${{ secrets.PUSHER_APP_ID }}
             SOKETI_DEFAULT_APP_KEY=${{ secrets.PUSHER_APP_KEY }}
             SOKETI_DEFAULT_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}
-            SOKETI_ADAPTER_DRIVER=redis
-            REDIS_HOST=${{ secrets.REDIS_HOST }}
-            REDIS_PORT=6379
+            SOKETI_ADAPTER_DRIVER=memory
           flags: |
             --allow-unauthenticated
