@@ -50,6 +50,7 @@ cd /var/www/html\n\
 php artisan config:cache\n\
 php artisan route:cache\n\
 php artisan view:cache\n\
+php artisan migrate --force\n\
 exec supervisord -n' > /start.sh && chmod +x /start.sh
 
 EXPOSE 8080
