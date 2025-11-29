@@ -1,22 +1,16 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache git ca-certificates bash
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /srv
 RUN npm i -g @soketi/soketi
 
-# Cloud Run sets PORT env var (defaults to 8080)
+# Cloud Run sets PORT env var
 ENV PORT=8080
 EXPOSE 8080
 
-# Create startup script that uses env vars
-RUN echo '#!/bin/bash\n\
-soketi start \\\n\
-  --host=0.0.0.0 \\\n\
-  --port=${PORT:-8080} \\\n\
-  --debug=${SOKETI_DEBUG:-0} \\\n\
-  --adapter.driver=redis \\\n\
-  --adapter.redis.host=${SOKETI_REDIS_HOST} \\\n\
-  --adapter.redis.port=${SOKETI_REDIS_PORT:-6379}' > /start.sh && chmod +x /start.sh
+# Soketi will read these from environment:
+# PORT, SOKETI_DEBUG, SOKETI_DEFAULT_APP_ID, SOKETI_DEFAULT_APP_KEY, 
+# SOKETI_DEFAULT_APP_SECRET, SOKETI_ADAPTER_DRIVER, SOKETI_ADAPTER_REDIS_*
 
-CMD ["/start.sh"]
+CMD soketi start --host=0.0.0.0 --port=$PORT
