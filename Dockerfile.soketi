@@ -3,7 +3,11 @@ FROM node:18-alpine
 RUN apk add --no-cache ca-certificates
 
 WORKDIR /srv
-RUN npm i -g @soketi/soketi
+
+# Install soketi with specific version and retry on failure
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm i -g @soketi/soketi@1.6.0 || npm i -g @soketi/soketi
 
 # Cloud Run sets PORT env var
 ENV PORT=8080
@@ -13,4 +17,4 @@ EXPOSE 8080
 # PORT, SOKETI_DEBUG, SOKETI_DEFAULT_APP_ID, SOKETI_DEFAULT_APP_KEY, 
 # SOKETI_DEFAULT_APP_SECRET, SOKETI_ADAPTER_DRIVER, SOKETI_ADAPTER_REDIS_*
 
-CMD soketi start --host=0.0.0.0 --port=$PORT
+CMD ["sh", "-c", "soketi start --host=0.0.0.0 --port=$PORT"]
