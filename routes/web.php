@@ -59,10 +59,19 @@ Route::get('/testdb', function () {
         \DB::connection()->getPdo();
         $tables = \DB::select('SHOW TABLES');
 
+        // Get users if table exists
+        $users = [];
+        try {
+            $users = \DB::table('users')->select('id', 'name', 'email', 'role', 'created_at')->get();
+        } catch (\Exception $e) {
+            $users = ['error' => 'Users table not found or empty'];
+        }
+
         return response()->json([
             'status' => 'Connected successfully!',
             'config' => $dbConfig,
             'tables' => $tables,
+            'users' => $users,
         ]);
     } catch (\Exception $e) {
         return response()->json([
