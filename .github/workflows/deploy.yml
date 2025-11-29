@@ -75,6 +75,7 @@ jobs:
           flags: |
             --add-cloudsql-instances=${{ secrets.DB_INSTANCE_CONNECTION_NAME }}
             --allow-unauthenticated
+            --memory=1Gi
 
       # Deploy Soketi to Cloud Run
       - name: Deploy Soketi to Cloud Run
