@@ -21,10 +21,7 @@ CMD soketi start \
   --host=0.0.0.0 \
   --port=${PORT} \
   --debug=${SOKETI_DEBUG:-0} \
-  --adapter.driver=redis \
-  --adapter.redis.prefix=soketi \
-  --adapter.redis.host=${REDIS_HOST:-127.0.0.1} \
-  --adapter.redis.port=${REDIS_PORT:-6379} \
+  --adapter.driver=memory \
   --app-manager.array.apps.0.id=${SOKETI_DEFAULT_APP_ID} \
   --app-manager.array.apps.0.key=${SOKETI_DEFAULT_APP_KEY} \
   --app-manager.array.apps.0.secret=${SOKETI_DEFAULT_APP_SECRET} \
