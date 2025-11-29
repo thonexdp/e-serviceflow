@@ -37,11 +37,20 @@ COPY . ./
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # configure nginx
-COPY ./.nginx.conf /etc/nginx/sites-available/default
-RUN rm /etc/nginx/sites-enabled/default || true
+COPY ./.nginx.conf /etc/nginx/conf.d/default.conf
+# Remove default nginx config if exists
+RUN rm -f /etc/nginx/sites-enabled/default
 
 # supervisor to manage php-fpm and nginx
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Create startup script to run migrations and start supervisor
+RUN echo '#!/bin/bash\n\
+cd /var/www/html\n\
+php artisan config:cache\n\
+php artisan route:cache\n\
+php artisan view:cache\n\
+exec supervisord -n' > /start.sh && chmod +x /start.sh
+
 EXPOSE 8080
-CMD ["supervisord", "-n"]
+CMD ["/start.sh"]
