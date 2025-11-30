@@ -40,12 +40,6 @@ jobs:
           docker build -f Dockerfile.app -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
-      # Build and Push Soketi
-      - name: Build and Push Soketi Container
-        run: |
-          docker build -f Dockerfile.soketi -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }} .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }}
-
       # Deploy App to Cloud Run
       - name: Deploy App to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v1
@@ -56,38 +50,19 @@ jobs:
           env_vars: |
             APP_ENV=production
             APP_DEBUG=true
+            APP_KEY=${{ secrets.APP_KEY }}
             LOG_CHANNEL=stderr
             DB_CONNECTION=mysql
+            DB_HOST=localhost
             DB_SOCKET=/cloudsql/${{ secrets.DB_INSTANCE_CONNECTION_NAME }}
             DB_DATABASE=${{ secrets.DB_DATABASE }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            BROADCAST_DRIVER=pusher
-            PUSHER_APP_ID=${{ secrets.PUSHER_APP_ID }}
-            PUSHER_APP_KEY=${{ secrets.PUSHER_APP_KEY }}
-            PUSHER_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}
-            PUSHER_HOST=${{ env.SOKETI_SERVICE_NAME }}-url-placeholder
-            PUSHER_PORT=443
-            PUSHER_SCHEME=https
-            REDIS_HOST=${{ secrets.REDIS_HOST }}
-            REDIS_PORT=6379
+            BROADCAST_DRIVER=log
+            CACHE_DRIVER=file
+            QUEUE_CONNECTION=sync
+            SESSION_DRIVER=file
           flags: |
             --add-cloudsql-instances=${{ secrets.DB_INSTANCE_CONNECTION_NAME }}
             --allow-unauthenticated
-
-      # Deploy Soketi to Cloud Run
-      - name: Deploy Soketi to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v1
-        with:
-          service: ${{ env.SOKETI_SERVICE_NAME }}
-          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }}
-          region: ${{ env.REGION }}
-          env_vars: |
-            SOKETI_DEBUG=1
-            SOKETI_APP_ID=${{ secrets.PUSHER_APP_ID }}
-            SOKETI_APP_KEY=${{ secrets.PUSHER_APP_KEY }}
-            SOKETI_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}
-            SOKETI_REDIS_HOST=${{ secrets.REDIS_HOST }}
-            SOKETI_REDIS_PORT=6379
-          flags: |
-            --allow-unauthenticated
+            --memory=1Gi

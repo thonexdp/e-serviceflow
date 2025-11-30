@@ -1,15 +1,35 @@
-FROM node:18-alpine
+FROM node:18-slim
 
-RUN apk add --no-cache git ca-certificates
+# Install git (required for npm dependencies)
+RUN apt-get update && \
+    apt-get install -y git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /srv
-RUN npm i -g @soketi/soketi
 
-# Copy optional config file (if you use one)
-COPY soketi.config.json /srv/soketi.config.json
+# Install soketi with specific version and retry on failure
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm i -g @soketi/soketi@1.6.0 || npm i -g @soketi/soketi
 
-ENV PORT=6001
-EXPOSE 6001
+# Cloud Run sets PORT env var
+ENV PORT=8080
+EXPOSE 8080
 
-# Use env vars: SOKETI_REDIS_URL and SOKETI_REDIS_PASSWORD if needed
-CMD ["soketi", "start", "--config", "/srv/soketi.config.json"]
+# Set default environment variables
+ENV SOKETI_DEBUG=1
+ENV SOKETI_PORT=8080
+ENV SOKETI_ADAPTER_DRIVER=memory
+ENV SOKETI_DEFAULT_APP_ID=app-id
+ENV SOKETI_DEFAULT_APP_KEY=app-key
+ENV SOKETI_DEFAULT_APP_SECRET=app-secret
+
+COPY soketi.json.template /srv/soketi.json.template
+
+# Generate config.json from template and start Soketi
+CMD sed -e "s/SOKETI_DEFAULT_APP_ID_PLACEHOLDER/$SOKETI_DEFAULT_APP_ID/g" \
+        -e "s/SOKETI_DEFAULT_APP_KEY_PLACEHOLDER/$SOKETI_DEFAULT_APP_KEY/g" \
+        -e "s/SOKETI_DEFAULT_APP_SECRET_PLACEHOLDER/$SOKETI_DEFAULT_APP_SECRET/g" \
+        /srv/soketi.json.template > /srv/config.json && \
+    cat /srv/config.json && \
+    soketi start --config=/srv/config.json
