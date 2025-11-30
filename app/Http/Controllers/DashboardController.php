@@ -68,10 +68,16 @@ class DashboardController extends Controller
                             break;
                     }
 
+                    // New orders from online (customer orders) - pending status tickets
+                    $newOnlineOrders = Ticket::where('status', 'pending')
+                        ->whereBetween('created_at', [$startDate, $endDate])
+                        ->count();
+
                     return [
                         'newTickets' => Ticket::where('status', 'pending')
                             ->whereBetween('created_at', [$startDate, $endDate])
                             ->count(),
+                        'newOnlineOrders' => $newOnlineOrders,
                         'paymentPending' => Ticket::whereIn('payment_status', ['pending', 'partial'])
                             ->whereBetween('created_at', [$startDate, $endDate])
                             ->count(),
@@ -126,21 +132,103 @@ class DashboardController extends Controller
                             'customer' => $t->customer->name ?? 'Unknown',
                         ]),
                 ],
-                'allTickets' => Ticket::with('customer')
-                    ->latest()
-                    ->take(10)
-                    ->get()
-                    ->map(fn($t) => [
-                        'id' => $t->id,
-                        'trackingNumber' => $t->ticket_number,
-                        'customer' => ['name' => $t->customer->name ?? 'Unknown'],
-                        'description' => $t->description,
-                        'dueDate' => $t->due_date,
-                        'status' => $t->status,
-                        'statusLabel' => ucfirst(str_replace('_', ' ', $t->status)),
-                        'statusColor' => $this->getStatusColor($t->status),
-                        'totalAmount' => $t->total_amount,
-                    ]),
+                // New/Online Orders to Confirm - pending tickets with pagination
+                'newOnlineOrders' => function () use ($request) {
+                    $query = Ticket::with(['customer', 'customerFiles', 'payments.documents'])
+                        ->where('status', 'pending')
+                        ->orderBy('created_at', 'desc');
+
+                    // Search
+                    if ($request->has('search') && $request->search) {
+                        $search = $request->search;
+                        $query->where(function ($q) use ($search) {
+                            $q->where('ticket_number', 'like', "%{$search}%")
+                                ->orWhere('description', 'like', "%{$search}%")
+                                ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                                    $customerQuery->where('firstname', 'like', "%{$search}%")
+                                        ->orWhere('lastname', 'like', "%{$search}%")
+                                        ->orWhere('email', 'like', "%{$search}%");
+                                });
+                        });
+                    }
+
+                    // Order by
+                    $orderBy = $request->get('order_by', 'created_at');
+                    $orderDir = $request->get('order_dir', 'desc');
+                    $query->orderBy($orderBy, $orderDir);
+
+                    $tickets = $query->paginate(5);
+
+                    return $tickets->through(function ($ticket) {
+                        return [
+                            'id' => $ticket->id,
+                            'ticket_number' => $ticket->ticket_number,
+                            'customer' => $ticket->customer ? [
+                                'id' => $ticket->customer->id,
+                                'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
+                                'email' => $ticket->customer->email,
+                                'phone' => $ticket->customer->phone,
+                            ] : null,
+                            'description' => $ticket->description,
+                            'total_amount' => $ticket->total_amount,
+                            'payment_status' => $ticket->payment_status,
+                            'payment_method' => $ticket->payment_method,
+                            'created_at' => $ticket->created_at,
+                            'customer_files' => $ticket->customerFiles->map(function ($file) {
+                                return [
+                                    'id' => $file->id,
+                                    'filename' => $file->filename,
+                                    'filepath' => $file->filepath,
+                                    'file_path' => $file->file_path,
+                                ];
+                            }),
+                        ];
+                    });
+                },
+                // Recent Tickets (Today)
+                'recentTicketsToday' => function () use ($request) {
+                    $tickets = Ticket::with(['customer', 'payments.documents'])
+                        ->whereDate('created_at', today())
+                        ->orderBy('created_at', 'desc')
+                        ->get();
+
+                    return $tickets->map(function ($ticket) {
+                        return [
+                            'id' => $ticket->id,
+                            'ticket_number' => $ticket->ticket_number,
+                            'customer' => $ticket->customer ? [
+                                'id' => $ticket->customer->id,
+                                'firstname' => $ticket->customer->firstname,
+                                'lastname' => $ticket->customer->lastname,
+                                'full_name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
+                            ] : null,
+                            'description' => $ticket->description,
+                            'total_amount' => $ticket->total_amount,
+                            'amount_paid' => $ticket->amount_paid ?? 0,
+                            'outstanding_balance' => $ticket->outstanding_balance ?? $ticket->total_amount,
+                            'due_date' => $ticket->due_date,
+                            'status' => $ticket->status,
+                            'payment_status' => $ticket->payment_status,
+                            'payments' => $ticket->payments->map(function ($payment) {
+                                return [
+                                    'id' => $payment->id,
+                                    'amount' => $payment->amount,
+                                    'payment_date' => $payment->payment_date,
+                                    'payment_method' => $payment->payment_method,
+                                    'official_receipt_number' => $payment->official_receipt_number,
+                                    'payment_reference' => $payment->payment_reference,
+                                    'notes' => $payment->notes,
+                                    'documents' => $payment->documents->map(function ($doc) {
+                                        return [
+                                            'id' => $doc->id,
+                                            'file_path' => $doc->file_path,
+                                        ];
+                                    }),
+                                ];
+                            }),
+                        ];
+                    });
+                },
                 'payments' => Ticket::whereIn('payment_status', ['pending', 'partial'])
                     ->with('customer')
                     ->latest()

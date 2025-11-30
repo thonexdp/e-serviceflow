@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, Package, Phone, Mail, MapPin, Plus, CheckCircle, Clock, Printer, Truck } from 'lucide-react';
 import axios from 'axios';
+import { router } from '@inertiajs/react';
 
 export default function PrintShoppeLanding() {
     const [trackingNumber, setTrackingNumber] = useState('');
@@ -55,9 +56,9 @@ export default function PrintShoppeLanding() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center">
-                                <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-8 h-8" />
-                            </div>
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                        <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
+                    </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
                                 <p className="text-sm text-gray-600">Track Your Order</p>
@@ -219,7 +220,9 @@ export default function PrintShoppeLanding() {
                         <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-sm p-6 text-white">
                             <h3 className="text-lg font-semibold mb-2">Need Printing Services?</h3>
                             <p className="text-indigo-100 text-sm mb-4">Create a new order and get professional printing solutions</p>
-                            <button className="w-full bg-white text-indigo-600 px-4 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2">
+                            <button className="w-full bg-white text-indigo-600 px-4 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                            onClick={() => router.visit('/orders', { preserveState: true, preserveScroll: true, replace: true })}
+                            >
                                 <Plus className="w-5 h-5" />
                                 Create New Order
                             </button>

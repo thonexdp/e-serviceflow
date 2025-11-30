@@ -15,6 +15,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicTicketController;
+use App\Http\Controllers\PublicOrderController;
 use App\Http\Controllers\UserController;
 use App\Models\JobCategory;
 use Illuminate\Support\Facades\Route;
@@ -53,9 +54,24 @@ Route::post('/api/public/tickets/search', [PublicTicketController::class, 'searc
     ->middleware('throttle:api')
     ->name('public.tickets.search');
 
+// Public API for orders
+Route::post('/api/public/orders/customer/find-or-create', [PublicOrderController::class, 'findOrCreateCustomer'])
+    ->middleware('throttle:api')
+    ->name('public.orders.customer.find-or-create');
+
+Route::post('/api/public/orders', [PublicOrderController::class, 'storeOrder'])
+    ->middleware('throttle:api')
+    ->name('public.orders.store');
+
 // About page (public)
 Route::get('/orders', function () {
-    $jobCategories = JobCategory::with('jobTypes')->get();
+    $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
+        $query->where('is_active', true)
+            ->with(['priceTiers', 'sizeRates', 'promoRules'])
+            ->orderBy('sort_order')
+            ->orderBy('name');
+    }])->orderBy('name')->get();
+    
     return Inertia::render('Public/Orders', [
         'jobCategories' => $jobCategories
     ]);

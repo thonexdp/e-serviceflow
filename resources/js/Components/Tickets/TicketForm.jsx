@@ -503,17 +503,18 @@ export default function TicketForm({
     };
 
     const handlePaymentProofUpload = (event) => {
-        const files = Array.from(event.target.files || []);
-        if (!files.length) {
-            return;
-        }
-        const uploads = files.map((file) => ({
+        const file = event.target.files?.[0];
+        if (!file) return;
+    
+        const upload = {
             file,
             preview: URL.createObjectURL(file),
             name: file.name,
-        }));
-        setPaymentProofs((prev) => [...prev, ...uploads]);
-        event.target.value = "";
+        };
+    
+        setPaymentProofs([upload]); // replace instead of append (single upload)
+    
+        event.target.value = ""; 
     };
 
     const removePaymentProof = (index) => {
@@ -1244,7 +1245,6 @@ export default function TicketForm({
                                         type="file"
                                         className="form-control"
                                         accept="image/*,application/pdf"
-                                        multiple
                                         onChange={handlePaymentProofUpload}
                                     />
                                 </div>

@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
+import PreviewModal from "@/Components/Main/PreviewModal";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
+import CardStatistics from "@/Components/Common/CardStatistics";
 
 export default function FrontDesk({
     user = {},
@@ -10,36 +12,41 @@ export default function FrontDesk({
     messages = [],
     statistics = {
         newTickets: 0,
+        newOnlineOrders: 0,
         paymentPending: 0,
         completed: 0,
         inProgress: 0,
     },
-    ticketsByStatus = {
-        pendingPayment: [],
-        inProgress: [],
-        readyForPickup: [],
-        completed: [],
-    },
-    allTickets = [],
-    payments = [],
-    filters = { date_range: 'this_month' }
+    newOnlineOrders = { data: [], links: [], meta: {} },
+    recentTicketsToday = [],
+    filters = { date_range: "this_month" },
 }) {
-
     const [refreshing, setRefreshing] = useState(false);
-    const [dateRange, setDateRange] = useState(filters.date_range || 'this_month');
+    const [dateRange, setDateRange] = useState(
+        filters.date_range || "this_month"
+    );
+    const [search, setSearch] = useState(filters.search || "");
+    const [orderBy, setOrderBy] = useState(filters.order_by || "created_at");
+    const [orderDir, setOrderDir] = useState(filters.order_dir || "desc");
 
     // Modal States
     const [openPaymentModal, setOpenPaymentModal] = useState(false);
-    const [selectedPayment, setSelectedPayment] = useState(null);
-    const [paymentForm, setPaymentForm] = useState({
-        ticketId: "",
-        customerId: "",
-        customerName: "",
-        amountDue: 0,
-        paymentAmount: "",
-        paymentMethod: "cash",
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [paymentFormData, setPaymentFormData] = useState({
+        ticket_id: "",
+        amount: "",
+        payment_method: "cash",
+        payment_date: new Date().toISOString().slice(0, 10),
+        allocation: "downpayment",
+        official_receipt_number: "",
+        payment_reference: "",
         notes: "",
+        attachments: [],
     });
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    // Preview Modal
+    const [previewModal, setPreviewModal] = useState({ isOpen: false, fileUrl: null });
 
     const refreshDashboard = () => {
         setRefreshing(true);
@@ -50,63 +57,126 @@ export default function FrontDesk({
 
     const handleDateRangeChange = (range) => {
         setDateRange(range);
-        router.get('/dashboard', { date_range: range }, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true
-        });
+        router.get(
+            "/frontdesk/",
+            { date_range: range, search, order_by: orderBy, order_dir: orderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleSearch = (value) => {
+        setSearch(value);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search: value, order_by: orderBy, order_dir: orderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleOrderBy = (field) => {
+        const newDir = orderBy === field && orderDir === "desc" ? "asc" : "desc";
+        setOrderBy(field);
+        setOrderDir(newDir);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search, order_by: field, order_dir: newDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleViewTicket = (ticketId) => {
+        router.visit(`/frontdesk/tickets/${ticketId}`);
+    };
+
+    const handlePreviewFile = (file) => {
+        const filePath = file.file_path || file.filepath || `/storage/${file.filepath}`;
+        setPreviewModal({ isOpen: true, fileUrl: filePath });
     };
 
     // ============================================
     // PAYMENT MODAL HANDLERS
     // ============================================
-    const openPaymentModalWithData = (payment) => {
-        setSelectedPayment(payment);
-        setPaymentForm({
-            ticketId: payment.ticketId,
-            customerId: payment.customer.id,
-            customerName: payment.customer.name,
-            amountDue: payment.amountDue,
-            paymentAmount: payment.amountDue.toString(),
-            paymentMethod: "cash",
+    const handleOpenPaymentModal = (ticket) => {
+        setSelectedTicket(ticket);
+        const balance = parseFloat(ticket.outstanding_balance || ticket.total_amount || 0);
+        setPaymentFormData({
+            ticket_id: ticket.id,
+            amount: balance > 0 ? balance.toString() : "",
+            payment_method: "cash",
+            payment_date: new Date().toISOString().slice(0, 10),
+            allocation: ticket.payments && ticket.payments.length > 0 ? "balance" : "downpayment",
+            official_receipt_number: "",
+            payment_reference: "",
             notes: "",
+            attachments: [],
         });
         setOpenPaymentModal(true);
     };
 
     const handlePaymentFormChange = (field, value) => {
-        setPaymentForm((prev) => ({
+        setPaymentFormData((prev) => ({
             ...prev,
             [field]: value,
         }));
     };
 
     const handleRecordPayment = async () => {
-        // TODO: Implement actual payment recording via API
-        // For now, we'll just log it and close the modal
-        console.log("Recording payment:", paymentForm);
+        if (!selectedTicket || !paymentFormData.amount) {
+            alert("Please enter the payment amount.");
+            return;
+        }
 
-        // Example of how to submit using router
-        // router.post(`/tickets/${paymentForm.ticketId}/payments`, paymentForm, {
-        //     onSuccess: () => {
-        //         setOpenPaymentModal(false);
-        //         // Success notification handled by flash messages
-        //     }
-        // });
+        setIsUpdating(true);
+        const formData = new FormData();
+        formData.append("ticket_id", selectedTicket.id);
+        formData.append("payment_method", paymentFormData.payment_method);
+        formData.append("payment_date", paymentFormData.payment_date);
+        formData.append("amount", paymentFormData.amount);
+        formData.append("allocation", paymentFormData.allocation);
+        if (paymentFormData.official_receipt_number) {
+            formData.append("official_receipt_number", paymentFormData.official_receipt_number);
+        }
+        if (paymentFormData.payment_reference) {
+            formData.append("payment_reference", paymentFormData.payment_reference);
+        }
+        if (paymentFormData.notes) {
+            formData.append("notes", paymentFormData.notes);
+        }
+        formData.append("payment_type", "collection");
 
-        alert("Payment recording endpoint not yet connected in this view. Please use the Tickets page.");
-        setOpenPaymentModal(false);
-    };
+        paymentFormData.attachments.forEach((file) => {
+            formData.append("attachments[]", file);
+        });
 
-    // ============================================
-    // TICKET HANDLERS
-    // ============================================
-    const handleTicketClick = (ticketId) => {
-        router.visit(`/tickets/${ticketId}`);
-    };
-
-    const handleViewTicket = (ticketId) => {
-        router.visit(`/tickets/${ticketId}`);
+        try {
+            router.post("/frontdesk/payments", formData, {
+                onSuccess: () => {
+                    setOpenPaymentModal(false);
+                    setSelectedTicket(null);
+                    refreshDashboard();
+                },
+                onError: (errors) => {
+                    alert(errors.message || "Failed to record payment.");
+                },
+            });
+        } catch (error) {
+            console.error("Payment recording failed:", error);
+            alert("Failed to record payment. Please try again.");
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
     // ============================================
@@ -116,7 +186,7 @@ export default function FrontDesk({
         return new Intl.NumberFormat("en-PH", {
             style: "currency",
             currency: "PHP",
-        }).format(amount);
+        }).format(amount || 0);
     };
 
     const formatDate = (date) => {
@@ -128,16 +198,15 @@ export default function FrontDesk({
         });
     };
 
-    const getStatusBadgeClass = (color) => {
-        const colorMap = {
-            primary: "badge-primary",
-            warning: "badge-warning",
-            info: "badge-info",
-            success: "badge-success",
-            danger: "badge-danger",
-            secondary: "badge-secondary",
+    const getStatusBadgeClass = (status) => {
+        const statusMap = {
+            pending: "badge-warning",
+            in_production: "badge-info",
+            ready_to_print: "badge-info",
+            completed: "badge-success",
+            cancelled: "badge-danger",
         };
-        return `badge ${colorMap[color] || "badge-secondary"}`;
+        return `badge ${statusMap[status] || "badge-secondary"}`;
     };
 
     const getPaymentStatusBadge = (status) => {
@@ -147,13 +216,18 @@ export default function FrontDesk({
             paid: "badge-success",
         };
         return (
-            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+            <span className={`badge ${classes[status] || "badge-secondary"}`}>
                 {status?.toUpperCase() || "PENDING"}
-            </div>
+            </span>
         );
     };
+
     return (
-        <AdminLayout user={user} notifications={notifications} messages={messages}>
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
             <Head title="Front Desk Dashboard" />
 
             {/* Page Header */}
@@ -174,7 +248,9 @@ export default function FrontDesk({
                                 <li className="breadcrumb-item">
                                     <a href="#">Dashboard</a>
                                 </li>
-                                <li className="breadcrumb-item active">Front Desk</li>
+                                <li className="breadcrumb-item active">
+                                    Front Desk
+                                </li>
                             </ol>
                         </div>
                     </div>
@@ -185,102 +261,250 @@ export default function FrontDesk({
             <Modal
                 title="Record Payment"
                 isOpen={openPaymentModal}
-                onClose={() => setOpenPaymentModal(false)}
-                onSave={handleRecordPayment}
-                size="3xl"
-                submitButtonText="Record Payment"
+                onClose={() => {
+                    setOpenPaymentModal(false);
+                    setSelectedTicket(null);
+                }}
+                size="4xl"
+                submitButtonText={null}
             >
-                <div className="space-y-4">
-                    <div className="mb-4">
-                        <h3 className="text-lg font-semibold mb-2">
-                            Record Payment for Ticket {selectedPayment?.trackingNumber}
-                        </h3>
-                        <hr />
-                    </div>
+                {selectedTicket && (
+                    <div className="modal-body">
+                        <div className="mb-4 border rounded p-3 bg-light">
+                            <div className="row">
+                                <div className="col-md-6">
+                                    <p className="m-b-5">
+                                        <strong>Ticket:</strong> {selectedTicket.ticket_number}
+                                    </p>
+                                    <p className="m-b-5">
+                                        <strong>Customer:</strong>{" "}
+                                        {selectedTicket.customer
+                                            ? `${selectedTicket.customer.firstname} ${selectedTicket.customer.lastname}`
+                                            : "Walk-in"}
+                                    </p>
+                                    <p className="m-b-0">
+                                        <strong>Status:</strong>{" "}
+                                        {getPaymentStatusBadge(selectedTicket.payment_status)}
+                                    </p>
+                                </div>
+                                <div className="col-md-6">
+                                    <p className="m-b-5">
+                                        <strong>Total Amount:</strong>{" "}
+                                        {formatCurrency(selectedTicket.total_amount)}
+                                    </p>
+                                    <p className="m-b-5">
+                                        <strong>Amount Paid:</strong>{" "}
+                                        {formatCurrency(selectedTicket.amount_paid || 0)}
+                                    </p>
+                                    <p className="m-b-0 text-danger font-bold">
+                                        <strong>Balance:</strong>{" "}
+                                        {formatCurrency(selectedTicket.outstanding_balance || selectedTicket.total_amount)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">
-                                Customer
-                            </label>
-                            <input
-                                type="text"
-                                className="w-full border rounded-md p-2 bg-gray-50"
-                                value={paymentForm.customerName}
-                                disabled
-                            />
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group">
+                                    <label>Payment Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-control"
+                                        value={paymentFormData.payment_date}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("payment_date", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Payment Method</label>
+                                    <select
+                                        className="form-control"
+                                        value={paymentFormData.payment_method}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("payment_method", e.target.value)
+                                        }
+                                    >
+                                        <option value="cash">Cash</option>
+                                        <option value="gcash">GCash</option>
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>
+                                        Amount <span className="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Enter amount"
+                                        value={paymentFormData.amount}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("amount", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Allocation</label>
+                                    <select
+                                        className="form-control"
+                                        value={paymentFormData.allocation}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("allocation", e.target.value)
+                                        }
+                                    >
+                                        <option value="downpayment">Downpayment</option>
+                                        <option value="balance">Balance</option>
+                                        <option value="full">Full Payment</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Official Receipt #</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="OR number"
+                                        value={paymentFormData.official_receipt_number}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("official_receipt_number", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Reference # / GCash Trace</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="GCash, bank reference, etc."
+                                        value={paymentFormData.payment_reference}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("payment_reference", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Notes</label>
+                                    <textarea
+                                        className="form-control"
+                                        rows="3"
+                                        placeholder="Add any details about this payment..."
+                                        value={paymentFormData.notes}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("notes", e.target.value)
+                                        }
+                                    ></textarea>
+                                </div>
+                                <div className="form-group">
+                                    <label>Attachments (GCash / Bank proof)</label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        multiple
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("attachments", Array.from(e.target.files || []))
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <h5 className="m-b-3">Payment History</h5>
+                                <div className="border rounded p-3 payment-history" style={{ maxHeight: "500px", overflowY: "auto" }}>
+                                    {selectedTicket.payments && selectedTicket.payments.length ? (
+                                        selectedTicket.payments.map((payment) => (
+                                            <div key={payment.id} className="border-bottom pb-2 mb-2">
+                                                <div className="d-flex justify-content-between">
+                                                    <strong>{formatCurrency(payment.amount)}</strong>
+                                                    <span className="text-muted text-sm">
+                                                        {new Date(payment.payment_date).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {payment.payment_method?.replace("_", " ") || "N/A"}
+                                                    {payment.official_receipt_number && (
+                                                        <> • OR {payment.official_receipt_number}</>
+                                                    )}
+                                                </div>
+                                                {payment.payment_reference && (
+                                                    <div className="text-xs text-gray-500">
+                                                        Ref: {payment.payment_reference}
+                                                    </div>
+                                                )}
+                                                {payment.notes && (
+                                                    <p className="text-xs mt-1">{payment.notes}</p>
+                                                )}
+                                                {payment.documents?.length ? (
+                                                    <>
+                                                        <span className="badge badge-success">
+                                                            {payment.documents.length} attachment{payment.documents.length > 1 ? "s" : ""}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handlePreviewFile(payment.documents[0])}
+                                                            className="btn btn-sm btn-outline-primary ml-1"
+                                                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                        >
+                                                            <i className="ti-eye"></i>
+                                                        </button>
+                                                    </>
+                                                ) : null}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-muted m-b-0">No payments recorded yet.</p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">
-                                Amount Due
-                            </label>
-                            <input
-                                type="text"
-                                className="w-full border rounded-md p-2 bg-gray-50"
-                                value={formatCurrency(paymentForm.amountDue)}
-                                disabled
-                            />
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">
-                                Payment Amount <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="number"
-                                className="w-full border rounded-md p-2"
-                                placeholder="0.00"
-                                value={paymentForm.paymentAmount}
-                                onChange={(e) =>
-                                    handlePaymentFormChange("paymentAmount", e.target.value)
-                                }
-                                step="0.01"
-                                min="0"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">
-                                Payment Method <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                className="w-full border rounded-md p-2"
-                                value={paymentForm.paymentMethod}
-                                onChange={(e) =>
-                                    handlePaymentFormChange("paymentMethod", e.target.value)
-                                }
+                        <div className="modal-footer border-top pt-3">
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => {
+                                    setOpenPaymentModal(false);
+                                    setSelectedTicket(null);
+                                }}
+                                disabled={isUpdating}
                             >
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="gcash">GCash</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                            </select>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-success"
+                                onClick={handleRecordPayment}
+                                disabled={isUpdating}
+                            >
+                                {isUpdating ? (
+                                    <>
+                                        <i className="fa fa-spinner fa-spin mr-2"></i>
+                                        Updating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="ti-check mr-2"></i>
+                                        Record Payment
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-1">
-                            Notes (Optional)
-                        </label>
-                        <textarea
-                            className="w-full border rounded-md p-2"
-                            placeholder="Add any notes about this payment..."
-                            rows="3"
-                            value={paymentForm.notes}
-                            onChange={(e) =>
-                                handlePaymentFormChange("notes", e.target.value)
-                            }
-                        />
-                    </div>
-                </div>
+                )}
             </Modal>
+
+            {/* Preview Modal */}
+            <PreviewModal
+                isOpen={previewModal.isOpen}
+                onClose={() => setPreviewModal({ isOpen: false, fileUrl: null })}
+                fileUrl={previewModal.fileUrl}
+                title="File Preview"
+            />
 
             <section id="main-content">
                 {/* Date Filter Section */}
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -298,149 +522,61 @@ export default function FrontDesk({
                         </select>
                     </div>
                 </div>
-                {/* Statistics Cards - Compact */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">New Orders</p>
-                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.newTickets}</p>
-                                <div className="flex items-center mt-2 text-xs">
-                                    <span className="text-green-600 font-semibold flex items-center">
-                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                        12%
-                                    </span>
-                                    <span className="text-gray-400 ml-1">vs last month</span>
-                                </div>
-                            </div>
-                            <div className="bg-blue-50 p-3 rounded-lg">
-                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pending Payment</p>
-                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.paymentPending}</p>
-                                <div className="flex items-center mt-2 text-xs">
-                                    <span className="text-red-600 font-semibold flex items-center">
-                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                        5%
-                                    </span>
-                                    <span className="text-gray-400 ml-1">vs last month</span>
-                                </div>
-                            </div>
-                            <div className="bg-red-50 p-3 rounded-lg">
-                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</p>
-                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.completed}</p>
-                                <div className="flex items-center mt-2 text-xs">
-                                    <span className="text-green-600 font-semibold flex items-center">
-                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                        8%
-                                    </span>
-                                    <span className="text-gray-400 ml-1">vs last month</span>
-                                </div>
-                            </div>
-                            <div className="bg-green-50 p-3 rounded-lg">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">In Progress</p>
-                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.inProgress}</p>
-                                <div className="flex items-center mt-2 text-xs">
-                                    <span className="text-green-600 font-semibold flex items-center">
-                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                        15%
-                                    </span>
-                                    <span className="text-gray-400 ml-1">vs last month</span>
-                                </div>
-                            </div>
-                            <div className="bg-yellow-50 p-3 rounded-lg">
-                                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <CardStatistics
+                        label="New Orders"
+                        statistics={statistics.newTickets}
+                        icon="ti-printer"
+                    />
+                    {/* <CardStatistics
+                        label="Online Orders"
+                        statistics={statistics.newOnlineOrders}
+                        icon="ti-shopping-cart"
+                    /> */}
+                    <CardStatistics
+                        label="Pending Payment"
+                        statistics={statistics.paymentPending}
+                        icon="ti-credit-card"
+                    />
+                    <CardStatistics
+                        label="Completed"
+                        statistics={statistics.completed}
+                        icon="ti-check-box"
+                    />
+                    <CardStatistics
+                        label="In Progress"
+                        statistics={statistics.inProgress}
+                        icon="ti-reload"
+                    />
                 </div>
 
-
-
-                <div className="row">
-                    <div className="col-lg-3">
-                        <div className="card bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">New Orders</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.newTickets}</p>
-                                    <div className="flex items-center mt-2 text-xs">
-                                        <span className="text-green-600 font-semibold flex items-center">
-                                            <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                            </svg>
-                                            12%
-                                        </span>
-                                        <span className="text-gray-400 ml-1">vs last month</span>
-                                    </div>
-                                </div>
-                                <div className="bg-blue-50 p-3 rounded-lg">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-9">
+                {/* New/Online Orders to Confirm */}
+                <div className="row mb-4">
+                    <div className="col-lg-12">
                         <div className="card">
                             <div className="card-title pr">
                                 <div className="flex justify-between items-center">
                                     <h4>New/ Online Orders to Confirm</h4>
-                                    <button
-                                        onClick={refreshDashboard}
-                                        className="btn btn-sm btn-primary"
-                                        disabled={refreshing}
-                                    >
-                                        <i className={`ti-reload ${refreshing ? 'animate-spin' : ''}`}></i>
-                                        {refreshing ? ' Refreshing...' : ' Refresh'}
-                                    </button>
-                                    <div className="basic-form">
-                                        <div className="form-group">
-                                            <CustomerSearchBox
-
-                                            />
-                                        </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Search by ticket #, customer, description..."
+                                            value={search}
+                                            onChange={(e) => handleSearch(e.target.value)}
+                                            style={{ width: "300px" }}
+                                        />
+                                        <button
+                                            onClick={refreshDashboard}
+                                            className="btn btn-sm btn-primary"
+                                            disabled={refreshing}
+                                        >
+                                            <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
+                                            {refreshing ? " Refreshing..." : " Refresh"}
+                                        </button>
                                     </div>
-
                                 </div>
                             </div>
                             <div className="card-body">
@@ -448,36 +584,111 @@ export default function FrontDesk({
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Ticket ID</th>
-                                                <th>Customer</th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleOrderBy("ticket_number")}
+                                                        className="btn-link p-0 border-0 bg-transparent"
+                                                    >
+                                                        Ticket ID {orderBy === "ticket_number" && (orderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleOrderBy("customer")}
+                                                        className="btn-link p-0 border-0 bg-transparent"
+                                                    >
+                                                        Customer {orderBy === "customer" && (orderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
                                                 <th>Description</th>
+                                                <th>Amount</th>
+                                                <th>Payment Status</th>
                                                 <th>Files</th>
-                                                <th>Payment</th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr>
-                                                <td>1DTSYDS</td>
-                                                <td>John Doe</td>
-                                                <td>Mugs</td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-primary">Preview</button>
-                                                </td>
-                                                <td>GCash</td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-primary">View</button>
-                                                </td>
-                                            </tr>
+                                            {newOnlineOrders.data && newOnlineOrders.data.length > 0 ? (
+                                                newOnlineOrders.data.map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>{ticket.ticket_number}</td>
+                                                        <td>
+                                                            {ticket.customer
+                                                                ? `${ticket.customer.name}`
+                                                                : "Unknown"}
+                                                            {ticket.customer?.email && (
+                                                                <div className="text-xs text-gray-500">{ticket.customer.email}</div>
+                                                            )}
+                                                        </td>
+                                                        <td>{ticket.description}</td>
+                                                        <td>{formatCurrency(ticket.total_amount)}</td>
+                                                        <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
+                                                        <td>
+                                                            {ticket.customer_files && ticket.customer_files.length > 0 ? (
+                                                                <button
+                                                                    className="btn btn-sm btn-primary"
+                                                                    onClick={() => handlePreviewFile(ticket.customer_files[0])}
+                                                                >
+                                                                    Preview ({ticket.customer_files.length})
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-gray-400">No files</span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            <button
+                                                                className="btn btn-sm btn-primary"
+                                                                onClick={() => handleViewTicket(ticket.id)}
+                                                            >
+                                                                View
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="7" className="text-center text-gray-400">
+                                                        No orders found
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
+                                {/* Pagination */}
+                                {newOnlineOrders.links && newOnlineOrders.links.length > 3 && (
+                                    <div className="d-flex justify-content-center mt-3">
+                                        <nav>
+                                            <ul className="pagination">
+                                                {newOnlineOrders.links.map((link, index) => (
+                                                    <li
+                                                        key={index}
+                                                        className={`page-item ${link.active ? "active" : ""} ${!link.url ? "disabled" : ""}`}
+                                                    >
+                                                        <button
+                                                            className="page-link"
+                                                            onClick={() => {
+                                                                if (link.url) {
+                                                                    router.visit(link.url, {
+                                                                        preserveState: true,
+                                                                        preserveScroll: true,
+                                                                    });
+                                                                }
+                                                            }}
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* All Tickets Table */}
+                {/* Recent Tickets (Today) */}
                 <div className="row">
                     <div className="col-lg-12">
                         <div className="card">
@@ -489,8 +700,8 @@ export default function FrontDesk({
                                         className="btn btn-sm btn-primary"
                                         disabled={refreshing}
                                     >
-                                        <i className={`ti-reload ${refreshing ? 'animate-spin' : ''}`}></i>
-                                        {refreshing ? ' Refreshing...' : ' Refresh'}
+                                        <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
+                                        {refreshing ? " Refreshing..." : " Refresh"}
                                     </button>
                                 </div>
                             </div>
@@ -506,47 +717,44 @@ export default function FrontDesk({
                                                 <th>Due Date</th>
                                                 <th>Status</th>
                                                 <th>Payment Status</th>
-                                                <th></th>
+                                                <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {allTickets.length > 0 ? (
-                                                allTickets.map((ticket) => (
+                                            {recentTicketsToday && recentTicketsToday.length > 0 ? (
+                                                recentTicketsToday.map((ticket) => (
                                                     <tr key={ticket.id}>
+                                                        <td>{ticket.ticket_number}</td>
                                                         <td>
-                                                            {ticket.trackingNumber}
+                                                            {ticket.customer
+                                                                ? ticket.customer.full_name
+                                                                : "Walk-in"}
                                                         </td>
-                                                        <td>{ticket.customer.firstname}</td>
                                                         <td>{ticket.description}</td>
-                                                        <td>{ticket.balance}</td>
-                                                        <td>{formatDate(ticket.dueDate)}</td>
+                                                        <td>{formatCurrency(ticket.outstanding_balance || ticket.total_amount)}</td>
+                                                        <td>{formatDate(ticket.due_date)}</td>
                                                         <td>
-                                                            <div className={getStatusBadgeClass(ticket.statusColor)}>
-                                                                {ticket.statusLabel}
-                                                            </div>
+                                                            <span className={getStatusBadgeClass(ticket.status)}>
+                                                                {ticket.status?.replace("_", " ").toUpperCase() || "PENDING"}
+                                                            </span>
                                                         </td>
+                                                        <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
                                                         <td>
-                                                            <div className={getPaymentStatusBadge(ticket.statusColor)}>
-                                                                {ticket.statusLabel}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            {ticket.status !== "paid" && (
+                                                            {ticket.payment_status !== "paid" && (
                                                                 <button
                                                                     className="btn btn-sm btn-primary"
-                                                                    onClick={() => handleViewTicket(ticket.id)}
+                                                                    onClick={() => handleOpenPaymentModal(ticket)}
                                                                 >
                                                                     Payment
                                                                 </button>
                                                             )}
-
                                                         </td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="6" className="text-center text-gray-400">
-                                                        No tickets found
+                                                    <td colSpan="8" className="text-center text-gray-400">
+                                                        No tickets found for today
                                                     </td>
                                                 </tr>
                                             )}
