@@ -5,6 +5,8 @@ import Modal from "@/Components/Main/Modal";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import CardStatistics from "@/Components/Common/CardStatistics";
+import { formatPeso } from "@/Utils/currency";
+import { formatDate } from "@/Utils/formatDate";
 
 export default function FrontDesk({
     user = {},
@@ -18,7 +20,7 @@ export default function FrontDesk({
         inProgress: 0,
     },
     newOnlineOrders = { data: [], links: [], meta: {} },
-    recentTicketsToday = [],
+    recentTicketsToday = { data: [], links: [], meta: {} },
     filters = { date_range: "this_month" },
 }) {
     const [refreshing, setRefreshing] = useState(false);
@@ -29,7 +31,11 @@ export default function FrontDesk({
     const [orderBy, setOrderBy] = useState(filters.order_by || "created_at");
     const [orderDir, setOrderDir] = useState(filters.order_dir || "desc");
 
-    // Modal States
+    // Recent Tickets Search and Sort
+    const [recentSearch, setRecentSearch] = useState(filters.recent_search || "");
+    const [recentOrderBy, setRecentOrderBy] = useState(filters.recent_order_by || "created_at");
+    const [recentOrderDir, setRecentOrderDir] = useState(filters.recent_order_dir || "desc");
+
     const [openPaymentModal, setOpenPaymentModal] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [paymentFormData, setPaymentFormData] = useState({
@@ -59,7 +65,7 @@ export default function FrontDesk({
         setDateRange(range);
         router.get(
             "/frontdesk/",
-            { date_range: range, search, order_by: orderBy, order_dir: orderDir },
+            { date_range: range, search, order_by: orderBy, order_dir: orderDir, recent_search: recentSearch, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -72,7 +78,7 @@ export default function FrontDesk({
         setSearch(value);
         router.get(
             "/frontdesk/",
-            { date_range: dateRange, search: value, order_by: orderBy, order_dir: orderDir },
+            { date_range: dateRange, search: value, order_by: orderBy, order_dir: orderDir, recent_search: recentSearch, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -87,7 +93,36 @@ export default function FrontDesk({
         setOrderDir(newDir);
         router.get(
             "/frontdesk/",
-            { date_range: dateRange, search, order_by: field, order_dir: newDir },
+            { date_range: dateRange, search, order_by: field, order_dir: newDir, recent_search: recentSearch, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    // Recent Tickets Handlers
+    const handleRecentSearch = (value) => {
+        setRecentSearch(value);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search, order_by: orderBy, order_dir: orderDir, recent_search: value, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleRecentOrderBy = (field) => {
+        const newDir = recentOrderBy === field && recentOrderDir === "desc" ? "asc" : "desc";
+        setRecentOrderBy(field);
+        setRecentOrderDir(newDir);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search, order_by: orderBy, order_dir: orderDir, recent_search: recentSearch, recent_order_by: field, recent_order_dir: newDir },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -179,24 +214,6 @@ export default function FrontDesk({
         }
     };
 
-    // ============================================
-    // UTILITY FUNCTIONS
-    // ============================================
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat("en-PH", {
-            style: "currency",
-            currency: "PHP",
-        }).format(amount || 0);
-    };
-
-    const formatDate = (date) => {
-        if (!date) return "-";
-        return new Date(date).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    };
 
     const getStatusBadgeClass = (status) => {
         const statusMap = {
@@ -216,9 +233,9 @@ export default function FrontDesk({
             paid: "badge-success",
         };
         return (
-            <span className={`badge ${classes[status] || "badge-secondary"}`}>
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
                 {status?.toUpperCase() || "PENDING"}
-            </span>
+            </div>
         );
     };
 
@@ -290,15 +307,15 @@ export default function FrontDesk({
                                 <div className="col-md-6">
                                     <p className="m-b-5">
                                         <strong>Total Amount:</strong>{" "}
-                                        {formatCurrency(selectedTicket.total_amount)}
+                                        {formatPeso(selectedTicket.total_amount)}
                                     </p>
                                     <p className="m-b-5">
                                         <strong>Amount Paid:</strong>{" "}
-                                        {formatCurrency(selectedTicket.amount_paid || 0)}
+                                        {formatPeso(selectedTicket.amount_paid || 0)}
                                     </p>
                                     <p className="m-b-0 text-danger font-bold">
                                         <strong>Balance:</strong>{" "}
-                                        {formatCurrency(selectedTicket.outstanding_balance || selectedTicket.total_amount)}
+                                        {formatPeso(selectedTicket.outstanding_balance || selectedTicket.total_amount)}
                                     </p>
                                 </div>
                             </div>
@@ -416,7 +433,7 @@ export default function FrontDesk({
                                         selectedTicket.payments.map((payment) => (
                                             <div key={payment.id} className="border-bottom pb-2 mb-2">
                                                 <div className="d-flex justify-content-between">
-                                                    <strong>{formatCurrency(payment.amount)}</strong>
+                                                    <strong>{formatPeso(payment.amount)}</strong>
                                                     <span className="text-muted text-sm">
                                                         {new Date(payment.payment_date).toLocaleDateString()}
                                                     </span>
@@ -506,6 +523,14 @@ export default function FrontDesk({
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
+                        <button
+                            onClick={refreshDashboard}
+                            className="btn btn-sm btn-link"
+                            disabled={refreshing}
+                        >
+                            <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
+                            {refreshing ? " Refreshing..." : " Refresh"}
+                        </button> |
                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
@@ -519,6 +544,11 @@ export default function FrontDesk({
                             <option value="this_month">This Month</option>
                             <option value="last_30_days">Last 30 Days</option>
                             <option value="this_year">This Year</option>
+                            {Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                                <option key={year} value={`year_${year}`}>
+                                    {year}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -558,7 +588,7 @@ export default function FrontDesk({
                         <div className="card">
                             <div className="card-title pr">
                                 <div className="flex justify-between items-center">
-                                    <h4>New/ Online Orders to Confirm</h4>
+                                    <h4>Pending/ New/ Online Orders to Confirm</h4>
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="text"
@@ -568,14 +598,6 @@ export default function FrontDesk({
                                             onChange={(e) => handleSearch(e.target.value)}
                                             style={{ width: "300px" }}
                                         />
-                                        <button
-                                            onClick={refreshDashboard}
-                                            className="btn btn-sm btn-primary"
-                                            disabled={refreshing}
-                                        >
-                                            <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
-                                            {refreshing ? " Refreshing..." : " Refresh"}
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -585,26 +607,26 @@ export default function FrontDesk({
                                         <thead>
                                             <tr>
                                                 <th>
-                                                    <button
+                                                    {/* <button
                                                         onClick={() => handleOrderBy("ticket_number")}
                                                         className="btn-link p-0 border-0 bg-transparent"
-                                                    >
-                                                        Ticket ID {orderBy === "ticket_number" && (orderDir === "asc" ? "↑" : "↓")}
-                                                    </button>
+                                                    > */}
+                                                    Ticket ID {orderBy === "ticket_number" && (orderDir === "asc" ? "↑" : "↓")}
+                                                    {/* </button> */}
                                                 </th>
                                                 <th>
-                                                    <button
+                                                    {/* <button
                                                         onClick={() => handleOrderBy("customer")}
                                                         className="btn-link p-0 border-0 bg-transparent"
-                                                    >
-                                                        Customer {orderBy === "customer" && (orderDir === "asc" ? "↑" : "↓")}
-                                                    </button>
+                                                    > */}
+                                                    Customer {orderBy === "customer" && (orderDir === "asc" ? "↑" : "↓")}
+                                                    {/* </button> */}
                                                 </th>
                                                 <th>Description</th>
                                                 <th>Amount</th>
                                                 <th>Payment Status</th>
                                                 <th>Files</th>
-                                                <th>Action</th>
+                                                {/* <th>Action</th> */}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -621,28 +643,36 @@ export default function FrontDesk({
                                                             )}
                                                         </td>
                                                         <td>{ticket.description}</td>
-                                                        <td>{formatCurrency(ticket.total_amount)}</td>
+                                                        <td>{formatPeso(ticket.total_amount)}</td>
                                                         <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
                                                         <td>
                                                             {ticket.customer_files && ticket.customer_files.length > 0 ? (
-                                                                <button
-                                                                    className="btn btn-sm btn-primary"
-                                                                    onClick={() => handlePreviewFile(ticket.customer_files[0])}
-                                                                >
-                                                                    Preview ({ticket.customer_files.length})
-                                                                </button>
+                                                                <>
+                                                                    <span className="text-xs text-gray-500">
+                                                                        Proof of payment
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={() => handlePreviewFile(ticket.customer_files[0])}
+                                                                        className="btn btn-sm btn-outline-primary ml-1"
+                                                                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                                        title="Photo preview"
+                                                                    >
+                                                                        <i className="ti-eye"></i>
+                                                                    </button>
+                                                                </>
+                                                                // <button type="button" class="btn btn-sm btn-link btn-flat m-b-10 m-l-5" onClick={() => handlePreviewFile(ticket.customer_files[0])}> <i className="ti ti-eye"></i> Preview</button>
                                                             ) : (
                                                                 <span className="text-gray-400">No files</span>
                                                             )}
                                                         </td>
-                                                        <td>
+                                                        {/* <td>
                                                             <button
-                                                                className="btn btn-sm btn-primary"
-                                                                onClick={() => handleViewTicket(ticket.id)}
+                                                                className="btn btn-sm btn-link btn-flat m-b-10 m-l-5"
+                                                                onClick={() => handleOpenPaymentModal(ticket)}
                                                             >
-                                                                View
+                                                                <i className="ti ti-eye"></i> Review
                                                             </button>
-                                                        </td>
+                                                        </td> */}
                                                     </tr>
                                                 ))
                                             ) : (
@@ -657,7 +687,7 @@ export default function FrontDesk({
                                 </div>
                                 {/* Pagination */}
                                 {newOnlineOrders.links && newOnlineOrders.links.length > 3 && (
-                                    <div className="d-flex justify-content-center mt-3">
+                                    <div className="d-flex justify-content-end mt-3">
                                         <nav>
                                             <ul className="pagination">
                                                 {newOnlineOrders.links.map((link, index) => (
@@ -695,14 +725,16 @@ export default function FrontDesk({
                             <div className="card-title pr">
                                 <div className="flex justify-between items-center">
                                     <h4>RECENT TICKETS (Today)</h4>
-                                    <button
-                                        onClick={refreshDashboard}
-                                        className="btn btn-sm btn-primary"
-                                        disabled={refreshing}
-                                    >
-                                        <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
-                                        {refreshing ? " Refreshing..." : " Refresh"}
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Search by ticket #, customer, description..."
+                                            value={recentSearch}
+                                            onChange={(e) => handleRecentSearch(e.target.value)}
+                                            style={{ width: "300px" }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div className="card-body">
@@ -710,19 +742,59 @@ export default function FrontDesk({
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Ticket ID</th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("ticket_number")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Ticket ID {recentOrderBy === "ticket_number" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
                                                 <th>Customer</th>
                                                 <th>Description</th>
-                                                <th>Balance</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
-                                                <th>Payment Status</th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("outstanding_balance")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Balance {recentOrderBy === "outstanding_balance" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("due_date")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Due Date {recentOrderBy === "due_date" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("status")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Status {recentOrderBy === "status" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("payment_status")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Payment Status {recentOrderBy === "payment_status" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {recentTicketsToday && recentTicketsToday.length > 0 ? (
-                                                recentTicketsToday.map((ticket) => (
+                                            {recentTicketsToday.data && recentTicketsToday.data.length > 0 ? (
+                                                recentTicketsToday.data.map((ticket) => (
                                                     <tr key={ticket.id}>
                                                         <td>{ticket.ticket_number}</td>
                                                         <td>
@@ -730,22 +802,30 @@ export default function FrontDesk({
                                                                 ? ticket.customer.full_name
                                                                 : "Walk-in"}
                                                         </td>
-                                                        <td>{ticket.description}</td>
-                                                        <td>{formatCurrency(ticket.outstanding_balance || ticket.total_amount)}</td>
+                                                        <td>
+                                                            <div className="text-truncate" style={{ maxWidth: "200px" }} title={ticket.description}>
+                                                                {ticket.description}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span className="font-weight-bold text-danger">
+                                                                {formatPeso(ticket.outstanding_balance || ticket.total_amount)}
+                                                            </span>
+                                                        </td>
                                                         <td>{formatDate(ticket.due_date)}</td>
                                                         <td>
-                                                            <span className={getStatusBadgeClass(ticket.status)}>
+                                                            <div className={getStatusBadgeClass(ticket.status)}>
                                                                 {ticket.status?.replace("_", " ").toUpperCase() || "PENDING"}
-                                                            </span>
+                                                            </div>
                                                         </td>
                                                         <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
                                                         <td>
                                                             {ticket.payment_status !== "paid" && (
                                                                 <button
-                                                                    className="btn btn-sm btn-primary"
+                                                                    className="btn btn-sm btn-link btn-flat m-b-10 m-l-5"
                                                                     onClick={() => handleOpenPaymentModal(ticket)}
                                                                 >
-                                                                    Payment
+                                                                    <i className="ti-clipboard"></i> Payment
                                                                 </button>
                                                             )}
                                                         </td>
@@ -754,13 +834,41 @@ export default function FrontDesk({
                                             ) : (
                                                 <tr>
                                                     <td colSpan="8" className="text-center text-gray-400">
-                                                        No tickets found for today
+                                                        {recentSearch ? "No tickets found matching your search" : "No tickets found for today"}
                                                     </td>
                                                 </tr>
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
+                                {/* Pagination */}
+                                {recentTicketsToday.links && recentTicketsToday.links.length > 3 && (
+                                    <div className="d-flex justify-content-end mt-3">
+                                        <nav>
+                                            <ul className="pagination">
+                                                {recentTicketsToday.links.map((link, index) => (
+                                                    <li
+                                                        key={index}
+                                                        className={`page-item ${link.active ? "active" : ""} ${!link.url ? "disabled" : ""}`}
+                                                    >
+                                                        <button
+                                                            className="page-link"
+                                                            onClick={() => {
+                                                                if (link.url) {
+                                                                    router.visit(link.url, {
+                                                                        preserveState: true,
+                                                                        preserveScroll: true,
+                                                                    });
+                                                                }
+                                                            }}
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

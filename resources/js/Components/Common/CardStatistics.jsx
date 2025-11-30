@@ -3,7 +3,8 @@ import React from "react";
 export default function CardStatistics({
     label,
     statistics = 0,
-    icon
+    icon,
+    color = "bg-secondary"
 }) {
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -35,10 +36,10 @@ export default function CardStatistics({
                         </span>
                     </div> */}
                 </div>
-                <div className="bg-blue-50 p-3 rounded-lg">
-                    <i className={icon}></i>
+                <div className={`${color} p-3 rounded-lg`}>
+                    <i className={`${icon} text-white`}></i>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

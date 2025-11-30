@@ -8,6 +8,7 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import ProductionBoard from "@/Components/Production/ProductionBoard";
 import { formatDate } from "@/Utils/formatDate";
+import CardStatistics from "@/Components/Common/CardStatistics";
 
 export default function Productions({
     user = {},
@@ -611,112 +612,7 @@ export default function Productions({
             )}
 
             {/* Summary Cards */}
-            <div
-                className="row mb-4"
-                style={{
-                    marginTop: isFullscreen ? "20px" : "0",
-                    marginBottom: isFullscreen ? "30px" : "20px",
-                }}
-            >
-                <div className="col-lg-3 col-md-6 mb-3">
-                    <div
-                        className="card p-0 shadow-sm border-0"
-                        onMouseEnter={(e) =>
-                        (e.currentTarget.style.transform =
-                            "translateY(-5px)")
-                        }
-                        onMouseLeave={(e) =>
-                            (e.currentTarget.style.transform = "translateY(0)")
-                        }
-                    >
-                        <div className="stat-widget-three home-widget-three">
-                            <div className="stat-icon bg-info">
-                                <i className="ti-package"></i>
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-digit">
-                                    <b>{stats.total}</b>
-                                </div>
-                                <div className="stat-text">
-                                    Total Items Produced Today
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-3 col-md-6 mb-3">
-                    <div
-                        className="card shadow-sm border-0 p-0"
-                        onMouseEnter={(e) =>
-                        (e.currentTarget.style.transform =
-                            "translateY(-5px)")
-                        }
-                        onMouseLeave={(e) =>
-                            (e.currentTarget.style.transform = "translateY(0)")
-                        }
-                    >
-                        <div className="stat-widget-three home-widget-three">
-                            <div className="stat-icon bg-primary">
-                                <i className="ti-printer"></i>
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-digit">
-                                    <b>{stats.inProgress}</b>
-                                </div>
-                                <div className="stat-text">Ready to Print</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-3 col-md-6 mb-3">
-                    <div
-                        className="card shadow-sm border-0 p-0"
-                        onMouseEnter={(e) =>
-                        (e.currentTarget.style.transform =
-                            "translateY(-5px)")
-                        }
-                        onMouseLeave={(e) =>
-                            (e.currentTarget.style.transform = "translateY(0)")
-                        }
-                    >
-                        <div className="stat-widget-three home-widget-three">
-                            <div className="stat-icon bg-success">
-                                <i className="ti-check-box"></i>
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-digit">
-                                    <b>{stats.finished}</b>
-                                </div>
-                                <div className="stat-text">Finished</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-3 col-md-6 mb-3">
-                    <div
-                        className="card shadow-sm border-0 p-0"
-                        onMouseEnter={(e) =>
-                        (e.currentTarget.style.transform =
-                            "translateY(-5px)")
-                        }
-                        onMouseLeave={(e) =>
-                            (e.currentTarget.style.transform = "translateY(0)")
-                        }
-                    >
-                        <div className="stat-widget-three home-widget-three">
-                            <div className="stat-icon bg-info">
-                                <i className="ti-package"></i>
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-digit">
-                                    <b>{stats.delays}</b>
-                                </div>
-                                <div className="stat-text">Delays</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             {!isFullscreen && (
                 <div className="row">
@@ -746,6 +642,137 @@ export default function Productions({
                 </div>
             )}
 
+
+            <div
+                className="row mb-4"
+                style={{
+                    marginTop: isFullscreen ? "20px" : "0",
+                    marginBottom: isFullscreen ? "30px" : "20px",
+                }}
+            >
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Total Items Produced Today"
+                        statistics={stats.total}
+                        icon="ti-package"
+                        color="bg-info"
+                    />
+                    {/* <div
+                        className="card p-0 shadow-sm border-0"
+                        onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
+                        }
+                        onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "translateY(0)")
+                        }
+                    >
+                        <div className="stat-widget-three home-widget-three">
+                            <div className="stat-icon bg-info">
+                                <i className="ti-package"></i>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-digit">
+                                    <b>{stats.total}</b>
+                                </div>
+                                <div className="stat-text">
+                                    Total Items Produced Today
+                                </div>
+                            </div>
+                        </div>
+                    </div> */}
+                </div>
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Ready to Print"
+                        statistics={stats.inProgress}
+                        icon="ti-printer"
+                        color="bg-primary"
+                    />
+                    {/* <div
+                        className="card shadow-sm border-0 p-0"
+                        onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
+                        }
+                        onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "translateY(0)")
+                        }
+                    >
+                        <div className="stat-widget-three home-widget-three">
+                            <div className="stat-icon bg-primary">
+                                <i className="ti-printer"></i>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-digit">
+                                    <b>{stats.inProgress}</b>
+                                </div>
+                                <div className="stat-text">Ready to Print</div>
+                            </div>
+                        </div>
+                    </div> */}
+                </div>
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Finished"
+                        statistics={stats.finished}
+                        icon="ti-check-box"
+                        color="bg-success"
+                    />
+                    {/* <div
+                        className="card shadow-sm border-0 p-0"
+                        onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
+                        }
+                        onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "translateY(0)")
+                        }
+                    >
+                        <div className="stat-widget-three home-widget-three">
+                            <div className="stat-icon bg-success">
+                                <i className="ti-check-box"></i>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-digit">
+                                    <b>{stats.finished}</b>
+                                </div>
+                                <div className="stat-text">Finished</div>
+                            </div>
+                        </div>
+                    </div> */}
+                </div>
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Delays"
+                        statistics={stats.delays}
+                        icon="ti-package"
+                        color="bg-danger"
+                    />
+                    {/* <div
+                        className="card shadow-sm border-0 p-0"
+                        onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform =
+                            "translateY(-5px)")
+                        }
+                        onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "translateY(0)")
+                        }
+                    >
+                        <div className="stat-widget-three home-widget-three">
+                            <div className="stat-icon bg-info">
+                                <i className="ti-package"></i>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-digit">
+                                    <b>{stats.delays}</b>
+                                </div>
+                                <div className="stat-text">Delays</div>
+                            </div>
+                        </div>
+                    </div> */}
+                </div>
+            </div>
             {isFullscreen && (
                 <div className="row mb-1">
                     <div className="col-12 text-center">

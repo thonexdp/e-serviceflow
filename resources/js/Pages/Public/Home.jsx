@@ -57,8 +57,8 @@ export default function PrintShoppeLanding() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                        <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
-                    </div>
+                            <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
+                        </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
                                 <p className="text-sm text-gray-600">Track Your Order</p>

@@ -21,13 +21,13 @@ export default function PreviewModal({
 
     return (
         <Transition show={isOpen} as={Fragment}>
-            <Dialog 
-                as="div" 
-                className="relative z-[60]" 
+            <Dialog
+                as="div"
+                className="relative z-[60]"
                 onClose={handleClose}
                 static
             >
-                
+
                 {/* Background Overlay */}
                 <Transition.Child
                     as={Fragment}
@@ -38,7 +38,7 @@ export default function PreviewModal({
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                 >
-                    <div 
+                    <div
                         className="fixed inset-0 bg-black/50"
                         onClick={(e) => {
                             e.stopPropagation();
@@ -48,7 +48,7 @@ export default function PreviewModal({
                 </Transition.Child>
 
                 {/* Modal Panel */}
-                <div 
+                <div
                     className="fixed inset-0 flex items-center justify-center p-4"
                     onClick={(e) => e.stopPropagation()}
                 >

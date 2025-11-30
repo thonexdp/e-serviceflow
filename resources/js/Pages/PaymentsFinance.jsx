@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Head, router } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import DataTable from "@/Components/Common/DataTable";
 import Modal from "@/Components/Main/Modal";
@@ -19,7 +19,7 @@ export default function PaymentsFinance({
     expenseCategories = [],
     openTickets = [],
     customers = [],
-    flash = {},
+    // flash = {},
     user = {},
     notifications = [],
     messages = [],
@@ -45,6 +45,8 @@ export default function PaymentsFinance({
         attachments: [],
     });
     const { api } = useRoleApi();
+    const { flash, auth } = usePage().props;
+
 
     const [show, setShow] = useState(false);
     const [filepath, setFilepath] = useState("");
@@ -354,12 +356,12 @@ export default function PaymentsFinance({
                     <div className="card">
                         <div className="card-title flex justify-between items-center">
                             <h4>Payment Ledger</h4>
-                            <button
+                            {/* <button
                                 className="btn btn-primary"
                                 onClick={() => setPaymentModalOpen(true)}
                             >
                                 <i className="ti-plus m-r-5"></i> Record Payment
-                            </button>
+                            </button> */}
                         </div>
                         <div className="card-body">
                             <DataTable
@@ -935,7 +937,7 @@ export default function PaymentsFinance({
                         </div>
                     </div>
 
-                    {renderSummaryCards()}
+                    {auth.user.role === 'admin' && renderSummaryCards()}
 
                     <div className="card">
                         <div className="card-body">

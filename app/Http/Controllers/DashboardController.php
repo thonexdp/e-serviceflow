@@ -24,6 +24,7 @@ class DashboardController extends Controller
         $user = $request->user();
         $data = [];
 
+
         if (!$user) {
             return redirect()->route('login');
         }
@@ -65,6 +66,17 @@ class DashboardController extends Controller
                         case 'this_year':
                             $startDate = now()->startOfYear();
                             $endDate = now()->endOfYear();
+                            break;
+                        default:
+                            // Handle year_YYYY format
+                            if (str_starts_with($dateRange, 'year_')) {
+                                $year = (int) str_replace('year_', '', $dateRange);
+                                $startDate = now()->setYear($year)->startOfYear();
+                                $endDate = now()->setYear($year)->endOfYear();
+                            } else {
+                                $startDate = now()->startOfMonth();
+                                $endDate = now()->endOfMonth();
+                            }
                             break;
                     }
 
@@ -152,10 +164,12 @@ class DashboardController extends Controller
                         });
                     }
 
+
                     // Order by
                     $orderBy = $request->get('order_by', 'created_at');
                     $orderDir = $request->get('order_dir', 'desc');
                     $query->orderBy($orderBy, $orderDir);
+
 
                     $tickets = $query->paginate(5);
 
@@ -187,12 +201,31 @@ class DashboardController extends Controller
                 },
                 // Recent Tickets (Today)
                 'recentTicketsToday' => function () use ($request) {
-                    $tickets = Ticket::with(['customer', 'payments.documents'])
-                        ->whereDate('created_at', today())
-                        ->orderBy('created_at', 'desc')
-                        ->get();
+                    $query = Ticket::with(['customer', 'payments.documents'])
+                        ->whereDate('created_at', today());
 
-                    return $tickets->map(function ($ticket) {
+                    // Search functionality
+                    if ($request->has('recent_search') && $request->recent_search) {
+                        $search = $request->recent_search;
+                        $query->where(function ($q) use ($search) {
+                            $q->where('ticket_number', 'like', "%{$search}%")
+                                ->orWhere('description', 'like', "%{$search}%")
+                                ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                                    $customerQuery->where('firstname', 'like', "%{$search}%")
+                                        ->orWhere('lastname', 'like', "%{$search}%")
+                                        ->orWhere('email', 'like', "%{$search}%");
+                                });
+                        });
+                    }
+
+                    // Sorting
+                    $orderBy = $request->get('recent_order_by', 'created_at');
+                    $orderDir = $request->get('recent_order_dir', 'desc');
+                    $query->orderBy($orderBy, $orderDir);
+
+                    $tickets = $query->paginate(10, ['*'], 'recent_page');
+
+                    return $tickets->through(function ($ticket) {
                         return [
                             'id' => $ticket->id,
                             'ticket_number' => $ticket->ticket_number,
@@ -247,6 +280,152 @@ class DashboardController extends Controller
             ]),
             'Designer' => Inertia::render('Dashboard/Graphic', [
                 'user' => $user,
+                'filters' => [
+                    'date_range' => $request->input('date_range', 'this_month'),
+                ],
+                'statistics' => function () use ($request) {
+                    $dateRange = $request->input('date_range', 'this_month');
+                    $startDate = now()->startOfMonth();
+                    $endDate = now()->endOfMonth();
+
+                    switch ($dateRange) {
+                        case 'today':
+                            $startDate = now()->startOfDay();
+                            $endDate = now()->endOfDay();
+                            break;
+                        case 'this_week':
+                            $startDate = now()->startOfWeek();
+                            $endDate = now()->endOfWeek();
+                            break;
+                        case 'this_month':
+                            $startDate = now()->startOfMonth();
+                            $endDate = now()->endOfMonth();
+                            break;
+                        case 'last_30_days':
+                            $startDate = now()->subDays(30);
+                            $endDate = now();
+                            break;
+                        case 'this_year':
+                            $startDate = now()->startOfYear();
+                            $endDate = now()->endOfYear();
+                            break;
+                        default:
+                            // Handle year_YYYY format
+                            if (str_starts_with($dateRange, 'year_')) {
+                                $year = (int) str_replace('year_', '', $dateRange);
+                                $startDate = now()->setYear($year)->startOfYear();
+                                $endDate = now()->setYear($year)->endOfYear();
+                            } else {
+                                $startDate = now()->startOfMonth();
+                                $endDate = now()->endOfMonth();
+                            }
+                            break;
+                    }
+
+                    return [
+                        'ticketsPendingReview' => Ticket::where(function ($q) {
+                            $q->whereNull('design_status')
+                                ->orWhere('design_status', 'pending');
+                        })
+                            ->whereBetween('created_at', [$startDate, $endDate])
+                            ->count(),
+                        'revisionRequested' => Ticket::where('design_status', 'revision_requested')
+                            ->whereBetween('updated_at', [$startDate, $endDate])
+                            ->count(),
+                        'mockupsUploadedToday' => Ticket::where('design_status', 'mockup_uploaded')
+                            ->whereDate('updated_at', today())
+                            ->count(),
+                        'approvedDesign' => Ticket::where('design_status', 'approved')
+                            ->whereBetween('updated_at', [$startDate, $endDate])
+                            ->count(),
+                    ];
+                },
+                'ticketsPendingReview' => function () use ($request) {
+                    $query = Ticket::with(['customer', 'customerFiles', 'jobType'])
+                        ->where(function ($q) {
+                            $q->whereNull('design_status')
+                                ->orWhere('design_status', 'pending');
+                        })
+                        ->orderBy('created_at', 'desc')
+                        ->limit(10);
+
+                    return $query->get()->map(function ($ticket) {
+                        return [
+                            'id' => $ticket->id,
+                            'ticket_number' => $ticket->ticket_number,
+                            'customer' => $ticket->customer ? [
+                                'id' => $ticket->customer->id,
+                                'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
+                            ] : null,
+                            'description' => $ticket->description,
+                            'due_date' => $ticket->due_date,
+                            'created_at' => $ticket->created_at,
+                            'customer_files' => $ticket->customerFiles->map(function ($file) {
+                                return [
+                                    'id' => $file->id,
+                                    'filename' => $file->filename,
+                                    'filepath' => $file->filepath,
+                                ];
+                            }),
+                        ];
+                    });
+                },
+                'revisionRequested' => function () use ($request) {
+                    $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
+                        ->where('design_status', 'revision_requested')
+                        ->orderBy('updated_at', 'desc')
+                        ->limit(10);
+
+                    return $query->get()->map(function ($ticket) {
+                        return [
+                            'id' => $ticket->id,
+                            'ticket_number' => $ticket->ticket_number,
+                            'customer' => $ticket->customer ? [
+                                'id' => $ticket->customer->id,
+                                'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
+                            ] : null,
+                            'description' => $ticket->description,
+                            'design_notes' => $ticket->design_notes,
+                            'due_date' => $ticket->due_date,
+                            'updated_at' => $ticket->updated_at,
+                            'mockup_files' => $ticket->mockupFiles->map(function ($file) {
+                                return [
+                                    'id' => $file->id,
+                                    'filename' => $file->filename,
+                                    'filepath' => $file->filepath,
+                                ];
+                            }),
+                        ];
+                    });
+                },
+                'mockupsUploadedToday' => function () use ($request) {
+                    $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
+                        ->where('design_status', 'mockup_uploaded')
+                        ->whereDate('updated_at', today())
+                        ->orderBy('updated_at', 'desc')
+                        ->limit(10);
+
+                    return $query->get()->map(function ($ticket) {
+                        return [
+                            'id' => $ticket->id,
+                            'ticket_number' => $ticket->ticket_number,
+                            'customer' => $ticket->customer ? [
+                                'id' => $ticket->customer->id,
+                                'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
+                            ] : null,
+                            'description' => $ticket->description,
+                            'due_date' => $ticket->due_date,
+                            'updated_at' => $ticket->updated_at,
+                            'mockup_files' => $ticket->mockupFiles->map(function ($file) {
+                                return [
+                                    'id' => $file->id,
+                                    'filename' => $file->filename,
+                                    'filepath' => $file->filepath,
+                                ];
+                            }),
+                        ];
+                    });
+                },
             ]),
             'Production' => Inertia::render('Dashboard/Production', [
                 'tickets' => $data['tickets'],
