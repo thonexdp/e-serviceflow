@@ -420,10 +420,12 @@ class TicketController extends BaseCrudController
         $validated = $request->validate([
             'status' => 'required|in:pending,ready_to_print,in_designer,in_production,completed,cancelled,approved,rejected',
             'notes' => 'nullable|string|max:500',
+            'design_status' => 'nullable|in:pending,in_designer,cancelled',
         ]);
 
         // Update the status
         $ticket->status = $validated['status'];
+        $ticket->design_status = $validated['status'] === 'in_designer' ? 'pending' : null;
 
         // If there are notes, you can save them (add a notes field to your tickets table)
         if (!empty($validated['notes'])) {
@@ -583,7 +585,6 @@ class TicketController extends BaseCrudController
 
             case 'rejected':
             case 'cancelled':
-                // Notify FrontDesk
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_rejected';
@@ -592,16 +593,20 @@ class TicketController extends BaseCrudController
                 break;
 
             case 'in_production':
-                // Notify FrontDesk (optional)
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_in_production';
                 $title = 'Ticket In Production';
                 $message = "Ticket {$ticket->ticket_number} is now in production.";
                 break;
-
+            case 'in_designer':
+                $frontDeskUsers = User::where('role', User::ROLE_DESIGNER)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_in_designer';
+                $title = 'Ticket In Designer';
+                $message = "Ticket {$ticket->ticket_number} is now in designer.";
+                break;
             case 'completed':
-                // Notify FrontDesk (optional)
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_completed';
