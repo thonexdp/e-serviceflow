@@ -1,0 +1,64 @@
+substitutions:
+  # VITE variables (used during frontend build)
+  _VITE_PUSHER_APP_KEY: "staging-key"
+  _VITE_PUSHER_HOST: "34.142.242.81"
+  _VITE_PUSHER_PORT: "6001"
+  _VITE_PUSHER_SCHEME: "http"
+  _VITE_PUSHER_APP_CLUSTER: "mt1"
+
+  # Backend variables
+  _PUSHER_APP_SECRET: "staging-secret"
+  _SERVICE_NAME: "e-serviceflow"
+  _REGION: "asia-southeast1"
+
+steps:
+  # Build the Docker image with VITE build args
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "Dockerfile.app"
+      - "--build-arg"
+      - "VITE_PUSHER_APP_KEY=${_VITE_PUSHER_APP_KEY}"
+      - "--build-arg"
+      - "VITE_PUSHER_HOST=${_VITE_PUSHER_HOST}"
+      - "--build-arg"
+      - "VITE_PUSHER_PORT=${_VITE_PUSHER_PORT}"
+      - "--build-arg"
+      - "VITE_PUSHER_SCHEME=${_VITE_PUSHER_SCHEME}"
+      - "--build-arg"
+      - "VITE_PUSHER_APP_CLUSTER=${_VITE_PUSHER_APP_CLUSTER}"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest"
+      - "."
+
+  # Push to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+
+  # Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--set-env-vars"
+      - "BROADCAST_DRIVER=pusher,PUSHER_APP_ID=e-serviceflow,PUSHER_APP_KEY=${_VITE_PUSHER_APP_KEY},PUSHER_APP_SECRET=${_PUSHER_APP_SECRET},PUSHER_HOST=${_VITE_PUSHER_HOST},PUSHER_PORT=${_VITE_PUSHER_PORT},PUSHER_SCHEME=${_VITE_PUSHER_SCHEME},PUSHER_APP_CLUSTER=${_VITE_PUSHER_APP_CLUSTER}"
+
+images:
+  - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+  - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
