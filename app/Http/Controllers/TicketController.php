@@ -67,13 +67,39 @@ class TicketController extends BaseCrudController
             $query->where('customer_id', $request->customer_id);
         }
 
+        // Default to Last 30 Days if no date range is specified
+        $dateRange = $request->get('date_range');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        // If no date_range parameter exists at all, set default to last_30_days
+        if (!$request->has('date_range')) {
+            $dateRange = 'last_30_days';
+            $thirtyDaysAgo = now()->subDays(30)->format('Y-m-d');
+            $today = now()->format('Y-m-d');
+            $startDate = $thirtyDaysAgo;
+            $endDate = $today;
+        }
+
+        // Filter by date range (only if date_range is not explicitly empty)
+        if ($dateRange !== '') {
+            if ($startDate) {
+                $query->whereDate('created_at', '>=', $startDate);
+            }
+
+            if ($endDate) {
+                $query->whereDate('created_at', '<=', $endDate);
+            }
+        }
+
         $tickets = $query->with('jobType.category')
             ->orderByRaw("
                 CASE status
                     WHEN 'pending' THEN 1
-                    WHEN 'in_production' THEN 2
-                    WHEN 'completed' THEN 3
-                    WHEN 'cancelled' THEN 4
+                    WHEN 'in_designer' THEN 2
+                    WHEN 'in_production' THEN 3
+                    WHEN 'completed' THEN 4
+                    WHEN 'cancelled' THEN 5
                     ELSE 5
                 END
             ")
@@ -95,7 +121,14 @@ class TicketController extends BaseCrudController
             'customers' => $customers,
             'jobCategories' => $jobCategories,
             'selectedCustomer' => $request->get('customer_id') ? \App\Models\Customer::find($request->get('customer_id')) : null,
-            'filters' => $request->only(['search', 'status', 'payment_status']),
+            'filters' => [
+                'search' => $request->get('search'),
+                'status' => $request->get('status'),
+                'payment_status' => $request->get('payment_status'),
+                'date_range' => $dateRange,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
         ]);
     }
 
@@ -122,7 +155,7 @@ class TicketController extends BaseCrudController
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
-            'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -155,6 +188,7 @@ class TicketController extends BaseCrudController
 
         $this->applyPricing($ticketData, $request);
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
+
 
         $ticket = Ticket::create($ticketData);
 
@@ -201,7 +235,8 @@ class TicketController extends BaseCrudController
         }
 
         // Notify designers when ticket is created (status: pending)
-        if ($ticket->status === 'pending') {
+        // if ($ticket->status === 'pending') {
+        if ($ticket->status === 'in_designer') {
             $this->notifyTicketCreated($ticket);
         }
 
@@ -234,7 +269,7 @@ class TicketController extends BaseCrudController
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
-            'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -383,7 +418,7 @@ class TicketController extends BaseCrudController
         $oldStatus = $ticket->status;
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled,approved,rejected',
+            'status' => 'required|in:pending,ready_to_print,in_designer,in_production,completed,cancelled,approved,rejected',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -473,7 +508,7 @@ class TicketController extends BaseCrudController
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
-            'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
         ];
     }
@@ -513,7 +548,8 @@ class TicketController extends BaseCrudController
         event(new TicketStatusChanged(
             $ticket,
             'new',
-            'pending',
+            // 'pending',
+            'in_designer',
             Auth::user(),
             $recipientIds,
             'ticket_created',

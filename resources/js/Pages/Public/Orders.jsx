@@ -1,0 +1,1026 @@
+import { useState, useEffect, useMemo } from 'react';
+import { router, usePage } from '@inertiajs/react';
+
+export default function CustomerPOSOrder() {
+    const { jobCategories = [] } = usePage().props;
+
+    const [currentStep, setCurrentStep] = useState(1);
+    const [formData, setFormData] = useState({
+        customer_name: '',
+        customer_email: '',
+        customer_facebook: '',
+        customer_phone: '',
+        customer_id: null,
+        category_id: '',
+        job_type_id: '',
+        description: '',
+        quantity: 1,
+        free_quantity: 0,
+        size_width: '',
+        size_height: '',
+        size_rate_id: '',
+        due_date: '',
+        file: null
+    });
+
+    const [imagePreview, setImagePreview] = useState(null);
+    const [selectedJobType, setSelectedJobType] = useState(null);
+    const [selectedSizeRate, setSelectedSizeRate] = useState(null);
+    const [subtotal, setSubtotal] = useState(0);
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState({});
+    const [paymentMethod, setPaymentMethod] = useState('walkin');
+    const [paymentProofs, setPaymentProofs] = useState([]);
+    const [activeProofTab, setActiveProofTab] = useState(0);
+    const [submittedTicket, setSubmittedTicket] = useState(null);
+
+    const availableJobTypes = useMemo(() => {
+        if (!formData.category_id) return [];
+        const category = jobCategories.find(cat => cat.id.toString() === formData.category_id.toString());
+        return category?.job_types || category?.jobTypes || [];
+    }, [formData.category_id, jobCategories]);
+
+    // Update selected job type when job_type_id changes
+    useEffect(() => {
+        if (formData.job_type_id) {
+            const jobType = availableJobTypes.find(jt => jt.id.toString() === formData.job_type_id.toString());
+            setSelectedJobType(jobType || null);
+
+            if (jobType?.size_rates?.length > 0) {
+                const defaultRate = jobType.size_rates.find(r => r.is_default) || jobType.size_rates[0];
+                setSelectedSizeRate(defaultRate);
+                setFormData(prev => ({ ...prev, size_rate_id: defaultRate.id.toString() }));
+            } else {
+                setSelectedSizeRate(null);
+            }
+        } else {
+            setSelectedJobType(null);
+            setSelectedSizeRate(null);
+        }
+    }, [formData.job_type_id, availableJobTypes]);
+
+    // Update selected size rate
+    useEffect(() => {
+        if (formData.size_rate_id && selectedJobType?.size_rates) {
+            const rate = selectedJobType.size_rates.find(r => r.id.toString() === formData.size_rate_id.toString());
+            setSelectedSizeRate(rate || null);
+        }
+    }, [formData.size_rate_id, selectedJobType]);
+
+    // Calculate subtotal and free quantity
+    useEffect(() => {
+        if (!selectedJobType) {
+            setSubtotal(0);
+            setFormData(prev => ({ ...prev, free_quantity: 0 }));
+            return;
+        }
+
+        const quantity = parseFloat(formData.quantity) || 0;
+        if (quantity <= 0) {
+            setSubtotal(0);
+            return;
+        }
+
+        let calculated = 0;
+        const sizeRates = selectedJobType.size_rates || [];
+        const priceTiers = selectedJobType.price_tiers || [];
+
+        // Size-based pricing
+        if (sizeRates.length > 0 && selectedSizeRate) {
+            const width = parseFloat(formData.size_width) || 0;
+            const height = parseFloat(formData.size_height) || 0;
+
+            if (selectedSizeRate.calculation_method === 'length' && width > 0) {
+                calculated = width * parseFloat(selectedSizeRate.rate) * quantity;
+            } else if (width > 0 && height > 0) {
+                calculated = width * height * parseFloat(selectedSizeRate.rate) * quantity;
+            }
+        }
+        // Price tier pricing
+        else if (priceTiers.length > 0) {
+            const tier = [...priceTiers]
+                .filter(tier => 
+                    quantity >= tier.min_quantity && 
+                    (!tier.max_quantity || quantity <= tier.max_quantity)
+                )
+                .sort((a, b) => a.min_quantity - b.min_quantity)
+                .pop();
+            
+            const unitPrice = tier ? parseFloat(tier.price) : parseFloat(selectedJobType.price || 0);
+            calculated = unitPrice * quantity;
+        }
+        // Standard pricing
+        else {
+            calculated = (parseFloat(selectedJobType.price) || 0) * quantity;
+        }
+
+        setSubtotal(calculated);
+
+        // Calculate free quantity based on promo rules
+        const promoRules = selectedJobType.promo_rules || [];
+        if (promoRules.length > 0) {
+            const activeRules = promoRules.filter(r => r.is_active);
+            if (activeRules.length > 0) {
+                // Sort by buy_quantity descending to apply largest rules first
+                const sortedRules = [...activeRules].sort((a, b) => b.buy_quantity - a.buy_quantity);
+                
+                // Find the best matching rule
+                const applicableRule = sortedRules.find(r => quantity >= r.buy_quantity);
+                
+                if (applicableRule) {
+                    const sets = Math.floor(quantity / applicableRule.buy_quantity);
+                    const totalFree = sets * applicableRule.free_quantity;
+                    setFormData(prev => ({ ...prev, free_quantity: totalFree }));
+                } else {
+                    setFormData(prev => ({ ...prev, free_quantity: 0 }));
+                }
+            } else {
+                setFormData(prev => ({ ...prev, free_quantity: 0 }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, free_quantity: 0 }));
+        }
+    }, [selectedJobType, selectedSizeRate, formData.quantity, formData.size_width, formData.size_height]);
+
+    const handleImageUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setFormData(prev => ({ ...prev, file }));
+            const reader = new FileReader();
+            reader.onloadend = () => setImagePreview(reader.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handlePaymentProofUpload = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
+        const uploads = files.map((file) => ({
+            file,
+            preview: URL.createObjectURL(file),
+            name: file.name,
+        }));
+        setPaymentProofs((prev) => [...prev, ...uploads]);
+        event.target.value = "";
+    };
+
+    const removePaymentProof = (index) => {
+        setPaymentProofs((prev) => {
+            const updated = prev.filter((_, i) => i !== index);
+            if (activeProofTab >= updated.length && activeProofTab > 0) {
+                setActiveProofTab(updated.length - 1);
+            } else if (updated.length === 0) {
+                setActiveProofTab(0);
+            }
+            return updated;
+        });
+    };
+
+    const findOrCreateCustomer = async () => {
+        try {
+            const response = await fetch('/api/public/orders/customer/find-or-create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    email: formData.customer_email,
+                    customer_name: formData.customer_name,
+                    customer_phone: formData.customer_phone,
+                    customer_facebook: formData.customer_facebook,
+                }),
+            });
+
+            const data = await response.json();
+            
+            if (data.success && data.customer) {
+                setFormData(prev => ({ ...prev, customer_id: data.customer.id }));
+                return data.customer.id;
+            } else {
+                throw new Error(data.message || 'Failed to create customer');
+            }
+        } catch (error) {
+            console.error('Error finding/creating customer:', error);
+            throw error;
+        }
+    };
+
+    const handleSubmit = async () => {
+        setProcessing(true);
+        setErrors({});
+
+        try {
+            // Step 1: Find or create customer
+            let customerId = formData.customer_id;
+            if (!customerId) {
+                customerId = await findOrCreateCustomer();
+            }
+
+            // Step 2: Prepare order data
+            const orderData = new FormData();
+            orderData.append('customer_id', customerId);
+            orderData.append('description', formData.description);
+            orderData.append('job_type_id', formData.job_type_id);
+            orderData.append('quantity', formData.quantity);
+            orderData.append('free_quantity', formData.free_quantity || 0);
+            orderData.append('due_date', formData.due_date);
+            orderData.append('subtotal', subtotal.toFixed(2));
+            orderData.append('total_amount', subtotal.toFixed(2));
+
+            if (formData.size_rate_id) {
+                orderData.append('size_rate_id', formData.size_rate_id);
+            }
+            if (formData.size_width) {
+                orderData.append('size_width', formData.size_width);
+            }
+            if (formData.size_height) {
+                orderData.append('size_height', formData.size_height);
+            }
+            if (formData.file) {
+                orderData.append('file', formData.file);
+            }
+            
+            // Add payment method
+            orderData.append('payment_method', paymentMethod);
+            
+            // Add payment proofs if any
+            paymentProofs.forEach((proof, index) => {
+                if (proof.file) {
+                    orderData.append(`payment_proofs[]`, proof.file);
+                }
+            });
+
+            // Step 3: Submit order
+            const response = await fetch('/api/public/orders', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: orderData,
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Store submitted ticket info
+                setSubmittedTicket({
+                    ticket_number: data.ticket_number,
+                    status: data.ticket?.status || 'pending',
+                    payment_status: data.ticket?.payment_status || 'pending',
+                });
+                // Move to step 5 (success page)
+                setCurrentStep(5);
+            } else {
+                throw new Error(data.message || 'Failed to submit order');
+            }
+        } catch (error) {
+            console.error('Error submitting order:', error);
+            alert('Failed to submit order. Please try again.');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone;
+    const canProceedStep2 = formData.category_id && formData.job_type_id && formData.quantity > 0;
+    const canProceedStep3 = formData.description && formData.due_date;
+
+    const priceTiers = selectedJobType?.price_tiers || [];
+    const sizeRates = selectedJobType?.size_rates || [];
+    const promoRules = selectedJobType?.promo_rules || [];
+    const hasPriceTiers = priceTiers.length > 0;
+    const hasSizeRates = sizeRates.length > 0;
+    const hasPromoRules = promoRules.length > 0;
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+            {/* Header */}
+            <div className="bg-white shadow-sm border-b sticky top-0 z-50">
+                <div className="max-w-4xl mx-auto px-4 py-4">
+                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                            <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
+                        </div>
+                            <div onClick={() => router.visit('/', { preserveState: true, preserveScroll: true, replace: true })}>
+                                <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
+                                <p className="text-sm text-gray-600">Track Your Order</p>
+                            </div>
+                        </div>
+                    </div>
+
+                        {/* Step Indicator */}
+                        <div className="hidden sm:flex items-center gap-2">
+                            {[1, 2, 3, 4, 5].map(step => (
+                                <div key={step} className="flex items-center">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStep >= step ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
+                                        }`}>
+                                        {step}
+                                    </div>
+                                    {step < 5 && <div className={`w-8 h-0.5 ${currentStep > step ? 'bg-indigo-600' : 'bg-gray-200'}`} />}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-4xl mx-auto px-4 py-8">
+                {/* Step 1: Customer Info */}
+                {currentStep === 1 && (
+                    <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900">Your Information</h2>
+                            <p className="text-gray-500 mt-2">Let us know how to reach you</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                                <input
+                                    type="text"
+                                    value={formData.customer_name}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="Juan Dela Cruz"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                                <input
+                                    type="email"
+                                    value={formData.customer_email}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="juan@example.com"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Facebook *</label>
+                                <input
+                                    type="text"
+                                    value={formData.customer_facebook}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_facebook: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="ana.fb"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                                <input
+                                    type="tel"
+                                    value={formData.customer_phone}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="09XX XXX XXXX"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => setCurrentStep(2)}
+                                disabled={!canProceedStep1}
+                                className={`w-full py-4 rounded-lg font-semibold text-white transition-all ${canProceedStep1
+                                    ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg hover:shadow-xl'
+                                    : 'bg-gray-300 cursor-not-allowed'
+                                    }`}
+                            >
+                                Continue →
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 2: Select Service */}
+                {currentStep === 2 && (
+                    <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900">Select Your Service</h2>
+                            <p className="text-gray-500 mt-2">Choose what you need</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-3">Category</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {jobCategories.map(category => {
+                                        const jobTypes = category.job_types || category.jobTypes || [];
+                                        return (
+                                            <button
+                                                key={category.id}
+                                                onClick={() => setFormData(prev => ({ ...prev, category_id: category.id.toString(), job_type_id: '' }))}
+                                                className={`p-4 rounded-lg border-2 transition-all ${formData.category_id === category.id.toString()
+                                                    ? 'border-indigo-600 bg-indigo-50'
+                                                    : 'border-gray-200 hover:border-indigo-300'
+                                                    }`}
+                                            >
+                                                <p className="font-semibold text-gray-900">{category.name}</p>
+                                                <p className="text-xs text-gray-500 mt-1">{jobTypes.length} services</p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {availableJobTypes.length > 0 && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">Service Type</label>
+                                    <div className="space-y-3">
+                                        {availableJobTypes.map(jobType => {
+                                            const hasSizeRates = (jobType.size_rates || []).length > 0;
+                                            const hasPriceTiers = (jobType.price_tiers || []).length > 0;
+                                            return (
+                                                <button
+                                                    key={jobType.id}
+                                                    onClick={() => setFormData(prev => ({ ...prev, job_type_id: jobType.id.toString() }))}
+                                                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${formData.job_type_id === jobType.id.toString()
+                                                        ? 'border-indigo-600 bg-indigo-50'
+                                                        : 'border-gray-200 hover:border-indigo-300'
+                                                        }`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="flex-1">
+                                                            <p className="font-semibold text-gray-900">{jobType.name}</p>
+                                                            {jobType.promo_text && (
+                                                                <p className="text-xs text-green-600 mt-1">🎁 {jobType.promo_text}</p>
+                                                            )}
+                                                            {hasPriceTiers && (
+                                                                <p className="text-xs text-blue-600 mt-1">📊 Bulk Pricing Available</p>
+                                                            )}
+                                                            {hasSizeRates && (
+                                                                <p className="text-xs text-purple-600 mt-1">📐 Size-Based Pricing</p>
+                                                            )}
+                                                        </div>
+                                                        {!hasSizeRates && !hasPriceTiers && (
+                                                            <span className="text-indigo-600 font-bold">₱{parseFloat(jobType.price || 0).toFixed(2)}</span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Promo Rules Display */}
+                            {hasPromoRules && formData.quantity > 0 && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-2">
+                                        <span className="text-green-600 text-xl">🎁</span>
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-green-900 mb-1">Available Promos:</p>
+                                            <ul className="text-sm text-green-800 space-y-1">
+                                                {promoRules.filter(r => r.is_active).map((rule, idx) => (
+                                                    <li key={idx}>
+                                                        {rule.description || `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            {formData.free_quantity > 0 && (
+                                                <p className="text-sm font-bold text-green-700 mt-2">
+                                                    ✓ You get {formData.free_quantity} free item(s)! Total: {parseInt(formData.quantity) + parseInt(formData.free_quantity)} pcs
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Price Tiers Display */}
+                            {hasPriceTiers && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p className="font-semibold text-blue-900 mb-2">📊 Bulk Pricing:</p>
+                                    <div className="space-y-1 text-sm">
+                                        {priceTiers.map((tier, idx) => (
+                                            <div key={idx} className="flex justify-between">
+                                                <span className="text-blue-800">
+                                                    {tier.min_quantity}{tier.max_quantity ? ` - ${tier.max_quantity}` : '+'} pcs:
+                                                </span>
+                                                <span className="font-semibold text-blue-900">₱{parseFloat(tier.price).toFixed(2)}/unit</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Size-Based Pricing */}
+                            {hasSizeRates && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">Size Options</label>
+                                    <select
+                                        value={formData.size_rate_id}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, size_rate_id: e.target.value }))}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        {sizeRates.map(rate => (
+                                            <option key={rate.id} value={rate.id}>
+                                                {rate.variant_name} - ₱{parseFloat(rate.rate).toFixed(2)}/{rate.calculation_method === 'length' ? rate.dimension_unit : `${rate.dimension_unit}²`}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">Width ({selectedSizeRate?.dimension_unit || 'unit'})</label>
+                                            <input
+                                                type="number"
+                                                value={formData.size_width}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, size_width: e.target.value }))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                                placeholder="0"
+                                                step="0.1"
+                                                min="0"
+                                            />
+                                        </div>
+                                        {selectedSizeRate?.calculation_method !== 'length' && (
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Height ({selectedSizeRate?.dimension_unit || 'unit'})</label>
+                                                <input
+                                                    type="number"
+                                                    value={formData.size_height}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, size_height: e.target.value }))}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                                    placeholder="0"
+                                                    step="0.1"
+                                                    min="0"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                    {selectedSizeRate && (
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Rate: ₱{parseFloat(selectedSizeRate.rate).toFixed(2)} per {selectedSizeRate.calculation_method === 'length' ? selectedSizeRate.dimension_unit : `${selectedSizeRate.dimension_unit}²`}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                                <input
+                                    type="number"
+                                    value={formData.quantity}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    min="1"
+                                />
+                            </div>
+
+                            {subtotal > 0 && (
+                                <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-700 font-medium">Estimated Price:</span>
+                                        <span className="text-2xl font-bold text-indigo-600">₱{subtotal.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setCurrentStep(1)}
+                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                                >
+                                    ← Back
+                                </button>
+                                <button
+                                    onClick={() => setCurrentStep(3)}
+                                    disabled={!canProceedStep2}
+                                    className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedStep2
+                                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                                        : 'bg-gray-300 cursor-not-allowed'
+                                        }`}
+                                >
+                                    Continue →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 3: Details & Upload */}
+                {currentStep === 3 && (
+                    <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900">Order Details</h2>
+                            <p className="text-gray-500 mt-2">Tell us more about your order</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+                                <textarea
+                                    value={formData.description}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    rows="4"
+                                    placeholder="Describe what you need... (e.g., 'Business cards with my logo on glossy paper')"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">When do you need it? *</label>
+                                <input
+                                    type="date"
+                                    value={formData.due_date}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Design/Reference (Optional)</label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors">
+                                    {imagePreview ? (
+                                        <div className="space-y-3">
+                                            <img src={imagePreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+                                            <button
+                                                onClick={() => {
+                                                    setImagePreview(null);
+                                                    setFormData(prev => ({ ...prev, file: null }));
+                                                }}
+                                                className="text-red-600 text-sm hover:underline"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <label className="cursor-pointer">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageUpload}
+                                                className="hidden"
+                                            />
+                                            <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <p className="text-gray-600">Click to upload or drag and drop</p>
+                                            <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</p>
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setCurrentStep(2)}
+                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                                >
+                                    ← Back
+                                </button>
+                                <button
+                                    onClick={() => setCurrentStep(4)}
+                                    disabled={!canProceedStep3}
+                                    className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedStep3
+                                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                                        : 'bg-gray-300 cursor-not-allowed'
+                                        }`}
+                                >
+                                    Review Order →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 4: Payment & Review */}
+                {currentStep === 4 && (
+                    <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900">Payment & Review</h2>
+                            <p className="text-gray-500 mt-2">Review your order and choose payment method</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Order Summary */}
+                            <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide">Customer</p>
+                                    <p className="font-semibold text-gray-900">{formData.customer_name}</p>
+                                    <p className="text-sm text-gray-600">{formData.customer_email}</p>
+                                    <p className="text-sm text-gray-600">{formData.customer_phone}</p>
+                                </div>
+
+                                <div className="border-t pt-4">
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide">Service</p>
+                                    <p className="font-semibold text-gray-900">{selectedJobType?.name}</p>
+                                    <p className="text-sm text-gray-600">Quantity: {formData.quantity}</p>
+                                    {formData.free_quantity > 0 && (
+                                        <p className="text-sm text-green-600 font-semibold">Free: {formData.free_quantity} (Total: {parseInt(formData.quantity) + parseInt(formData.free_quantity)} pcs)</p>
+                                    )}
+                                    {formData.size_width && (
+                                        <p className="text-sm text-gray-600">
+                                            Size: {formData.size_width}{formData.size_height && ` × ${formData.size_height}`} {selectedSizeRate?.dimension_unit}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="border-t pt-4">
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide">Details</p>
+                                    <p className="text-sm text-gray-700">{formData.description}</p>
+                                    <p className="text-sm text-gray-600 mt-2">Due: {new Date(formData.due_date).toLocaleDateString()}</p>
+                                </div>
+
+                                <div className="border-t pt-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
+                                        <span className="text-3xl font-bold text-indigo-600">₱{subtotal.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Payment Method Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-3">Payment Method *</label>
+                                <div className="space-y-3">
+                                    <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="payment_method"
+                                            value="walkin"
+                                            checked={paymentMethod === 'walkin'}
+                                            onChange={(e) => setPaymentMethod(e.target.value)}
+                                            className="mt-1 mr-3"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-gray-900">Pay on Walk-in</p>
+                                            <p className="text-sm text-gray-600">Pay when you visit our shop. Just for record keeping.</p>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="payment_method"
+                                            value="gcash"
+                                            checked={paymentMethod === 'gcash'}
+                                            onChange={(e) => setPaymentMethod(e.target.value)}
+                                            className="mt-1 mr-3"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-gray-900">GCash</p>
+                                            <p className="text-sm text-gray-600">Pay via GCash (downpayment or full payment)</p>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="payment_method"
+                                            value="bank"
+                                            checked={paymentMethod === 'bank'}
+                                            onChange={(e) => setPaymentMethod(e.target.value)}
+                                            className="mt-1 mr-3"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-gray-900">Bank Transfer</p>
+                                            <p className="text-sm text-gray-600">Pay via bank transfer (downpayment or full payment)</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* GCash Payment Info */}
+                            {paymentMethod === 'gcash' && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                                    <h3 className="font-semibold text-green-900 mb-4">GCash Payment Details</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-sm font-medium text-green-800">Account Name:</p>
+                                            <p className="text-lg font-bold text-green-900">RC PrintShoppe</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-green-800">GCash Number:</p>
+                                            <p className="text-lg font-bold text-green-900">0912 345 6789</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-green-800 mb-2">QR Code:</p>
+                                            <div className="bg-white p-4 rounded border border-green-300 inline-block">
+                                                <div className="w-32 h-32 bg-gray-200 flex items-center justify-center text-xs text-gray-500">
+                                                    QR Code Sample
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Bank Transfer Payment Info */}
+                            {paymentMethod === 'bank' && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                    <h3 className="font-semibold text-blue-900 mb-4">Bank Transfer Details</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-800">Bank Name:</p>
+                                            <p className="text-lg font-bold text-blue-900">BDO (Banco de Oro)</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-800">Account Name:</p>
+                                            <p className="text-lg font-bold text-blue-900">RC PrintShoppe</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-800">Account Number:</p>
+                                            <p className="text-lg font-bold text-blue-900">1234 5678 9012</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Payment Proof Upload */}
+                            {(paymentMethod === 'gcash' || paymentMethod === 'bank') && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Upload Payment Proof (GCash / Bank Receipts) *
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="image/*,application/pdf"
+                                        multiple
+                                        onChange={handlePaymentProofUpload}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                    />
+                                    {paymentProofs.length > 0 && (
+                                        <div className="mt-4">
+                                            {paymentProofs.length > 1 && (
+                                                <div className="flex gap-2 mb-3 overflow-x-auto">
+                                                    {paymentProofs.map((_, index) => (
+                                                        <button
+                                                            key={index}
+                                                            type="button"
+                                                            onClick={() => setActiveProofTab(index)}
+                                                            className={`px-3 py-1 rounded text-sm whitespace-nowrap ${activeProofTab === index
+                                                                ? 'bg-indigo-600 text-white'
+                                                                : 'bg-gray-200 text-gray-700'
+                                                                }`}
+                                                        >
+                                                            Proof {index + 1}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="border rounded-lg p-4 bg-gray-50">
+                                                <img
+                                                    src={paymentProofs[activeProofTab]?.preview}
+                                                    alt={`Payment proof ${activeProofTab + 1}`}
+                                                    className="max-h-64 mx-auto rounded"
+                                                />
+                                                <div className="text-center mt-2 text-sm text-gray-600">
+                                                    {activeProofTab + 1} of {paymentProofs.length}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removePaymentProof(activeProofTab)}
+                                                    className="w-full mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                                                >
+                                                    Remove Proof
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setCurrentStep(3)}
+                                    disabled={processing}
+                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                                >
+                                    ← Back
+                                </button>
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0)}
+                                    className={`flex-1 py-4 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    {processing ? 'Submitting...' : 'Submit Order ✓'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 5: Success Page */}
+                {currentStep === 5 && submittedTicket && (
+                    <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <h2 className="text-3xl font-bold text-gray-900 mb-2">Order Submitted Successfully!</h2>
+                            <p className="text-gray-500">Your order has been received. We will contact you shortly.</p>
+                        </div>
+
+                        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-6 mb-6">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center pb-3 border-b">
+                                    <span className="text-sm font-medium text-gray-700">Ticket Number:</span>
+                                    <span className="text-xl font-bold text-indigo-600">{submittedTicket.ticket_number}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium text-gray-700">Status:</span>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                        submittedTicket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        submittedTicket.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                        'bg-blue-100 text-blue-800'
+                                    }`}>
+                                        {submittedTicket.status.toUpperCase()}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center pt-3 border-t">
+                                    <span className="text-sm font-medium text-gray-700">Payment Status:</span>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                        submittedTicket.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        submittedTicket.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
+                                        'bg-blue-100 text-blue-800'
+                                    }`}>
+                                        {submittedTicket.payment_status.toUpperCase()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <div className="flex gap-3">
+                                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p className="text-sm text-blue-800">
+                                    <strong>Important:</strong> Please save your ticket number <strong>{submittedTicket.ticket_number}</strong> for tracking your order. 
+                                    We'll contact you within 24 hours to confirm your order and discuss payment options.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setFormData({
+                                    customer_name: '',
+                                    customer_email: '',
+                                    customer_facebook: '',
+                                    customer_phone: '',
+                                    customer_id: null,
+                                    category_id: '',
+                                    job_type_id: '',
+                                    description: '',
+                                    quantity: 1,
+                                    free_quantity: 0,
+                                    size_width: '',
+                                    size_height: '',
+                                    size_rate_id: '',
+                                    due_date: '',
+                                    file: null
+                                });
+                                setImagePreview(null);
+                                setPaymentProofs([]);
+                                setPaymentMethod('walkin');
+                                setSubmittedTicket(null);
+                                setCurrentStep(1);
+                            }}
+                            className="w-full py-4 rounded-lg bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all"
+                        >
+                            Place Another Order
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
+        </div>
+    );
+}

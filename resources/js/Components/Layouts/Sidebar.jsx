@@ -33,7 +33,7 @@ export default function Sidebar({ isCollapsed }) {
                             <img
                                 src="/images/logo.jpg"
                                 alt="RC PrintShoppe Logo"
-                                className="w-16 h-16 object-contain mb-2"
+                                className="w-16 h-16 object-contain mb-2 rounded-full"
                             // className="w-16 h-16 rounded-full shadow-md bg-white p-1"
                             />
                             <span className="text-lg font-semibold">

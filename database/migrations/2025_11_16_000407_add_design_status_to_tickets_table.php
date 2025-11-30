@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tickets', function (Blueprint $table) {
-            $table->string('design_status')->nullable()->after('status')->default('pending'); // pending, in_review, revision_requested, approved, mockup_uploaded
+            $table->string('design_status')->nullable()->after('status'); // pending, in_review, revision_requested, approved, mockup_uploaded
             $table->text('design_notes')->nullable()->after('design_status');
         });
     }

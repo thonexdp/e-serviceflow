@@ -1,21 +1,243 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
+import PreviewModal from "@/Components/Main/PreviewModal";
+import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
+import CardStatistics from "@/Components/Common/CardStatistics";
+import { formatPeso } from "@/Utils/currency";
+import { formatDate } from "@/Utils/formatDate";
 
-export default function Dashboard({
+export default function FrontDesk({
     user = {},
     notifications = [],
     messages = [],
+    statistics = {
+        newTickets: 0,
+        newOnlineOrders: 0,
+        paymentPending: 0,
+        completed: 0,
+        inProgress: 0,
+    },
+    newOnlineOrders = { data: [], links: [], meta: {} },
+    recentTicketsToday = { data: [], links: [], meta: {} },
+    filters = { date_range: "this_month" },
 }) {
-    
-    const [openPaymentModal, setPaymentModalOpen] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [dateRange, setDateRange] = useState(
+        filters.date_range || "this_month"
+    );
+    const [search, setSearch] = useState(filters.search || "");
+    const [orderBy, setOrderBy] = useState(filters.order_by || "created_at");
+    const [orderDir, setOrderDir] = useState(filters.order_dir || "desc");
 
-    const handleSave = () => {
-        console.log("save");
+    // Recent Tickets Search and Sort
+    const [recentSearch, setRecentSearch] = useState(filters.recent_search || "");
+    const [recentOrderBy, setRecentOrderBy] = useState(filters.recent_order_by || "created_at");
+    const [recentOrderDir, setRecentOrderDir] = useState(filters.recent_order_dir || "desc");
+
+    const [openPaymentModal, setOpenPaymentModal] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [paymentFormData, setPaymentFormData] = useState({
+        ticket_id: "",
+        amount: "",
+        payment_method: "cash",
+        payment_date: new Date().toISOString().slice(0, 10),
+        allocation: "downpayment",
+        official_receipt_number: "",
+        payment_reference: "",
+        notes: "",
+        attachments: [],
+    });
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    // Preview Modal
+    const [previewModal, setPreviewModal] = useState({ isOpen: false, fileUrl: null });
+
+    const refreshDashboard = () => {
+        setRefreshing(true);
+        router.reload({
+            onFinish: () => setRefreshing(false),
+        });
     };
 
-    console.log("openPaymentModal:", openPaymentModal);
+    const handleDateRangeChange = (range) => {
+        setDateRange(range);
+        router.get(
+            "/frontdesk/",
+            { date_range: range, search, order_by: orderBy, order_dir: orderDir, recent_search: recentSearch, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleSearch = (value) => {
+        setSearch(value);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search: value, order_by: orderBy, order_dir: orderDir, recent_search: recentSearch, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleOrderBy = (field) => {
+        const newDir = orderBy === field && orderDir === "desc" ? "asc" : "desc";
+        setOrderBy(field);
+        setOrderDir(newDir);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search, order_by: field, order_dir: newDir, recent_search: recentSearch, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    // Recent Tickets Handlers
+    const handleRecentSearch = (value) => {
+        setRecentSearch(value);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search, order_by: orderBy, order_dir: orderDir, recent_search: value, recent_order_by: recentOrderBy, recent_order_dir: recentOrderDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleRecentOrderBy = (field) => {
+        const newDir = recentOrderBy === field && recentOrderDir === "desc" ? "asc" : "desc";
+        setRecentOrderBy(field);
+        setRecentOrderDir(newDir);
+        router.get(
+            "/frontdesk/",
+            { date_range: dateRange, search, order_by: orderBy, order_dir: orderDir, recent_search: recentSearch, recent_order_by: field, recent_order_dir: newDir },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleViewTicket = (ticketId) => {
+        router.visit(`/frontdesk/tickets/${ticketId}`);
+    };
+
+    const handlePreviewFile = (file) => {
+        const filePath = file.file_path || file.filepath || `/storage/${file.filepath}`;
+        setPreviewModal({ isOpen: true, fileUrl: filePath });
+    };
+
+    // ============================================
+    // PAYMENT MODAL HANDLERS
+    // ============================================
+    const handleOpenPaymentModal = (ticket) => {
+        setSelectedTicket(ticket);
+        const balance = parseFloat(ticket.outstanding_balance || ticket.total_amount || 0);
+        setPaymentFormData({
+            ticket_id: ticket.id,
+            amount: balance > 0 ? balance.toString() : "",
+            payment_method: "cash",
+            payment_date: new Date().toISOString().slice(0, 10),
+            allocation: ticket.payments && ticket.payments.length > 0 ? "balance" : "downpayment",
+            official_receipt_number: "",
+            payment_reference: "",
+            notes: "",
+            attachments: [],
+        });
+        setOpenPaymentModal(true);
+    };
+
+    const handlePaymentFormChange = (field, value) => {
+        setPaymentFormData((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handleRecordPayment = async () => {
+        if (!selectedTicket || !paymentFormData.amount) {
+            alert("Please enter the payment amount.");
+            return;
+        }
+
+        setIsUpdating(true);
+        const formData = new FormData();
+        formData.append("ticket_id", selectedTicket.id);
+        formData.append("payment_method", paymentFormData.payment_method);
+        formData.append("payment_date", paymentFormData.payment_date);
+        formData.append("amount", paymentFormData.amount);
+        formData.append("allocation", paymentFormData.allocation);
+        if (paymentFormData.official_receipt_number) {
+            formData.append("official_receipt_number", paymentFormData.official_receipt_number);
+        }
+        if (paymentFormData.payment_reference) {
+            formData.append("payment_reference", paymentFormData.payment_reference);
+        }
+        if (paymentFormData.notes) {
+            formData.append("notes", paymentFormData.notes);
+        }
+        formData.append("payment_type", "collection");
+
+        paymentFormData.attachments.forEach((file) => {
+            formData.append("attachments[]", file);
+        });
+
+        try {
+            router.post("/frontdesk/payments", formData, {
+                onSuccess: () => {
+                    setOpenPaymentModal(false);
+                    setSelectedTicket(null);
+                    refreshDashboard();
+                },
+                onError: (errors) => {
+                    alert(errors.message || "Failed to record payment.");
+                },
+            });
+        } catch (error) {
+            console.error("Payment recording failed:", error);
+            alert("Failed to record payment. Please try again.");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+
+    const getStatusBadgeClass = (status) => {
+        const statusMap = {
+            pending: "badge-warning",
+            in_production: "badge-info",
+            ready_to_print: "badge-info",
+            completed: "badge-success",
+            cancelled: "badge-danger",
+        };
+        return `badge ${statusMap[status] || "badge-secondary"}`;
+    };
+
+    const getPaymentStatusBadge = (status) => {
+        const classes = {
+            pending: "badge-warning",
+            partial: "badge-info",
+            paid: "badge-success",
+        };
+        return (
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+                {status?.toUpperCase() || "PENDING"}
+            </div>
+        );
+    };
 
     return (
         <AdminLayout
@@ -23,14 +245,15 @@ export default function Dashboard({
             notifications={notifications}
             messages={messages}
         >
-            <Head title="Dashboard" />
+            <Head title="Front Desk Dashboard" />
 
+            {/* Page Header */}
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
                     <div className="page-header">
                         <div className="page-title">
                             <h1>
-                                Hello, <span>Welcome Here</span>
+                                Front Desk <span>Dashboard</span>
                             </h1>
                         </div>
                     </div>
@@ -42,666 +265,615 @@ export default function Dashboard({
                                 <li className="breadcrumb-item">
                                     <a href="#">Dashboard</a>
                                 </li>
-                                <li className="breadcrumb-item active">Home</li>
+                                <li className="breadcrumb-item active">
+                                    Front Desk
+                                </li>
                             </ol>
                         </div>
                     </div>
                 </div>
             </div>
 
+            {/* Payment Modal */}
             <Modal
-                title="Payments"
+                title="Record Payment"
                 isOpen={openPaymentModal}
-                onClose={() => setPaymentModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Record Payment"
+                onClose={() => {
+                    setOpenPaymentModal(false);
+                    setSelectedTicket(null);
+                }}
+                size="4xl"
+                submitButtonText={null}
             >
-                <form>
-                    <div className="mb-4">
-                        <h3 className="mb-4">
-                            {" "}
-                            Record Payment for Ticket #20454-12
-                        </h3>
-                        <hr />
-                    </div>
+                {selectedTicket && (
+                    <div className="modal-body">
+                        <div className="mb-4 border rounded p-3 bg-light">
+                            <div className="row">
+                                <div className="col-md-6">
+                                    <p className="m-b-5">
+                                        <strong>Ticket:</strong> {selectedTicket.ticket_number}
+                                    </p>
+                                    <p className="m-b-5">
+                                        <strong>Customer:</strong>{" "}
+                                        {selectedTicket.customer
+                                            ? `${selectedTicket.customer.firstname} ${selectedTicket.customer.lastname}`
+                                            : "Walk-in"}
+                                    </p>
+                                    <p className="m-b-0">
+                                        <strong>Status:</strong>{" "}
+                                        {getPaymentStatusBadge(selectedTicket.payment_status)}
+                                    </p>
+                                </div>
+                                <div className="col-md-6">
+                                    <p className="m-b-5">
+                                        <strong>Total Amount:</strong>{" "}
+                                        {formatPeso(selectedTicket.total_amount)}
+                                    </p>
+                                    <p className="m-b-5">
+                                        <strong>Amount Paid:</strong>{" "}
+                                        {formatPeso(selectedTicket.amount_paid || 0)}
+                                    </p>
+                                    <p className="m-b-0 text-danger font-bold">
+                                        <strong>Balance:</strong>{" "}
+                                        {formatPeso(selectedTicket.outstanding_balance || selectedTicket.total_amount)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Customer : <b>John Doe</b>
-                        </label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Amount Due : <b> P 2,000.00</b>
-                        </label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Paymeny Amount :
-                            </label>
-                            <input
-                                type="text"
-                                className="mt-1 w-full border"
-                                placeholder="0.00"
-                                value=""
-                                // value={forms.ticket.due_date}
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group">
+                                    <label>Payment Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-control"
+                                        value={paymentFormData.payment_date}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("payment_date", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Payment Method</label>
+                                    <select
+                                        className="form-control"
+                                        value={paymentFormData.payment_method}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("payment_method", e.target.value)
+                                        }
+                                    >
+                                        <option value="cash">Cash</option>
+                                        <option value="gcash">GCash</option>
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>
+                                        Amount <span className="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Enter amount"
+                                        value={paymentFormData.amount}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("amount", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Allocation</label>
+                                    <select
+                                        className="form-control"
+                                        value={paymentFormData.allocation}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("allocation", e.target.value)
+                                        }
+                                    >
+                                        <option value="downpayment">Downpayment</option>
+                                        <option value="balance">Balance</option>
+                                        <option value="full">Full Payment</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Official Receipt #</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="OR number"
+                                        value={paymentFormData.official_receipt_number}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("official_receipt_number", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Reference # / GCash Trace</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="GCash, bank reference, etc."
+                                        value={paymentFormData.payment_reference}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("payment_reference", e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Notes</label>
+                                    <textarea
+                                        className="form-control"
+                                        rows="3"
+                                        placeholder="Add any details about this payment..."
+                                        value={paymentFormData.notes}
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("notes", e.target.value)
+                                        }
+                                    ></textarea>
+                                </div>
+                                <div className="form-group">
+                                    <label>Attachments (GCash / Bank proof)</label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        multiple
+                                        onChange={(e) =>
+                                            handlePaymentFormChange("attachments", Array.from(e.target.files || []))
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <h5 className="m-b-3">Payment History</h5>
+                                <div className="border rounded p-3 payment-history" style={{ maxHeight: "500px", overflowY: "auto" }}>
+                                    {selectedTicket.payments && selectedTicket.payments.length ? (
+                                        selectedTicket.payments.map((payment) => (
+                                            <div key={payment.id} className="border-bottom pb-2 mb-2">
+                                                <div className="d-flex justify-content-between">
+                                                    <strong>{formatPeso(payment.amount)}</strong>
+                                                    <span className="text-muted text-sm">
+                                                        {new Date(payment.payment_date).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {payment.payment_method?.replace("_", " ") || "N/A"}
+                                                    {payment.official_receipt_number && (
+                                                        <> • OR {payment.official_receipt_number}</>
+                                                    )}
+                                                </div>
+                                                {payment.payment_reference && (
+                                                    <div className="text-xs text-gray-500">
+                                                        Ref: {payment.payment_reference}
+                                                    </div>
+                                                )}
+                                                {payment.notes && (
+                                                    <p className="text-xs mt-1">{payment.notes}</p>
+                                                )}
+                                                {payment.documents?.length ? (
+                                                    <>
+                                                        <span className="badge badge-success">
+                                                            {payment.documents.length} attachment{payment.documents.length > 1 ? "s" : ""}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handlePreviewFile(payment.documents[0])}
+                                                            className="btn btn-sm btn-outline-primary ml-1"
+                                                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                        >
+                                                            <i className="ti-eye"></i>
+                                                        </button>
+                                                    </>
+                                                ) : null}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-muted m-b-0">No payments recorded yet.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
 
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             due_date: e.target.value,
-                                //         },
-                                //     })
-                                // }
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Payment Method
-                            </label>
-                            <select class name="" id="">
-                                <option value="cash">Cash</option>
-                                <option value="cash">Card</option>
-                                <option value="cash">Gcash</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 mt-2">
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Notes
-                            </label>
-                            <input
-                                type="text"
-                                className="mt-1 w-full border rounded-md p-2" // fixed small width
-                                placeholder=""
-                                value=""
-                                // value={forms.ticket.quantity}
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             quantity: e.target.value,
-                                //         },
-                                //     })
-                                // }
-                            />
+                        <div className="modal-footer border-top pt-3">
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => {
+                                    setOpenPaymentModal(false);
+                                    setSelectedTicket(null);
+                                }}
+                                disabled={isUpdating}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-success"
+                                onClick={handleRecordPayment}
+                                disabled={isUpdating}
+                            >
+                                {isUpdating ? (
+                                    <>
+                                        <i className="fa fa-spinner fa-spin mr-2"></i>
+                                        Updating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="ti-check mr-2"></i>
+                                        Record Payment
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
-                </form>
+                )}
             </Modal>
 
+            {/* Preview Modal */}
+            <PreviewModal
+                isOpen={previewModal.isOpen}
+                onClose={() => setPreviewModal({ isOpen: false, fileUrl: null })}
+                fileUrl={previewModal.fileUrl}
+                title="File Preview"
+            />
+
             <section id="main-content">
-                <div className="row">
-                    {/* New Tickets */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-primary">
-                                    <i className="ti-ticket"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">18</div>
-
-                                    <div className="stat-text">
-                                        New Tickets
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Payment Pending */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-warning">
-                                    <i className="ti-wallet"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">6</div>
-                                    <div className="stat-text">
-                                        Payment Pending
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Completed Tickets */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-success">
-                                    <i className="ti-check"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">23</div>
-                                    <div className="stat-text">
-                                        Completed Tickets
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* In Progress */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-info">
-                                    <i className="ti-time"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">11</div>
-                                    <div className="stat-text">
-                                        In Progress
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                {/* Date Filter Section */}
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
+                        <button
+                            onClick={refreshDashboard}
+                            className="btn btn-sm btn-link"
+                            disabled={refreshing}
+                        >
+                            <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
+                            {refreshing ? " Refreshing..." : " Refresh"}
+                        </button> |
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <select
+                            className="text-sm font-medium text-gray-700 border-none bg-transparent focus:ring-0 p-0 pr-6 cursor-pointer"
+                            value={dateRange}
+                            onChange={(e) => handleDateRangeChange(e.target.value)}
+                        >
+                            <option value="today">Today</option>
+                            <option value="this_week">This Week</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_30_days">Last 30 Days</option>
+                            <option value="this_year">This Year</option>
+                            {Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                                <option key={year} value={`year_${year}`}>
+                                    {year}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
-                <div className="row">
-                    <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Pending Payment
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    {" "}
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        {" "}
-                                                        #3424234243
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #3424234243
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    In Progress
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #TRE234FDF34
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #ERTEW235346
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Ready for Pick Up
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #FGDG6456DFD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #SDFSDFSD35345
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Completed
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #345345DSFSD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #DFGDFG3253
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <CardStatistics
+                        label="New Orders"
+                        statistics={statistics.newTickets}
+                        icon="ti-printer"
+                    />
+                    {/* <CardStatistics
+                        label="Online Orders"
+                        statistics={statistics.newOnlineOrders}
+                        icon="ti-shopping-cart"
+                    /> */}
+                    <CardStatistics
+                        label="Pending Payment"
+                        statistics={statistics.paymentPending}
+                        icon="ti-credit-card"
+                    />
+                    <CardStatistics
+                        label="Completed"
+                        statistics={statistics.completed}
+                        icon="ti-check-box"
+                    />
+                    <CardStatistics
+                        label="In Progress"
+                        statistics={statistics.inProgress}
+                        icon="ti-reload"
+                    />
                 </div>
-                <div className="row">
+
+                {/* New/Online Orders to Confirm */}
+                <div className="row mb-4">
                     <div className="col-lg-12">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>All Tickets</h4>
+                                <div className="flex justify-between items-center">
+                                    <h4>Pending/ New/ Online Orders to Confirm</h4>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Search by ticket #, customer, description..."
+                                            value={search}
+                                            onChange={(e) => handleSearch(e.target.value)}
+                                            style={{ width: "300px" }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Ticket ID</th>
+                                                <th>
+                                                    {/* <button
+                                                        onClick={() => handleOrderBy("ticket_number")}
+                                                        className="btn-link p-0 border-0 bg-transparent"
+                                                    > */}
+                                                    Ticket ID {orderBy === "ticket_number" && (orderDir === "asc" ? "↑" : "↓")}
+                                                    {/* </button> */}
+                                                </th>
+                                                <th>
+                                                    {/* <button
+                                                        onClick={() => handleOrderBy("customer")}
+                                                        className="btn-link p-0 border-0 bg-transparent"
+                                                    > */}
+                                                    Customer {orderBy === "customer" && (orderDir === "asc" ? "↑" : "↓")}
+                                                    {/* </button> */}
+                                                </th>
+                                                <th>Description</th>
+                                                <th>Amount</th>
+                                                <th>Payment Status</th>
+                                                <th>Files</th>
+                                                {/* <th>Action</th> */}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {newOnlineOrders.data && newOnlineOrders.data.length > 0 ? (
+                                                newOnlineOrders.data.map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>{ticket.ticket_number}</td>
+                                                        <td>
+                                                            {ticket.customer
+                                                                ? `${ticket.customer.name}`
+                                                                : "Unknown"}
+                                                            {ticket.customer?.email && (
+                                                                <div className="text-xs text-gray-500">{ticket.customer.email}</div>
+                                                            )}
+                                                        </td>
+                                                        <td>{ticket.description}</td>
+                                                        <td>{formatPeso(ticket.total_amount)}</td>
+                                                        <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
+                                                        <td>
+                                                            {ticket.customer_files && ticket.customer_files.length > 0 ? (
+                                                                <>
+                                                                    <span className="text-xs text-gray-500">
+                                                                        Proof of payment
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={() => handlePreviewFile(ticket.customer_files[0])}
+                                                                        className="btn btn-sm btn-outline-primary ml-1"
+                                                                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                                        title="Photo preview"
+                                                                    >
+                                                                        <i className="ti-eye"></i>
+                                                                    </button>
+                                                                </>
+                                                                // <button type="button" class="btn btn-sm btn-link btn-flat m-b-10 m-l-5" onClick={() => handlePreviewFile(ticket.customer_files[0])}> <i className="ti ti-eye"></i> Preview</button>
+                                                            ) : (
+                                                                <span className="text-gray-400">No files</span>
+                                                            )}
+                                                        </td>
+                                                        {/* <td>
+                                                            <button
+                                                                className="btn btn-sm btn-link btn-flat m-b-10 m-l-5"
+                                                                onClick={() => handleOpenPaymentModal(ticket)}
+                                                            >
+                                                                <i className="ti ti-eye"></i> Review
+                                                            </button>
+                                                        </td> */}
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="7" className="text-center text-gray-400">
+                                                        No orders found
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {/* Pagination */}
+                                {newOnlineOrders.links && newOnlineOrders.links.length > 3 && (
+                                    <div className="d-flex justify-content-end mt-3">
+                                        <nav>
+                                            <ul className="pagination">
+                                                {newOnlineOrders.links.map((link, index) => (
+                                                    <li
+                                                        key={index}
+                                                        className={`page-item ${link.active ? "active" : ""} ${!link.url ? "disabled" : ""}`}
+                                                    >
+                                                        <button
+                                                            className="page-link"
+                                                            onClick={() => {
+                                                                if (link.url) {
+                                                                    router.visit(link.url, {
+                                                                        preserveState: true,
+                                                                        preserveScroll: true,
+                                                                    });
+                                                                }
+                                                            }}
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Recent Tickets (Today) */}
+                <div className="row">
+                    <div className="col-lg-12">
+                        <div className="card">
+                            <div className="card-title pr">
+                                <div className="flex justify-between items-center">
+                                    <h4>RECENT TICKETS (Today)</h4>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Search by ticket #, customer, description..."
+                                            value={recentSearch}
+                                            onChange={(e) => handleRecentSearch(e.target.value)}
+                                            style={{ width: "300px" }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="card-body">
+                                <div className="table-responsive">
+                                    <table className="table student-data-table m-t-20">
+                                        <thead>
+                                            <tr>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("ticket_number")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Ticket ID {recentOrderBy === "ticket_number" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
                                                 <th>Customer</th>
                                                 <th>Description</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
-                                                <th>Payment</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>#43242</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-primary">
-                                                        Pending Design Verification
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#7456345</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-warning">
-                                                        Payment Pending
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#54653232</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-info badge-outline">
-                                                        Ready for Production
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2436754</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-success">
-                                                        Completed
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="row">
-                    <div className="col-lg-12">
-                        <div className="card">
-                            <div className="card-title pr">
-                                <h4>Payments</h4>
-                            </div>
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table student-data-table m-t-20">
-                                        <thead>
-                                            <tr>
-                                                <th>Ticket ID</th>
-                                                <th>Customer</th>
-                                                <th>Amount Due</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
-                                                <th>Payment Date</th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("outstanding_balance")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Balance {recentOrderBy === "outstanding_balance" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("due_date")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Due Date {recentOrderBy === "due_date" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("status")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Status {recentOrderBy === "status" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
+                                                <th>
+                                                    <button
+                                                        onClick={() => handleRecentOrderBy("payment_status")}
+                                                        className="btn-link p-0 border-0 bg-transparent text-left w-100"
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        Payment Status {recentOrderBy === "payment_status" && (recentOrderDir === "asc" ? "↑" : "↓")}
+                                                    </button>
+                                                </th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>John Doe</td>
-                                                <td>P 4500.00</td>
-                                                <td>Oct. 05, 2025</td>
-                                                <td>Pending</td>
-                                                <td>-</td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-default btn-sm btn-outline m-b-10"
-                                                        onClick={() =>
-                                                            setPaymentModalOpen(
-                                                                true
-                                                            )
-                                                        }
-                                                    >
-                                                        <span className="ti-credit-card"></span>{" "}
-                                                        Payment
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>John Doe</td>
-                                                <td>P 4500.00</td>
-                                                <td>Oct. 05, 2025</td>
-                                                <td>
-                                                    <b className="text-success">
-                                                        PAID
-                                                    </b>
-                                                </td>
-                                                <td>2025-09-11</td>
-                                                <td></td>
-                                            </tr>
+                                            {recentTicketsToday.data && recentTicketsToday.data.length > 0 ? (
+                                                recentTicketsToday.data.map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>{ticket.ticket_number}</td>
+                                                        <td>
+                                                            {ticket.customer
+                                                                ? ticket.customer.full_name
+                                                                : "Walk-in"}
+                                                        </td>
+                                                        <td>
+                                                            <div className="text-truncate" style={{ maxWidth: "200px" }} title={ticket.description}>
+                                                                {ticket.description}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span className="font-weight-bold text-danger">
+                                                                {formatPeso(ticket.outstanding_balance || ticket.total_amount)}
+                                                            </span>
+                                                        </td>
+                                                        <td>{formatDate(ticket.due_date)}</td>
+                                                        <td>
+                                                            <div className={getStatusBadgeClass(ticket.status)}>
+                                                                {ticket.status?.replace("_", " ").toUpperCase() || "PENDING"}
+                                                            </div>
+                                                        </td>
+                                                        <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
+                                                        <td>
+                                                            {ticket.payment_status !== "paid" && (
+                                                                <button
+                                                                    className="btn btn-sm btn-link btn-flat m-b-10 m-l-5"
+                                                                    onClick={() => handleOpenPaymentModal(ticket)}
+                                                                >
+                                                                    <i className="ti-clipboard"></i> Payment
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="8" className="text-center text-gray-400">
+                                                        {recentSearch ? "No tickets found matching your search" : "No tickets found for today"}
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
+                                {/* Pagination */}
+                                {recentTicketsToday.links && recentTicketsToday.links.length > 3 && (
+                                    <div className="d-flex justify-content-end mt-3">
+                                        <nav>
+                                            <ul className="pagination">
+                                                {recentTicketsToday.links.map((link, index) => (
+                                                    <li
+                                                        key={index}
+                                                        className={`page-item ${link.active ? "active" : ""} ${!link.url ? "disabled" : ""}`}
+                                                    >
+                                                        <button
+                                                            className="page-link"
+                                                            onClick={() => {
+                                                                if (link.url) {
+                                                                    router.visit(link.url, {
+                                                                        preserveState: true,
+                                                                        preserveScroll: true,
+                                                                    });
+                                                                }
+                                                            }}
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
-                {/* <div className="row">
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="year-calendar"></div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Notice Board </h4>
-
-                            </div>
-                            <div className="recent-comment m-t-15">
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-danger">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media no-border">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-info">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Timeline</h4>
-
-                            </div>
-                            <div className="card-body">
-                                <ul className="timeline">
-                                    <li>
-                                        <div className="timeline-badge primary"><i className="fa fa-smile-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">School promote video sharing</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>10 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Ready our school website and online
-                                                    service</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge danger"><i className="fa fa-times-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Routine pubish our website form
-                                                    10/03/2017 </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>30 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge success"><i className="fa fa-check-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Principle quotation publish our website
-                                                </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>15 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Class schedule publish our website</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
             </section>
-
         </AdminLayout>
     );
 }

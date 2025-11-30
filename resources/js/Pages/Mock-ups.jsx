@@ -6,6 +6,7 @@ import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
+import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Mockups({
@@ -20,6 +21,8 @@ export default function Mockups({
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [uploadFiles, setUploadFiles] = useState([]);
+    const [dateRange, setDateRange] = useState(filters.date_range || "");
+
     const [notes, setNotes] = useState("");
     const [loading, setLoading] = useState(false);
     const { flash } = usePage().props;
@@ -639,7 +642,7 @@ export default function Mockups({
                                         </div>
                                         <div className="card-body">
                                             <div className="row mt-4 align-items-center">
-                                                <div className="col-md-5">
+                                                <div className="col-md-3">
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
@@ -671,6 +674,11 @@ export default function Mockups({
                                                         ]}
                                                     />
                                                 </div>
+                                                <DateRangeFilter
+                                                    filters={filters}
+                                                    route="/mock-ups"
+                                                    buildUrl={buildUrl}
+                                                />
                                             </div>
 
                                             <div className="mt-4">

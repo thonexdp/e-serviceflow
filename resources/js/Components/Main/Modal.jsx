@@ -10,6 +10,7 @@ export default function Modal({
     size = "md",
     submitButtonText = "Save",
     submitSecond = "",
+    staticBackdrop = false, // Add this prop
 }) {
     const sizeClasses = {
         sm: "max-w-sm",
@@ -24,8 +25,11 @@ export default function Modal({
         "7xl": "max-w-7xl",
     };
 
-    // Prevent closing if a higher z-index modal is open
+    // Prevent closing if a higher z-index modal is open or if staticBackdrop is true
     const handleClose = () => {
+        if (staticBackdrop) {
+            return; // Don't close if staticBackdrop is enabled
+        }
         // Check if PreviewModal (z-60) is open by checking if there's a dialog with higher z-index
         const higherZIndexDialog = document.querySelector('.z-\\[60\\]');
         if (higherZIndexDialog) {
@@ -60,9 +64,8 @@ export default function Modal({
                         leaveTo="opacity-0 scale-95"
                     >
                         <Dialog.Panel
-                            className={`w-full ${
-                                sizeClasses[size] || sizeClasses.md
-                            } bg-white p-6 shadow-xl rounded-lg`}
+                            className={`w-full ${sizeClasses[size] || sizeClasses.md
+                                } bg-white p-6 shadow-xl rounded-lg`}
                         >
                             {/* Header */}
                             <div className="flex justify-between items-center border-b pb-2 mb-4">

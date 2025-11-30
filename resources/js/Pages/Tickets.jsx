@@ -9,6 +9,7 @@ import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
+import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 import axios from "axios";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
@@ -37,6 +38,8 @@ export default function Tickets({
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const { api, buildUrl } = useRoleApi();
+    const { flash, auth } = usePage().props;
+
 
     useEffect(() => {
         setSelectedCustomer(selectedCustomer);
@@ -92,17 +95,11 @@ export default function Tickets({
         attachments: [],
     });
 
-    const { flash, auth } = usePage().props;
 
     const hasPermission = (module, feature) => {
         if (auth.user.role === 'admin') return true;
         return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
     };
-
-
-
-    const isAllowedToAddCustomer =
-        auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
 
 
     const handleCustomerSubmit = async (formData) => {
@@ -300,6 +297,7 @@ export default function Tickets({
 
     const handleEditTicket = (ticket) => {
         console.log(ticket);
+        setSelectedCustomer(ticket?.customer);
         setEditingTicket(ticket);
         setTicketModalOpen(true);
     };
@@ -375,7 +373,8 @@ export default function Tickets({
 
     const getStatusBadge = (status) => {
         const classes = {
-            pending: "badge-warning",
+            pending: "badge-primary",
+            in_designer: "badge-warning",
             in_production: "badge-info",
             completed: "badge-success",
             cancelled: "badge-danger",
@@ -478,6 +477,13 @@ export default function Tickets({
             render: (row) => (
                 <div>
                     {getStatusBadge(row.status)}
+                    {row.current_workflow_step && row.status !== "completed" && (
+                        <div className="text-secondary small">
+                            <i className="ti-time mr-1"></i>
+                            <i>{row.current_workflow_step}</i>
+                        </div>
+                    )}
+
                     {row.status !== "completed" &&
                         row.status !== "cancelled" && (
                             <button
@@ -525,9 +531,11 @@ export default function Tickets({
                 onClose={closeTicketModal}
                 size="7xl"
                 submitButtonText={null}
+                staticBackdrop={true}
             >
                 <TicketForm
                     ticket={editingTicket}
+                    hasPermission={hasPermission}
                     customerId={_selectedCustomer?.id}
                     onSubmit={handleTicketSubmit}
                     onCancel={closeTicketModal}
@@ -563,7 +571,7 @@ export default function Tickets({
                 )}
 
                 <div className="row">
-                    <div className="col-lg-8 p-r-0 title-margin-right">
+                    <div className="col-lg-6 p-r-0 title-margin-right">
                         <div className="page-header">
                             <div className="page-title">
                                 <h1>
@@ -572,7 +580,7 @@ export default function Tickets({
                             </div>
                         </div>
                     </div>
-                    <div className="col-lg-4 p-l-0 title-margin-left">
+                    <div className="col-lg-6 p-l-0 title-margin-left">
                         <div className="page-header">
                             <div className="page-title">
                                 <ol className="breadcrumb">
@@ -581,6 +589,13 @@ export default function Tickets({
                                     </li>
                                     <li className="breadcrumb-item active">
                                         Tickets
+                                    </li>
+                                    <li className="breadcrumb-item">
+                                        <a href="#" className="text-blue-500" onClick={() => {
+                                            router.get(buildUrl("tickets"));
+                                        }}>
+                                            <i className="ti-reload"></i> Refresh
+                                        </a>
                                     </li>
                                 </ol>
                             </div>
@@ -631,10 +646,9 @@ export default function Tickets({
                                 }
                             >
                                 <option value="pending">Pending</option>
-                                <option value="in_production">
-                                    In Production
-                                </option>
-                                <option value="completed">Completed</option>
+                                <option value="in_designer">In Designer</option>
+                                {/* <option value="in_production">In Production</option> */}
+                                {/* <option value="completed">Completed</option> */}
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
@@ -990,7 +1004,7 @@ export default function Tickets({
 
                 <section id="main-content">
                     {/* Customer Search and Add Section */}
-                    {isAllowedToAddCustomer && (
+                    {hasPermission('customers', 'create') && (
                         <div className="row">
                             <div className="col-lg-6">
                                 <div className="card">
@@ -998,13 +1012,10 @@ export default function Tickets({
                                         <h4>Search Customer</h4>
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                setCustomerModalOpen(true)
-                                            }
-                                            className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition float-end"
+                                            className="btn btn-primary text-medium float-end"
+                                            onClick={() => setCustomerModalOpen(true)}
                                         >
-                                            <i className="ti-plus"></i> Add
-                                            Customer
+                                            <i className="ti-plus"></i> Add Customer
                                         </button>
                                     </div>
                                     <div className="card-body">
@@ -1104,6 +1115,29 @@ export default function Tickets({
                                 <div className="card-title">
                                     <h4>Tickets</h4>
                                     <div className="button-list float-end">
+                                        {/* <button
+                                            className="btn btn-outline-secondary btn-block"
+                                            onClick={() => {
+                                                setDateRange('');
+                                                setCustomStartDate('');
+                                                setCustomEndDate('');
+                                                setShowCustomDateInputs(false);
+                                                router.get(buildUrl("tickets"));
+                                            }}
+                                            style={{ height: '42px' }}
+                                        >
+                                            Reset
+                                        </button> */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                router.get(buildUrl("tickets"));
+                                            }}
+                                            className="px-3 py-2 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
+                                        >
+                                            <i className="ti-reload"></i>
+                                        </button>
+
                                         {hasPermission('tickets', 'create') && (
 
                                             <button
@@ -1112,15 +1146,7 @@ export default function Tickets({
                                                     setTicketModalOpen(true)
                                                 }
                                                 disabled={!_selectedCustomer}
-                                                className="
-                                                px-3 mb-2 py-2.5 text-sm font-medium rounded-md transition
-                                                text-white bg-blue-700 hover:bg-blue-500
-                                                focus:outline-none focus:ring-2 focus:ring-blue-300
-                                                disabled:bg-gray-300
-                                                disabled:text-gray-500
-                                                disabled:cursor-not-allowed
-                                                disabled:hover:bg-gray-300
-                                            "
+                                                className="btn btn-primary text-medium float-end"
                                             >
                                                 <i className="ti-plus"></i> Add
                                                 Tickets
@@ -1131,7 +1157,7 @@ export default function Tickets({
                                 </div>
                                 <div className="card-body">
                                     <div className="row mb-4">
-                                        <div className="col-md-4">
+                                        <div className="col-md-3">
                                             <div className="input-group">
                                                 <input
                                                     type="text"
@@ -1154,7 +1180,7 @@ export default function Tickets({
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="col-md-3">
+                                        <div className="col-md-2">
                                             <select
                                                 className="form-control"
                                                 value={filters.status || ''}
@@ -1162,12 +1188,13 @@ export default function Tickets({
                                             >
                                                 <option value="">All Status</option>
                                                 <option value="pending">Pending</option>
+                                                <option value="in_designer">In Designer</option>
                                                 <option value="in_production">In Production</option>
                                                 <option value="completed">Completed</option>
                                                 <option value="cancelled">Cancelled</option>
                                             </select>
                                         </div>
-                                        <div className="col-md-3">
+                                        <div className="col-md-2">
                                             <select
                                                 className="form-control"
                                                 value={filters.payment_status || ''}
@@ -1179,25 +1206,61 @@ export default function Tickets({
                                                 <option value="paid">Paid</option>
                                             </select>
                                         </div>
+                                        <DateRangeFilter
+                                            filters={filters}
+                                            route="tickets"
+                                            buildUrl={buildUrl}
+                                        />
                                         <div className="col-md-2">
-                                            <button
-                                                className="btn btn-outline-secondary btn-block"
-                                                onClick={() => router.get(buildUrl("tickets"))}
-                                                style={{ height: '42px' }}
-                                            >
-                                                Reset
-                                            </button>
                                         </div>
                                     </div>
-                                    <div
-                                        className="alert alert-info"
-                                        role="alert"
-                                    >
+
+                                    {/* Active Filters Indicator */}
+                                    {(filters.search || filters.status || filters.payment_status || filters.date_range) && (
+                                        <div className="row mb-3">
+                                            <div className="col-12">
+                                                <div className="alert alert-light border p-2">
+                                                    <small className="text-muted mr-2">
+                                                        <i className="ti-filter mr-1"></i>
+                                                        <strong>Active Filters:</strong>
+                                                    </small>
+                                                    {filters.search && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Search: {filters.search}
+                                                        </span>
+                                                    )}
+                                                    {filters.status && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Status: {filters.status}
+                                                        </span>
+                                                    )}
+                                                    {filters.payment_status && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Payment: {filters.payment_status}
+                                                        </span>
+                                                    )}
+                                                    {filters.date_range && (
+                                                        <span className="badge badge-primary mr-2">
+                                                            <i className="ti-calendar mr-1"></i>
+                                                            {filters.date_range === 'custom'
+                                                                ? `Custom: ${filters.start_date} to ${filters.end_date}`
+                                                                : filters.date_range === 'last_30_days'
+                                                                    ? 'Last 30 Days'
+                                                                    : `Year: ${filters.date_range}`
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="alert alert-info" role="alert">
                                         <i className="fa fa-info-circle"></i>{" "}
-                                        <strong>Quick Update:</strong> Click the
-                                        pencil icon next to status or payment
-                                        status to update them quickly.
+                                        <strong>Note:</strong> Update the status using the pencil icon.
+                                        Set it to <strong>In Designer</strong> once the job is ready to proceed with design review.
                                     </div>
+
+
                                     <DataTable
                                         columns={ticketColumns}
                                         data={tickets.data}
