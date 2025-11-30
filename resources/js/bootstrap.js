@@ -21,15 +21,16 @@ import Pusher from 'pusher-js';
 window.Pusher = Pusher;
 
 // Only initialize Echo if Pusher key is available
-if (import.meta.env.VITE_PUSHER_APP_KEY) {
-    window.Echo = new Echo({
+// if (import.meta.env.VITE_PUSHER_APP_KEY) {
+if (import.meta.env.PUSHER_APP_KEY) {
+     window.Echo = new Echo({
         broadcaster: 'pusher',
-        key: import.meta.env.VITE_PUSHER_APP_KEY,
-        cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
-        wsHost: import.meta.env.VITE_PUSHER_HOST || window.location.hostname,
-        wsPort: import.meta.env.VITE_PUSHER_PORT ?? 6001,
-        wssPort: import.meta.env.VITE_PUSHER_PORT ?? 6001,
-        forceTLS: (import.meta.env.VITE_PUSHER_SCHEME ?? 'http') === 'https',
+        key: import.meta.env.PUSHER_APP_KEY,
+        cluster: import.meta.env.PUSHER_APP_CLUSTER ?? 'mt1',
+        wsHost: import.meta.env.PUSHER_HOST || window.location.hostname,
+        wsPort: import.meta.env.PUSHER_PORT ?? 6001,
+        wssPort: import.meta.env.PUSHER_PORT ?? 6001,
+        forceTLS: (import.meta.env.PUSHER_SCHEME ?? 'http') === 'https',
         enabledTransports: ['ws', 'wss'],
         disableStats: true,
         authEndpoint: '/broadcasting/auth',
@@ -40,6 +41,24 @@ if (import.meta.env.VITE_PUSHER_APP_KEY) {
             },
         },
     });
+    // window.Echo = new Echo({
+    //     broadcaster: 'pusher',
+    //     key: import.meta.env.VITE_PUSHER_APP_KEY,
+    //     cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
+    //     wsHost: import.meta.env.VITE_PUSHER_HOST || window.location.hostname,
+    //     wsPort: import.meta.env.VITE_PUSHER_PORT ?? 6001,
+    //     wssPort: import.meta.env.VITE_PUSHER_PORT ?? 6001,
+    //     forceTLS: (import.meta.env.VITE_PUSHER_SCHEME ?? 'http') === 'https',
+    //     enabledTransports: ['ws', 'wss'],
+    //     disableStats: true,
+    //     authEndpoint: '/broadcasting/auth',
+    //     auth: {
+    //         headers: {
+    //             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+    //             'X-Requested-With': 'XMLHttpRequest',
+    //         },
+    //     },
+    // });
 
     // Add connection event listeners for debugging
     window.Echo.connector.pusher.connection.bind('connected', () => {
