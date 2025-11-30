@@ -1,36 +1,168 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
+import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 
-export default function Dashboard({
+export default function FrontDesk({
     user = {},
     notifications = [],
     messages = [],
+    statistics = {
+        newTickets: 0,
+        paymentPending: 0,
+        completed: 0,
+        inProgress: 0,
+    },
+    ticketsByStatus = {
+        pendingPayment: [],
+        inProgress: [],
+        readyForPickup: [],
+        completed: [],
+    },
+    allTickets = [],
+    payments = [],
+    filters = { date_range: 'this_month' }
 }) {
-    
-    const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
-    const handleSave = () => {
-        console.log("save");
+    const [refreshing, setRefreshing] = useState(false);
+    const [dateRange, setDateRange] = useState(filters.date_range || 'this_month');
+
+    // Modal States
+    const [openPaymentModal, setOpenPaymentModal] = useState(false);
+    const [selectedPayment, setSelectedPayment] = useState(null);
+    const [paymentForm, setPaymentForm] = useState({
+        ticketId: "",
+        customerId: "",
+        customerName: "",
+        amountDue: 0,
+        paymentAmount: "",
+        paymentMethod: "cash",
+        notes: "",
+    });
+
+    const refreshDashboard = () => {
+        setRefreshing(true);
+        router.reload({
+            onFinish: () => setRefreshing(false),
+        });
     };
 
-    console.log("openPaymentModal:", openPaymentModal);
+    const handleDateRangeChange = (range) => {
+        setDateRange(range);
+        router.get('/dashboard', { date_range: range }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    };
 
+    // ============================================
+    // PAYMENT MODAL HANDLERS
+    // ============================================
+    const openPaymentModalWithData = (payment) => {
+        setSelectedPayment(payment);
+        setPaymentForm({
+            ticketId: payment.ticketId,
+            customerId: payment.customer.id,
+            customerName: payment.customer.name,
+            amountDue: payment.amountDue,
+            paymentAmount: payment.amountDue.toString(),
+            paymentMethod: "cash",
+            notes: "",
+        });
+        setOpenPaymentModal(true);
+    };
+
+    const handlePaymentFormChange = (field, value) => {
+        setPaymentForm((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handleRecordPayment = async () => {
+        // TODO: Implement actual payment recording via API
+        // For now, we'll just log it and close the modal
+        console.log("Recording payment:", paymentForm);
+
+        // Example of how to submit using router
+        // router.post(`/tickets/${paymentForm.ticketId}/payments`, paymentForm, {
+        //     onSuccess: () => {
+        //         setOpenPaymentModal(false);
+        //         // Success notification handled by flash messages
+        //     }
+        // });
+
+        alert("Payment recording endpoint not yet connected in this view. Please use the Tickets page.");
+        setOpenPaymentModal(false);
+    };
+
+    // ============================================
+    // TICKET HANDLERS
+    // ============================================
+    const handleTicketClick = (ticketId) => {
+        router.visit(`/tickets/${ticketId}`);
+    };
+
+    const handleViewTicket = (ticketId) => {
+        router.visit(`/tickets/${ticketId}`);
+    };
+
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat("en-PH", {
+            style: "currency",
+            currency: "PHP",
+        }).format(amount);
+    };
+
+    const formatDate = (date) => {
+        if (!date) return "-";
+        return new Date(date).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    };
+
+    const getStatusBadgeClass = (color) => {
+        const colorMap = {
+            primary: "badge-primary",
+            warning: "badge-warning",
+            info: "badge-info",
+            success: "badge-success",
+            danger: "badge-danger",
+            secondary: "badge-secondary",
+        };
+        return `badge ${colorMap[color] || "badge-secondary"}`;
+    };
+
+    const getPaymentStatusBadge = (status) => {
+        const classes = {
+            pending: "badge-warning",
+            partial: "badge-info",
+            paid: "badge-success",
+        };
+        return (
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+                {status?.toUpperCase() || "PENDING"}
+            </div>
+        );
+    };
     return (
-        <AdminLayout
-            user={user}
-            notifications={notifications}
-            messages={messages}
-        >
-            <Head title="Dashboard" />
+        <AdminLayout user={user} notifications={notifications} messages={messages}>
+            <Head title="Front Desk Dashboard" />
 
+            {/* Page Header */}
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
                     <div className="page-header">
                         <div className="page-title">
                             <h1>
-                                Hello, <span>Welcome Here</span>
+                                Front Desk <span>Dashboard</span>
                             </h1>
                         </div>
                     </div>
@@ -42,365 +174,274 @@ export default function Dashboard({
                                 <li className="breadcrumb-item">
                                     <a href="#">Dashboard</a>
                                 </li>
-                                <li className="breadcrumb-item active">Home</li>
+                                <li className="breadcrumb-item active">Front Desk</li>
                             </ol>
                         </div>
                     </div>
                 </div>
             </div>
 
+            {/* Payment Modal */}
             <Modal
-                title="Payments"
+                title="Record Payment"
                 isOpen={openPaymentModal}
-                onClose={() => setPaymentModalOpen(false)}
-                onSave={handleSave}
+                onClose={() => setOpenPaymentModal(false)}
+                onSave={handleRecordPayment}
                 size="3xl"
                 submitButtonText="Record Payment"
             >
-                <form>
+                <div className="space-y-4">
                     <div className="mb-4">
-                        <h3 className="mb-4">
-                            {" "}
-                            Record Payment for Ticket #20454-12
+                        <h3 className="text-lg font-semibold mb-2">
+                            Record Payment for Ticket {selectedPayment?.trackingNumber}
                         </h3>
                         <hr />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Customer : <b>John Doe</b>
-                        </label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Amount Due : <b> P 2,000.00</b>
-                        </label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium">
-                                Paymeny Amount :
+                            <label className="block text-sm font-medium mb-1">
+                                Customer
                             </label>
                             <input
                                 type="text"
-                                className="mt-1 w-full border"
-                                placeholder="0.00"
-                                value=""
-                                // value={forms.ticket.due_date}
-
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             due_date: e.target.value,
-                                //         },
-                                //     })
-                                // }
+                                className="w-full border rounded-md p-2 bg-gray-50"
+                                value={paymentForm.customerName}
+                                disabled
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium">
-                                Payment Method
+                            <label className="block text-sm font-medium mb-1">
+                                Amount Due
                             </label>
-                            <select class name="" id="">
+                            <input
+                                type="text"
+                                className="w-full border rounded-md p-2 bg-gray-50"
+                                value={formatCurrency(paymentForm.amountDue)}
+                                disabled
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">
+                                Payment Amount <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                className="w-full border rounded-md p-2"
+                                placeholder="0.00"
+                                value={paymentForm.paymentAmount}
+                                onChange={(e) =>
+                                    handlePaymentFormChange("paymentAmount", e.target.value)
+                                }
+                                step="0.01"
+                                min="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">
+                                Payment Method <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                className="w-full border rounded-md p-2"
+                                value={paymentForm.paymentMethod}
+                                onChange={(e) =>
+                                    handlePaymentFormChange("paymentMethod", e.target.value)
+                                }
+                            >
                                 <option value="cash">Cash</option>
-                                <option value="cash">Card</option>
-                                <option value="cash">Gcash</option>
+                                <option value="card">Card</option>
+                                <option value="gcash">GCash</option>
+                                <option value="bank_transfer">Bank Transfer</option>
                             </select>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 mt-2">
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Notes
-                            </label>
-                            <input
-                                type="text"
-                                className="mt-1 w-full border rounded-md p-2" // fixed small width
-                                placeholder=""
-                                value=""
-                                // value={forms.ticket.quantity}
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             quantity: e.target.value,
-                                //         },
-                                //     })
-                                // }
-                            />
-                        </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-1">
+                            Notes (Optional)
+                        </label>
+                        <textarea
+                            className="w-full border rounded-md p-2"
+                            placeholder="Add any notes about this payment..."
+                            rows="3"
+                            value={paymentForm.notes}
+                            onChange={(e) =>
+                                handlePaymentFormChange("notes", e.target.value)
+                            }
+                        />
                     </div>
-                </form>
+                </div>
             </Modal>
 
             <section id="main-content">
-                <div className="row">
-                    {/* New Tickets */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-primary">
-                                    <i className="ti-ticket"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">18</div>
+                {/* Date Filter Section */}
+                <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-                                    <div className="stat-text">
-                                        New Tickets
-                                    </div>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <select
+                            className="text-sm font-medium text-gray-700 border-none bg-transparent focus:ring-0 p-0 pr-6 cursor-pointer"
+                            value={dateRange}
+                            onChange={(e) => handleDateRangeChange(e.target.value)}
+                        >
+                            <option value="today">Today</option>
+                            <option value="this_week">This Week</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_30_days">Last 30 Days</option>
+                            <option value="this_year">This Year</option>
+                        </select>
+                    </div>
+                </div>
+                {/* Statistics Cards - Compact */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">New Orders</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.newTickets}</p>
+                                <div className="flex items-center mt-2 text-xs">
+                                    <span className="text-green-600 font-semibold flex items-center">
+                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        12%
+                                    </span>
+                                    <span className="text-gray-400 ml-1">vs last month</span>
                                 </div>
+                            </div>
+                            <div className="bg-blue-50 p-3 rounded-lg">
+                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
                             </div>
                         </div>
                     </div>
 
-                    {/* Payment Pending */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-warning">
-                                    <i className="ti-wallet"></i>
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pending Payment</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.paymentPending}</p>
+                                <div className="flex items-center mt-2 text-xs">
+                                    <span className="text-red-600 font-semibold flex items-center">
+                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        5%
+                                    </span>
+                                    <span className="text-gray-400 ml-1">vs last month</span>
                                 </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">6</div>
-                                    <div className="stat-text">
-                                        Payment Pending
-                                    </div>
-                                </div>
+                            </div>
+                            <div className="bg-red-50 p-3 rounded-lg">
+                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                             </div>
                         </div>
                     </div>
 
-                    {/* Completed Tickets */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-success">
-                                    <i className="ti-check"></i>
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.completed}</p>
+                                <div className="flex items-center mt-2 text-xs">
+                                    <span className="text-green-600 font-semibold flex items-center">
+                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        8%
+                                    </span>
+                                    <span className="text-gray-400 ml-1">vs last month</span>
                                 </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">23</div>
-                                    <div className="stat-text">
-                                        Completed Tickets
-                                    </div>
-                                </div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-lg">
+                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                             </div>
                         </div>
                     </div>
 
-                    {/* In Progress */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-info">
-                                    <i className="ti-time"></i>
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">In Progress</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.inProgress}</p>
+                                <div className="flex items-center mt-2 text-xs">
+                                    <span className="text-green-600 font-semibold flex items-center">
+                                        <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        15%
+                                    </span>
+                                    <span className="text-gray-400 ml-1">vs last month</span>
                                 </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">11</div>
-                                    <div className="stat-text">
-                                        In Progress
-                                    </div>
-                                </div>
+                            </div>
+                            <div className="bg-yellow-50 p-3 rounded-lg">
+                                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
                             </div>
                         </div>
                     </div>
                 </div>
 
+
+
                 <div className="row">
                     <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Pending Payment
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    {" "}
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        {" "}
-                                                        #3424234243
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #3424234243
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                        <div className="card bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">New Orders</p>
+                                    <p className="text-3xl font-bold text-gray-900 mt-1">{statistics.newTickets}</p>
+                                    <div className="flex items-center mt-2 text-xs">
+                                        <span className="text-green-600 font-semibold flex items-center">
+                                            <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                            12%
+                                        </span>
+                                        <span className="text-gray-400 ml-1">vs last month</span>
+                                    </div>
+                                </div>
+                                <div className="bg-blue-50 p-3 rounded-lg">
+                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    In Progress
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #TRE234FDF34
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #ERTEW235346
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Ready for Pick Up
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #FGDG6456DFD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #SDFSDFSD35345
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Completed
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #345345DSFSD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #DFGDFG3253
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="row">
-                    <div className="col-lg-12">
+                    <div className="col-lg-9">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>All Tickets</h4>
+                                <div className="flex justify-between items-center">
+                                    <h4>New/ Online Orders to Confirm</h4>
+                                    <button
+                                        onClick={refreshDashboard}
+                                        className="btn btn-sm btn-primary"
+                                        disabled={refreshing}
+                                    >
+                                        <i className={`ti-reload ${refreshing ? 'animate-spin' : ''}`}></i>
+                                        {refreshing ? ' Refreshing...' : ' Refresh'}
+                                    </button>
+                                    <div className="basic-form">
+                                        <div className="form-group">
+                                            <CustomerSearchBox
+
+                                            />
+                                        </div>
+                                    </div>
+
+                                </div>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
@@ -410,66 +451,22 @@ export default function Dashboard({
                                                 <th>Ticket ID</th>
                                                 <th>Customer</th>
                                                 <th>Description</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
+                                                <th>Files</th>
                                                 <th>Payment</th>
+                                                <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td>#43242</td>
+                                                <td>1DTSYDS</td>
                                                 <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
+                                                <td>Mugs</td>
                                                 <td>
-                                                    <span className="badge badge-primary">
-                                                        Pending Design Verification
-                                                    </span>
+                                                    <button className="btn btn-sm btn-primary">Preview</button>
                                                 </td>
+                                                <td>GCash</td>
                                                 <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#7456345</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-warning">
-                                                        Payment Pending
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#54653232</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-info badge-outline">
-                                                        Ready for Production
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2436754</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-success">
-                                                        Completed
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <b> P 335.00</b>
+                                                    <button className="btn btn-sm btn-primary">View</button>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -479,11 +476,23 @@ export default function Dashboard({
                         </div>
                     </div>
                 </div>
+
+                {/* All Tickets Table */}
                 <div className="row">
                     <div className="col-lg-12">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>Payments</h4>
+                                <div className="flex justify-between items-center">
+                                    <h4>RECENT TICKETS (Today)</h4>
+                                    <button
+                                        onClick={refreshDashboard}
+                                        className="btn btn-sm btn-primary"
+                                        disabled={refreshing}
+                                    >
+                                        <i className={`ti-reload ${refreshing ? 'animate-spin' : ''}`}></i>
+                                        {refreshing ? ' Refreshing...' : ' Refresh'}
+                                    </button>
+                                </div>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
@@ -492,49 +501,55 @@ export default function Dashboard({
                                             <tr>
                                                 <th>Ticket ID</th>
                                                 <th>Customer</th>
-                                                <th>Amount Due</th>
+                                                <th>Description</th>
+                                                <th>Balance</th>
                                                 <th>Due Date</th>
                                                 <th>Status</th>
-                                                <th>Payment Date</th>
-                                                <th>Action</th>
+                                                <th>Payment Status</th>
+                                                <th></th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>John Doe</td>
-                                                <td>P 4500.00</td>
-                                                <td>Oct. 05, 2025</td>
-                                                <td>Pending</td>
-                                                <td>-</td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-default btn-sm btn-outline m-b-10"
-                                                        onClick={() =>
-                                                            setPaymentModalOpen(
-                                                                true
-                                                            )
-                                                        }
-                                                    >
-                                                        <span className="ti-credit-card"></span>{" "}
-                                                        Payment
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>John Doe</td>
-                                                <td>P 4500.00</td>
-                                                <td>Oct. 05, 2025</td>
-                                                <td>
-                                                    <b className="text-success">
-                                                        PAID
-                                                    </b>
-                                                </td>
-                                                <td>2025-09-11</td>
-                                                <td></td>
-                                            </tr>
+                                            {allTickets.length > 0 ? (
+                                                allTickets.map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>
+                                                            {ticket.trackingNumber}
+                                                        </td>
+                                                        <td>{ticket.customer.firstname}</td>
+                                                        <td>{ticket.description}</td>
+                                                        <td>{ticket.balance}</td>
+                                                        <td>{formatDate(ticket.dueDate)}</td>
+                                                        <td>
+                                                            <div className={getStatusBadgeClass(ticket.statusColor)}>
+                                                                {ticket.statusLabel}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className={getPaymentStatusBadge(ticket.statusColor)}>
+                                                                {ticket.statusLabel}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            {ticket.status !== "paid" && (
+                                                                <button
+                                                                    className="btn btn-sm btn-primary"
+                                                                    onClick={() => handleViewTicket(ticket.id)}
+                                                                >
+                                                                    Payment
+                                                                </button>
+                                                            )}
+
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="6" className="text-center text-gray-400">
+                                                        No tickets found
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -542,166 +557,7 @@ export default function Dashboard({
                         </div>
                     </div>
                 </div>
-                {/* <div className="row">
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="year-calendar"></div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Notice Board </h4>
-
-                            </div>
-                            <div className="recent-comment m-t-15">
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-danger">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media no-border">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-info">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Timeline</h4>
-
-                            </div>
-                            <div className="card-body">
-                                <ul className="timeline">
-                                    <li>
-                                        <div className="timeline-badge primary"><i className="fa fa-smile-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">School promote video sharing</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>10 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Ready our school website and online
-                                                    service</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge danger"><i className="fa fa-times-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Routine pubish our website form
-                                                    10/03/2017 </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>30 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge success"><i className="fa fa-check-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Principle quotation publish our website
-                                                </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>15 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Class schedule publish our website</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
             </section>
-
         </AdminLayout>
     );
 }

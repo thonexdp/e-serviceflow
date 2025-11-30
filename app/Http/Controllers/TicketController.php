@@ -67,6 +67,31 @@ class TicketController extends BaseCrudController
             $query->where('customer_id', $request->customer_id);
         }
 
+        // Default to Last 30 Days if no date range is specified
+        $dateRange = $request->get('date_range');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        // If no date_range parameter exists at all, set default to last_30_days
+        if (!$request->has('date_range')) {
+            $dateRange = 'last_30_days';
+            $thirtyDaysAgo = now()->subDays(30)->format('Y-m-d');
+            $today = now()->format('Y-m-d');
+            $startDate = $thirtyDaysAgo;
+            $endDate = $today;
+        }
+
+        // Filter by date range (only if date_range is not explicitly empty)
+        if ($dateRange !== '') {
+            if ($startDate) {
+                $query->whereDate('created_at', '>=', $startDate);
+            }
+
+            if ($endDate) {
+                $query->whereDate('created_at', '<=', $endDate);
+            }
+        }
+
         $tickets = $query->with('jobType.category')
             ->orderByRaw("
                 CASE status
@@ -95,7 +120,14 @@ class TicketController extends BaseCrudController
             'customers' => $customers,
             'jobCategories' => $jobCategories,
             'selectedCustomer' => $request->get('customer_id') ? \App\Models\Customer::find($request->get('customer_id')) : null,
-            'filters' => $request->only(['search', 'status', 'payment_status']),
+            'filters' => [
+                'search' => $request->get('search'),
+                'status' => $request->get('status'),
+                'payment_status' => $request->get('payment_status'),
+                'date_range' => $dateRange,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
         ]);
     }
 

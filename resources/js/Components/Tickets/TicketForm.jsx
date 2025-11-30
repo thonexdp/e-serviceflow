@@ -36,11 +36,16 @@ export default function TicketForm({
     customerId = null,
     onSubmit,
     onCancel,
+    hasPermission,
+    isPublic = false,
 }) {
     const { jobCategories = [] } = usePage().props;
 
     const [formData, setFormData] = useState({
         customer_id: customerId || "",
+        customer_name: "",
+        customer_email: "",
+        customer_phone: "",
         description: "",
         category_id: "",
         job_type_id: "",
@@ -89,7 +94,7 @@ export default function TicketForm({
         const category = jobCategories.find(
             (cat) => cat.id.toString() === formData.category_id.toString()
         );
-        return category?.job_types || [];
+        return category?.jobTypes || category?.job_types || [];
     }, [formData.category_id, jobCategories]);
 
     // Populate form if editing
@@ -215,6 +220,29 @@ export default function TicketForm({
         } else {
             setTicketAttachments([]);
             setActiveAttachmentTab(0);
+        }
+
+        // Load existing payment proofs from ticket.payments[0].documents if available
+
+
+        if (ticket && ticket.payments && ticket.payments.length > 0) {
+            const firstPayment = ticket.payments[0];
+            if (firstPayment.documents && firstPayment.documents.length > 0) {
+                console.log("firstPayment.documents:", firstPayment.documents);
+                const existingProofs = firstPayment.documents.map((doc, index) => ({
+                    preview: `/storage/${doc.file_path}`,
+                    file: null,
+                    existing: true,
+                    id: doc.id,
+                    name: `Proof ${index + 1}`,
+                }));
+                console.log("existingProofs:", existingProofs);
+                setPaymentProofs(existingProofs);
+                setActiveProofTab(0);
+            }
+        } else {
+            setPaymentProofs([]);
+            setActiveProofTab(0);
         }
     }, [ticket]);
 
@@ -503,8 +531,14 @@ export default function TicketForm({
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.customer_id) {
+        if (!isPublic && !formData.customer_id) {
             newErrors.customer_id = "Customer is required";
+        }
+
+        if (isPublic) {
+            if (!formData.customer_name?.trim()) newErrors.customer_name = "Name is required";
+            if (!formData.customer_email?.trim()) newErrors.customer_email = "Email is required";
+            if (!formData.customer_phone?.trim()) newErrors.customer_phone = "Phone is required";
         }
 
         if (!formData.description.trim()) {
@@ -764,6 +798,47 @@ export default function TicketForm({
 
                 {/* RIGHT COLUMN — ALL FORM FIELDS */}
                 <div className="col-md-9">
+                    {/* CUSTOMER DETAILS (PUBLIC ONLY) */}
+                    {isPublic && (
+                        <Section title="Customer Details">
+                            <div className="row">
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Full Name"
+                                        type="text"
+                                        name="customer_name"
+                                        value={formData.customer_name}
+                                        onChange={handleChange}
+                                        error={errors.customer_name}
+                                        required
+                                    />
+                                </div>
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Email Address"
+                                        type="email"
+                                        name="customer_email"
+                                        value={formData.customer_email}
+                                        onChange={handleChange}
+                                        error={errors.customer_email}
+                                        required
+                                    />
+                                </div>
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Phone Number"
+                                        type="text"
+                                        name="customer_phone"
+                                        value={formData.customer_phone}
+                                        onChange={handleChange}
+                                        error={errors.customer_phone}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </Section>
+                    )}
+
                     {/* JOB DETAILS */}
                     <Section title="Job Details">
                         <div className="row">
@@ -1010,7 +1085,9 @@ export default function TicketForm({
                         </div>
                     )}
 
+
                     {/* SCHEDULE & PAYMENT */}
+                    <hr className="my-2" />
                     <Section title="Schedule & Payment">
                         <div className="row">
                             <div className="col-md-4">
@@ -1050,6 +1127,82 @@ export default function TicketForm({
                                 />
                             </div>
                         </div>
+                    </Section>
+                    <Section title="Billing">
+                        <div className="row">
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Downpayment"
+                                    type="number"
+                                    name="downpayment"
+                                    value={formData.downpayment}
+                                    onChange={handleChange}
+                                    error={errors.downpayment}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                />
+                            </div>
+                            {hasPermission("tickets", "price_edit") ? (
+                                <>
+                                    <div className="col-md-3">
+                                        <div className="custom-control custom-checkbox float-end">
+                                            <input
+                                                type="checkbox"
+                                                className="custom-control-input"
+                                                id="enableDiscount"
+                                                checked={enableDiscount}
+                                                onChange={(e) => {
+                                                    setEnableDiscount(e.target.checked);
+                                                    // if (!e.target.checked) {
+                                                    //     setFormData((prev) => ({
+                                                    //         ...prev,
+                                                    //         discount: "",
+                                                    //         discount_amount: "0.00",
+                                                    //     }));
+                                                    // }
+                                                }}
+                                            />
+                                            <label
+                                                className="custom-control-label"
+                                                htmlFor="enableDiscount"
+                                            >
+                                                <i className="ti-cut mr-1"></i>{" "}
+                                                <small>Add Discount</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div className="col-md-2">
+                                        <FormInput
+                                            label="Discount (%)"
+                                            type="number"
+                                            name="discount"
+                                            value={formData.discount}
+                                            onChange={handleChange}
+                                            error={errors.discount}
+                                            placeholder="0"
+                                            step="0.01"
+                                            min="0"
+                                            max="100"
+                                            disabled={!enableDiscount}
+                                        />
+                                    </div>
+                                    <div className="col-md-3">
+                                        <FormInput
+                                            label="Discount Amount"
+                                            type="number"
+                                            name="discount_amount"
+                                            value={formData.discount_amount}
+                                            readOnly
+                                            className="bg-light"
+                                            disabled={!enableDiscount}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="col-md-8"></div>)
+                            }
+                        </div>
                         <div className="row mt-3">
                             <div className="col-md-4">
                                 <FormInput
@@ -1083,7 +1236,7 @@ export default function TicketForm({
                         </div>
                         <div className="row">
                             <div className="col-md-6">
-                                <div className="mt-32">
+                                <div className="mt-10">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Payment Proofs (GCash / bank receipts)
                                     </label>
@@ -1113,20 +1266,25 @@ export default function TicketForm({
                                                     >
                                                         <i className="ti-receipt mr-1"></i>
                                                         Proof {index + 1}
+                                                        {paymentProofs[index].existing && (
+                                                            <span className="badge badge-success ml-1">
+                                                                Existing
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 ))}
                                             </div>
                                         )}
                                         <div
                                             className="border rounded overflow-hidden bg-light d-flex align-items-center justify-content-center"
-                                            style={{ minHeight: "220px" }}
+                                            style={{ minHeight: "300px", maxHeight: "300px" }}
                                         >
                                             <img
                                                 src={paymentProofs[activeProofTab].preview}
                                                 alt={`Payment proof ${activeProofTab + 1}`}
                                                 className="img-fluid"
                                                 style={{
-                                                    maxHeight: "100%",
+                                                    maxHeight: "300px",
                                                     maxWidth: "100%",
                                                     objectFit: "contain",
                                                 }}
@@ -1139,8 +1297,17 @@ export default function TicketForm({
                                             type="button"
                                             className="btn btn-sm btn-outline-danger w-100 mt-2"
                                             onClick={() => removePaymentProof(activeProofTab)}
+                                            disabled={paymentProofs[activeProofTab]?.existing}
+                                            title={
+                                                paymentProofs[activeProofTab]?.existing
+                                                    ? "Existing payment proofs cannot be removed here."
+                                                    : "Remove proof"
+                                            }
                                         >
-                                            <i className="ti-trash mr-1"></i>Remove Proof
+                                            <i className="ti-trash mr-1"></i>
+                                            {paymentProofs[activeProofTab]?.existing
+                                                ? "Existing Proof"
+                                                : "Remove Proof"}
                                         </button>
                                     </div>
                                 ) : (
@@ -1155,113 +1322,12 @@ export default function TicketForm({
                         </div>
                     </Section>
 
-                    {/* BILLING */}
-                    <Section title="Billing">
-                        <div className="row">
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Downpayment"
-                                    type="number"
-                                    name="downpayment"
-                                    value={formData.downpayment}
-                                    onChange={handleChange}
-                                    error={errors.downpayment}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                />
-                            </div>
-
-                            <div className="col-md-3">
-                                <div className="custom-control custom-checkbox float-end">
-                                    <input
-                                        type="checkbox"
-                                        className="custom-control-input"
-                                        id="enableDiscount"
-                                        checked={enableDiscount}
-                                        onChange={(e) => {
-                                            setEnableDiscount(e.target.checked);
-                                            // if (!e.target.checked) {
-                                            //     setFormData((prev) => ({
-                                            //         ...prev,
-                                            //         discount: "",
-                                            //         discount_amount: "0.00",
-                                            //     }));
-                                            // }
-                                        }}
-                                    />
-                                    <label
-                                        className="custom-control-label"
-                                        htmlFor="enableDiscount"
-                                    >
-                                        <i className="ti-cut mr-1"></i>{" "}
-                                        <small>Add Discount</small>
-                                    </label>
-                                </div>
-                            </div>
-                            <div className="col-md-2">
-                                <FormInput
-                                    label="Discount (%)"
-                                    type="number"
-                                    name="discount"
-                                    value={formData.discount}
-                                    onChange={handleChange}
-                                    error={errors.discount}
-                                    placeholder="0"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    disabled={!enableDiscount}
-                                />
-                            </div>
-                            <div className="col-md-3">
-                                <FormInput
-                                    label="Discount Amount"
-                                    type="number"
-                                    name="discount_amount"
-                                    value={formData.discount_amount}
-                                    readOnly
-                                    className="bg-light"
-                                    disabled={!enableDiscount}
-                                />
-                            </div>
-                        </div>
-
-                        {/* {enableDiscount && ( */}
-                        {/* <div className="row mt-3">
-                    <div className="col-md-4">
-                        <FormInput
-                            label="Discount (%)"
-                            type="number"
-                            name="discount"
-                            value={formData.discount}
-                            onChange={handleChange}
-                            error={errors.discount}
-                            placeholder="0"
-                            step="0.01"
-                            min="0"
-                            max="100"
-                        />
-                    </div>
-                    <div className="col-md-4">
-                        <FormInput
-                            label="Discount Amount"
-                            type="number"
-                            name="discount_amount"
-                            value={formData.discount_amount}
-                            readOnly
-                            className="bg-light"
-                        />
-                    </div>
-                </div> */}
-                        {/* )} */}
-                    </Section>
                     <Section title="Attachments">
                         <div className="card shadow-sm border-0">
                             <div className="card-body">
                                 <div className="d-flex align-items-center mb-2">
                                     <i className="ti-image mr-2"></i>
-                                    <span className="font-semibold">Attachments</span>
+                                    <span className="font-semibold">Attachments/Mock-Up Design</span>
                                 </div>
                                 <input
                                     type="file"
@@ -1282,8 +1348,8 @@ export default function TicketForm({
                                                         key={index}
                                                         type="button"
                                                         className={`nav-link btn-sm py-1 px-2 ${activeAttachmentTab === index
-                                                                ? "active"
-                                                                : ""
+                                                            ? "active"
+                                                            : ""
                                                             }`}
                                                         onClick={() => setActiveAttachmentTab(index)}
                                                         style={{ fontSize: "0.75rem" }}
@@ -1303,7 +1369,8 @@ export default function TicketForm({
                                         <div
                                             className="border rounded overflow-hidden bg-light"
                                             style={{
-                                                aspectRatio: "1",
+                                                // minHeight: "400px",
+                                                // maxHeight: "400px",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
@@ -1331,7 +1398,7 @@ export default function TicketForm({
 
                                         <button
                                             type="button"
-                                            className="btn btn-sm btn-outline-danger w-100 mt-2"
+                                            className="btn btn-sm btn-outline-danger w-20 mt-2"
                                             onClick={() =>
                                                 removeTicketAttachment(activeAttachmentTab)
                                             }

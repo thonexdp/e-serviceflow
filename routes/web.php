@@ -16,6 +16,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicTicketController;
 use App\Http\Controllers\UserController;
+use App\Models\JobCategory;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -53,10 +54,12 @@ Route::post('/api/public/tickets/search', [PublicTicketController::class, 'searc
     ->name('public.tickets.search');
 
 // About page (public)
-Route::get('/about', function () {
-    // TODO: Implement about page
-    return Inertia::render('Public/About');
-})->name('about');
+Route::get('/orders', function () {
+    $jobCategories = JobCategory::with('jobTypes')->get();
+    return Inertia::render('Public/Orders', [
+        'jobCategories' => $jobCategories
+    ]);
+})->name('orders');
 
 
 // // Notifications

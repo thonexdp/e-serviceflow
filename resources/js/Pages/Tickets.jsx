@@ -37,16 +37,146 @@ export default function Tickets({
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const { api, buildUrl } = useRoleApi();
+    const { flash, auth } = usePage().props;
+
 
     useEffect(() => {
         setSelectedCustomer(selectedCustomer);
     }, [selectedCustomer]);
 
     const [localSearch, setLocalSearch] = useState(filters.search || "");
+    const [dateRange, setDateRange] = useState(filters.date_range || "");
+    const [customStartDate, setCustomStartDate] = useState(filters.start_date || "");
+    const [customEndDate, setCustomEndDate] = useState(filters.end_date || "");
+    const [showCustomDateInputs, setShowCustomDateInputs] = useState(filters.date_range === "custom");
 
     useEffect(() => {
         setLocalSearch(filters.search || "");
     }, [filters.search]);
+
+    useEffect(() => {
+        setDateRange(filters.date_range || "");
+        setCustomStartDate(filters.start_date || "");
+        setCustomEndDate(filters.end_date || "");
+        setShowCustomDateInputs(filters.date_range === "custom");
+    }, [filters.date_range, filters.start_date, filters.end_date]);
+
+    // Helper function to get date range values
+    const getDateRangeValues = (rangeType) => {
+        const today = new Date();
+
+        // Check if rangeType is a 4-digit year
+        if (/^\d{4}$/.test(rangeType)) {
+            return {
+                start_date: `${rangeType}-01-01`,
+                end_date: `${rangeType}-12-31`
+            };
+        }
+
+        switch (rangeType) {
+            case 'last_30_days':
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                return {
+                    start_date: thirtyDaysAgo.toISOString().split('T')[0],
+                    end_date: today.toISOString().split('T')[0]
+                };
+            case 'custom':
+                return {
+                    start_date: customStartDate,
+                    end_date: customEndDate
+                };
+            default:
+                return { start_date: null, end_date: null };
+        }
+    };
+
+    // Generate years for filter (Current year down to 2020)
+    const currentYear = new Date().getFullYear();
+    const filterYears = [];
+    for (let y = currentYear; y >= 2025; y--) {
+        filterYears.push(y);
+    }
+
+    const handleDateRangeChange = (rangeType) => {
+        setDateRange(rangeType);
+
+        if (rangeType === 'custom') {
+            setShowCustomDateInputs(true);
+            // Don't apply filter yet, wait for user to input dates
+            return;
+        }
+
+        setShowCustomDateInputs(false);
+
+        if (!rangeType) {
+            // Clear date filters
+            handleFilterChange('date_range', '');
+            handleFilterChange('start_date', '');
+            handleFilterChange('end_date', '');
+            return;
+        }
+
+        const dates = getDateRangeValues(rangeType);
+
+        const newFilters = {
+            search: filters.search,
+            status: filters.status,
+            payment_status: filters.payment_status,
+            customer_id: _selectedCustomer?.id,
+            date_range: rangeType,
+            start_date: dates.start_date,
+            end_date: dates.end_date,
+        };
+
+        // Clean up empty values
+        Object.keys(newFilters).forEach(k => {
+            if (newFilters[k] === '' || newFilters[k] === null || newFilters[k] === undefined) {
+                delete newFilters[k];
+            }
+        });
+
+        router.get(buildUrl("tickets"), newFilters, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    };
+
+    const applyCustomDateRange = () => {
+        if (!customStartDate || !customEndDate) {
+            alert('Please select both start and end dates');
+            return;
+        }
+
+        if (new Date(customStartDate) > new Date(customEndDate)) {
+            alert('Start date cannot be after end date');
+            return;
+        }
+
+        const newFilters = {
+            search: filters.search,
+            status: filters.status,
+            payment_status: filters.payment_status,
+            customer_id: _selectedCustomer?.id,
+            date_range: 'custom',
+            start_date: customStartDate,
+            end_date: customEndDate,
+        };
+
+        // Clean up empty values
+        Object.keys(newFilters).forEach(k => {
+            if (newFilters[k] === '' || newFilters[k] === null || newFilters[k] === undefined) {
+                delete newFilters[k];
+            }
+        });
+
+        router.get(buildUrl("tickets"), newFilters, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    };
 
     const handleFilterChange = (key, value) => {
         const newFilters = {
@@ -92,17 +222,14 @@ export default function Tickets({
         attachments: [],
     });
 
-    const { flash, auth } = usePage().props;
 
     const hasPermission = (module, feature) => {
         if (auth.user.role === 'admin') return true;
         return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
     };
 
+    console.log("aaa:", auth);
 
-
-    const isAllowedToAddCustomer =
-        auth?.user?.role === "admin" || auth?.user?.role === "FrontDesk";
 
 
     const handleCustomerSubmit = async (formData) => {
@@ -300,6 +427,7 @@ export default function Tickets({
 
     const handleEditTicket = (ticket) => {
         console.log(ticket);
+        setSelectedCustomer(ticket?.customer);
         setEditingTicket(ticket);
         setTicketModalOpen(true);
     };
@@ -478,7 +606,14 @@ export default function Tickets({
             render: (row) => (
                 <div>
                     {getStatusBadge(row.status)}
-                    {row.status !== "completed" &&
+                    {row.current_workflow_step && row.status !== "completed" && (
+                        <div className="text-secondary small">
+                            <i className="ti-time mr-1"></i>
+                            <i>{row.current_workflow_step}</i>
+                        </div>
+                    )}
+
+                    {/* {row.status !== "completed" &&
                         row.status !== "cancelled" && (
                             <button
                                 onClick={() => handleOpenStatusModal(row)}
@@ -488,7 +623,7 @@ export default function Tickets({
                             >
                                 <i className="ti-pencil"></i>
                             </button>
-                        )}
+                        )} */}
                 </div>
             ),
         },
@@ -525,9 +660,11 @@ export default function Tickets({
                 onClose={closeTicketModal}
                 size="7xl"
                 submitButtonText={null}
+                staticBackdrop={true}
             >
                 <TicketForm
                     ticket={editingTicket}
+                    hasPermission={hasPermission}
                     customerId={_selectedCustomer?.id}
                     onSubmit={handleTicketSubmit}
                     onCancel={closeTicketModal}
@@ -990,7 +1127,7 @@ export default function Tickets({
 
                 <section id="main-content">
                     {/* Customer Search and Add Section */}
-                    {isAllowedToAddCustomer && (
+                    {hasPermission('customers', 'create') && (
                         <div className="row">
                             <div className="col-lg-6">
                                 <div className="card">
@@ -1104,6 +1241,33 @@ export default function Tickets({
                                 <div className="card-title">
                                     <h4>Tickets</h4>
                                     <div className="button-list float-end">
+                                        {/* <button
+                                            className="btn btn-outline-secondary btn-block"
+                                            onClick={() => {
+                                                setDateRange('');
+                                                setCustomStartDate('');
+                                                setCustomEndDate('');
+                                                setShowCustomDateInputs(false);
+                                                router.get(buildUrl("tickets"));
+                                            }}
+                                            style={{ height: '42px' }}
+                                        >
+                                            Reset
+                                        </button> */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setDateRange('');
+                                                setCustomStartDate('');
+                                                setCustomEndDate('');
+                                                setShowCustomDateInputs(false);
+                                                router.get(buildUrl("tickets"));
+                                            }}
+                                            className="px-3 py-2 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
+                                        >
+                                            <i className="ti-reload"></i>
+                                        </button>
+
                                         {hasPermission('tickets', 'create') && (
 
                                             <button
@@ -1131,7 +1295,7 @@ export default function Tickets({
                                 </div>
                                 <div className="card-body">
                                     <div className="row mb-4">
-                                        <div className="col-md-4">
+                                        <div className="col-md-3">
                                             <div className="input-group">
                                                 <input
                                                     type="text"
@@ -1154,7 +1318,7 @@ export default function Tickets({
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="col-md-3">
+                                        <div className="col-md-2">
                                             <select
                                                 className="form-control"
                                                 value={filters.status || ''}
@@ -1167,7 +1331,7 @@ export default function Tickets({
                                                 <option value="cancelled">Cancelled</option>
                                             </select>
                                         </div>
-                                        <div className="col-md-3">
+                                        <div className="col-md-2">
                                             <select
                                                 className="form-control"
                                                 value={filters.payment_status || ''}
@@ -1179,16 +1343,95 @@ export default function Tickets({
                                                 <option value="paid">Paid</option>
                                             </select>
                                         </div>
-                                        <div className="col-md-2">
-                                            <button
-                                                className="btn btn-outline-secondary btn-block"
-                                                onClick={() => router.get(buildUrl("tickets"))}
-                                                style={{ height: '42px' }}
+                                        <div className="col-md-3">
+                                            <select
+                                                className="form-control"
+                                                value={dateRange}
+                                                onChange={(e) => handleDateRangeChange(e.target.value)}
+                                                title="Filter by date range"
                                             >
-                                                Reset
-                                            </button>
+                                                <option value="">All Dates</option>
+                                                <option value="last_30_days">Last 30 Days</option>
+                                                {filterYears.map(year => (
+                                                    <option key={year} value={year}>{year}</option>
+                                                ))}
+                                                <option value="custom">Custom Range</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-2">
                                         </div>
                                     </div>
+                                    {showCustomDateInputs && (
+                                        <div className="row mb-4">
+                                            <div className="col-md-3">
+                                                <label className="small text-muted mb-1">Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    className="form-control"
+                                                    value={customStartDate}
+                                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <label className="small text-muted mb-1">End Date</label>
+                                                <input
+                                                    type="date"
+                                                    className="form-control"
+                                                    value={customEndDate}
+                                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="col-md-3" style={{ paddingTop: '24px' }}>
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={applyCustomDateRange}
+                                                    style={{ height: '42px' }}
+                                                >
+                                                    <i className="ti-check mr-1"></i>
+                                                    Apply Date Range
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Active Filters Indicator */}
+                                    {(filters.search || filters.status || filters.payment_status || filters.date_range) && (
+                                        <div className="row mb-3">
+                                            <div className="col-12">
+                                                <div className="alert alert-light border p-2">
+                                                    <small className="text-muted mr-2">
+                                                        <i className="ti-filter mr-1"></i>
+                                                        <strong>Active Filters:</strong>
+                                                    </small>
+                                                    {filters.search && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Search: {filters.search}
+                                                        </span>
+                                                    )}
+                                                    {filters.status && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Status: {filters.status}
+                                                        </span>
+                                                    )}
+                                                    {filters.payment_status && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Payment: {filters.payment_status}
+                                                        </span>
+                                                    )}
+                                                    {filters.date_range && (
+                                                        <span className="badge badge-primary mr-2">
+                                                            <i className="ti-calendar mr-1"></i>
+                                                            {filters.date_range === 'custom'
+                                                                ? `Custom: ${filters.start_date} to ${filters.end_date}`
+                                                                : filters.date_range === 'last_30_days'
+                                                                    ? 'Last 30 Days'
+                                                                    : `Year: ${filters.date_range}`
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div
                                         className="alert alert-info"
                                         role="alert"
