@@ -22,10 +22,10 @@ window.Pusher = Pusher;
 
 // Only initialize Echo if Pusher key is available
 // if (import.meta.env.VITE_PUSHER_APP_KEY) {
-if (import.meta.env.PUSHER_APP_KEY) {
+if ('staging-key') {
      window.Echo = new Echo({
         broadcaster: 'pusher',
-        key: import.meta.env.PUSHER_APP_KEY,
+        key: "staging-key",
         cluster: import.meta.env.PUSHER_APP_CLUSTER ?? 'mt1',
         wsHost: import.meta.env.PUSHER_HOST || window.location.hostname,
         wsPort: import.meta.env.PUSHER_PORT ?? 6001,
