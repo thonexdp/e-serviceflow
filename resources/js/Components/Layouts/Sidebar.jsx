@@ -171,7 +171,7 @@ export default function Sidebar({ isCollapsed }) {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/admin/customers">
+                                    <Link href="/admin/reports">
                                         <i className="ti-stats-up"></i> Reports
                                         & Analytics
                                     </Link>
