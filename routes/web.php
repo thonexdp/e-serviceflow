@@ -44,6 +44,77 @@ Route::get('/', function () {
     return Inertia::render('Public/Home');
 })->name('home');
 
+// Debug route - Nice UI page (TEMPORARY - REMOVE IN PRODUCTION!)
+Route::get('/test-env', function () {
+    $serverEnv = [
+        'APP_ENV' => env('APP_ENV'),
+        'APP_DEBUG' => env('APP_DEBUG'),
+        'APP_URL' => env('APP_URL'),
+        'BROADCAST_DRIVER' => env('BROADCAST_DRIVER'),
+        'PUSHER_APP_ID' => env('PUSHER_APP_ID'),
+        'PUSHER_APP_KEY' => env('PUSHER_APP_KEY'),
+        'PUSHER_APP_SECRET' => substr(env('PUSHER_APP_SECRET', 'not-set'), 0, 5) . '***', // Partially hide secret
+        'PUSHER_HOST' => env('PUSHER_HOST'),
+        'PUSHER_PORT' => env('PUSHER_PORT'),
+        'PUSHER_SCHEME' => env('PUSHER_SCHEME'),
+        'PUSHER_APP_CLUSTER' => env('PUSHER_APP_CLUSTER'),
+    ];
+
+    $broadcastingConfig = [
+        'default' => config('broadcasting.default'),
+        'connections.pusher.key' => config('broadcasting.connections.pusher.key'),
+        'connections.pusher.secret' => substr(config('broadcasting.connections.pusher.secret', 'not-set'), 0, 5) . '***',
+        'connections.pusher.app_id' => config('broadcasting.connections.pusher.app_id'),
+        'connections.pusher.options.host' => config('broadcasting.connections.pusher.options.host'),
+        'connections.pusher.options.port' => config('broadcasting.connections.pusher.options.port'),
+        'connections.pusher.options.scheme' => config('broadcasting.connections.pusher.options.scheme'),
+        'connections.pusher.options.cluster' => config('broadcasting.connections.pusher.options.cluster'),
+    ];
+
+    return Inertia::render('Debug/EnvTest', [
+        'serverEnv' => $serverEnv,
+        'broadcastingConfig' => $broadcastingConfig,
+    ]);
+});
+
+// Debug route - Simple JSON response (TEMPORARY - REMOVE IN PRODUCTION!)
+Route::get('/test-env-json', function () {
+    $data = [
+        'server_env' => [
+            'APP_ENV' => env('APP_ENV'),
+            'APP_DEBUG' => env('APP_DEBUG'),
+            'APP_URL' => env('APP_URL'),
+            'BROADCAST_DRIVER' => env('BROADCAST_DRIVER'),
+            'PUSHER_APP_ID' => env('PUSHER_APP_ID'),
+            'PUSHER_APP_KEY' => env('PUSHER_APP_KEY'),
+            'PUSHER_APP_SECRET' => substr(env('PUSHER_APP_SECRET', 'not-set'), 0, 5) . '***',
+            'PUSHER_HOST' => env('PUSHER_HOST'),
+            'PUSHER_PORT' => env('PUSHER_PORT'),
+            'PUSHER_SCHEME' => env('PUSHER_SCHEME'),
+            'PUSHER_APP_CLUSTER' => env('PUSHER_APP_CLUSTER'),
+        ],
+        'broadcasting_config' => [
+            'default' => config('broadcasting.default'),
+            'pusher_key' => config('broadcasting.connections.pusher.key'),
+            'pusher_secret' => substr(config('broadcasting.connections.pusher.secret', 'not-set'), 0, 5) . '***',
+            'pusher_app_id' => config('broadcasting.connections.pusher.app_id'),
+            'pusher_host' => config('broadcasting.connections.pusher.options.host'),
+            'pusher_port' => config('broadcasting.connections.pusher.options.port'),
+            'pusher_scheme' => config('broadcasting.connections.pusher.options.scheme'),
+            'pusher_cluster' => config('broadcasting.connections.pusher.options.cluster'),
+        ],
+        'all_env_pusher' => [
+            'VITE_PUSHER_APP_KEY' => env('VITE_PUSHER_APP_KEY'),
+            'VITE_PUSHER_HOST' => env('VITE_PUSHER_HOST'),
+            'VITE_PUSHER_PORT' => env('VITE_PUSHER_PORT'),
+            'VITE_PUSHER_SCHEME' => env('VITE_PUSHER_SCHEME'),
+            'VITE_PUSHER_APP_CLUSTER' => env('VITE_PUSHER_APP_CLUSTER'),
+        ],
+    ];
+
+    return response()->json($data, 200, [], JSON_PRETTY_PRINT);
+});
+
 // Debug route to test database connection
 Route::get('/testdb', function () {
     try {
@@ -111,7 +182,7 @@ Route::get('/orders', function () {
             ->orderBy('sort_order')
             ->orderBy('name');
     }])->orderBy('name')->get();
-    
+
     return Inertia::render('Public/Orders', [
         'jobCategories' => $jobCategories
     ]);

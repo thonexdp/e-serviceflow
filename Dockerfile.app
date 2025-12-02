@@ -1,5 +1,20 @@
 # Stage 1 — build assets
 FROM node:18 AS node-builder
+
+# Accept build arguments for VITE environment variables
+ARG VITE_PUSHER_APP_KEY
+ARG VITE_PUSHER_HOST
+ARG VITE_PUSHER_PORT
+ARG VITE_PUSHER_SCHEME
+ARG VITE_PUSHER_APP_CLUSTER
+
+# Make them available as environment variables during build
+ENV VITE_PUSHER_APP_KEY=$VITE_PUSHER_APP_KEY
+ENV VITE_PUSHER_HOST=$VITE_PUSHER_HOST
+ENV VITE_PUSHER_PORT=$VITE_PUSHER_PORT
+ENV VITE_PUSHER_SCHEME=$VITE_PUSHER_SCHEME
+ENV VITE_PUSHER_APP_CLUSTER=$VITE_PUSHER_APP_CLUSTER
+
 WORKDIR /workspace
 COPY package*.json package-lock.json ./
 RUN npm ci
@@ -8,6 +23,8 @@ COPY vite.config.js jsconfig.json ./
 # Copy other necessary files for build if needed (e.g. tailwind, postcss)
 COPY tailwind.config.js postcss.config.js ./
 COPY public public
+
+# Build with VITE_ env vars available
 RUN npm run build
 
 # Stage 2 — PHP + app
