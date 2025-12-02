@@ -13,9 +13,7 @@ use Illuminate\Support\Str;
 
 class PublicOrderController extends Controller
 {
-    public function __construct(protected PaymentRecorder $paymentRecorder)
-    {
-    }
+    public function __construct(protected PaymentRecorder $paymentRecorder) {}
 
     /**
      * Find or create a customer by email
@@ -94,7 +92,7 @@ class PublicOrderController extends Controller
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
         $paymentStatus = ($paymentMethod === 'walkin') ? 'pending' : 'pending';
-        
+
         $ticketData = [
             'customer_id' => $validated['customer_id'],
             'description' => $validated['description'],
@@ -120,7 +118,7 @@ class PublicOrderController extends Controller
         // Handle file upload
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $path = $file->store('tickets/customer', 'public');
+            $path = Storage::put('tickets/customer', $file);
             $ticketData['file_path'] = $path;
         }
 
@@ -225,4 +223,3 @@ class PublicOrderController extends Controller
         $ticketData['total_amount'] = round($subtotal, 2);
     }
 }
-
