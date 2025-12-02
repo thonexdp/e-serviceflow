@@ -140,9 +140,6 @@ export default function FrontDesk({
         setPreviewModal({ isOpen: true, fileUrl: filePath });
     };
 
-    // ============================================
-    // PAYMENT MODAL HANDLERS
-    // ============================================
     const handleOpenPaymentModal = (ticket) => {
         setSelectedTicket(ticket);
         const balance = parseFloat(ticket.outstanding_balance || ticket.total_amount || 0);
@@ -559,26 +556,26 @@ export default function FrontDesk({
                         label="New Orders"
                         statistics={statistics.newTickets}
                         icon="ti-printer"
+                        color="bg-primary"
                     />
-                    {/* <CardStatistics
-                        label="Online Orders"
-                        statistics={statistics.newOnlineOrders}
-                        icon="ti-shopping-cart"
-                    /> */}
                     <CardStatistics
                         label="Pending Payment"
                         statistics={statistics.paymentPending}
                         icon="ti-credit-card"
+                        color="bg-warning"
                     />
                     <CardStatistics
                         label="Completed"
                         statistics={statistics.completed}
                         icon="ti-check-box"
+                        color="bg-success"
+
                     />
                     <CardStatistics
                         label="In Progress"
                         statistics={statistics.inProgress}
                         icon="ti-reload"
+                        color="bg-info"
                     />
                 </div>
 

@@ -99,7 +99,7 @@ class MockupsController extends Controller
         }
 
         foreach ($files as $file) {
-            $path = $file->store('tickets/mockups', 'public');
+            $path = Storage::put('tickets/mockups', $file);
 
             TicketFile::create([
                 'ticket_id' => $ticket->id,
@@ -181,11 +181,11 @@ class MockupsController extends Controller
     {
         $file = TicketFile::findOrFail($id);
 
-        if (!Storage::disk('public')->exists($file->filepath)) {
+        if (!Storage::exists($file->filepath)) {
             abort(404);
         }
 
-        return Storage::disk('public')->download($file->filepath, $file->filename);
+        return Storage::download($file->filepath, $file->filename);
     }
 
     /**

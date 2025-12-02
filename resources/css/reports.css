@@ -1,0 +1,239 @@
+/**
+ * Reports & Analytics Styles
+ */
+
+.stat-card {
+    padding: 20px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.stat-card h6 {
+    margin: 0 0 10px 0;
+    font-size: 0.875rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.stat-card h3 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #212529;
+}
+
+.stat-card.bg-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+}
+
+.stat-card.bg-success {
+    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+    border-color: #84fab0;
+}
+
+.stat-card.bg-danger {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    border-color: #fa709a;
+}
+
+.stat-card.bg-warning {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+    border-color: #ffecd2;
+}
+
+.stat-card.bg-info {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    border-color: #a8edea;
+}
+
+.list-group-item.active {
+    background-color: #0b84ff !important;
+    border-color: #0b84ff !important;
+}
+
+.list-group-item i {
+    margin-right: 8px;
+    width: 20px;
+    display: inline-block;
+}
+
+/* Print Styles */
+@media print {
+    .no-print,
+    .header,
+    .sidebar,
+    .footer,
+    button,
+    .btn {
+        display: none !important;
+    }
+    
+    .print-header {
+        display: block !important;
+        border-bottom: 2px solid #000;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+    }
+    
+    body {
+        margin: 0;
+        padding: 20px;
+        font-size: 12pt;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+    
+    table {
+        page-break-inside: auto;
+    }
+    
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+    
+    thead {
+        display: table-header-group;
+    }
+    
+    tfoot {
+        display: table-footer-group;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+    }
+    
+    .stat-card {
+        border: 1px solid #ddd !important;
+        page-break-inside: avoid;
+    }
+    
+    @page {
+        margin: 1cm;
+    }
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+    .table-responsive {
+        overflow-x: auto;
+    }
+}
+
+/* List Group Styling */
+.list-group-item {
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #0b84ff;
+}
+
+.list-group-item.active {
+    border-left-color: #fff;
+}
+
+/* Table Enhancements */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Color Indicators */
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-info {
+    color: #17a2b8 !important;
+}
+
+/* Report Header */
+.page-header h1 {
+    color: #212529;
+    font-weight: 700;
+}
+
+.page-header h1 span {
+    color: #0b84ff;
+}
+
+/* Card Enhancements */
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-title h4 {
+    font-weight: 600;
+    color: #212529;
+}
+
+/* Badges */
+.badge {
+    padding: 0.375rem 0.75rem;
+    font-weight: 600;
+    border-radius: 0.25rem;
+}
+
+/* Alert Styling */
+.alert {
+    border-radius: 0.5rem;
+    border-left: 4px solid;
+}
+
+.alert-info {
+    border-left-color: #17a2b8;
+}
+
+.alert-success {
+    border-left-color: #28a745;
+}
+
+.alert-warning {
+    border-left-color: #ffc107;
+}
+
+.alert-danger {
+    border-left-color: #dc3545;
+}
+

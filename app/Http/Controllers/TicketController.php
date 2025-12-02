@@ -182,7 +182,7 @@ class TicketController extends BaseCrudController
         // Handle legacy single file upload
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $path = $file->store('tickets/customer', 'public');
+            $path = Storage::put('tickets/customer', $file);
             $ticketData['file_path'] = $path;
         }
 
@@ -206,7 +206,7 @@ class TicketController extends BaseCrudController
             if (!$attachment) {
                 continue;
             }
-            $storedPath = $attachment->store('tickets/customer', 'public');
+            $storedPath = Storage::put('tickets/customer', $attachment);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
                 'filename' => $attachment->getClientOriginalName(),
@@ -294,10 +294,10 @@ class TicketController extends BaseCrudController
         // Handle file upload
         if ($request->hasFile('file')) {
             if ($ticket->file_path) {
-                Storage::disk('public')->delete($ticket->file_path);
+                Storage::delete($ticket->file_path);
             }
             $file = $request->file('file');
-            $path = $file->store('tickets/customer', 'public');
+            $path = Storage::put('tickets/customer', $file);
             $ticketData['file_path'] = $path;
 
             TicketFile::create([
@@ -317,7 +317,7 @@ class TicketController extends BaseCrudController
             if (!$attachment) {
                 continue;
             }
-            $storedPath = $attachment->store('tickets/customer', 'public');
+            $storedPath = Storage::put('tickets/customer', $attachment);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
                 'filename' => $attachment->getClientOriginalName(),
@@ -339,7 +339,7 @@ class TicketController extends BaseCrudController
 
         // Delete associated file
         if ($ticket->file_path) {
-            Storage::disk('public')->delete($ticket->file_path);
+            Storage::delete($ticket->file_path);
         }
 
         $ticket->delete();
