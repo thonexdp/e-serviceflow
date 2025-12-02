@@ -36,6 +36,7 @@ export default function Productions({
     const [currentWorkflowStep, setCurrentWorkflowStep] = useState(null);
     const [stockConsumptions, setStockConsumptions] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
     const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
 
@@ -129,6 +130,7 @@ export default function Productions({
         setSelectedTicket(null);
         setProducedQuantity(0);
         setStockConsumptions([]);
+        setSelectedPreviewFile(null);
     };
 
     const handleStartProduction = (ticketId) => {
@@ -498,33 +500,58 @@ export default function Productions({
                         <div className="mb-4">
                             <h6>Design Files:</h6>
                             {mockupFiles.length > 0 ? (
-                                <div className="table-responsive">
-                                    <table className="table table-sm table-bordered">
-                                        <thead>
-                                            <tr>
-                                                <th>Filename</th>
-                                                <th>Uploaded</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {mockupFiles.map((file) => (
-                                                <tr key={file.id}>
-                                                    <td>{file.filename}</td>
-                                                    <td>{new Date(file.created_at).toLocaleDateString()}</td>
-                                                    <td>
-                                                        <a
-                                                            href={`/mock-ups/files/${file.id}/download`}
-                                                            target="_blank"
-                                                            className="btn btn-link btn-sm text-blue-500"
-                                                        >
-                                                            <i className="ti-download"></i> Download
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div className="row">
+                                    <div className="col-md-7">
+                                        <div className="table-responsive">
+                                            <table className="table table-sm table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Filename</th>
+                                                        <th>Uploaded</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {mockupFiles.map((file) => (
+                                                        <tr key={file.id}>
+                                                            <td>{file.filename}</td>
+                                                            <td>{new Date(file.created_at).toLocaleDateString()}</td>
+                                                            <td>
+                                                                <a
+                                                                    href={`/mock-ups/files/${file.id}/download`}
+                                                                    target="_blank"
+                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                >
+                                                                    <i className="ti-download"></i> Download
+                                                                </a>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    onClick={() => setSelectedPreviewFile(file)}
+                                                                >
+                                                                    <i className="ti-image"></i> Preview
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div className="col-md-5">
+                                        <div className="card">
+                                            <div className="card-body text-center">
+                                                {selectedPreviewFile && (
+                                                    <img
+                                                        src={`/storage/${selectedPreviewFile.filepath}`}
+                                                        alt={selectedPreviewFile.filename}
+                                                        className="img-fluid mb-2"
+                                                        style={{ maxHeight: "280px", objectFit: "contain" }}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             ) : (
                                 <p className="text-muted">No design files available</p>

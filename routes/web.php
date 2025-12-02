@@ -190,10 +190,9 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/production/{id}/complete', [ProductionQueueController::class, 'markCompleted'])->name('production.complete');
     Route::post('/production/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->name('production.record-stock');
 
-    // Reports
-    Route::get('/reports', function () {
-        return Inertia::render('Reports');
-    })->name('reports');
+    // Reports & Analytics
+    Route::get('/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('reports');
+    Route::post('/reports/export-pdf', [App\Http\Controllers\ReportsController::class, 'exportPdf'])->name('reports.export-pdf');
 
     // Settings
     Route::get('/settings', function () {
