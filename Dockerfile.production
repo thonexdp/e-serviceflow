@@ -1,0 +1,28 @@
+# Production Dockerfile - Simple build
+FROM php:8.2-fpm
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git curl unzip libzip-dev libonig-dev libpng-dev libjpeg-dev \
+    libxml2-dev nginx supervisor ca-certificates libicu-dev \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd intl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+# Copy application files
+COPY . .
+
+# Install PHP dependencies
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+# Set permissions
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+EXPOSE 8080
+
+CMD ["php-fpm"
