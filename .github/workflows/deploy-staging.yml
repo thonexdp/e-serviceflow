@@ -11,7 +11,7 @@ env:
   APP_SERVICE_NAME: e-serviceflow-app
   SOKETI_SERVICE_NAME: e-serviceflow-soketi
   REPOSITORY: e-serviceflow-repo
-z
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
