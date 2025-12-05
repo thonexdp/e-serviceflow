@@ -24,6 +24,8 @@ export default function PrintShoppeLanding() {
                 ticket_number: trackingNumber.trim(),
             });
 
+            console.log(response.data);
+
             if (response.data.success) {
                 setOrderData(response.data.data);
             } else {
@@ -56,9 +58,9 @@ export default function PrintShoppeLanding() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                            <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
-                        </div>
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                                <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
+                            </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
                                 <p className="text-sm text-gray-600">Track Your Order</p>
@@ -133,6 +135,10 @@ export default function PrintShoppeLanding() {
                                                             <span className="text-sm text-gray-500">{item.date}</span>
                                                         )}
                                                     </div>
+                                                    {index === 3 && item.status === 'current' && (
+                                                        <span className="text-sm text-gray-500"> <i className='ti ti-reload mr-2'></i> <i>{orderData.current_workflow_step}</i> </span>
+                                                    )}
+
                                                     {item.status === 'current' && (
                                                         <p className="text-sm text-gray-600 mt-1">Your order is currently being processed</p>
                                                     )}
@@ -221,7 +227,7 @@ export default function PrintShoppeLanding() {
                             <h3 className="text-lg font-semibold mb-2">Need Printing Services?</h3>
                             <p className="text-indigo-100 text-sm mb-4">Create a new order and get professional printing solutions</p>
                             <button className="w-full bg-white text-indigo-600 px-4 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
-                            onClick={() => router.visit('/orders', { preserveState: true, preserveScroll: true, replace: true })}
+                                onClick={() => router.visit('/orders', { preserveState: true, preserveScroll: true, replace: true })}
                             >
                                 <Plus className="w-5 h-5" />
                                 Create New Order
@@ -254,7 +260,7 @@ export default function PrintShoppeLanding() {
                                     </div>
                                 </div>
                             </div>
-                            <button className="w-full mt-4 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm">
+                            <button disabled={true} className="w-full mt-4 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm">
                                 Send us a message
                             </button>
                         </div>

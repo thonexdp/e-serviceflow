@@ -9,22 +9,26 @@ export default function useSidebar() {
         const checkWindowSize = () => {
             const isMobileView = window.innerWidth < 1000;
             setIsMobile(isMobileView);
-            if (isMobileView && !isCollapsed) {
-                setIsCollapsed(true);
-            }
+            // Only collapse on initial load if mobile
         };
 
         checkWindowSize();
+        
+        if (window.innerWidth < 1000) {
+            setIsCollapsed(true);
+        }
 
         // Add resize listener
         window.addEventListener('resize', checkWindowSize);
 
-        // Apply body classes based on state
-        document.body.classList.toggle('sidebar-hide', isCollapsed);
-
         return () => {
             window.removeEventListener('resize', checkWindowSize);
         };
+    }, []);
+
+    // Apply body classes based on state
+    useEffect(() => {
+        document.body.classList.toggle('sidebar-hide', isCollapsed);
     }, [isCollapsed]);
 
     const toggleSidebar = () => {

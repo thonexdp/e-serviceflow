@@ -541,7 +541,7 @@ export default function FrontDesk({
                             <option value="this_month">This Month</option>
                             <option value="last_30_days">Last 30 Days</option>
                             <option value="this_year">This Year</option>
-                            {Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                            {Array.from({ length: new Date().getFullYear() - 2024 }, (_, i) => new Date().getFullYear() - i).map((year) => (
                                 <option key={year} value={`year_${year}`}>
                                     {year}
                                 </option>

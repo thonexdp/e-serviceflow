@@ -42,6 +42,7 @@ class UserController extends Controller
             'role' => 'required|in:admin,FrontDesk,Designer,Production',
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
+            'is_active' => 'nullable|boolean',
         ]);
 
         $user = User::create([
@@ -49,6 +50,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
+            'is_active' => $validated['is_active'] ?? true,
         ]);
 
         // Sync permissions if provided
@@ -71,12 +73,14 @@ class UserController extends Controller
             'role' => 'required|in:admin,FrontDesk,Designer,Production',
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
+            'is_active' => 'nullable|boolean',
         ]);
 
         $user->update([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role' => $validated['role'],
+            'is_active' => $validated['is_active'] ?? $user->is_active,
         ]);
 
         // Update password if provided

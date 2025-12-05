@@ -52,11 +52,11 @@ export default function SearchBox({
 
     return (
         <form onSubmit={handleSubmit} className="w-full">
-            <div className="relative flex items-center">
+            <div className="relative flex items-center mb-4">
                 <input
                     type="text"
                     placeholder={placeholder}
-                    className="w-full rounded-sm border border-gray-300 bg-white py-2 pl-10 pr-10 text-sm text-gray-700 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all"
+                    className="w-full rounded-sm border border-gray-300 bg-white pl-10 pr-10 text-sm text-gray-700 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all"
                     value={search}
                     onChange={handleChange}
                 />

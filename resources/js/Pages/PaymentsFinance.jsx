@@ -29,6 +29,8 @@ export default function PaymentsFinance({
     const [isExpenseSubmitting, setIsExpenseSubmitting] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+    const [paymentErrors, setPaymentErrors] = useState({});
+    const [expenseErrors, setExpenseErrors] = useState({});
     const [paymentForm, setPaymentForm] = useState({
         ticket_id: "",
         customer_id: "",
@@ -84,6 +86,7 @@ export default function PaymentsFinance({
             notes: "",
             attachments: [],
         }));
+        setPaymentErrors({});
     };
 
     const resetExpenseForm = () => {
@@ -98,6 +101,7 @@ export default function PaymentsFinance({
             ticket_id: "",
             notes: "",
         });
+        setExpenseErrors({});
     };
 
     const ticketOptions = useMemo(
@@ -128,12 +132,17 @@ export default function PaymentsFinance({
     );
 
     const handlePaymentSubmit = async () => {
+        const errors = {};
+
         if (!paymentForm.ticket_id && !paymentForm.customer_id && !paymentForm.payer_name) {
-            alert("Select a ticket, customer, or specify a payer name.");
-            return;
+            errors.payer = "Select a ticket, customer, or specify a payer name.";
         }
         if (!paymentForm.amount) {
-            alert("Enter the amount received.");
+            errors.amount = "Enter the amount received.";
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setPaymentErrors(errors);
             return;
         }
 
@@ -147,6 +156,7 @@ export default function PaymentsFinance({
         });
 
         setIsSubmitting(true);
+        setPaymentErrors({});
         try {
             await api.post("/payments", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
@@ -156,19 +166,31 @@ export default function PaymentsFinance({
             router.reload({ preserveScroll: true });
         } catch (error) {
             console.error("Payment submission failed", error);
-            alert(error.response?.data?.message || "Failed to record payment.");
+            setPaymentErrors({
+                submit: error.response?.data?.message || "Failed to record payment."
+            });
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleExpenseSubmit = async () => {
-        if (!expenseForm.description || !expenseForm.amount) {
-            alert("Fill out the description and amount.");
+        const errors = {};
+
+        if (!expenseForm.description) {
+            errors.description = "Description is required.";
+        }
+        if (!expenseForm.amount) {
+            errors.amount = "Amount is required.";
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setExpenseErrors(errors);
             return;
         }
 
         setIsExpenseSubmitting(true);
+        setExpenseErrors({});
         try {
             await api.post("/expenses", expenseForm);
             setExpenseModalOpen(false);
@@ -176,7 +198,9 @@ export default function PaymentsFinance({
             router.reload({ preserveScroll: true });
         } catch (error) {
             console.error("Expense submission failed", error);
-            alert(error.response?.data?.message || "Failed to record expense.");
+            setExpenseErrors({
+                submit: error.response?.data?.message || "Failed to record expense."
+            });
         } finally {
             setIsExpenseSubmitting(false);
         }
@@ -545,16 +569,22 @@ export default function PaymentsFinance({
                         <label className="form-label">Payer Name</label>
                         <input
                             type="text"
-                            className="form-control"
+                            className={`form-control ${paymentErrors.payer ? "border-danger" : ""}`}
                             placeholder="Walk-in customer name"
                             value={paymentForm.payer_name}
-                            onChange={(e) =>
+                            onChange={(e) => {
                                 setPaymentForm({
                                     ...paymentForm,
                                     payer_name: e.target.value,
-                                })
-                            }
+                                });
+                                if (paymentErrors.payer) {
+                                    setPaymentErrors({ ...paymentErrors, payer: "" });
+                                }
+                            }}
                         />
+                        {paymentErrors.payer && (
+                            <span className="text-danger small">{paymentErrors.payer}</span>
+                        )}
                     </div>
                 )}
                 <div>
@@ -596,16 +626,22 @@ export default function PaymentsFinance({
                         type="number"
                         min="0"
                         step="0.01"
-                        className="form-control"
+                        className={`form-control ${paymentErrors.amount ? "border-danger" : ""}`}
                         placeholder="0.00"
                         value={paymentForm.amount}
-                        onChange={(e) =>
+                        onChange={(e) => {
                             setPaymentForm({
                                 ...paymentForm,
                                 amount: e.target.value,
-                            })
-                        }
+                            });
+                            if (paymentErrors.amount) {
+                                setPaymentErrors({ ...paymentErrors, amount: "" });
+                            }
+                        }}
                     />
+                    {paymentErrors.amount && (
+                        <span className="text-danger small">{paymentErrors.amount}</span>
+                    )}
                 </div>
                 <div>
                     <label className="form-label">Allocation</label>
@@ -696,6 +732,12 @@ export default function PaymentsFinance({
                     />
                 </div>
             </div>
+            {paymentErrors.submit && (
+                <div className="alert alert-danger mt-3">
+                    <i className="ti-alert mr-2"></i>
+                    {paymentErrors.submit}
+                </div>
+            )}
             <div className="flex justify-end gap-3 mt-6 border-t pt-4">
                 <button
                     className="btn btn-secondary"
@@ -804,15 +846,22 @@ export default function PaymentsFinance({
                     <label className="form-label">Description</label>
                     <input
                         type="text"
-                        className="form-control"
+                        className={`form-control ${expenseErrors.description ? "border-danger" : ""}`}
                         value={expenseForm.description}
-                        onChange={(e) =>
+                        onChange={(e) => {
                             setExpenseForm({
                                 ...expenseForm,
                                 description: e.target.value,
-                            })
-                        }
+                            });
+                            if (expenseErrors.description) {
+                                setExpenseErrors({ ...expenseErrors, description: "" });
+                            }
+                        }}
+                        required
                     />
+                    {expenseErrors.description && (
+                        <span className="text-danger small">{expenseErrors.description}</span>
+                    )}
                 </div>
                 <div>
                     <label className="form-label">Vendor</label>
@@ -834,15 +883,22 @@ export default function PaymentsFinance({
                         type="number"
                         min="0"
                         step="0.01"
-                        className="form-control"
+                        className={`form-control ${expenseErrors.amount ? "border-danger" : ""}`}
                         value={expenseForm.amount}
-                        onChange={(e) =>
+                        onChange={(e) => {
                             setExpenseForm({
                                 ...expenseForm,
                                 amount: e.target.value,
-                            })
-                        }
+                            });
+                            if (expenseErrors.amount) {
+                                setExpenseErrors({ ...expenseErrors, amount: "" });
+                            }
+                        }}
+                        required
                     />
+                    {expenseErrors.amount && (
+                        <span className="text-danger small">{expenseErrors.amount}</span>
+                    )}
                 </div>
                 <div className="md:col-span-2">
                     <label className="form-label">Related Ticket (optional)</label>
@@ -879,6 +935,12 @@ export default function PaymentsFinance({
                     ></textarea>
                 </div>
             </div>
+            {expenseErrors.submit && (
+                <div className="alert alert-danger mt-3">
+                    <i className="ti-alert mr-2"></i>
+                    {expenseErrors.submit}
+                </div>
+            )}
             <div className="flex justify-end gap-3 mt-6 border-t pt-4">
                 <button
                     className="btn btn-secondary"

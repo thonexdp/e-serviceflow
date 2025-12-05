@@ -38,8 +38,8 @@ export default function FormInput({
               onChange={(e) =>
                 onChange
                   ? onChange({
-                      target: { name, value: e.target.checked },
-                    })
+                    target: { name, value: e.target.checked },
+                  })
                   : null
               }
               disabled={disabled}

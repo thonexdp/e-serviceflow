@@ -19,6 +19,7 @@ export default function PurchaseOrdersIndex({
 }) {
     const [openReceiveModal, setReceiveModalOpen] = useState(false);
     const [selectedPO, setSelectedPO] = useState(null);
+    const [error, setError] = useState("");
     const [receivedItems, setReceivedItems] = useState({});
     const { flash } = usePage().props;
     const { buildUrl } = useRoleApi();
@@ -62,10 +63,12 @@ export default function PurchaseOrdersIndex({
         setReceiveModalOpen(false);
         setSelectedPO(null);
         setReceivedItems({});
+        setError("");
     };
 
     const handleReceive = (e) => {
         e.preventDefault();
+        setError("");
         if (!selectedPO) return;
 
         const receivedItemsArray = Object.entries(receivedItems)
@@ -76,7 +79,7 @@ export default function PurchaseOrdersIndex({
             }));
 
         if (receivedItemsArray.length === 0) {
-            alert("Please enter at least one item quantity to receive.");
+            setError("Please enter at least one item quantity to receive.");
             return;
         }
 
@@ -217,6 +220,7 @@ export default function PurchaseOrdersIndex({
                 </div>
             </div>
 
+
             {/* Receive Items Modal */}
             <Modal
                 title={`Receive Items - ${selectedPO?.po_number}`}
@@ -309,6 +313,7 @@ export default function PurchaseOrdersIndex({
                                     })}
                                 </tbody>
                             </table>
+                            <span className="text-danger">{error}</span>
                         </div>
                         <div className="d-flex justify-content-end gap-2 mt-3">
                             <button type="submit" className="btn btn-success">

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import FormInput from "@/Components/Common/FormInput";
 
-export default function CustomerForm({ customer = null, onSubmit, onCancel , jsonReturn = false }) {
+export default function CustomerForm({ customer = null, onSubmit, onCancel, jsonReturn = false }) {
     const [formData, setFormData] = useState({
         firstname: "",
         lastname: "",
@@ -169,31 +169,31 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel , jso
             </div>
 
             <div className="mt-4 d-flex justify-content-end gap-2">
-                 <button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            // onClick={onSubmit}
-                            disabled={processing}
-                            className={`px-4 py-2.5 text-sm font-medium text-white rounded-md transition
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    // onClick={onSubmit}
+                    disabled={processing}
+                    className={`px-4 py-2.5 text-sm font-medium text-white rounded-md transition
                                 ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-400"}
                             `}
-                            >
-                            {processing ? (
-                                <span className="flex items-center">
-                                <i className="ti-reload mr-2 animate-spin"></i> Saving...
-                                </span>
-                            ) : (
-                                <span className="flex items-center">
-                                <i className="ti-save mr-2"></i> {customer? "Update" : "Save"}
-                                </span>
-                            )}
-                            </button>
+                >
+                    {processing ? (
+                        <span className="flex items-center">
+                            <i className="ti-reload mr-2 animate-spin"></i> Saving...
+                        </span>
+                    ) : (
+                        <span className="flex items-center">
+                            <i className="ti-save mr-2"></i> {customer ? "Update" : "Save"}
+                        </span>
+                    )}
+                </button>
 
             </div>
         </form>

@@ -29,6 +29,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
+    const [sizeBase, setSizeBase] = useState(false);
 
     // Populate form if editing
     useEffect(() => {
@@ -334,6 +335,21 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
     return (
         <form onSubmit={handleSubmit}>
+            <div className="row mt-1 justify-end">
+                <label className="block text-sm font-medium text-gray-700 mr-2">
+                    Status:
+                </label>
+                <input
+                    type="checkbox"
+                    name="is_active"
+                    checked={formData.is_active}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label className="ml-2 text-sm text-gray-700">
+                    Active
+                </label>
+            </div>
             <div className="row">
                 <div className="col-md-6">
                     <FormInput
@@ -355,7 +371,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         value={formData.name}
                         onChange={handleChange}
                         error={errors.name}
-                        placeholder="e.g., 2x3 ft, 3x5 ft, 2×2 photo"
+                        placeholder="e.g., MUG,BASKET BALL JERSEY (SET), Tarpaulin"
                         required
                     />
                 </div>
@@ -364,7 +380,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             <div className="row">
                 <div className="col-md-12">
                     <FormInput
-                        label="Description"
+                        label="Description (Optional)"
                         type="textarea"
                         name="description"
                         value={formData.description}
@@ -391,7 +407,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         min="0"
                     />
                 </div>
-
                 <div className="col-md-4">
                     <FormInput
                         label="Price By"
@@ -404,7 +419,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         required
                     />
                 </div>
-
                 <div className="col-md-4">
                     <FormInput
                         label="Discount (%)"
@@ -421,7 +435,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 </div>
             </div>
 
-            <div className="row">
+            {/* <div className="row">
                 <div className="col-md-6">
                     <FormInput
                         label="Sort Order"
@@ -434,282 +448,288 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         min="0"
                     />
                 </div>
+            </div> */}
 
-                <div className="col-md-6">
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Status
-                        </label>
-                        <div className="flex items-center mt-2">
-                            <input
-                                type="checkbox"
-                                name="is_active"
-                                checked={formData.is_active}
-                                onChange={handleChange}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <label className="ml-2 text-sm text-gray-700">
-                                Active
-                            </label>
+            <div class="flex space-x-4">
+                <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
+                    <input type="radio" name="role" value="FrontDesk" class="h-4 w-4 text-indigo-600"
+                        checked={!sizeBase}
+                        onChange={() => setSizeBase(false)}
+                    />
+                    <span>Quantity Base</span>
+                </label>
+
+                <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
+                    <input type="radio" name="role" value="Designer" class="h-4 w-4 text-indigo-600"
+                        checked={sizeBase}
+                        onChange={() => setSizeBase(true)}
+                    />
+                    <span>Size Base</span>
+                </label>
+            </div>
+
+
+            {
+                sizeBase ? (
+                    <div className="mt-4">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                            <h5 className="mb-0">Size Based Pricing (Optional)</h5>
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={addSizeRate}
+                            >
+                                <i className="ti-plus"></i> Add Size Rate
+                            </button>
                         </div>
-                    </div>
-                </div>
-            </div>
+                        <p className="text-muted text-sm mb-3">
+                            Define rates per size or area (useful for Tarpaulins, Panaflex, etc.). If present, ticket pricing will use these rates.
+                        </p>
 
-            <div className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Quantity Based Pricing (Optional)</h5>
-                    <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={addPriceTier}
-                    >
-                        <i className="ti-plus"></i> Add Tier
-                    </button>
-                </div>
-                <p className="text-muted text-sm mb-3">
-                    Use tiers to offer bulk discounts. Leave empty to use base price.
-                </p>
-                {priceTiers.length > 0 ? (
-                    <div className="table-responsive">
-                        <table className="table table-sm table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Label</th>
-                                    <th>Min Qty</th>
-                                    <th>Max Qty</th>
-                                    <th>Price (per unit)</th>
-                                    <th>Notes</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {priceTiers.map((tier, index) => (
-                                    <tr key={index}>
-                                        <td>
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-sm"
-                                                value={tier.label}
-                                                onChange={(e) => updatePriceTier(index, "label", e.target.value)}
-                                                placeholder="e.g., Retail"
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                className="form-control form-control-sm"
-                                                value={tier.min_quantity}
-                                                onChange={(e) => updatePriceTier(index, "min_quantity", e.target.value)}
-                                                min="1"
-                                                placeholder="1"
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                className="form-control form-control-sm"
-                                                value={tier.max_quantity}
-                                                onChange={(e) => updatePriceTier(index, "max_quantity", e.target.value)}
-                                                min="1"
-                                                placeholder="Optional"
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                className="form-control form-control-sm"
-                                                value={tier.price}
-                                                onChange={(e) => updatePriceTier(index, "price", e.target.value)}
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-sm"
-                                                value={tier.notes}
-                                                onChange={(e) => updatePriceTier(index, "notes", e.target.value)}
-                                                placeholder="Optional notes"
-                                            />
-                                        </td>
-                                        <td>
-                                            <button
-                                                type="button"
-                                                className="btn btn-sm btn-link text-danger"
-                                                onClick={() => removePriceTier(index)}
-                                            >
-                                                <i className="ti-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        {sizeRates.length > 0 ? (
+                            <div className="table-responsive">
+                                <table className="table table-sm table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Variant</th>
+                                            <th>Method</th>
+                                            <th>Unit</th>
+                                            <th>Rate</th>
+                                            <th>Size Limits (W / H)</th>
+                                            <th>Default</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sizeRates.map((rate, index) => (
+                                            <tr key={index}>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control form-control-sm mb-2"
+                                                        value={rate.variant_name}
+                                                        onChange={(e) => updateSizeRate(index, "variant_name", e.target.value)}
+                                                        placeholder="e.g., Ready to Print"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        className="form-control form-control-sm"
+                                                        value={rate.description}
+                                                        onChange={(e) => updateSizeRate(index, "description", e.target.value)}
+                                                        placeholder="Optional description"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        className="form-control form-control-sm"
+                                                        value={rate.calculation_method}
+                                                        onChange={(e) => updateSizeRate(index, "calculation_method", e.target.value)}
+                                                    >
+                                                        <option value="area">Area (W x H)</option>
+                                                        <option value="length">Length Only</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        className="form-control form-control-sm"
+                                                        value={rate.dimension_unit}
+                                                        onChange={(e) => updateSizeRate(index, "dimension_unit", e.target.value)}
+                                                    >
+                                                        <option value="ft">Feet</option>
+                                                        <option value="m">Meters</option>
+                                                        <option value="cm">Centimeters</option>
+                                                        <option value="in">Inches</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control form-control-sm"
+                                                        value={rate.rate}
+                                                        onChange={(e) => updateSizeRate(index, "rate", e.target.value)}
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="Rate"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div className="d-flex gap-2">
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={rate.min_width}
+                                                            onChange={(e) => updateSizeRate(index, "min_width", e.target.value)}
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="Min W"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={rate.min_height}
+                                                            onChange={(e) => updateSizeRate(index, "min_height", e.target.value)}
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="Min H"
+                                                        />
+                                                    </div>
+                                                    <div className="d-flex gap-2 mt-2">
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={rate.max_width}
+                                                            onChange={(e) => updateSizeRate(index, "max_width", e.target.value)}
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="Max W"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={rate.max_height}
+                                                            onChange={(e) => updateSizeRate(index, "max_height", e.target.value)}
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="Max H"
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td className="text-center">
+                                                    <div className="form-check">
+                                                        <input
+                                                            className="form-check-input"
+                                                            type="radio"
+                                                            name="default_rate"
+                                                            checked={rate.is_default}
+                                                            onChange={() => updateSizeRate(index, "is_default", true)}
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-link text-danger"
+                                                        onClick={() => removeSizeRate(index)}
+                                                    >
+                                                        <i className="ti-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="alert text-warning">
+                                No size rates configured. Base price will be used.
+                            </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="alert alert-light border">
-                        No quantity tiers added yet.
+                    <div className="mt-4">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                            <h5 className="mb-0">Quantity Based Pricing (Optional) </h5>
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={addPriceTier}
+                            >
+                                <i className="ti-plus"></i> Add Tier
+                            </button>
+                        </div>
+                        <p className="text-muted text-sm mb-3">
+                            Use tiers to offer bulk discounts. Leave empty to use base price.
+                        </p>
+                        {priceTiers.length > 0 ? (
+                            <div className="table-responsive">
+                                <table className="table table-sm table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Label</th>
+                                            <th>Min Qty</th>
+                                            <th>Max Qty</th>
+                                            <th>Price (per unit)</th>
+                                            <th>Notes</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {priceTiers.map((tier, index) => (
+                                            <tr key={index}>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control form-control-sm"
+                                                        value={tier.label}
+                                                        onChange={(e) => updatePriceTier(index, "label", e.target.value)}
+                                                        placeholder="e.g., Retail"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control form-control-sm"
+                                                        value={tier.min_quantity}
+                                                        onChange={(e) => updatePriceTier(index, "min_quantity", e.target.value)}
+                                                        min="1"
+                                                        placeholder="1"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control form-control-sm"
+                                                        value={tier.max_quantity}
+                                                        onChange={(e) => updatePriceTier(index, "max_quantity", e.target.value)}
+                                                        min="1"
+                                                        placeholder="Optional"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control form-control-sm"
+                                                        value={tier.price}
+                                                        onChange={(e) => updatePriceTier(index, "price", e.target.value)}
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control form-control-sm"
+                                                        value={tier.notes}
+                                                        onChange={(e) => updatePriceTier(index, "notes", e.target.value)}
+                                                        placeholder="Optional notes"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-link text-danger"
+                                                        onClick={() => removePriceTier(index)}
+                                                    >
+                                                        <i className="ti-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="alert text-warning">
+                                No quantity tiers added yet.
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                )
+            }
 
-            <div className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Size Based Pricing (Optional)</h5>
-                    <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={addSizeRate}
-                    >
-                        <i className="ti-plus"></i> Add Size Rate
-                    </button>
-                </div>
-                <p className="text-muted text-sm mb-3">
-                    Define rates per size or area (useful for Tarpaulins, Panaflex, etc.). If present, ticket pricing will use these rates.
-                </p>
 
-                {sizeRates.length > 0 ? (
-                    <div className="table-responsive">
-                        <table className="table table-sm table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Variant</th>
-                                    <th>Method</th>
-                                    <th>Unit</th>
-                                    <th>Rate</th>
-                                    <th>Size Limits (W / H)</th>
-                                    <th>Default</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sizeRates.map((rate, index) => (
-                                    <tr key={index}>
-                                        <td>
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-sm mb-2"
-                                                value={rate.variant_name}
-                                                onChange={(e) => updateSizeRate(index, "variant_name", e.target.value)}
-                                                placeholder="e.g., Ready to Print"
-                                            />
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-sm"
-                                                value={rate.description}
-                                                onChange={(e) => updateSizeRate(index, "description", e.target.value)}
-                                                placeholder="Optional description"
-                                            />
-                                        </td>
-                                        <td>
-                                            <select
-                                                className="form-control form-control-sm"
-                                                value={rate.calculation_method}
-                                                onChange={(e) => updateSizeRate(index, "calculation_method", e.target.value)}
-                                            >
-                                                <option value="area">Area (W x H)</option>
-                                                <option value="length">Length Only</option>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select
-                                                className="form-control form-control-sm"
-                                                value={rate.dimension_unit}
-                                                onChange={(e) => updateSizeRate(index, "dimension_unit", e.target.value)}
-                                            >
-                                                <option value="ft">Feet</option>
-                                                <option value="m">Meters</option>
-                                                <option value="cm">Centimeters</option>
-                                                <option value="in">Inches</option>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                className="form-control form-control-sm"
-                                                value={rate.rate}
-                                                onChange={(e) => updateSizeRate(index, "rate", e.target.value)}
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="Rate"
-                                            />
-                                        </td>
-                                        <td>
-                                            <div className="d-flex gap-2">
-                                                <input
-                                                    type="number"
-                                                    className="form-control form-control-sm"
-                                                    value={rate.min_width}
-                                                    onChange={(e) => updateSizeRate(index, "min_width", e.target.value)}
-                                                    min="0"
-                                                    step="0.01"
-                                                    placeholder="Min W"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    className="form-control form-control-sm"
-                                                    value={rate.min_height}
-                                                    onChange={(e) => updateSizeRate(index, "min_height", e.target.value)}
-                                                    min="0"
-                                                    step="0.01"
-                                                    placeholder="Min H"
-                                                />
-                                            </div>
-                                            <div className="d-flex gap-2 mt-2">
-                                                <input
-                                                    type="number"
-                                                    className="form-control form-control-sm"
-                                                    value={rate.max_width}
-                                                    onChange={(e) => updateSizeRate(index, "max_width", e.target.value)}
-                                                    min="0"
-                                                    step="0.01"
-                                                    placeholder="Max W"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    className="form-control form-control-sm"
-                                                    value={rate.max_height}
-                                                    onChange={(e) => updateSizeRate(index, "max_height", e.target.value)}
-                                                    min="0"
-                                                    step="0.01"
-                                                    placeholder="Max H"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="form-check">
-                                                <input
-                                                    className="form-check-input"
-                                                    type="radio"
-                                                    name="default_rate"
-                                                    checked={rate.is_default}
-                                                    onChange={() => updateSizeRate(index, "is_default", true)}
-                                                />
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <button
-                                                type="button"
-                                                className="btn btn-sm btn-link text-danger"
-                                                onClick={() => removeSizeRate(index)}
-                                            >
-                                                <i className="ti-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="alert alert-light border">
-                        No size rates configured. Base price will be used.
-                    </div>
-                )}
-            </div>
+
 
             <div className="mt-4">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -723,7 +743,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     </button>
                 </div>
                 <p className="text-muted text-sm mb-3">
-                    Define promotional offers like "Buy 12, Get 1 Free" to incentivize bulk purchases.
+                    Define promotional offers like "Buy 12, Get 1 Free" for bulk purchases.
                 </p>
 
                 {promoRules.length > 0 ? (
@@ -795,12 +815,13 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         </table>
                     </div>
                 ) : (
-                    <div className="alert alert-light border">
+                    <div className="alert text-warning">
                         No promotional rules added yet.
                     </div>
                 )}
             </div>
 
+            <hr />
             <div className="mt-4">
                 <h5 className="mb-3">Production Workflow Template</h5>
                 <p className="text-muted text-sm mb-3">

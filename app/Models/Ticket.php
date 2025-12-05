@@ -65,6 +65,11 @@ class Ticket extends Model
             if (empty($ticket->ticket_number)) {
                 $ticket->ticket_number = static::generateTicketNumber();
             }
+            $ticket->created_by = auth()->id();
+        });
+
+        static::updating(function ($ticket) {
+            $ticket->updated_by = auth()->id();
         });
     }
 
@@ -82,7 +87,7 @@ class Ticket extends Model
         $last = static::orderBy('id', 'desc')->first();
         $num = $last ? $last->id + 1 : 1;
 
-        return 'TKT-' . str_pad($num, 6, '0', STR_PAD_LEFT);
+        return 'RC-' . date('Y') . str_pad($num, 6, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -222,11 +227,6 @@ class Ticket extends Model
         return ['width' => null, 'height' => null];
     }
 
-    /**
-     * Calculate total area in square meters.
-     * 
-     * @return float|null Total area in sqm, or null if area cannot be calculated
-     */
     public function calculateTotalArea(): ?float
     {
         $dimensions = $this->parseSizeDimensions();
@@ -238,32 +238,22 @@ class Ticket extends Model
         $width = $dimensions['width'];
         $height = $dimensions['height'];
 
-        // Calculate area per piece
-        $areaPerPiece = $width * $height;
+        $areaPerPiece = $width * $height;  #Calculate area per piece
 
         // Convert to square meters if needed (assuming size_unit might indicate the unit)
         // For now, assume dimensions are already in meters if size_unit contains 'm' or 'sqm'
         // Otherwise, assume they're in the same unit and calculate directly
         if ($this->size_unit && (stripos($this->size_unit, 'sqm') !== false || stripos($this->size_unit, 'm²') !== false)) {
-            // Already in square meters
-            return $areaPerPiece * $this->quantity;
+            return $areaPerPiece * $this->quantity;  # Already in square meters
         } elseif ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
-            // Convert from cm² to m²
-            return ($areaPerPiece / 10000) * $this->quantity;
+            return ($areaPerPiece / 10000) * $this->quantity; #Convert from cm² to m²
         } elseif ($this->size_unit && stripos($this->size_unit, 'mm') !== false) {
-            // Convert from mm² to m²
-            return ($areaPerPiece / 1000000) * $this->quantity;
+            return ($areaPerPiece / 1000000) * $this->quantity;  # Convert from mm² to m²
         } else {
-            // Assume meters (default)
             return $areaPerPiece * $this->quantity;
         }
     }
 
-    /**
-     * Calculate total length in meters.
-     * 
-     * @return float|null Total length in meters, or null if length cannot be calculated
-     */
     public function calculateTotalLength(): ?float
     {
         $dimensions = $this->parseSizeDimensions();
@@ -274,22 +264,16 @@ class Ticket extends Model
 
         $length = $dimensions['width'];
 
-        // Convert to meters if needed
         if ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
-            // Convert from cm to m
             return ($length / 100) * $this->quantity;
         } elseif ($this->size_unit && stripos($this->size_unit, 'mm') !== false) {
-            // Convert from mm to m
             return ($length / 1000) * $this->quantity;
         } else {
-            // Assume meters (default)
             return $length * $this->quantity;
         }
     }
 
-    /**
-     * Get the total quantity (paid + free).
-     */
+
     public function getTotalQuantityAttribute(): int
     {
         return (int)($this->quantity ?? 0) + (int)($this->free_quantity ?? 0);
