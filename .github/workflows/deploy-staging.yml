@@ -27,8 +27,6 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
-        with:
-          version: 'latest'
 
       - name: Configure Docker for Artifact Registry
         run: |
@@ -90,6 +88,7 @@ jobs:
             --max-instances=2 \
             --timeout=300 \
             --cpu-boost \
+            --startup-cpu-boost \
             --set-env-vars="PORT=8080,SOKETI_DEFAULT_APP_ID=${{ secrets.PUSHER_APP_ID }},SOKETI_DEFAULT_APP_KEY=${{ secrets.PUSHER_APP_KEY }},SOKETI_DEFAULT_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}"
 
       - name: Get Actual Soketi URL
