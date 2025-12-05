@@ -31,5 +31,8 @@ CMD sed -e "s/SOKETI_DEFAULT_APP_ID_PLACEHOLDER/$SOKETI_DEFAULT_APP_ID/g" \
         -e "s/SOKETI_DEFAULT_APP_KEY_PLACEHOLDER/$SOKETI_DEFAULT_APP_KEY/g" \
         -e "s/SOKETI_DEFAULT_APP_SECRET_PLACEHOLDER/$SOKETI_DEFAULT_APP_SECRET/g" \
         /srv/soketi.json.template > /srv/config.json && \
+    echo "=== Soketi Configuration ===" && \
     cat /srv/config.json && \
-    soketi start --config=/srv/config.json
+    echo "=== Starting Soketi on port $SOKETI_PORT ===" && \
+    soketi start --config=/srv/config.json --port=$SOKETI_PORT
+

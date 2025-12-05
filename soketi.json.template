@@ -6,7 +6,7 @@
     "driver": "memory"
   },
   "wsHandler": {
-    "driver": "socket.io"
+    "driver": "ws"
   },
   "cache": {
     "driver": "memory"

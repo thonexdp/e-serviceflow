@@ -15,7 +15,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -38,7 +38,7 @@ jobs:
           SOKETI_URL=$(gcloud run services describe ${{ env.SOKETI_SERVICE_NAME }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)' 2>/dev/null || echo "")
-          
+
           if [ -z "$SOKETI_URL" ]; then
             echo "SOKETI_HOST=e-serviceflow-soketi-temp.run.app" >> $GITHUB_OUTPUT
           else
@@ -59,7 +59,7 @@ jobs:
             -t asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.APP_SERVICE_NAME }}:${{ github.sha }} \
             -t asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.APP_SERVICE_NAME }}:latest \
             .
-          
+
           docker push asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.APP_SERVICE_NAME }}:${{ github.sha }}
           docker push asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.APP_SERVICE_NAME }}:latest
 
@@ -70,7 +70,7 @@ jobs:
             -t asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }} \
             -t asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:latest \
             .
-          
+
           docker push asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }}
           docker push asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:latest
 
@@ -86,6 +86,8 @@ jobs:
             --cpu=1 \
             --min-instances=0 \
             --max-instances=2 \
+            --timeout=300 \
+            --startup-cpu-boost \
             --set-env-vars="SOKETI_DEFAULT_APP_ID=${{ secrets.PUSHER_APP_ID }},SOKETI_DEFAULT_APP_KEY=${{ secrets.PUSHER_APP_KEY }},SOKETI_DEFAULT_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}"
 
       - name: Get Actual Soketi URL
