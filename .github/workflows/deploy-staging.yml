@@ -8,7 +8,7 @@ on:
 env:
   PROJECT_ID: rcprintshoppe-480111
   REGION: asia-southeast1
-  APP_SERVICE_NAME: e-serviceflow-app
+  APP_SERVICE_NAME: rcprintshoppe
   REPOSITORY: e-serviceflow-repo
 
 jobs:
