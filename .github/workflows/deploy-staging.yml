@@ -87,7 +87,7 @@ jobs:
             --min-instances=0 \
             --max-instances=2 \
             --timeout=300 \
-            --startup-cpu-boost \
+            --cpu-boost \
             --set-env-vars="SOKETI_DEFAULT_APP_ID=${{ secrets.PUSHER_APP_ID }},SOKETI_DEFAULT_APP_KEY=${{ secrets.PUSHER_APP_KEY }},SOKETI_DEFAULT_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}"
 
       - name: Get Actual Soketi URL
