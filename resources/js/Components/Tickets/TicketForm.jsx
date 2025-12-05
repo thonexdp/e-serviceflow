@@ -209,7 +209,7 @@ export default function TicketForm({
     useEffect(() => {
         if (ticket && ticket.customer_files && ticket.customer_files.length > 0) {
             const existingImages = ticket.customer_files.map((attachment) => ({
-                preview: attachment.file_path || `/storage/${attachment.filepath}`,
+                preview: attachment.file_path || attachment.filepath,
                 file: null,
                 existing: true,
                 id: attachment.id,
@@ -230,7 +230,7 @@ export default function TicketForm({
             if (firstPayment.documents && firstPayment.documents.length > 0) {
                 console.log("firstPayment.documents:", firstPayment.documents);
                 const existingProofs = firstPayment.documents.map((doc, index) => ({
-                    preview: `/storage/${doc.file_path}`,
+                    preview: doc.file_path,
                     file: null,
                     existing: true,
                     id: doc.id,
@@ -505,16 +505,16 @@ export default function TicketForm({
     const handlePaymentProofUpload = (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
-    
+
         const upload = {
             file,
             preview: URL.createObjectURL(file),
             name: file.name,
         };
-    
+
         setPaymentProofs([upload]); // replace instead of append (single upload)
-    
-        event.target.value = ""; 
+
+        event.target.value = "";
     };
 
     const removePaymentProof = (index) => {
