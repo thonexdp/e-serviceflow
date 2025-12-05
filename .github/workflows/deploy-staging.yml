@@ -74,7 +74,7 @@ jobs:
           docker push asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }}
           docker push asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:latest
 
-     - name: Deploy Soketi to Cloud Run
+      - name: Deploy Soketi to Cloud Run
         run: |
           gcloud run deploy ${{ env.SOKETI_SERVICE_NAME }} \
             --image=asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SOKETI_SERVICE_NAME }}:${{ github.sha }} \
@@ -88,7 +88,6 @@ jobs:
             --max-instances=2 \
             --timeout=300 \
             --cpu-boost \
-            --startup-cpu-boost \
             --set-env-vars="PORT=8080,SOKETI_DEFAULT_APP_ID=${{ secrets.PUSHER_APP_ID }},SOKETI_DEFAULT_APP_KEY=${{ secrets.PUSHER_APP_KEY }},SOKETI_DEFAULT_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }}"
 
       - name: Get Actual Soketi URL
