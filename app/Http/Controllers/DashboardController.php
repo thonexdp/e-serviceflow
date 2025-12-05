@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Ticket;
 use App\Models\Payment;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -455,17 +456,17 @@ class DashboardController extends Controller
 
         // Calculate date ranges for current and previous periods
         $dates = $this->calculateDateRanges($dateRange, $year, $month);
-        
+
         // Get statistics for current period
         $currentStats = $this->calculatePeriodStats($dates['current_start'], $dates['current_end']);
-        
+
         // Get statistics for previous period (for comparison)
         $previousStats = $this->calculatePeriodStats($dates['previous_start'], $dates['previous_end']);
-        
+
         // Calculate daily data for charts (for selected month)
         $dailyOrders = $this->getDailyOrders($year, $month);
         $dailyRevenue = $this->getDailyRevenue($year, $month);
-        
+
         // Get user transaction summaries
         $frontDeskTransactions = $this->getUserTransactions('FrontDesk', $dates['current_start'], $dates['current_end']);
         $designerTransactions = $this->getUserTransactions('Designer', $dates['current_start'], $dates['current_end']);
@@ -595,7 +596,7 @@ class DashboardController extends Controller
         // Estimate COGS at 30% of sales (industry standard for printing services)
         // This should be replaced with actual inventory/material costs
         $estimatedCOGS = $totalSales * 0.30;
-        
+
         $netIncome = $totalSales - $discounts - $estimatedCOGS;
 
         return [
@@ -612,8 +613,9 @@ class DashboardController extends Controller
     private function getDailyOrders($year, $month)
     {
         // Get the number of days in the month
-        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-        
+        // $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $daysInMonth = \Carbon\Carbon::create($year, $month)->daysInMonth;
+
         $startDate = \Carbon\Carbon::create($year, $month, 1)->startOfDay();
         $endDate = \Carbon\Carbon::create($year, $month, $daysInMonth)->endOfDay();
 
@@ -641,8 +643,8 @@ class DashboardController extends Controller
 
     private function getDailyRevenue($year, $month)
     {
-        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-        
+        $daysInMonth = \Carbon\Carbon::create($year, $month)->daysInMonth;
+
         $startDate = \Carbon\Carbon::create($year, $month, 1)->startOfDay();
         $endDate = \Carbon\Carbon::create($year, $month, $daysInMonth)->endOfDay();
 
@@ -670,7 +672,7 @@ class DashboardController extends Controller
             $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
             $sales = max($paymentsRevenue[$date] ?? 0, $ticketRevenue[$date] ?? 0);
             $netIncome = $sales * 0.70; // 70% margin (30% COGS estimate)
-            
+
             $dailyData[] = [
                 'day' => $day,
                 'date' => $date,
@@ -692,7 +694,7 @@ class DashboardController extends Controller
 
         // Get total tickets in period for the role context
         $totalTickets = Ticket::whereBetween('created_at', [$startDate, $endDate])->count();
-        
+
         return $users->map(function ($user) use ($totalTickets) {
             return [
                 'name' => $user->name,
