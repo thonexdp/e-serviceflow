@@ -33,7 +33,31 @@ class TicketFile extends Model
     protected function filePath(): Attribute
     {
         return Attribute::make(
-            get: fn($value) => $value ? Storage::url($value) : null
+            get: function ($value) {
+                if (!$value) {
+                    return null;
+                }
+
+                $disk = config('filesystems.default');
+
+                // For GCS, generate the full public URL
+                if ($disk === 'gcs') {
+                    $bucket = config('filesystems.disks.gcs.bucket');
+                    return "https://storage.googleapis.com/{$bucket}/{$value}";
+                }
+
+                // For local/public storage, use the /storage/ prefix
+                if ($disk === 'public' || $disk === 'local') {
+                    return "/storage/{$value}";
+                }
+
+                // Fallback: try to use Storage::url()
+                try {
+                    return Storage::url($value);
+                } catch (\Exception $e) {
+                    return "/storage/{$value}";
+                }
+            }
         );
     }
 }
