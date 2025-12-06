@@ -136,8 +136,7 @@ export default function FrontDesk({
     };
 
     const handlePreviewFile = (file) => {
-        const filePath = file.file_path || file.file_path || `/storage/${file.file_path}`;
-        setPreviewModal({ isOpen: true, fileUrl: filePath });
+        setPreviewModal({ isOpen: true, fileUrl: file.file_path });
     };
 
     const handleOpenPaymentModal = (ticket) => {

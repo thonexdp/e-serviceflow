@@ -130,8 +130,7 @@ export default function Mockups({
     };
 
     const handlePreview = (filepath) => {
-        const imageUrl = `/storage/${filepath}`;
-        setSelectedImage(imageUrl);
+        setSelectedImage(filepath);
     };
 
     const getDesignStatusBadge = (status) => {

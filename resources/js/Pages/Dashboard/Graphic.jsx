@@ -56,8 +56,7 @@ export default function Dashboard({
     };
 
     const handlePreviewFile = (file) => {
-        const filePath = file.file_path || `/storage/${file.file_path}`;
-        setPreviewModal({ isOpen: true, fileUrl: filePath });
+        setPreviewModal({ isOpen: true, fileUrl: file?.file_path });
     };
 
     const handleReviewTicket = (ticket) => {
@@ -138,7 +137,7 @@ export default function Dashboard({
                                                 <span className="mr-2">{file.file_name}</span>
                                                 <div className="btn-group ml-3">
                                                     <a
-                                                        href={`/storage/${file.file_path}`}
+                                                        href={file?.file_path}
                                                         download
                                                         className="btn btn-link btn-outline btn-sm text-blue-500"
                                                     >

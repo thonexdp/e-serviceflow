@@ -543,8 +543,8 @@ export default function Productions({
                                             <div className="card-body text-center">
                                                 {selectedPreviewFile && (
                                                     <img
-                                                        src={`/storage/${selectedPreviewFile.file_path}`}
-                                                        alt={selectedPreviewFile.file_name}
+                                                        src={selectedPreviewFile?.file_path}
+                                                        alt={selectedPreviewFile?.file_name}
                                                         className="img-fluid mb-2"
                                                         style={{ maxHeight: "280px", objectFit: "contain" }}
                                                     />
