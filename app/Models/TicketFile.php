@@ -13,8 +13,8 @@ class TicketFile extends Model
 
     protected $fillable = [
         'ticket_id',
-        'filename',
-        'filepath',
+        'file_name',
+        'file_path',
         'type',
     ];
 

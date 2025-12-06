@@ -209,11 +209,11 @@ export default function TicketForm({
     useEffect(() => {
         if (ticket && ticket.customer_files && ticket.customer_files.length > 0) {
             const existingImages = ticket.customer_files.map((attachment) => ({
-                preview: attachment.file_path || attachment.filepath,
+                preview: attachment.file_path || attachment.file_path,
                 file: null,
                 existing: true,
                 id: attachment.id,
-                name: attachment.filename,
+                name: attachment.file_name,
             }));
             setTicketAttachments(existingImages);
             setActiveAttachmentTab(0);
@@ -1244,7 +1244,7 @@ export default function TicketForm({
                                     <input
                                         type="file"
                                         className="form-control"
-                                        accept="image/*,application/pdf"
+                                        accept="image/*"
                                         onChange={handlePaymentProofUpload}
                                     />
                                 </div>

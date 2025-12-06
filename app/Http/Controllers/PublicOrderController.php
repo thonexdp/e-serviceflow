@@ -134,8 +134,8 @@ class PublicOrderController extends Controller
         if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $request->file('file')->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $request->file('file')->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'customer',
             ]);
         }

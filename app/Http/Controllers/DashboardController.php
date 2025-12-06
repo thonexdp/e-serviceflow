@@ -200,9 +200,9 @@ class DashboardController extends Controller
                             'customer_files' => $ticket->customerFiles->map(function ($file) {
                                 return [
                                     'id' => $file->id,
-                                    'filename' => $file->filename,
-                                    'filepath' => $file->filepath,
+                                    'file_name' => $file->file_name,
                                     'file_path' => $file->file_path,
+                                    'type' => $file->type,
                                 ];
                             }),
                         ];
@@ -372,8 +372,9 @@ class DashboardController extends Controller
                             'customer_files' => $ticket->customerFiles->map(function ($file) {
                                 return [
                                     'id' => $file->id,
-                                    'filename' => $file->filename,
-                                    'filepath' => $file->filepath,
+                                    'file_name' => $file->file_name,
+                                    'file_path' => $file->file_path,
+                                    'type' => $file->type,
                                 ];
                             }),
                         ];
@@ -400,8 +401,9 @@ class DashboardController extends Controller
                             'mockup_files' => $ticket->mockupFiles->map(function ($file) {
                                 return [
                                     'id' => $file->id,
-                                    'filename' => $file->filename,
-                                    'filepath' => $file->filepath,
+                                    'file_name' => $file->file_name,
+                                    'file_path' => $file->file_path,
+                                    'type' => $file->type,
                                 ];
                             }),
                         ];
@@ -428,8 +430,8 @@ class DashboardController extends Controller
                             'mockup_files' => $ticket->mockupFiles->map(function ($file) {
                                 return [
                                     'id' => $file->id,
-                                    'filename' => $file->filename,
-                                    'filepath' => $file->filepath,
+                                    'file_name' => $file->file_name,
+                                    'file_path' => $file->file_path,
                                 ];
                             }),
                         ];

@@ -56,7 +56,7 @@ export default function Dashboard({
     };
 
     const handlePreviewFile = (file) => {
-        const filePath = file.filepath || `/storage/${file.filepath}`;
+        const filePath = file.file_path || `/storage/${file.file_path}`;
         setPreviewModal({ isOpen: true, fileUrl: filePath });
     };
 
@@ -135,10 +135,10 @@ export default function Dashboard({
                                     <ul>
                                         {selectedTicket.customer_files.map((file) => (
                                             <li key={file.id} className="mb-2">
-                                                <span className="mr-2">{file.filename}</span>
+                                                <span className="mr-2">{file.file_name}</span>
                                                 <div className="btn-group ml-3">
                                                     <a
-                                                        href={`/storage/${file.filepath}`}
+                                                        href={`/storage/${file.file_path}`}
                                                         download
                                                         className="btn btn-link btn-outline btn-sm text-blue-500"
                                                     >

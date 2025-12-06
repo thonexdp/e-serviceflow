@@ -514,7 +514,7 @@ export default function Productions({
                                                 <tbody>
                                                     {mockupFiles.map((file) => (
                                                         <tr key={file.id}>
-                                                            <td>{file.filename}</td>
+                                                            <td>{file.file_name}</td>
                                                             <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                             <td>
                                                                 <a
@@ -543,8 +543,8 @@ export default function Productions({
                                             <div className="card-body text-center">
                                                 {selectedPreviewFile && (
                                                     <img
-                                                        src={`/storage/${selectedPreviewFile.filepath}`}
-                                                        alt={selectedPreviewFile.filename}
+                                                        src={`/storage/${selectedPreviewFile.file_path}`}
+                                                        alt={selectedPreviewFile.file_name}
                                                         className="img-fluid mb-2"
                                                         style={{ maxHeight: "280px", objectFit: "contain" }}
                                                     />
