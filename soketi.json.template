@@ -1,12 +1,13 @@
 {
   "debug": true,
+  "host": "0.0.0.0",
   "port": 8080,
   "mode": "full",
   "adapter": {
     "driver": "memory"
   },
   "wsHandler": {
-    "driver": "socket.io"
+    "driver": "ws"
   },
   "cache": {
     "driver": "memory"

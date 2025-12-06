@@ -84,13 +84,13 @@ export default function PreviewModal({
                             <div className="w-full h-[80vh] bg-gray-50 flex items-center justify-center">
                                 {isPDF ? (
                                     <embed
-                                        src={`/storage/${fileUrl}`}
+                                        src={fileUrl}
                                         type="application/pdf"
                                         className="w-full h-full"
                                     />
                                 ) : (
                                     <img
-                                        src={`/storage/${fileUrl}`}
+                                        src={fileUrl}
                                         alt="Preview"
                                         className="max-h-full max-w-full object-contain"
                                     />

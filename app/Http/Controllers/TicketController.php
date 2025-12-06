@@ -195,8 +195,8 @@ class TicketController extends BaseCrudController
         if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $request->file('file')->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $request->file('file')->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'customer',
             ]);
         }
@@ -209,8 +209,8 @@ class TicketController extends BaseCrudController
             $storedPath = Storage::put('tickets/customer', $attachment);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $attachment->getClientOriginalName(),
-                'filepath' => $storedPath,
+                'file_name' => $attachment->getClientOriginalName(),
+                'file_path' => $storedPath,
                 'type' => 'customer',
             ]);
         }
@@ -302,8 +302,8 @@ class TicketController extends BaseCrudController
 
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'customer',
             ]);
         }
@@ -320,8 +320,8 @@ class TicketController extends BaseCrudController
             $storedPath = Storage::put('tickets/customer', $attachment);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $attachment->getClientOriginalName(),
-                'filepath' => $storedPath,
+                'file_name' => $attachment->getClientOriginalName(),
+                'file_path' => $storedPath,
                 'type' => 'customer',
             ]);
         }

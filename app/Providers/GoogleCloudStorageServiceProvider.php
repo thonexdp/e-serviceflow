@@ -35,10 +35,11 @@ class GoogleCloudStorageServiceProvider extends ServiceProvider
 
             $pathPrefix = $config['path_prefix'] ?? '';
 
+            // Create adapter with correct parameters
+            // Constructor: __construct(StorageBucket $bucket, string $prefix = '', ?VisibilityHandler $visibilityHandler = null)
             $adapter = new GoogleCloudStorageAdapter(
                 $bucket,
-                $pathPrefix,
-                $config
+                $pathPrefix
             );
 
             return new FilesystemAdapter(

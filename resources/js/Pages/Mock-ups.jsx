@@ -130,8 +130,7 @@ export default function Mockups({
     };
 
     const handlePreview = (filepath) => {
-        const imageUrl = `/storage/${filepath}`;
-        setSelectedImage(imageUrl);
+        setSelectedImage(filepath);
     };
 
     const getDesignStatusBadge = (status) => {
@@ -303,21 +302,21 @@ export default function Mockups({
                                             {customerFiles.length > 0 ? (
                                                 customerFiles.map((file) => (
                                                     <tr key={file.id}>
-                                                        <td>{file.filename}</td>
+                                                        <td>{file.file_name}</td>
                                                         <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                         <td>
                                                             <div className="btn-group">
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
-                                                                    onClick={() => handleDownload(file.id, file.filename)}
+                                                                    onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-green-500"
-                                                                    onClick={() => handlePreview(file.filepath)}
+                                                                    onClick={() => handlePreview(file.file_path)}
                                                                 >
                                                                     <i className="ti-eye"></i> Preview
                                                                 </button>
@@ -352,21 +351,21 @@ export default function Mockups({
                                                 <tbody>
                                                     {mockupFiles.map((file) => (
                                                         <tr key={file.id}>
-                                                            <td>{file.filename}</td>
+                                                            <td>{file.file_name}</td>
                                                             <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                             <td>
                                                                 <div className="btn-group">
                                                                     <button
                                                                         type="button"
                                                                         className="btn btn-link btn-sm text-blue-500"
-                                                                        onClick={() => handleDownload(file.id, file.filename)}
+                                                                        onClick={() => handleDownload(file.id, file.file_name)}
                                                                     >
                                                                         <i className="ti-download"></i> Download
                                                                     </button>
                                                                     <button
                                                                         type="button"
                                                                         className="btn btn-link btn-sm text-green-500"
-                                                                        onClick={() => handlePreview(file.filepath)}
+                                                                        onClick={() => handlePreview(file.file_path)}
                                                                     >
                                                                         <i className="ti-eye"></i> Preview
                                                                     </button>
@@ -486,21 +485,21 @@ export default function Mockups({
                                             {customerFiles.length > 0 ? (
                                                 customerFiles.map((file) => (
                                                     <tr key={file.id}>
-                                                        <td>{file.filename}</td>
+                                                        <td>{file.file_name}</td>
                                                         <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                         <td>
                                                             <div className="btn-group">
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
-                                                                    onClick={() => handleDownload(file.id, file.filename)}
+                                                                    onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-green-500"
-                                                                    onClick={() => handlePreview(file.filepath)}
+                                                                    onClick={() => handlePreview(file.file_path)}
                                                                 >
                                                                     <i className="ti-eye"></i> Preview
                                                                 </button>

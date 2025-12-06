@@ -66,6 +66,8 @@ return [
             'metadata' => [
                 'cacheControl' => 'public,max-age=86400', // 1 day cache
             ],
+            // Add URL configuration for public access
+            'url' => env('GCS_URL', 'https://storage.googleapis.com/' . env('GOOGLE_CLOUD_STORAGE_BUCKET', 'rcshoppe-buckets')),
         ],
 
     ],

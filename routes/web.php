@@ -115,6 +115,75 @@ Route::get('/test-env-json', function () {
     return response()->json($data, 200, [], JSON_PRETTY_PRINT);
 });
 
+// Debug route - File Storage Configuration (TEMPORARY - REMOVE IN PRODUCTION!)
+Route::get('/test-storage', function () {
+    try {
+        $storageInfo = [
+            'environment_variables' => [
+                'FILESYSTEM_DISK' => env('FILESYSTEM_DISK', 'NOT SET'),
+                'GOOGLE_CLOUD_STORAGE_BUCKET' => env('GOOGLE_CLOUD_STORAGE_BUCKET', 'NOT SET'),
+                'GOOGLE_CLOUD_PROJECT_ID' => env('GOOGLE_CLOUD_PROJECT_ID', 'NOT SET'),
+                'GCP_PROJECT_ID' => env('GCP_PROJECT_ID', 'NOT SET'),
+            ],
+            'config_values' => [
+                'default_disk' => config('filesystems.default'),
+                'gcs_driver' => config('filesystems.disks.gcs.driver'),
+                'gcs_project_id' => config('filesystems.disks.gcs.project_id'),
+                'gcs_bucket' => config('filesystems.disks.gcs.bucket'),
+            ],
+            'disk_availability' => [
+                'local_exists' => array_key_exists('local', config('filesystems.disks')),
+                'public_exists' => array_key_exists('public', config('filesystems.disks')),
+                'gcs_exists' => array_key_exists('gcs', config('filesystems.disks')),
+            ],
+        ];
+
+        // Try to test the default disk
+        try {
+            $defaultDisk = \Illuminate\Support\Facades\Storage::getDefaultDriver();
+            $storageInfo['test_results']['default_disk'] = $defaultDisk;
+
+            // Try to create a test file
+            $testContent = 'Test file created at ' . now()->toDateTimeString();
+            $testPath = 'test-' . time() . '.txt';
+
+            \Illuminate\Support\Facades\Storage::put($testPath, $testContent);
+            $storageInfo['test_results']['file_created'] = 'SUCCESS';
+            $storageInfo['test_results']['file_path'] = $testPath;
+
+            // Check if file exists
+            if (\Illuminate\Support\Facades\Storage::exists($testPath)) {
+                $storageInfo['test_results']['file_exists'] = 'YES';
+
+                // Get file URL
+                try {
+                    $url = \Illuminate\Support\Facades\Storage::url($testPath);
+                    $storageInfo['test_results']['file_url'] = $url;
+                } catch (\Exception $e) {
+                    $storageInfo['test_results']['file_url'] = 'ERROR: ' . $e->getMessage();
+                }
+
+                // Delete test file
+                \Illuminate\Support\Facades\Storage::delete($testPath);
+                $storageInfo['test_results']['file_deleted'] = 'SUCCESS';
+            } else {
+                $storageInfo['test_results']['file_exists'] = 'NO - UPLOAD FAILED!';
+            }
+        } catch (\Exception $e) {
+            $storageInfo['test_results']['error'] = $e->getMessage();
+            $storageInfo['test_results']['trace'] = $e->getTraceAsString();
+        }
+
+        return response()->json($storageInfo, 200, [], JSON_PRETTY_PRINT);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Failed to test storage',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+});
+
 // Debug route to test database connection
 Route::get('/testdb', function () {
     try {
