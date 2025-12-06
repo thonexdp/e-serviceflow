@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useRoleApi } from "@/Hooks/useRoleApi";
+
 
 export default function CustomerSearchBox({ onSelect, _selectedCustomer }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
+    const { api } = useRoleApi();
+
 
     useEffect(() => {
         if (query.length < 2) {
@@ -16,7 +20,7 @@ export default function CustomerSearchBox({ onSelect, _selectedCustomer }) {
         const delay = setTimeout(async () => {
             setLoading(true);
             try {
-                const { data } = await axios.get(`/customers/search`, { params: { q: query } });
+                const { data } = await api.get(`/customers/search`, { params: { q: query } });
                 setResults(data);
                 setShowDropdown(true);
             } catch (error) {

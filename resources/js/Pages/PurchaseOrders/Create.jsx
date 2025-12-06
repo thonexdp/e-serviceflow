@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function PurchaseOrdersCreate({
     user = {},
@@ -24,6 +24,7 @@ export default function PurchaseOrdersCreate({
         internal_notes: "",
     });
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
     const handleAddItem = () => {
         setItems([...items, { stock_item_id: "", quantity: 0, unit_cost: 0, notes: "" }]);
@@ -36,7 +37,7 @@ export default function PurchaseOrdersCreate({
     const handleItemChange = (index, field, value) => {
         const newItems = [...items];
         newItems[index][field] = value;
-        
+
         // Auto-fill unit cost from stock item if available
         if (field === "stock_item_id") {
             const stockItem = stockItems.find((si) => si.id === parseInt(value));
@@ -44,24 +45,24 @@ export default function PurchaseOrdersCreate({
                 newItems[index].unit_cost = stockItem.unit_cost || 0;
             }
         }
-        
+
         setItems(newItems);
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         // Validate items
         const validItems = items.filter(
             (item) => item.stock_item_id && item.quantity > 0 && item.unit_cost >= 0
         );
-        
+
         if (validItems.length === 0) {
             alert("Please add at least one valid item.");
             return;
         }
 
-        router.post("/purchase-orders", {
+        router.post(buildUrl("/purchase-orders"), {
             ...formData,
             items: validItems,
         }, {
@@ -327,7 +328,7 @@ export default function PurchaseOrdersCreate({
                                                     <button
                                                         type="button"
                                                         className="btn btn-secondary"
-                                                        onClick={() => router.get("/purchase-orders")}
+                                                        onClick={() => router.get(buildUrl("/purchase-orders"))}
                                                     >
                                                         Cancel
                                                     </button>
@@ -345,7 +346,6 @@ export default function PurchaseOrdersCreate({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

@@ -1,0 +1,32 @@
+{
+  "debug": true,
+  "host": "0.0.0.0",
+  "port": 8080,
+  "mode": "full",
+  "adapter": {
+    "driver": "memory"
+  },
+  "wsHandler": {
+    "driver": "ws"
+  },
+  "cache": {
+    "driver": "memory"
+  },
+  "queue": {
+    "driver": "sync"
+  },
+  "appManager": {
+    "driver": "array",
+    "array": {
+      "apps": [
+        {
+          "id": "SOKETI_DEFAULT_APP_ID_PLACEHOLDER",
+          "key": "SOKETI_DEFAULT_APP_KEY_PLACEHOLDER",
+          "secret": "SOKETI_DEFAULT_APP_SECRET_PLACEHOLDER",
+          "enableClientMessages": true,
+          "enabled": true
+        }
+      ]
+    }
+  }
+}

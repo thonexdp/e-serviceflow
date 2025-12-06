@@ -1,6 +1,7 @@
-import { router, usePage  } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Header({
     user = {},
@@ -11,11 +12,32 @@ export default function Header({
     const { auth } = usePage().props;
 
     const userName = auth?.user?.name || "Guest";
-    const userAvatar = auth?.user?.avatar || "images/avatar/default.jpg";
+    const userAvatar = auth?.user?.avatar || "images/icons/chat.png";
     const [notificationList, setNotificationList] = useState(notifications || []);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const echoInitialized = useRef(false);
+    const notificationDropdownRef = useRef(null);
+    const profileDropdownRef = useRef(null);
+    const { buildUrl } = useRoleApi();
+
+    // Handle clicks outside dropdowns to close them
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+                setIsProfileDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
         // Fetch initial notifications and unread count
@@ -38,12 +60,12 @@ export default function Header({
         }
 
         echoInitialized.current = true;
-        
+
         console.log(`🔌 Connecting to WebSocket channel: user.${auth?.user.id}`);
-        
+
         // Subscribe to user's private channel
         const channel = window.Echo.private(`user.${auth?.user.id}`);
-        
+
         // Add subscription event listeners
         channel.subscribed(() => {
             console.log(`✅ Subscribed to channel: user.${auth?.user.id}`);
@@ -52,13 +74,13 @@ export default function Header({
         channel.error((error) => {
             console.error('❌ Channel subscription error:', error);
         });
-        
+
         // Listen for ticket status changes
         // When using broadcastAs(), we listen to the broadcast name without the dot prefix
         // Laravel Echo automatically handles the App namespace
         const eventHandler = (data) => {
             console.log('📬 Notification received via WebSocket:', data);
-            
+
             // Create notification object from broadcast data
             const newNotification = {
                 id: Date.now(), // Temporary ID
@@ -72,7 +94,7 @@ export default function Header({
 
             // Add to notification list
             setNotificationList((prev) => [newNotification, ...prev]);
-            
+
             // Update unread count
             setUnreadCount((prev) => prev + 1);
 
@@ -138,9 +160,10 @@ export default function Header({
         e.preventDefault();
         e.stopPropagation();
 
+        console.log('MarkAsRead notificationId:', notificationId);
         try {
             await axios.patch(`/notifications/${notificationId}/read`);
-            
+
             // Update local state
             setNotificationList((prev) =>
                 prev.map((notif) =>
@@ -149,7 +172,7 @@ export default function Header({
                         : notif
                 )
             );
-            
+
             // Update unread count
             setUnreadCount((prev) => Math.max(0, prev - 1));
         } catch (error) {
@@ -161,9 +184,10 @@ export default function Header({
         e.preventDefault();
         e.stopPropagation();
 
+        console.log('MarkAllAsRead');
         try {
             await axios.patch('/notifications/read-all');
-            
+
             // Update local state
             setNotificationList((prev) =>
                 prev.map((notif) => ({
@@ -172,7 +196,7 @@ export default function Header({
                     read_at: new Date().toISOString(),
                 }))
             );
-            
+
             // Reset unread count
             setUnreadCount(0);
         } catch (error) {
@@ -193,7 +217,7 @@ export default function Header({
         if (diffMins < 60) return `${diffMins} min ago`;
         if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
         if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-        
+
         return date.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -204,7 +228,7 @@ export default function Header({
 
     const handleNotificationClick = (notification, e) => {
         e.preventDefault();
-        
+
         // Mark as read if unread
         if (!notification.read) {
             handleMarkAsRead(notification.id, e);
@@ -231,8 +255,9 @@ export default function Header({
 
     const handleBellClick = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDropdownOpen(!isDropdownOpen);
-        
+
         // Refresh notifications when opening dropdown
         if (!isDropdownOpen) {
             fetchNotifications();
@@ -240,6 +265,12 @@ export default function Header({
         }
     };
 
+    const handleProfileClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsProfileDropdownOpen(!isProfileDropdownOpen);
+    };
+    console.log("notificationList:", notificationList)
     return (
         <div className="header">
             <div className="container-fluid">
@@ -256,19 +287,15 @@ export default function Header({
                             </div>
                         </div>
                         <div className="float-right">
-                            <div className="dropdown dib">
-                                <a href="#" onClick={handleLogout}>
-                                    Logout
-                                </a>
-                                <div 
-                                    className="header-icon" 
-                                    data-toggle="dropdown"
+                            <div className="dropdown dib" ref={notificationDropdownRef} style={{ position: 'relative' }}>
+                                <div
+                                    className="header-icon"
                                     onClick={handleBellClick}
                                     style={{ position: 'relative', cursor: 'pointer' }}
                                 >
                                     <i className="ti-bell"></i>
                                     {unreadCount > 0 && (
-                                        <span 
+                                        <span
                                             className="notification-badge"
                                             style={{
                                                 position: 'absolute',
@@ -280,6 +307,7 @@ export default function Header({
                                                 width: '18px',
                                                 height: '18px',
                                                 fontSize: '11px',
+                                                padding: "10px",
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -290,7 +318,19 @@ export default function Header({
                                             {unreadCount > 99 ? '99+' : unreadCount}
                                         </span>
                                     )}
-                                    <div className="drop-down dropdown-menu dropdown-menu-right w-72">
+                                </div>
+                                {isDropdownOpen && (
+                                    <div
+                                        className="drop-down dropdown-menu dropdown-menu-right w-72"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            display: 'block',
+                                            position: 'absolute',
+                                            top: '100%',
+                                            right: 0,
+                                            zIndex: 1000,
+                                        }}
+                                    >
                                         <div className="dropdown-content-heading">
                                             <span className="text-left">Recent Notifications</span>
                                             {unreadCount > 0 && (
@@ -317,14 +357,14 @@ export default function Header({
                                             ) : (
                                                 <ul>
                                                     {notificationList.map((notification) => (
-                                                        <li 
+                                                        <li
                                                             key={notification.id}
                                                             style={{
                                                                 backgroundColor: notification.read ? 'transparent' : '#f0f8ff',
                                                             }}
                                                         >
-                                                            <a 
-                                                                href="#" 
+                                                            <a
+                                                                href="#"
                                                                 onClick={(e) => handleNotificationClick(notification, e)}
                                                                 style={{
                                                                     display: 'flex',
@@ -334,19 +374,19 @@ export default function Header({
                                                                     color: 'inherit',
                                                                 }}
                                                             >
-                                                                <img 
-                                                                    className="pull-left m-r-10 avatar-img" 
-                                                                    src={userAvatar} 
-                                                                    alt="" 
+                                                                <img
+                                                                    className="pull-left m-r-10"
+                                                                    src={userAvatar}
+                                                                    alt=""
                                                                     style={{
-                                                                        width: '40px',
-                                                                        height: '40px',
-                                                                        borderRadius: '50%',
+                                                                        width: '30px',
+                                                                        height: '30px',
+                                                                        // borderRadius: '10%',
                                                                         marginRight: '10px',
                                                                     }}
                                                                 />
                                                                 <div className="notification-content" style={{ flex: 1 }}>
-                                                                    <small 
+                                                                    <small
                                                                         className="notification-timestamp pull-right"
                                                                         style={{
                                                                             float: 'right',
@@ -356,7 +396,7 @@ export default function Header({
                                                                     >
                                                                         {formatTime(notification.created_at)}
                                                                     </small>
-                                                                    <div 
+                                                                    <div
                                                                         className="notification-heading"
                                                                         style={{
                                                                             fontWeight: notification.read ? 'normal' : 'bold',
@@ -365,7 +405,7 @@ export default function Header({
                                                                     >
                                                                         {notification.title}
                                                                     </div>
-                                                                    <div 
+                                                                    <div
                                                                         className="notification-text"
                                                                         style={{
                                                                             fontSize: '13px',
@@ -379,56 +419,69 @@ export default function Header({
                                                                         <button
                                                                             onClick={(e) => handleMarkAsRead(notification.id, e)}
                                                                             className="btn btn-xs btn-link"
+                                                                            style={{
+                                                                                padding: '2px 5px',
+                                                                                fontSize: '11px',
+                                                                                marginTop: '5px',
+                                                                                color: '#007bff',
+                                                                            }}
+                                                                        >
+                                                                            Mark as read
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </a>
+                                                        </li>
+                                                    ))}
+                                                    <li className="text-center" style={{ padding: '10px' }}>
+                                                        <a
+                                                            href={buildUrl(notificationList?.[0]?.type === 'ticket_in_designer' ? 'mock-ups' : 'tickets')} className="more-link"
                                                             style={{
-                                                                padding: '2px 5px',
-                                                                fontSize: '11px',
-                                                                marginTop: '5px',
                                                                 color: '#007bff',
+                                                                textDecoration: 'none',
                                                             }}
                                                         >
-                                                            Mark as read
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </a>
-                                        </li>
-                                    ))}
-                                    <li className="text-center" style={{ padding: '10px' }}>
-                                        <a 
-                                            href="/tickets" 
-                                            className="more-link"
-                                            style={{
-                                                color: '#007bff',
-                                                textDecoration: 'none',
-                                            }}
-                                        >
-                                            See All Notifications
-                                        </a>
-                                    </li>
-                                </ul>
-                            )}
-                        </div>
+                                                            See All Notifications
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
-                            <div className="dropdown dib">
+                            <div className="dropdown dib" ref={profileDropdownRef} style={{ position: 'relative' }}>
                                 <div
                                     className="header-icon"
-                                    data-toggle="dropdown"
+                                    onClick={handleProfileClick}
+                                    style={{ cursor: 'pointer' }}
                                 >
                                     <span className="user-avatar">
                                         {userName}{" "}
                                         <i className="ti-angle-down f-s-10"></i>
                                     </span>
-                                    <div className="drop-down dropdown-profile dropdown-menu dropdown-menu-right">
-                                        <div className="dropdown-content-heading">
+                                </div>
+                                {isProfileDropdownOpen && (
+                                    <div
+                                        className="drop-down dropdown-profile dropdown-menu dropdown-menu-right"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            display: 'block',
+                                            position: 'absolute',
+                                            top: '100%',
+                                            right: 0,
+                                            marginTop: '40px',
+                                            zIndex: 1000,
+                                        }}
+                                    >
+                                        {/* <div className="dropdown-content-heading">
                                             <span className="text-left">
                                                 Upgrade Now
                                             </span>
                                             <p className="trial-day">
                                                 30 Days Trail
                                             </p>
-                                        </div>
+                                        </div> */}
                                         <div className="dropdown-content-body">
                                             <ul>
                                                 <li>
@@ -444,7 +497,7 @@ export default function Header({
                                             </ul>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -2,13 +2,13 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import CustomerForm from "@/Components/Customers/CustomerForm";
 import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Customers({
     user = {},
@@ -23,7 +23,13 @@ export default function Customers({
     const [loading, setLoading] = useState(false);
 
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
+    const { buildUrl } = useRoleApi();
+
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
 
     const handleOpenModal = (customer = null) => {
         setEditingCustomer(customer);
@@ -39,7 +45,7 @@ export default function Customers({
     const handleCustomerSubmit = (data) => {
         console.log('handleCustomerSubmit', data);
         if (editingCustomer) {
-            router.put(`/customers/${editingCustomer.id}`, data, {
+            router.put(buildUrl(`/customers/${editingCustomer.id}`), data, {
                 onSuccess: () => {
                     handleCloseModal();
                 },
@@ -47,7 +53,7 @@ export default function Customers({
                 preserveScroll: true,
             });
         } else {
-            router.post("/customers", data, {
+            router.post(buildUrl("/customers"), data, {
                 onSuccess: () => {
                     handleCloseModal();
                 },
@@ -64,9 +70,9 @@ export default function Customers({
 
     const handleDeleteCustomer = () => {
         if (!selectedID) return;
-        router.delete(`/customers/${selectedID}`, {
+        router.delete(buildUrl(`/customers/${selectedID}`), {
             preserveScroll: true,
-             preserveState: false,
+            preserveState: false,
 
             onBefore: () => {
                 setLoading(true);
@@ -220,7 +226,7 @@ export default function Customers({
                                                         initialValue={
                                                             filters.search || ""
                                                         }
-                                                        route="/customers"
+                                                        route={buildUrl("/customers")}
                                                     />
                                                 </div>
 
@@ -228,23 +234,25 @@ export default function Customers({
                                                     <button
                                                         type="button"
                                                         onClick={() =>
-                                                            router.replace("/customers")
+                                                            router.replace(buildUrl("/customers"))
                                                         }
                                                         className="px-3 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
                                                     >
                                                         <i className="ti-reload"></i>
                                                     </button>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handleOpenModal()
-                                                        }
-                                                        className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
-                                                    >
-                                                        <i className="ti-plus"></i>{" "}
-                                                        Add Customer
-                                                    </button>
+                                                    {hasPermission('customers', 'create') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleOpenModal()
+                                                            }
+                                                            className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+                                                        >
+                                                            <i className="ti-plus"></i>{" "}
+                                                            Add Customer
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -253,8 +261,8 @@ export default function Customers({
                                                     columns={customerColumns}
                                                     data={customers.data}
                                                     pagination={customers}
-                                                    onEdit={handleOpenModal}
-                                                    onDelete={handleDelete}
+                                                    onEdit={hasPermission('customers', 'update') ? handleOpenModal : null}
+                                                    onDelete={hasPermission('customers', 'delete') ? handleDelete : null}
                                                     emptyMessage="No customers found."
                                                 />
                                             </div>
@@ -267,7 +275,6 @@ export default function Customers({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

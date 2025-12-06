@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import useSidebar from '@/Hooks/useSidebar';
+import Footer from './Footer';
 
 export default function AdminLayout({ children, user = {}, notifications = [], messages = [] }) {
     const { isCollapsed, toggleSidebar, hideSidebar, isMobile } = useSidebar();
@@ -62,6 +63,7 @@ export default function AdminLayout({ children, user = {}, notifications = [], m
                         {children}
                     </div>
                 </div>
+                <Footer/>
             </div>
         </div>
     );

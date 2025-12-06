@@ -10,13 +10,23 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         price: "",
         price_by: "pcs",
         discount: "",
-        promo_text: "",
         is_active: true,
         sort_order: 0,
     });
 
     const [priceTiers, setPriceTiers] = useState([]);
     const [sizeRates, setSizeRates] = useState([]);
+    const [promoRules, setPromoRules] = useState([]);
+    const [workflowSteps, setWorkflowSteps] = useState({
+        design: false,
+        printing: false,
+        lamination_heatpress: false,
+        cutting: false,
+        sewing: false,
+        dtf_press: false,
+        // assembly: false,
+        // quality_check: false,
+    });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
 
@@ -30,7 +40,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 price: jobType.price || "",
                 price_by: jobType.price_by || "pcs",
                 discount: jobType.discount || "",
-                promo_text: jobType.promo_text || "",
                 is_active: jobType.is_active !== undefined ? jobType.is_active : true,
                 sort_order: jobType.sort_order || 0,
             });
@@ -59,9 +68,43 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     is_default: !!rate.is_default,
                 }))
             );
+            setPromoRules(
+                (jobType.promo_rules || []).map((rule) => ({
+                    id: rule.id || null,
+                    buy_quantity: rule.buy_quantity?.toString() || "",
+                    free_quantity: rule.free_quantity?.toString() || "",
+                    description: rule.description || "",
+                    is_active: rule.is_active !== undefined ? rule.is_active : true,
+                }))
+            );
+
+            // Load workflow steps if they exist
+            if (jobType.workflow_steps) {
+                setWorkflowSteps({
+                    design: jobType.workflow_steps.design || false,
+                    printing: jobType.workflow_steps.printing || false,
+                    lamination_heatpress: jobType.workflow_steps.lamination_heatpress || false,
+                    cutting: jobType.workflow_steps.cutting || false,
+                    sewing: jobType.workflow_steps.sewing || false,
+                    dtf_press: jobType.workflow_steps.dtf_press || false,
+                    // assembly: jobType.workflow_steps.assembly || false,
+                    // quality_check: jobType.workflow_steps.quality_check || false,
+                });
+            }
         } else {
             setPriceTiers([]);
             setSizeRates([]);
+            setPromoRules([]);
+            setWorkflowSteps({
+                design: false,
+                printing: false,
+                lamination_heatpress: false,
+                cutting: false,
+                sewing: false,
+                dtf_press: false,
+                // assembly: false,
+                // quality_check: false,
+            });
         }
     }, [jobType]);
 
@@ -80,6 +123,13 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 return newErrors;
             });
         }
+    };
+
+    const handleWorkflowChange = (step) => {
+        setWorkflowSteps((prev) => ({
+            ...prev,
+            [step]: !prev[step],
+        }));
     };
 
     const addPriceTier = () => {
@@ -158,6 +208,33 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         });
     };
 
+    const addPromoRule = () => {
+        setPromoRules((prev) => [
+            ...prev,
+            {
+                buy_quantity: "",
+                free_quantity: "",
+                description: "",
+                is_active: true,
+            },
+        ]);
+    };
+
+    const updatePromoRule = (index, field, value) => {
+        setPromoRules((prev) => {
+            const updated = [...prev];
+            updated[index] = {
+                ...updated[index],
+                [field]: value,
+            };
+            return updated;
+        });
+    };
+
+    const removePromoRule = (index) => {
+        setPromoRules((prev) => prev.filter((_, i) => i !== index));
+    };
+
     const validateForm = () => {
         const newErrors = {};
 
@@ -189,7 +266,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         }
 
         setProcessing(true);
-        
+
         // Convert string values to appropriate types
         const formattedPriceTiers = priceTiers
             .filter((tier) => tier.min_quantity && tier.price)
@@ -216,6 +293,15 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 is_default: !!rate.is_default,
             }));
 
+        const formattedPromoRules = promoRules
+            .filter((rule) => rule.buy_quantity && rule.free_quantity)
+            .map((rule) => ({
+                buy_quantity: Number(rule.buy_quantity),
+                free_quantity: Number(rule.free_quantity),
+                description: rule.description || null,
+                is_active: rule.is_active !== undefined ? rule.is_active : true,
+            }));
+
         const submitData = {
             ...formData,
             category_id: parseInt(formData.category_id),
@@ -224,6 +310,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             sort_order: parseInt(formData.sort_order) || 0,
             price_tiers: formattedPriceTiers,
             size_rates: formattedSizeRates,
+            promo_rules: formattedPromoRules,
+            workflow_steps: workflowSteps,
         };
 
         onSubmit(submitData);
@@ -336,17 +424,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             <div className="row">
                 <div className="col-md-6">
                     <FormInput
-                        label="Promo Text"
-                        name="promo_text"
-                        value={formData.promo_text}
-                        onChange={handleChange}
-                        error={errors.promo_text}
-                        placeholder="e.g., 12 + 1 free"
-                    />
-                </div>
-
-                <div className="col-md-3">
-                    <FormInput
                         label="Sort Order"
                         type="number"
                         name="sort_order"
@@ -358,7 +435,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     />
                 </div>
 
-                <div className="col-md-3">
+                <div className="col-md-6">
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Status
@@ -632,6 +709,258 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         No size rates configured. Base price will be used.
                     </div>
                 )}
+            </div>
+
+            <div className="mt-4">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h5 className="mb-0">Promotional Rules (Optional)</h5>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-success"
+                        onClick={addPromoRule}
+                    >
+                        <i className="ti-gift"></i> Add Promo
+                    </button>
+                </div>
+                <p className="text-muted text-sm mb-3">
+                    Define promotional offers like "Buy 12, Get 1 Free" to incentivize bulk purchases.
+                </p>
+
+                {promoRules.length > 0 ? (
+                    <div className="table-responsive">
+                        <table className="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Buy Quantity</th>
+                                    <th>Free Quantity</th>
+                                    <th>Description</th>
+                                    <th>Active</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {promoRules.map((rule, index) => (
+                                    <tr key={index}>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                className="form-control form-control-sm"
+                                                value={rule.buy_quantity}
+                                                onChange={(e) => updatePromoRule(index, "buy_quantity", e.target.value)}
+                                                min="1"
+                                                placeholder="e.g., 12"
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                className="form-control form-control-sm"
+                                                value={rule.free_quantity}
+                                                onChange={(e) => updatePromoRule(index, "free_quantity", e.target.value)}
+                                                min="1"
+                                                placeholder="e.g., 1"
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-sm"
+                                                value={rule.description}
+                                                onChange={(e) => updatePromoRule(index, "description", e.target.value)}
+                                                placeholder="e.g., Buy 12, Get 1 Free!"
+                                            />
+                                        </td>
+                                        <td className="text-center">
+                                            <div className="form-check">
+                                                <input
+                                                    className="form-check-input"
+                                                    type="checkbox"
+                                                    checked={rule.is_active}
+                                                    onChange={(e) => updatePromoRule(index, "is_active", e.target.checked)}
+                                                />
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm btn-link text-danger"
+                                                onClick={() => removePromoRule(index)}
+                                            >
+                                                <i className="ti-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="alert alert-light border">
+                        No promotional rules added yet.
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-4">
+                <h5 className="mb-3">Production Workflow Template</h5>
+                <p className="text-muted text-sm mb-3">
+                    Select the production steps that apply to this job type/product. These steps will be used to track progress in the production board.
+                </p>
+                <div className="row">
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_design"
+                                checked={workflowSteps.design}
+                                onChange={() => handleWorkflowChange('design')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_design">
+                                <i className="ti-pencil-alt mr-1"></i> Design
+                            </label>
+                        </div>
+                    </div>
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_printing"
+                                checked={workflowSteps.printing}
+                                onChange={() => handleWorkflowChange('printing')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_printing">
+                                <i className="ti-printer mr-1"></i> Printing
+                            </label>
+                        </div>
+                    </div>
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_lamination"
+                                checked={workflowSteps.lamination_heatpress}
+                                onChange={() => handleWorkflowChange('lamination_heatpress')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_lamination">
+                                <i className="ti-layers mr-1"></i> Lamination/Heatpress
+                            </label>
+                        </div>
+                    </div>
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_cutting"
+                                checked={workflowSteps.cutting}
+                                onChange={() => handleWorkflowChange('cutting')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_cutting">
+                                <i className="ti-cut mr-1"></i> Cutting
+                            </label>
+                        </div>
+                    </div>
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_sewing"
+                                checked={workflowSteps.sewing}
+                                onChange={() => handleWorkflowChange('sewing')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_sewing">
+                                <i className="ti-pin-alt mr-1"></i> Sewing
+                            </label>
+                        </div>
+                    </div>
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_dtf"
+                                checked={workflowSteps.dtf_press}
+                                onChange={() => handleWorkflowChange('dtf_press')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_dtf">
+                                <i className="ti-stamp mr-1"></i> DTF Press (T-shirts)
+                            </label>
+                        </div>
+                    </div>
+                    {/* <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_assembly"
+                                checked={workflowSteps.assembly}
+                                onChange={() => handleWorkflowChange('assembly')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_assembly">
+                                <i className="ti-package mr-1"></i> Assembly
+                            </label>
+                        </div>
+                    </div>
+                    <div className="col-md-3 mb-3">
+                        <div className="form-check">
+                            <input
+                                type="checkbox"
+                                className="form-check-input"
+                                id="workflow_quality"
+                                checked={workflowSteps.quality_check}
+                                onChange={() => handleWorkflowChange('quality_check')}
+                            />
+                            <label className="form-check-label" htmlFor="workflow_quality">
+                                <i className="ti-check-box mr-1"></i> Quality Check
+                            </label>
+                        </div>
+                    </div> */}
+                </div>
+            </div>
+
+            <div className="mt-4 p-4 bg-light rounded border">
+                <h6 className="mb-3 font-weight-bold text-dark">Workflow Preview</h6>
+                <div className="d-flex flex-wrap align-items-center gap-2">
+                    {Object.entries(workflowSteps)
+                        .filter(([key, value]) => value)
+                        .sort((a, b) => {
+                            // const order = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press', 'assembly', 'quality_check'];
+                            const order = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
+                            return order.indexOf(a[0]) - order.indexOf(b[0]);
+                        })
+                        .map(([key, value], index, array) => (
+                            <React.Fragment key={key}>
+                                <div className="d-flex align-items-center">
+                                    <div className="badge badge-primary p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                                        {key === 'lamination_heatpress' ? 'Lamination/Heatpress' :
+                                            key === 'dtf_press' ? 'DTF Press' :
+                                                key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                    </div>
+                                    {index < array.length - 1 && (
+                                        <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
+                                    )}
+                                </div>
+                            </React.Fragment>
+                        ))}
+
+                    {/* Visual connector to Completed if any steps are selected */}
+                    {Object.values(workflowSteps).some(v => v) && (
+                        <>
+                            <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
+                            <div className="badge badge-success p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                                Completed
+                            </div>
+                        </>
+                    )}
+
+                    {!Object.values(workflowSteps).some(v => v) && (
+                        <span className="text-muted font-italic">Select steps above to see the workflow preview.</span>
+                    )}
+                </div>
             </div>
 
             <div className="mt-4 d-flex justify-content-end gap-2">

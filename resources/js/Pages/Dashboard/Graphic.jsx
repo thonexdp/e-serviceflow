@@ -1,20 +1,95 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
+import { Head, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
+import PreviewModal from "@/Components/Main/PreviewModal";
+import CardStatistics from "@/Components/Common/CardStatistics";
+import { formatDate } from "@/Utils/formatDate";
 
 export default function Dashboard({
     user = {},
     notifications = [],
     messages = [],
+    statistics = {
+        ticketsPendingReview: 0,
+        revisionRequested: 0,
+        mockupsUploadedToday: 0,
+        approvedDesign: 0,
+    },
+    ticketsPendingReview = [],
+    revisionRequested = [],
+    mockupsUploadedToday = [],
+    filters = { date_range: "this_month" },
 }) {
+    const [refreshing, setRefreshing] = useState(false);
+    const [dateRange, setDateRange] = useState(
+        filters.date_range || "this_month"
+    );
     const [openReviewModal, setReviewModalOpen] = useState(false);
     const [openUploadModal, setUploadModalOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [previewModal, setPreviewModal] = useState({ isOpen: false, fileUrl: null });
+
+    const refreshDashboard = () => {
+        setRefreshing(true);
+        router.reload({
+            onFinish: () => setRefreshing(false),
+        });
+    };
+
+    const handleDateRangeChange = (range) => {
+        setDateRange(range);
+        router.get(
+            "/designer/",
+            { date_range: range },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handleViewTicket = (ticketId) => {
+        // router.visit(`/designer/mock-ups/${ticketId}`);
+        router.visit(`/designer/mock-ups`);
+    };
+
+    const handlePreviewFile = (file) => {
+        setPreviewModal({ isOpen: true, fileUrl: file?.file_path });
+    };
+
+    const handleReviewTicket = (ticket) => {
+        setSelectedTicket(ticket);
+        setReviewModalOpen(true);
+    };
 
     const handleSave = () => {
-        console.log("save");
+        if (!selectedTicket) return;
+        handleViewTicket(selectedTicket.id);
     };
+
+    const getDesignStatusBadge = (status) => {
+        const statusMap = {
+            pending: { class: "badge-warning", label: "Pending Review" },
+            revision_requested: { class: "badge-danger", label: "Revision Requested" },
+            mockup_uploaded: { class: "badge-info", label: "Mock-up Uploaded" },
+            approved: { class: "badge-success", label: "Approved" },
+        };
+        const statusInfo = statusMap[status] || { class: "badge-secondary", label: status || "Pending" };
+        return (
+            <span className={`badge ${statusInfo.class}`}>
+                {statusInfo.label}
+            </span>
+        );
+    };
+
+    // Generate year options from current year to 2020 (descending)
+    const currentYear = new Date().getFullYear();
+    const yearOptions = [];
+    for (let year = currentYear; year >= 2020; year--) {
+        yearOptions.push(year);
+    }
 
     return (
         <AdminLayout
@@ -22,113 +97,94 @@ export default function Dashboard({
             notifications={notifications}
             messages={messages}
         >
-            <Head title="Dashboard" />
+            <Head title="Designer Dashboard" />
 
+            {/* Review Modal */}
             <Modal
-                title="Review"
+                title="Review Ticket"
                 isOpen={openReviewModal}
-                onClose={() => setReviewModalOpen(false)}
+                onClose={() => {
+                    setReviewModalOpen(false);
+                    setSelectedTicket(null);
+                }}
                 onSave={handleSave}
                 size="3xl"
-                submitButtonText="Submit"
+                submitButtonText="View Details"
             >
-                <form>
-                    <div className="mb-4">
-                        <h3>
-                            {" "}
-                            Record Payment for Ticket: <b>#20454-12</b>{" "}
-                        </h3>
-                        <div>
-                            <h5>
-                                {" "}
-                                Customer : <b> John Doe</b>
-                            </h5>
+                {selectedTicket && (
+                    <form>
+                        <div className="mb-4">
+                            <h3>
+                                Record Payment for Ticket: <b>#{selectedTicket.ticket_number}</b>
+                            </h3>
+                            <div>
+                                <h5>
+                                    Customer : <b>{selectedTicket.customer?.name || "Unknown"}</b>
+                                </h5>
+                            </div>
+                            <div>
+                                <h5>
+                                    Description : <b>{selectedTicket.description}</b>
+                                </h5>
+                            </div>
+                            <hr className="my-3" />
+                            <div>
+                                <h6>Files :</h6>
+                                {selectedTicket.customer_files && selectedTicket.customer_files.length > 0 ? (
+                                    <ul>
+                                        {selectedTicket.customer_files.map((file) => (
+                                            <li key={file.id} className="mb-2">
+                                                <span className="mr-2">{file.file_name}</span>
+                                                <div className="btn-group ml-3">
+                                                    <a
+                                                        href={file?.file_path}
+                                                        download
+                                                        className="btn btn-link btn-outline btn-sm text-blue-500"
+                                                    >
+                                                        <span className="ti-download"></span> Download
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-link btn-outline btn-sm text-green-800"
+                                                        onClick={() => handlePreviewFile(file)}
+                                                    >
+                                                        <span className="ti-eye"></span> Preview
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted">No files uploaded</p>
+                                )}
+                            </div>
+                            <hr className="my-3" />
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => router.visit(`/designer/mock-ups`)}
+                            >
+                                <i className="ti-arrow-right"></i> Goto Mock-up Page
+                            </button>
                         </div>
-                        <div>
-                            <h5>
-                                {" "}
-                                Description :{" "}
-                                <b> 50pcs T-shirts (front & back)</b>
-                            </h5>
-                        </div>
-                        <hr className="my-3" />
-                        <div>
-                            <h6> Files : </h6>
-                            <ul>
-                                <li>
-                                    <span className="mr-2">Design1.png</span> |
-                                    <div class="btn-group ml-3">
-                                        <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-blue-500"
-                                        >
-                                            <span className="ti-download"></span>{" "}
-                                            Download
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-green-800"
-                                        >
-                                            <span className="ti-eye"></span>{" "}
-                                            Preview
-                                        </button>
-                                    </div>
-                                </li>
-                            </ul>
-                        </div>
-                        <hr className="my-3" />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium">
-                            <input
-                                type="checkbox"
-                                name="status"
-                                class="mail-checkbox"
-                            />{" "}
-                            <b>Approved</b>
-                        </label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            <input
-                                type="checkbox"
-                                name="status"
-                                class="mail-checkbox"
-                            />{" "}
-                            <b>Request Revisions</b>
-                        </label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Notes :
-                        </label>
-                        <input
-                            type="text"
-                            className="mt-1 w-full border p-2" // fixed small width
-                            placeholder=""
-                            value=""
-                            // value={forms.ticket.quantity}
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             quantity: e.target.value,
-                            //         },
-                            //     })
-                            // }
-                        />
-                    </div>
-                </form>
+                    </form>
+                )}
             </Modal>
+
+            {/* Preview Modal */}
+            <PreviewModal
+                isOpen={previewModal.isOpen}
+                onClose={() => setPreviewModal({ isOpen: false, fileUrl: null })}
+                fileUrl={previewModal.fileUrl}
+                title="File Preview"
+            />
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
                     <div className="page-header">
                         <div className="page-title">
                             <h1>
-                                Hello, <span>Welcome Here</span>
+                                Designer <span>Dashboard</span>
                             </h1>
                         </div>
                     </div>
@@ -140,7 +196,7 @@ export default function Dashboard({
                                 <li className="breadcrumb-item">
                                     <a href="#">Dashboard</a>
                                 </li>
-                                <li className="breadcrumb-item active">Home</li>
+                                <li className="breadcrumb-item active">Designer</li>
                             </ol>
                         </div>
                     </div>
@@ -148,209 +204,293 @@ export default function Dashboard({
             </div>
 
             <section id="main-content">
+                {/* Header with Date Filter */}
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl font-bold text-gray-800">Design Dashboard</h1>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
+                        <button
+                            onClick={refreshDashboard}
+                            className="btn btn-sm btn-link"
+                            disabled={refreshing}
+                        >
+                            <i className={`ti-reload ${refreshing ? "animate-spin" : ""}`}></i>
+                            {refreshing ? " Refreshing..." : " Refresh"}
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <select
+                            className="text-sm font-medium text-gray-700 border-none bg-transparent focus:ring-0 p-0 pr-6 cursor-pointer"
+                            value={dateRange}
+                            onChange={(e) => handleDateRangeChange(e.target.value)}
+                        >
+                            <option value="today">Today</option>
+                            <option value="this_week">This Week</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_30_days">Last 30 Days</option>
+                            <option value="this_year">This Year</option>
+                            {yearOptions.map((year) => (
+                                <option key={year} value={`year_${year}`}>
+                                    {year}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Statistics Cards */}
+                <div className="row mb-4">
+                    <div className="col-lg-3">
+                        <CardStatistics
+                            label="Tickets Pending Review"
+                            statistics={statistics.ticketsPendingReview}
+                            icon="ti-clipboard"
+                            color="bg-warning"
+                        />
+                    </div>
+                    <div className="col-lg-3">
+                        <CardStatistics
+                            label="Revision Requested"
+                            statistics={statistics.revisionRequested}
+                            icon="ti-reload"
+                            color="bg-danger"
+                        />
+                    </div>
+                    <div className="col-lg-3">
+                        <CardStatistics
+                            label="Mock-Ups Uploaded Today"
+                            statistics={statistics.mockupsUploadedToday}
+                            icon="ti-upload"
+                            color="bg-primary"
+                        />
+                    </div>
+                    <div className="col-lg-3">
+                        <CardStatistics
+                            label="Approved Design"
+                            statistics={statistics.approvedDesign}
+                            icon="ti-check-box"
+                            color="bg-success"
+                        />
+                    </div>
+                </div>
+
+                {/* Tickets Lists */}
                 <div className="row">
                     {/* Tickets Pending Review */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-secondary">
-                                    <i className="ti-clipboard"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">12</div>
-
-                                    <div className="stat-text">
+                    <div className="col-lg-4">
+                        <div className="card shadow-sm">
+                            <div className="card-header bg-warning">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <h5 className="mb-0 text-white">
+                                        <i className="ti-clipboard mr-2"></i>
                                         Tickets Pending Review
-                                    </div>
+                                    </h5>
+                                    <span className="badge badge-light">
+                                        <span className="text-black">{ticketsPendingReview.length}</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="card-body p-0">
+                                <div className="table-responsive" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                                    <table className="table table-hover mb-0">
+                                        <tbody>
+                                            {ticketsPendingReview.length > 0 ? (
+                                                ticketsPendingReview.map((ticket) => (
+                                                    <tr
+                                                        key={ticket.id}
+                                                        className="cursor-pointer hover:bg-gray-50"
+                                                        onClick={() => handleReviewTicket(ticket)}
+                                                    >
+                                                        <td>
+                                                            <div className="d-flex flex-column">
+                                                                <strong className="text-primary">
+                                                                    #{ticket.ticket_number}
+                                                                </strong>
+                                                                <small className="text-muted">
+                                                                    {ticket.customer?.name || "Unknown"}
+                                                                </small>
+                                                                <small className="text-muted mt-1">
+                                                                    {ticket.description?.substring(0, 50)}
+                                                                    {ticket.description?.length > 50 ? "..." : ""}
+                                                                </small>
+                                                                {ticket.due_date && (
+                                                                    <small className="text-warning mt-1">
+                                                                        <i className="ti-calendar mr-1"></i>
+                                                                        Due: {formatDate(ticket.due_date)}
+                                                                    </small>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="text-right">
+                                                            {ticket.customer_files && ticket.customer_files.length > 0 && (
+                                                                <span className="badge badge-info">
+                                                                    <i className="ti-file mr-1"></i>
+                                                                    {ticket.customer_files.length} file{ticket.customer_files.length > 1 ? "s" : ""}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td className="text-center text-gray-400 py-4">
+                                                        <i className="ti-clipboard" style={{ fontSize: "32px" }}></i>
+                                                        <p className="mt-2 mb-0">No Tickets Pending Review</p>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Revision Requested */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-danger">
-                                    <i className="ti-reload"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">4</div>
-                                    <div className="stat-text">
+                    <div className="col-lg-4">
+                        <div className="card shadow-sm">
+                            <div className="card-header bg-danger">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <h5 className="mb-0">
+                                        <i className="ti-reload mr-2"></i>
                                         Revision Requested
-                                    </div>
+                                    </h5>
+                                    <span className="badge badge-light">
+                                        <span className="text-black">{revisionRequested.length}</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="card-body p-0">
+                                <div className="table-responsive" style={{ maxHeight: "500px", overflowY: "auto" }}>
+                                    <table className="table table-hover mb-0">
+                                        <tbody>
+                                            {revisionRequested.length > 0 ? (
+                                                revisionRequested.map((ticket) => (
+                                                    <tr
+                                                        key={ticket.id}
+                                                        className="cursor-pointer hover:bg-gray-50"
+                                                        onClick={() => handleViewTicket(ticket)}
+                                                    >
+                                                        <td>
+                                                            <div className="d-flex flex-column">
+                                                                <strong className="text-danger">
+                                                                    #{ticket.ticket_number}
+                                                                </strong>
+                                                                <small className="text-muted">
+                                                                    {ticket.customer?.name || "Unknown"}
+                                                                </small>
+                                                                <small className="text-muted mt-1">
+                                                                    {ticket.description?.substring(0, 50)}
+                                                                    {ticket.description?.length > 50 ? "..." : ""}
+                                                                </small>
+                                                                {ticket.design_notes && (
+                                                                    <small className="text-danger mt-1">
+                                                                        <i className="ti-comment mr-1"></i>
+                                                                        {ticket.design_notes.substring(0, 40)}
+                                                                        {ticket.design_notes.length > 40 ? "..." : ""}
+                                                                    </small>
+                                                                )}
+                                                                {ticket.due_date && (
+                                                                    <small className="text-warning mt-1">
+                                                                        <i className="ti-calendar mr-1"></i>
+                                                                        Due: {formatDate(ticket.due_date)}
+                                                                    </small>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="text-right">
+                                                            {ticket.mockup_files && ticket.mockup_files.length > 0 && (
+                                                                <span className="badge badge-info">
+                                                                    <i className="ti-file mr-1"></i>
+                                                                    {ticket.mockup_files.length} mockup{ticket.mockup_files.length > 1 ? "s" : ""}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td className="text-center text-gray-400 py-4">
+                                                        <i className="ti-reload" style={{ fontSize: "32px" }}></i>
+                                                        <p className="mt-2 mb-0">No Revision Requested</p>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Mock-Ups Uploaded Today */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-info">
-                                    <i className="ti-upload"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">9</div>
-                                    <div className="stat-text">
+                    <div className="col-lg-4">
+                        <div className="card shadow-sm">
+                            <div className="card-header bg-primary">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <h5 className="mb-0">
+                                        <i className="ti-upload mr-2"></i>
                                         Mock-Ups Uploaded Today
-                                    </div>
+                                    </h5>
+                                    <span className="badge badge-light">
+                                        <span className="text-black">{mockupsUploadedToday.length} </span>
+                                    </span>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Approved Design */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-success">
-                                    <i className="ti-check-box"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">15</div>
-                                    <div className="stat-text">
-                                        Approved Design
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="row">
-                    <div className="col-lg-12">
-                        <div className="card">
-                            <div className="card-title pr">
-                                <h4>All Tickets</h4>
-                            </div>
-                            <div className="card-body">
-                                <div className="row mt-4">
-                                    <div className="col-lg-3">
-                                        <div class="form-group">
-                                            <label>Search Name</label>
-                                            <input
-                                                type="text"
-                                                class="form-control input-focus input-sm"
-                                                placeholder=""
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-lg-3">
-                                        <div class="form-group">
-                                            <label>Status Type</label>
-                                            <select class="form-control input-sm">
-                                                <option>Pending Review</option>
-                                                <option>
-                                                    Revision Requested
-                                                </option>
-                                                <option>
-                                                    Mock-up Uploaded
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="col-lg-2">
-                                        <div class="form-group">
-                                            <label>From</label>
-                                            <input
-                                                type="date"
-                                                class="form-control input-sm"
-                                                placeholder="Input Focus"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-lg-2">
-                                        <div class="form-group">
-                                            <label>To</label>
-                                            <input
-                                                type="date"
-                                                class="form-control input-sm"
-                                                placeholder="Input Focus"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-lg-2"></div>
-                                </div>
-                                <div className="table-responsive">
-                                    <table className="table student-data-table m-t-20">
-                                        <thead>
-                                            <tr>
-                                                <th>Ticket ID</th>
-                                                <th>Customer</th>
-                                                <th>Description</th>
-                                                <th>Due Date</th>
-                                                <th>Status</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
+                            <div className="card-body p-0">
+                                <div className="table-responsive" style={{ maxHeight: "500px", overflowY: "auto" }}>
+                                    <table className="table table-hover mb-0">
                                         <tbody>
-                                            <tr>
-                                                <td>#43242</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-primary">
-                                                        Pending Review
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        class="btn btn-link btn-outline btn-sm text-blue-500"
-                                                        onClick={() =>
-                                                            setReviewModalOpen(
-                                                                true
-                                                            )
-                                                        }
+                                            {mockupsUploadedToday.length > 0 ? (
+                                                mockupsUploadedToday.map((ticket) => (
+                                                    <tr
+                                                        key={ticket.id}
+                                                        className="cursor-pointer hover:bg-gray-50"
+                                                        onClick={() => handleViewTicket(ticket)}
                                                     >
-                                                        <span className="ti-eye"></span>{" "}
-                                                        Review
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#7456345</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-warning">
-                                                        Revision Requested
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        class="btn btn-link btn-outline btn-sm text-blue-500"
-                                                    >
-                                                        <span className="ti-ruler-pencil"></span>{" "}
-                                                        Revise
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#54653232</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    <span className="badge badge-primary badge-success">
-                                                        Mock-Up Uploaded
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        class="btn btn-flat btn-sm text-blue-500"
-                                                    >
-                                                        <span className="ti-check-box"></span>{" "}
-                                                        Approved
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                                        <td>
+                                                            <div className="d-flex flex-column">
+                                                                <strong className="text-primary">
+                                                                    #{ticket.ticket_number}
+                                                                </strong>
+                                                                <small className="text-muted">
+                                                                    {ticket.customer?.name || "Unknown"}
+                                                                </small>
+                                                                <small className="text-muted mt-1">
+                                                                    {ticket.description?.substring(0, 50)}
+                                                                    {ticket.description?.length > 50 ? "..." : ""}
+                                                                </small>
+                                                                <small className="text-info mt-1">
+                                                                    <i className="ti-time mr-1"></i>
+                                                                    {formatDate(ticket.updated_at)}
+                                                                </small>
+                                                            </div>
+                                                        </td>
+                                                        <td className="text-right">
+                                                            {ticket.mockup_files && ticket.mockup_files.length > 0 && (
+                                                                <div className="d-flex flex-column align-items-end">
+                                                                    <span className="badge badge-success mb-1">
+                                                                        <i className="ti-check mr-1"></i>
+                                                                        Uploaded
+                                                                    </span>
+                                                                    <span className="badge badge-info">
+                                                                        <i className="ti-file mr-1"></i>
+                                                                        {ticket.mockup_files.length} file{ticket.mockup_files.length > 1 ? "s" : ""}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td className="text-center text-gray-400 py-4">
+                                                        <i className="ti-upload" style={{ fontSize: "32px" }}></i>
+                                                        <p className="mt-2 mb-0">No Mock-Ups Uploaded Today</p>
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -358,167 +498,7 @@ export default function Dashboard({
                         </div>
                     </div>
                 </div>
-                {/* <div className="row">
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="year-calendar"></div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Notice Board </h4>
-
-                            </div>
-                            <div className="recent-comment m-t-15">
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-danger">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media no-border">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-info">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Timeline</h4>
-
-                            </div>
-                            <div className="card-body">
-                                <ul className="timeline">
-                                    <li>
-                                        <div className="timeline-badge primary"><i className="fa fa-smile-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">School promote video sharing</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>10 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Ready our school website and online
-                                                    service</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge danger"><i className="fa fa-times-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Routine pubish our website form
-                                                    10/03/2017 </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>30 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge success"><i className="fa fa-check-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Principle quotation publish our website
-                                                </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>15 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Class schedule publish our website</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
             </section>
-
-            <Footer />
         </AdminLayout>
     );
 }

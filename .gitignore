@@ -18,3 +18,10 @@ yarn-error.log
 /.idea
 /.vscode
 /xcode
+/.agent
+/.docs
+
+# GCP Deployment Keys
+github-key.json
+*.key
+*.pem

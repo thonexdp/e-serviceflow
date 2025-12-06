@@ -1,0 +1,49 @@
+FROM node:18-slim
+
+# Install git (required for npm dependencies)
+RUN apt-get update && \
+    apt-get install -y git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srv
+
+# Install soketi with specific version and retry on failure
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm i -g @soketi/soketi@1.6.0 || npm i -g @soketi/soketi
+
+# Cloud Run sets PORT env var dynamically
+# Use PORT from Cloud Run, default to 8080 if not set
+ENV PORT=8080
+EXPOSE 8080
+
+# Set default environment variables
+ENV SOKETI_DEBUG=1
+ENV SOKETI_ADAPTER_DRIVER=memory
+ENV SOKETI_DEFAULT_APP_ID=app-id
+ENV SOKETI_DEFAULT_APP_KEY=app-key
+ENV SOKETI_DEFAULT_APP_SECRET=app-secret
+
+COPY soketi.json.template /srv/soketi.json.template
+
+# Create startup script
+RUN echo '#!/bin/sh\n\
+set -e\n\
+PORT=${PORT:-8080}\n\
+HOST=${HOST:-0.0.0.0}\n\
+echo "=== Generating Soketi Configuration ==="\n\
+echo "PORT=$PORT, HOST=$HOST"\n\
+sed -e "s/SOKETI_DEFAULT_APP_ID_PLACEHOLDER/$SOKETI_DEFAULT_APP_ID/g" \\\n\
+    -e "s/SOKETI_DEFAULT_APP_KEY_PLACEHOLDER/$SOKETI_DEFAULT_APP_KEY/g" \\\n\
+    -e "s/SOKETI_DEFAULT_APP_SECRET_PLACEHOLDER/$SOKETI_DEFAULT_APP_SECRET/g" \\\n\
+    -e "s/\"port\": 8080/\"port\": $PORT/g" \\\n\
+    /srv/soketi.json.template > /srv/config.json\n\
+echo "=== Soketi Configuration ==="\n\
+cat /srv/config.json\n\
+echo "=== Starting Soketi on $HOST:$PORT ==="\n\
+exec soketi start --config=/srv/config.json --host=$HOST --port=$PORT\n\
+' > /srv/start.sh && chmod +x /srv/start.sh
+
+# Use the startup script
+CMD ["/srv/start.sh"]
+

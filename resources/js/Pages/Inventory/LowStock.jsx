@@ -1,10 +1,10 @@
 import React from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import DataTable from "@/Components/Common/DataTable";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import { usePage } from "@inertiajs/react";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function InventoryLowStock({
     user = {},
@@ -13,6 +13,8 @@ export default function InventoryLowStock({
     lowStockItems = [],
 }) {
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
+
 
     const getStockStatusBadge = (stockItem) => {
         if (stockItem.current_stock <= 0) {
@@ -61,14 +63,14 @@ export default function InventoryLowStock({
                     <button
                         type="button"
                         className="btn btn-link btn-sm text-primary"
-                        onClick={() => router.get(`/purchase-orders/create?stock_item_id=${row.id}`)}
+                        onClick={() => router.get(buildUrl(`/purchase-orders/create?stock_item_id=${row.id}`))}
                     >
                         <i className="ti-shopping-cart"></i> Create PO
                     </button>
                     <button
                         type="button"
                         className="btn btn-link btn-sm text-blue-500"
-                        onClick={() => router.get(`/inventory/${row.id}/movements`)}
+                        onClick={() => router.get(buildUrl(`/inventory/${row.id}/movements`))}
                     >
                         <i className="ti-eye"></i> Movements
                     </button>
@@ -122,7 +124,7 @@ export default function InventoryLowStock({
                                             <h4>Low Stock Items ({lowStockItems.length})</h4>
                                             <button
                                                 className="btn btn-secondary btn-sm"
-                                                onClick={() => router.get("/inventory")}
+                                                onClick={() => router.get(buildUrl("/inventory"))}
                                             >
                                                 <i className="ti-arrow-left"></i> Back to Inventory
                                             </button>
@@ -148,7 +150,6 @@ export default function InventoryLowStock({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

@@ -36,15 +36,21 @@ export default function TicketForm({
     customerId = null,
     onSubmit,
     onCancel,
+    hasPermission,
+    isPublic = false,
 }) {
     const { jobCategories = [] } = usePage().props;
 
     const [formData, setFormData] = useState({
         customer_id: customerId || "",
+        customer_name: "",
+        customer_email: "",
+        customer_phone: "",
         description: "",
         category_id: "",
         job_type_id: "",
         quantity: "",
+        free_quantity: 0,
         size_value: "",
         size_unit: "",
         size_rate_id: "",
@@ -88,7 +94,7 @@ export default function TicketForm({
         const category = jobCategories.find(
             (cat) => cat.id.toString() === formData.category_id.toString()
         );
-        return category?.job_types || [];
+        return category?.jobTypes || category?.job_types || [];
     }, [formData.category_id, jobCategories]);
 
     // Populate form if editing
@@ -120,6 +126,7 @@ export default function TicketForm({
                 category_id: categoryId,
                 job_type_id: jobTypeId,
                 quantity: ticket.quantity || 1,
+                free_quantity: ticket.free_quantity || 0,
                 size_value: ticket.size_value || "",
                 size_unit: ticket.size_unit || "",
                 size_rate_id: "",
@@ -202,17 +209,40 @@ export default function TicketForm({
     useEffect(() => {
         if (ticket && ticket.customer_files && ticket.customer_files.length > 0) {
             const existingImages = ticket.customer_files.map((attachment) => ({
-                preview: attachment.file_path || `/storage/${attachment.filepath}`,
+                preview: attachment.file_path || attachment.file_path,
                 file: null,
                 existing: true,
                 id: attachment.id,
-                name: attachment.filename,
+                name: attachment.file_name,
             }));
             setTicketAttachments(existingImages);
             setActiveAttachmentTab(0);
         } else {
             setTicketAttachments([]);
             setActiveAttachmentTab(0);
+        }
+
+        // Load existing payment proofs from ticket.payments[0].documents if available
+
+
+        if (ticket && ticket.payments && ticket.payments.length > 0) {
+            const firstPayment = ticket.payments[0];
+            if (firstPayment.documents && firstPayment.documents.length > 0) {
+                console.log("firstPayment.documents:", firstPayment.documents);
+                const existingProofs = firstPayment.documents.map((doc, index) => ({
+                    preview: doc.file_path,
+                    file: null,
+                    existing: true,
+                    id: doc.id,
+                    name: `Proof ${index + 1}`,
+                }));
+                console.log("existingProofs:", existingProofs);
+                setPaymentProofs(existingProofs);
+                setActiveProofTab(0);
+            }
+        } else {
+            setPaymentProofs([]);
+            setActiveProofTab(0);
         }
     }, [ticket]);
 
@@ -265,11 +295,11 @@ export default function TicketForm({
     );
     const currentSizeRate = hasSizeRates
         ? sizeRates.find(
-              (rate) =>
-                  rate.id?.toString() === (selectedSizeRateId || "").toString()
-          ) ||
-          sizeRates.find((rate) => rate.is_default) ||
-          sizeRates[0]
+            (rate) =>
+                rate.id?.toString() === (selectedSizeRateId || "").toString()
+        ) ||
+        sizeRates.find((rate) => rate.is_default) ||
+        sizeRates[0]
         : null;
 
     useEffect(() => {
@@ -358,6 +388,49 @@ export default function TicketForm({
 
             return changed ? updated : prev;
         });
+
+        // Calculate Free Quantity based on Promo Rules
+        if (selectedJobType?.promo_rules?.length > 0) {
+            const qty = parseFloat(formData.quantity) || 0;
+            let totalFree = 0;
+            let promoDescription = "";
+
+            // Sort rules by buy_quantity descending to apply largest rules first
+            const rules = [...selectedJobType.promo_rules]
+                .filter(r => r.is_active)
+                .sort((a, b) => b.buy_quantity - a.buy_quantity);
+
+            // Simple implementation: Find the best matching rule
+            // Or cumulative? "Buy 12 get 1 free" -> Buy 24 get 2 free.
+            // Usually it's floor(quantity / buy_quantity) * free_quantity
+
+            // Let's assume cumulative for the best matching rule
+            // e.g. Rule: Buy 12 Get 1. Qty 25 -> 2 free.
+
+            // Find the rule with the highest buy_quantity that fits
+            const applicableRule = rules.find(r => qty >= r.buy_quantity);
+
+            if (applicableRule) {
+                const sets = Math.floor(qty / applicableRule.buy_quantity);
+                totalFree = sets * applicableRule.free_quantity;
+                promoDescription = applicableRule.description;
+            }
+
+            setFormData(prev => {
+                if (prev.free_quantity !== totalFree) {
+                    return { ...prev, free_quantity: totalFree };
+                }
+                return prev;
+            });
+        } else {
+            setFormData(prev => {
+                if (prev.free_quantity !== 0) {
+                    return { ...prev, free_quantity: 0 };
+                }
+                return prev;
+            });
+        }
+
     }, [
         selectedJobType,
         formData.quantity,
@@ -430,16 +503,17 @@ export default function TicketForm({
     };
 
     const handlePaymentProofUpload = (event) => {
-        const files = Array.from(event.target.files || []);
-        if (!files.length) {
-            return;
-        }
-        const uploads = files.map((file) => ({
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const upload = {
             file,
             preview: URL.createObjectURL(file),
             name: file.name,
-        }));
-        setPaymentProofs((prev) => [...prev, ...uploads]);
+        };
+
+        setPaymentProofs([upload]); // replace instead of append (single upload)
+
         event.target.value = "";
     };
 
@@ -458,8 +532,14 @@ export default function TicketForm({
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.customer_id) {
+        if (!isPublic && !formData.customer_id) {
             newErrors.customer_id = "Customer is required";
+        }
+
+        if (isPublic) {
+            if (!formData.customer_name?.trim()) newErrors.customer_name = "Name is required";
+            if (!formData.customer_email?.trim()) newErrors.customer_email = "Email is required";
+            if (!formData.customer_phone?.trim()) newErrors.customer_phone = "Phone is required";
         }
 
         if (!formData.description.trim()) {
@@ -514,6 +594,7 @@ export default function TicketForm({
         const submitData = {
             ...formData,
             quantity: parseInt(formData.quantity),
+            free_quantity: parseInt(formData.free_quantity),
             subtotal: parseFloat(formData.subtotal) || 0,
             discount: enableDiscount ? parseFloat(formData.discount) || 0 : 0,
             total_amount: parseFloat(formData.total_amount) || 0,
@@ -594,8 +675,8 @@ export default function TicketForm({
                                                 {subtotalValue.toLocaleString(
                                                     "en-US",
                                                     {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
                                                     }
                                                 )}
                                             </span>
@@ -611,8 +692,8 @@ export default function TicketForm({
                                                 {discountAmountValue.toLocaleString(
                                                     "en-US",
                                                     {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
                                                     }
                                                 )}
                                             </span>
@@ -631,8 +712,8 @@ export default function TicketForm({
                                                 {totalAmountValue.toLocaleString(
                                                     "en-US",
                                                     {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
                                                     }
                                                 )}
                                             </span>
@@ -718,6 +799,47 @@ export default function TicketForm({
 
                 {/* RIGHT COLUMN — ALL FORM FIELDS */}
                 <div className="col-md-9">
+                    {/* CUSTOMER DETAILS (PUBLIC ONLY) */}
+                    {isPublic && (
+                        <Section title="Customer Details">
+                            <div className="row">
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Full Name"
+                                        type="text"
+                                        name="customer_name"
+                                        value={formData.customer_name}
+                                        onChange={handleChange}
+                                        error={errors.customer_name}
+                                        required
+                                    />
+                                </div>
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Email Address"
+                                        type="email"
+                                        name="customer_email"
+                                        value={formData.customer_email}
+                                        onChange={handleChange}
+                                        error={errors.customer_email}
+                                        required
+                                    />
+                                </div>
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Phone Number"
+                                        type="text"
+                                        name="customer_phone"
+                                        value={formData.customer_phone}
+                                        onChange={handleChange}
+                                        error={errors.customer_phone}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </Section>
+                    )}
+
                     {/* JOB DETAILS */}
                     <Section title="Job Details">
                         <div className="row">
@@ -786,17 +908,39 @@ export default function TicketForm({
                         </div>
 
                         {/* Promo Display */}
-                        {selectedJobType?.promo_text && (
+                        {(selectedJobType?.promo_rules?.length > 0 || selectedJobType?.promo_text) && (
                             <div className="row mb-3">
                                 <div className="col-md-12">
-                                    <div
-                                        className="alert alert-info"
-                                        role="alert"
-                                    >
-                                        <i className="ti-gift mr-2"></i>
-                                        <strong>Promo:</strong>{" "}
-                                        {selectedJobType.promo_text}
-                                    </div>
+                                    {formData.free_quantity > 0 ? (
+                                        <div className="alert alert-success">
+                                            <div className="d-flex align-items-center">
+                                                <i className="ti-gift mr-2 text-xl"></i>
+                                                <div>
+                                                    <strong>Promo Applied!</strong>
+                                                    <div>
+                                                        You get <strong>{formData.free_quantity} free item(s)</strong> based on your quantity.
+                                                        <br />
+                                                        Total to produce: <strong>{parseInt(formData.quantity) + parseInt(formData.free_quantity)} pcs</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="alert alert-info">
+                                            <i className="ti-gift mr-2"></i>
+                                            <strong>Available Promo:</strong>
+                                            <ul className="mb-0 pl-4 mt-1">
+                                                {selectedJobType.promo_rules?.map((rule, idx) => (
+                                                    <li key={idx}>
+                                                        {rule.description || `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
+                                                    </li>
+                                                ))}
+                                                {selectedJobType.promo_text && !selectedJobType.promo_rules?.length && (
+                                                    <li>{selectedJobType.promo_text}</li>
+                                                )}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -806,7 +950,7 @@ export default function TicketForm({
                         <div className="alert alert-light border mt-3">
                             <div className="alert alert-info" role="alert">
                                 <i className="fa fa-info-circle"></i>{" "}
-                                <strong>Promo:</strong> Bulk Pricing for 
+                                <strong>Promo:</strong> Bulk Pricing for
                             </div>
                             <div className="table-responsive">
                                 <table className="table table-sm mb-0">
@@ -867,25 +1011,22 @@ export default function TicketForm({
                                         }
                                         options={sizeRates.map((rate) => ({
                                             value: rate.id?.toString(),
-                                            label: `${
-                                                rate.variant_name || "Variant"
-                                            } - ₱${parseFloat(
-                                                rate.rate
-                                            ).toFixed(2)} per ${
-                                                rate.calculation_method ===
-                                                "length"
+                                            label: `${rate.variant_name || "Variant"
+                                                } - ₱${parseFloat(
+                                                    rate.rate
+                                                ).toFixed(2)} per ${rate.calculation_method ===
+                                                    "length"
                                                     ? rate.dimension_unit
                                                     : `${rate.dimension_unit}²`
-                                            }`,
+                                                }`,
                                         }))}
                                     />
                                 </div>
                                 <div className="col-md-4">
                                     <FormInput
-                                        label={`Width (${
-                                            currentSizeRate?.dimension_unit ||
+                                        label={`Width (${currentSizeRate?.dimension_unit ||
                                             "unit"
-                                        })`}
+                                            })`}
                                         type="number"
                                         name="size_width"
                                         value={sizeDimensions.width}
@@ -904,29 +1045,28 @@ export default function TicketForm({
                                 </div>
                                 {currentSizeRate?.calculation_method !==
                                     "length" && (
-                                    <div className="col-md-4">
-                                        <FormInput
-                                            label={`Height (${
-                                                currentSizeRate?.dimension_unit ||
-                                                "unit"
-                                            })`}
-                                            type="number"
-                                            name="size_height"
-                                            value={sizeDimensions.height}
-                                            onChange={(e) => {
-                                                setSizeDimensions((prev) => ({
-                                                    ...prev,
-                                                    height: e.target.value,
-                                                }));
-                                                clearError("size_height");
-                                            }}
-                                            error={errors.size_height}
-                                            min="0"
-                                            step="0.01"
-                                            placeholder="Height"
-                                        />
-                                    </div>
-                                )}
+                                        <div className="col-md-4">
+                                            <FormInput
+                                                label={`Height (${currentSizeRate?.dimension_unit ||
+                                                    "unit"
+                                                    })`}
+                                                type="number"
+                                                name="size_height"
+                                                value={sizeDimensions.height}
+                                                onChange={(e) => {
+                                                    setSizeDimensions((prev) => ({
+                                                        ...prev,
+                                                        height: e.target.value,
+                                                    }));
+                                                    clearError("size_height");
+                                                }}
+                                                error={errors.size_height}
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="Height"
+                                            />
+                                        </div>
+                                    )}
                             </div>
                             {currentSizeRate && (
                                 <p className="text-muted text-sm mt-2">
@@ -936,7 +1076,7 @@ export default function TicketForm({
                                     )}{" "}
                                     per{" "}
                                     {currentSizeRate.calculation_method ===
-                                    "length"
+                                        "length"
                                         ? currentSizeRate.dimension_unit
                                         : `${currentSizeRate.dimension_unit}²`}
                                 </p>
@@ -946,7 +1086,9 @@ export default function TicketForm({
                         </div>
                     )}
 
+
                     {/* SCHEDULE & PAYMENT */}
+                    <hr className="my-2" />
                     <Section title="Schedule & Payment">
                         <div className="row">
                             <div className="col-md-4">
@@ -986,6 +1128,82 @@ export default function TicketForm({
                                 />
                             </div>
                         </div>
+                    </Section>
+                    <Section title="Billing">
+                        <div className="row">
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Downpayment"
+                                    type="number"
+                                    name="downpayment"
+                                    value={formData.downpayment}
+                                    onChange={handleChange}
+                                    error={errors.downpayment}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                />
+                            </div>
+                            {hasPermission("tickets", "price_edit") ? (
+                                <>
+                                    <div className="col-md-3">
+                                        <div className="custom-control custom-checkbox float-end">
+                                            <input
+                                                type="checkbox"
+                                                className="custom-control-input"
+                                                id="enableDiscount"
+                                                checked={enableDiscount}
+                                                onChange={(e) => {
+                                                    setEnableDiscount(e.target.checked);
+                                                    // if (!e.target.checked) {
+                                                    //     setFormData((prev) => ({
+                                                    //         ...prev,
+                                                    //         discount: "",
+                                                    //         discount_amount: "0.00",
+                                                    //     }));
+                                                    // }
+                                                }}
+                                            />
+                                            <label
+                                                className="custom-control-label"
+                                                htmlFor="enableDiscount"
+                                            >
+                                                <i className="ti-cut mr-1"></i>{" "}
+                                                <small>Add Discount</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div className="col-md-2">
+                                        <FormInput
+                                            label="Discount (%)"
+                                            type="number"
+                                            name="discount"
+                                            value={formData.discount}
+                                            onChange={handleChange}
+                                            error={errors.discount}
+                                            placeholder="0"
+                                            step="0.01"
+                                            min="0"
+                                            max="100"
+                                            disabled={!enableDiscount}
+                                        />
+                                    </div>
+                                    <div className="col-md-3">
+                                        <FormInput
+                                            label="Discount Amount"
+                                            type="number"
+                                            name="discount_amount"
+                                            value={formData.discount_amount}
+                                            readOnly
+                                            className="bg-light"
+                                            disabled={!enableDiscount}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="col-md-8"></div>)
+                            }
+                        </div>
                         <div className="row mt-3">
                             <div className="col-md-4">
                                 <FormInput
@@ -1019,22 +1237,21 @@ export default function TicketForm({
                         </div>
                         <div className="row">
                             <div className="col-md-6">
-                                <div className="mt-32">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Payment Proofs (GCash / bank receipts)
-                                </label>
-                                <input
-                                    type="file"
-                                    className="form-control"
-                                    accept="image/*,application/pdf"
-                                    multiple
-                                    onChange={handlePaymentProofUpload}
-                                />
+                                <div className="mt-10">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Payment Proofs (GCash / bank receipts)
+                                    </label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        accept="image/*"
+                                        onChange={handlePaymentProofUpload}
+                                    />
                                 </div>
-                               
+
                             </div>
                             <div className="col-md-6">
-                            {paymentProofs.length > 0 ? (
+                                {paymentProofs.length > 0 ? (
                                     <div className="mt-3">
                                         {paymentProofs.length > 1 && (
                                             <div className="nav nav-pills nav-fill gap-2 mb-3" role="tablist">
@@ -1042,28 +1259,32 @@ export default function TicketForm({
                                                     <button
                                                         key={index}
                                                         type="button"
-                                                        className={`nav-link btn-sm py-1 px-2 ${
-                                                            activeProofTab === index ? "active" : ""
-                                                        }`}
+                                                        className={`nav-link btn-sm py-1 px-2 ${activeProofTab === index ? "active" : ""
+                                                            }`}
                                                         onClick={() => setActiveProofTab(index)}
                                                         style={{ fontSize: "0.75rem" }}
                                                     >
                                                         <i className="ti-receipt mr-1"></i>
                                                         Proof {index + 1}
+                                                        {paymentProofs[index].existing && (
+                                                            <span className="badge badge-success ml-1">
+                                                                Existing
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 ))}
                                             </div>
                                         )}
                                         <div
                                             className="border rounded overflow-hidden bg-light d-flex align-items-center justify-content-center"
-                                            style={{ minHeight: "220px" }}
+                                            style={{ minHeight: "300px", maxHeight: "300px" }}
                                         >
                                             <img
                                                 src={paymentProofs[activeProofTab].preview}
                                                 alt={`Payment proof ${activeProofTab + 1}`}
                                                 className="img-fluid"
                                                 style={{
-                                                    maxHeight: "100%",
+                                                    maxHeight: "300px",
                                                     maxWidth: "100%",
                                                     objectFit: "contain",
                                                 }}
@@ -1074,10 +1295,19 @@ export default function TicketForm({
                                         </div>
                                         <button
                                             type="button"
-                        className="btn btn-sm btn-outline-danger w-100 mt-2"
+                                            className="btn btn-sm btn-outline-danger w-100 mt-2"
                                             onClick={() => removePaymentProof(activeProofTab)}
+                                            disabled={paymentProofs[activeProofTab]?.existing}
+                                            title={
+                                                paymentProofs[activeProofTab]?.existing
+                                                    ? "Existing payment proofs cannot be removed here."
+                                                    : "Remove proof"
+                                            }
                                         >
-                                            <i className="ti-trash mr-1"></i>Remove Proof
+                                            <i className="ti-trash mr-1"></i>
+                                            {paymentProofs[activeProofTab]?.existing
+                                                ? "Existing Proof"
+                                                : "Remove Proof"}
                                         </button>
                                     </div>
                                 ) : (
@@ -1092,113 +1322,12 @@ export default function TicketForm({
                         </div>
                     </Section>
 
-                    {/* BILLING */}
-                    <Section title="Billing">
-                        <div className="row">
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Downpayment"
-                                    type="number"
-                                    name="downpayment"
-                                    value={formData.downpayment}
-                                    onChange={handleChange}
-                                    error={errors.downpayment}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                />
-                            </div>
-
-                            <div className="col-md-3">
-                                <div className="custom-control custom-checkbox float-end">
-                                    <input
-                                        type="checkbox"
-                                        className="custom-control-input"
-                                        id="enableDiscount"
-                                        checked={enableDiscount}
-                                        onChange={(e) => {
-                                            setEnableDiscount(e.target.checked);
-                                            // if (!e.target.checked) {
-                                            //     setFormData((prev) => ({
-                                            //         ...prev,
-                                            //         discount: "",
-                                            //         discount_amount: "0.00",
-                                            //     }));
-                                            // }
-                                        }}
-                                    />
-                                    <label
-                                        className="custom-control-label"
-                                        htmlFor="enableDiscount"
-                                    >
-                                        <i className="ti-cut mr-1"></i>{" "}
-                                        <small>Add Discount</small>
-                                    </label>
-                                </div>
-                            </div>
-                            <div className="col-md-2">
-                                <FormInput
-                                    label="Discount (%)"
-                                    type="number"
-                                    name="discount"
-                                    value={formData.discount}
-                                    onChange={handleChange}
-                                    error={errors.discount}
-                                    placeholder="0"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    disabled={!enableDiscount}
-                                />
-                            </div>
-                            <div className="col-md-3">
-                                <FormInput
-                                    label="Discount Amount"
-                                    type="number"
-                                    name="discount_amount"
-                                    value={formData.discount_amount}
-                                    readOnly
-                                    className="bg-light"
-                                    disabled={!enableDiscount}
-                                />
-                            </div>
-                        </div>
-
-                        {/* {enableDiscount && ( */}
-                        {/* <div className="row mt-3">
-                    <div className="col-md-4">
-                        <FormInput
-                            label="Discount (%)"
-                            type="number"
-                            name="discount"
-                            value={formData.discount}
-                            onChange={handleChange}
-                            error={errors.discount}
-                            placeholder="0"
-                            step="0.01"
-                            min="0"
-                            max="100"
-                        />
-                    </div>
-                    <div className="col-md-4">
-                        <FormInput
-                            label="Discount Amount"
-                            type="number"
-                            name="discount_amount"
-                            value={formData.discount_amount}
-                            readOnly
-                            className="bg-light"
-                        />
-                    </div>
-                </div> */}
-                        {/* )} */}
-                    </Section>
                     <Section title="Attachments">
                         <div className="card shadow-sm border-0">
                             <div className="card-body">
                                 <div className="d-flex align-items-center mb-2">
                                     <i className="ti-image mr-2"></i>
-                                    <span className="font-semibold">Attachments</span>
+                                    <span className="font-semibold">Attachments/Mock-Up Design</span>
                                 </div>
                                 <input
                                     type="file"
@@ -1218,11 +1347,10 @@ export default function TicketForm({
                                                     <button
                                                         key={index}
                                                         type="button"
-                                                        className={`nav-link btn-sm py-1 px-2 ${
-                                                            activeAttachmentTab === index
-                                                                ? "active"
-                                                                : ""
-                                                        }`}
+                                                        className={`nav-link btn-sm py-1 px-2 ${activeAttachmentTab === index
+                                                            ? "active"
+                                                            : ""
+                                                            }`}
                                                         onClick={() => setActiveAttachmentTab(index)}
                                                         style={{ fontSize: "0.75rem" }}
                                                     >
@@ -1241,7 +1369,8 @@ export default function TicketForm({
                                         <div
                                             className="border rounded overflow-hidden bg-light"
                                             style={{
-                                                aspectRatio: "1",
+                                                // minHeight: "400px",
+                                                // maxHeight: "400px",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
@@ -1269,7 +1398,7 @@ export default function TicketForm({
 
                                         <button
                                             type="button"
-                                            className="btn btn-sm btn-outline-danger w-100 mt-2"
+                                            className="btn btn-sm btn-outline-danger w-20 mt-2"
                                             onClick={() =>
                                                 removeTicketAttachment(activeAttachmentTab)
                                             }

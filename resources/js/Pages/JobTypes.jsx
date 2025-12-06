@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import JobTypeForm from "@/Components/JobTypes/JobTypeForm";
 import JobCategoryForm from "@/Components/JobCategories/JobCategoryForm";
@@ -11,6 +10,7 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 import FormInput from "@/Components/Common/FormInput";
 import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function JobTypes({
     user = {},
@@ -23,16 +23,17 @@ export default function JobTypes({
 }) {
     const { flash } = usePage().props;
     const [activeTab, setActiveTab] = useState("job_type");
-    
+    const { buildUrl } = useRoleApi();
+
     // Modal states
     const [openJobTypeModal, setJobTypeModalOpen] = useState(false);
     const [openCategoryModal, setCategoryModalOpen] = useState(false);
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
-    
+
     // Edit states
     const [editingJobType, setEditingJobType] = useState(null);
     const [editingCategory, setEditingCategory] = useState(null);
-    
+
     // Delete state
     const [deleteConfig, setDeleteConfig] = useState({ id: null, type: null });
     const [loading, setLoading] = useState(false);
@@ -64,9 +65,9 @@ export default function JobTypes({
 
     // Submit Handlers
     const handleJobTypeSubmit = (data) => {
-        const url = editingJobType 
-            ? `/job-types/${editingJobType.id}` 
-            : "/job-types";
+        const url = editingJobType
+            ? buildUrl(`/job-types/${editingJobType.id}`)
+            : buildUrl("/job-types");
         const method = editingJobType ? "put" : "post";
 
         router[method](url, data, {
@@ -77,9 +78,9 @@ export default function JobTypes({
     };
 
     const handleCategorySubmit = (data) => {
-        const url = editingCategory 
-            ? `/job-categories/${editingCategory.id}` 
-            : "/job-categories";
+        const url = editingCategory
+            ? buildUrl(`/job-categories/${editingCategory.id}`)
+            : buildUrl("/job-categories");
         const method = editingCategory ? "put" : "post";
 
         router[method](url, data, {
@@ -98,9 +99,9 @@ export default function JobTypes({
     const handleDelete = () => {
         if (!deleteConfig.id) return;
 
-        const url = deleteConfig.type === "category" 
-            ? `/job-categories/${deleteConfig.id}` 
-            : `/job-types/${deleteConfig.id}`;
+        const url = deleteConfig.type === "category"
+            ? buildUrl(`/job-categories/${deleteConfig.id}`)
+            : buildUrl(`/job-types/${deleteConfig.id}`);
 
         router.delete(url, {
             preserveScroll: true,
@@ -116,7 +117,7 @@ export default function JobTypes({
     const handleCategoryFilter = (e) => {
         const categoryId = e.target.value;
         router.get(
-            "/job-types",
+            buildUrl("/job-types"),
             { ...filters, category_id: categoryId || null },
             { preserveState: false, preserveScroll: true }
         );
@@ -146,13 +147,33 @@ export default function JobTypes({
             label: "Pricing",
             key: "price",
             render: (row) => {
+                const badges = [];
+
+                if (row.promo_rules?.length > 0) {
+                    badges.push(
+                        <div key="promo" className="badge badge-success mr-1">
+                            <i className="ti-gift"></i> Has Promos
+                        </div>
+                    );
+                }
+
                 if (row.price_tiers?.length > 0) {
-                    return <div className="badge badge-info">Tiered by Qty</div>;
+                    badges.push(
+                        <div key="tiered" className="badge badge-info mr-1">Tiered by Qty</div>
+                    );
                 }
+
                 if (row.size_rates?.length > 0) {
-                    return <div className="badge badge-primary">Size-Based</div>;
+                    badges.push(
+                        <div key="size" className="badge badge-primary mr-1">Size-Based</div>
+                    );
                 }
-                return `${ formatPeso(parseFloat(row.price).toFixed(2))} / ${row.price_by}`;
+
+                if (badges.length > 0) {
+                    return <div className="d-flex flex-wrap gap-1">{badges}</div>;
+                }
+
+                return `${formatPeso(parseFloat(row.price).toFixed(2))} / ${row.price_by}`;
             },
         },
         {
@@ -188,8 +209,8 @@ export default function JobTypes({
         {
             label: "Created At",
             key: "created_at",
-            render: (row) => row.created_at 
-                ? new Date(row.created_at).toLocaleDateString() 
+            render: (row) => row.created_at
+                ? new Date(row.created_at).toLocaleDateString()
                 : "N/A",
         },
     ];
@@ -225,7 +246,7 @@ export default function JobTypes({
                     <div className="col-md-6 d-flex justify-content-end">
                         <button
                             type="button"
-                            onClick={() => router.replace("/job-types")}
+                            onClick={() => router.replace(buildUrl("/job-types"))}
                             className="px-3 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
                         >
                             <i className="ti-reload"></i>
@@ -267,7 +288,7 @@ export default function JobTypes({
                     <div className="col-md-7 d-flex justify-content-end">
                         <button
                             type="button"
-                            onClick={() => router.replace("/job-types")}
+                            onClick={() => router.replace(buildUrl("/job-types"))}
                             className="px-3 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
                         >
                             <i className="ti-reload"></i>
@@ -309,7 +330,7 @@ export default function JobTypes({
     return (
         <AdminLayout user={user} notifications={notifications} messages={messages}>
             <Head title="Job Types & Pricing" />
-            
+
             {/* Flash Messages */}
             {flash?.success && <FlashMessage type="success" message={flash.success} />}
             {flash?.error && <FlashMessage type="error" message={flash.error} />}
@@ -399,11 +420,10 @@ export default function JobTypes({
                                                     {tabs.map((tab) => (
                                                         <button
                                                             key={tab.key}
-                                                            className={`btn btn-sm m-r-3 ${
-                                                                activeTab === tab.key
-                                                                    ? "btn-primary"
-                                                                    : "btn-light"
-                                                            }`}
+                                                            className={`btn btn-sm m-r-3 ${activeTab === tab.key
+                                                                ? "btn-primary"
+                                                                : "btn-light"
+                                                                }`}
                                                             onClick={() => setActiveTab(tab.key)}
                                                         >
                                                             {tab.label}
@@ -423,7 +443,6 @@ export default function JobTypes({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

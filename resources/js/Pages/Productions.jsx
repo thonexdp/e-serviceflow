@@ -1,0 +1,1071 @@
+import React, { useState, useEffect } from "react";
+import AdminLayout from "@/Components/Layouts/AdminLayout";
+import { Head, router, usePage } from "@inertiajs/react";
+import Modal from "@/Components/Main/Modal";
+import DataTable from "@/Components/Common/DataTable";
+import SearchBox from "@/Components/Common/SearchBox";
+import FlashMessage from "@/Components/Common/FlashMessage";
+import FormInput from "@/Components/Common/FormInput";
+import { formatDate } from "@/Utils/formatDate";
+import { useRoleApi } from "@/Hooks/useRoleApi";
+
+const WORKFLOW_STEPS = [
+    { key: 'design', label: 'Design', icon: 'ti-pencil-alt', color: '#9C27B0' },
+    { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
+    { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
+    { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
+    { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
+    { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
+    // { key: 'assembly', label: 'Assembly', icon: 'ti-package', color: '#009688' },
+    // { key: 'quality_check', label: 'Quality Check', icon: 'ti-check-box', color: '#4CAF50' },
+];
+
+export default function Productions({
+    user = {},
+    notifications = [],
+    messages = [],
+    tickets = { data: [] },
+    stockItems = [],
+    filters = {},
+}) {
+    const [openViewModal, setViewModalOpen] = useState(false);
+    const [openUpdateModal, setUpdateModalOpen] = useState(false);
+    const [openStockModal, setStockModalOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [producedQuantity, setProducedQuantity] = useState(0);
+    const [currentWorkflowStep, setCurrentWorkflowStep] = useState(null);
+    const [stockConsumptions, setStockConsumptions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+    const { flash, auth } = usePage().props;
+    const { buildUrl } = useRoleApi();
+
+    // WebSocket real-time updates for production queue
+    useEffect(() => {
+        if (!window.Echo) {
+            console.warn('Echo not initialized. Real-time updates disabled.');
+            return;
+        }
+
+        if (!auth?.user?.id) {
+            console.warn('User ID not available for WebSocket connection');
+            return;
+        }
+
+        console.log('🔌 Setting up production queue real-time updates...');
+
+        // Subscribe to user's private channel
+        const channel = window.Echo.private(`user.${auth.user.id}`);
+
+        // Listen for ticket status changes
+        const handleTicketUpdate = (data) => {
+            console.log('📬 Production queue update received:', data);
+
+            // Refresh the tickets data
+            router.reload({
+                only: ['tickets'],
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    console.log('✅ Production queue refreshed');
+                }
+            });
+        };
+
+        // Listen for the ticket status changed event
+        channel.listen('.ticket.status.changed', handleTicketUpdate);
+
+        // Cleanup on unmount
+        return () => {
+            console.log('🔌 Cleaning up production queue WebSocket...');
+            if (channel) {
+                channel.stopListening('.ticket.status.changed');
+            }
+        };
+    }, []); // Run once on mount
+
+    const handleView = (ticket) => {
+        setSelectedTicket(ticket);
+        setViewModalOpen(true);
+    };
+
+    const handleUpdate = (ticket) => {
+        setSelectedTicket(ticket);
+        setProducedQuantity(ticket.produced_quantity || 0);
+        setCurrentWorkflowStep(ticket.current_workflow_step || getFirstWorkflowStep(ticket));
+        setUpdateModalOpen(true);
+    };
+
+    const getFirstWorkflowStep = (ticket) => {
+        if (!ticket?.job_type?.workflow_steps) return null;
+        const workflowSteps = ticket.job_type.workflow_steps;
+        const firstStep = WORKFLOW_STEPS.find(step => workflowSteps[step.key]);
+        return firstStep?.key || null;
+    };
+
+    const getActiveWorkflowSteps = (ticket) => {
+        if (!ticket?.job_type?.workflow_steps) return [];
+        const workflowSteps = ticket.job_type.workflow_steps;
+        return WORKFLOW_STEPS.filter(step => workflowSteps[step.key]);
+    };
+
+    const getNextWorkflowStep = (ticket, currentStep) => {
+        const activeSteps = getActiveWorkflowSteps(ticket);
+        const currentIndex = activeSteps.findIndex(step => step.key === currentStep);
+        if (currentIndex === -1 || currentIndex === activeSteps.length - 1) return null;
+        return activeSteps[currentIndex + 1]?.key || null;
+    };
+
+    const getPreviousWorkflowStep = (ticket, currentStep) => {
+        const activeSteps = getActiveWorkflowSteps(ticket);
+        const currentIndex = activeSteps.findIndex(step => step.key === currentStep);
+        if (currentIndex <= 0) return null;
+        return activeSteps[currentIndex - 1]?.key || null;
+    };
+
+    const handleCloseModals = () => {
+        setViewModalOpen(false);
+        setUpdateModalOpen(false);
+        setStockModalOpen(false);
+        setSelectedTicket(null);
+        setProducedQuantity(0);
+        setStockConsumptions([]);
+        setSelectedPreviewFile(null);
+    };
+
+    const handleStartProduction = (ticketId) => {
+        setLoading(true);
+        router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+        setLoading(false);
+    };
+
+    const handleUpdateProgress = () => {
+        if (!selectedTicket) return;
+
+        const quantity = parseInt(producedQuantity) || 0;
+        const maxQuantity = selectedTicket.total_quantity || selectedTicket.quantity;
+        if (quantity < 0 || quantity > maxQuantity) {
+            alert(`Quantity must be between 0 and ${maxQuantity}`);
+            return;
+        }
+
+        setLoading(true);
+
+        // Determine status based on workflow completion
+        const activeSteps = getActiveWorkflowSteps(selectedTicket);
+        const currentStepIndex = activeSteps.findIndex(step => step.key === currentWorkflowStep);
+        const isLastStep = currentStepIndex === activeSteps.length - 1;
+        const status = (quantity >= maxQuantity && isLastStep) ? 'completed' : 'in_production';
+
+        router.post(buildUrl(`/queue/${selectedTicket.id}/update`), {
+            produced_quantity: quantity,
+            current_workflow_step: currentWorkflowStep,
+            status: status,
+        }, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                handleCloseModals();
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+        setLoading(false);
+    };
+
+    const handleMarkCompleted = (ticketId) => {
+        if (!confirm("Mark this ticket as completed? Stock will be automatically deducted.")) return;
+
+        setLoading(true);
+        router.post(buildUrl(`/queue/${ticketId}/complete`), {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+        setLoading(false);
+    };
+
+    const handleOpenStockModal = (ticket) => {
+        setSelectedTicket(ticket);
+
+        // Pre-populate with suggested stocks based on job type requirements
+        const initialConsumptions = [];
+        if (ticket.job_type?.stock_requirements) {
+            ticket.job_type.stock_requirements.forEach(req => {
+                const requiredQty = parseFloat(req.quantity_per_unit) * (ticket.total_quantity || ticket.quantity);
+                initialConsumptions.push({
+                    stock_item_id: req.stock_item_id,
+                    quantity: requiredQty.toFixed(2),
+                    notes: req.notes || '',
+                });
+            });
+        }
+
+        // If no requirements, add one empty row
+        if (initialConsumptions.length === 0) {
+            initialConsumptions.push({
+                stock_item_id: '',
+                quantity: '',
+                notes: '',
+            });
+        }
+
+        setStockConsumptions(initialConsumptions);
+        setStockModalOpen(true);
+    };
+
+    const handleAddStockConsumption = () => {
+        setStockConsumptions([...stockConsumptions, {
+            stock_item_id: '',
+            quantity: '',
+            notes: '',
+        }]);
+    };
+
+    const handleRemoveStockConsumption = (index) => {
+        setStockConsumptions(stockConsumptions.filter((_, i) => i !== index));
+    };
+
+    const handleStockConsumptionChange = (index, field, value) => {
+        const updated = [...stockConsumptions];
+        updated[index][field] = value;
+        setStockConsumptions(updated);
+    };
+
+    const handleRecordStockConsumption = (e) => {
+        e.preventDefault();
+        if (!selectedTicket) return;
+
+        const validConsumptions = stockConsumptions.filter(
+            c => c.stock_item_id && parseFloat(c.quantity) > 0
+        );
+
+        if (validConsumptions.length === 0) {
+            alert("Please add at least one stock consumption record.");
+            return;
+        }
+
+        setLoading(true);
+        router.post(buildUrl(`/queue/${selectedTicket.id}/record-stock`), {
+            stock_consumptions: validConsumptions.map(c => ({
+                stock_item_id: parseInt(c.stock_item_id),
+                quantity: parseFloat(c.quantity),
+                notes: c.notes || null,
+            })),
+        }, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                handleCloseModals();
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+        });
+        setLoading(false);
+    };
+
+    const handleQuickAdd = (amount) => {
+        const current = parseInt(producedQuantity) || 0;
+        const maxQuantity = selectedTicket?.total_quantity || selectedTicket?.quantity || 0;
+        const newValue = Math.min(current + amount, maxQuantity);
+        setProducedQuantity(newValue);
+    };
+
+    const getStatusBadge = (status) => {
+        const classes = {
+            ready_to_print: "badge-info",
+            in_production: "badge-warning",
+            completed: "badge-success",
+            pending: "badge-secondary",
+        };
+        const labels = {
+            ready_to_print: "Ready to Print",
+            in_production: "In Progress",
+            completed: "Completed",
+            pending: "Pending",
+        };
+        return (
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+                {labels[status] || status?.toUpperCase() || "PENDING"}
+            </div>
+        );
+    };
+
+    const getActionButton = (ticket) => {
+        if (ticket.status === "ready_to_print") {
+            return (
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleView(ticket)}
+                    >
+                        <i className="ti-eye"></i> View
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-green-500"
+                        onClick={() => handleStartProduction(ticket.id)}
+                        disabled={loading}
+                    >
+                        <i className="ti-play"></i> Start
+                    </button>
+                </div>
+            );
+        } else if (ticket.status === "in_production") {
+            return (
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleUpdate(ticket)}
+                    >
+                        <i className="ti-pencil"></i> Update
+                    </button>
+                    {ticket.produced_quantity >= (ticket.total_quantity || ticket.quantity) && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-success"
+                            onClick={() => handleMarkCompleted(ticket.id)}
+                            disabled={loading}
+                        >
+                            <i className="ti-check"></i> Complete
+                        </button>
+                    )}
+                </div>
+            );
+        } else if (ticket.status === "completed") {
+            return (
+                <span className="text-success">
+                    <i className="ti-check"></i> Completed
+                    {ticket.stock_consumptions && ticket.stock_consumptions.length > 0 && (
+                        <small className="d-block text-muted">
+                            Stock deducted automatically
+                        </small>
+                    )}
+                </span>
+            );
+        } else {
+            return (
+                <button
+                    type="button"
+                    className="btn btn-link btn-sm text-blue-500"
+                    onClick={() => handleView(ticket)}
+                >
+                    <i className="ti-eye"></i> View
+                </button>
+            );
+        }
+    };
+
+    // Define table columns
+    const ticketColumns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) =>
+                (tickets.current_page - 1) * tickets.per_page + index + 1,
+        },
+        { label: "Ticket ID", key: "ticket_number" },
+        { label: "Description", key: "description" },
+        {
+            label: "Quantity",
+            key: "quantity",
+            render: (row) => (
+                <span>
+                    <b className={row.produced_quantity >= (row.total_quantity || row.quantity) ? "text-success" : "text-warning"}>
+                        {row.produced_quantity || 0}
+                    </b>
+                    {" / "}
+                    <b>{row.total_quantity || row.quantity}</b>
+                </span>
+            ),
+        },
+        {
+            label: "Status",
+            key: "status",
+            render: (row) => getStatusBadge(row.status),
+        },
+        {
+            label: "Due Date",
+            key: "due_date",
+            render: (row) =>
+                formatDate(row.due_date),
+        },
+        {
+            label: "Action",
+            key: "action",
+            render: (row) => getActionButton(row),
+        },
+    ];
+
+    const mockupFiles = selectedTicket?.mockup_files || [];
+
+    return (
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
+            <Head title="Production Queue" />
+
+            {/* Flash Messages */}
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
+
+            <div className="row">
+                <div className="col-lg-8 p-r-0 title-margin-right">
+                    <div className="page-header">
+                        <div className="page-title">
+                            <h1>
+                                Production Queue <span>Management</span>
+                            </h1>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-lg-4 p-l-0 title-margin-left">
+                    <div className="page-header">
+                        <div className="page-title">
+                            <ol className="breadcrumb">
+                                <li className="breadcrumb-item">
+                                    <a href="/dashboard">Dashboard</a>
+                                </li>
+                                <li className="breadcrumb-item active">Production Queue</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* View Modal */}
+            <Modal
+                title={`Ticket Details - #${selectedTicket?.ticket_number}`}
+                isOpen={openViewModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="row mb-4">
+                            <div className="col-md-6">
+                                <h5>
+                                    Customer: <b>{selectedTicket.customer?.firstname} {selectedTicket.customer?.lastname}</b>
+                                </h5>
+                                <h5>
+                                    Description: <b>{selectedTicket.description}</b>
+                                </h5>
+                                <p>
+                                    Status: {getStatusBadge(selectedTicket.status)}
+                                </p>
+                            </div>
+                            <div className="col-md-6">
+                                <p>
+                                    <strong>Quantity:</strong> {selectedTicket.produced_quantity || 0} / {selectedTicket.total_quantity || selectedTicket.quantity}
+                                </p>
+                                <p>
+                                    <strong>Due Date:</strong> {selectedTicket.due_date ? new Date(selectedTicket.due_date).toLocaleDateString() : "N/A"}
+                                </p>
+                                {selectedTicket.size_value && (
+                                    <p>
+                                        <strong>Size:</strong> {selectedTicket.size_value} {selectedTicket.size_unit || ""}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <hr className="my-3" />
+
+                        <div className="mb-4">
+                            <h6>Design Files:</h6>
+                            {mockupFiles.length > 0 ? (
+                                <div className="row">
+                                    <div className="col-md-7">
+                                        <div className="table-responsive">
+                                            <table className="table table-sm table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Filename</th>
+                                                        <th>Uploaded</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {mockupFiles.map((file) => (
+                                                        <tr key={file.id}>
+                                                            <td>{file.file_name}</td>
+                                                            <td>{new Date(file.created_at).toLocaleDateString()}</td>
+                                                            <td>
+                                                                <a
+                                                                    href={`/mock-ups/files/${file.id}/download`}
+                                                                    target="_blank"
+                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                >
+                                                                    <i className="ti-download"></i> Download
+                                                                </a>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    onClick={() => setSelectedPreviewFile(file)}
+                                                                >
+                                                                    <i className="ti-image"></i> Preview
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div className="col-md-5">
+                                        <div className="card">
+                                            <div className="card-body text-center">
+                                                {selectedPreviewFile && (
+                                                    <img
+                                                        src={selectedPreviewFile?.file_path}
+                                                        alt={selectedPreviewFile?.file_name}
+                                                        className="img-fluid mb-2"
+                                                        style={{ maxHeight: "280px", objectFit: "contain" }}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-muted">No design files available</p>
+                            )}
+                        </div>
+
+                        {selectedTicket.status === "ready_to_print" && (
+                            <div className="d-flex justify-content-end gap-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-success"
+                                    onClick={() => {
+                                        handleCloseModals();
+                                        handleStartProduction(selectedTicket.id);
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <i className="ti-play"></i> Start Production
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={handleCloseModals}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
+
+            {/* Update Progress Modal */}
+            <Modal
+                title={`Update Production - Ticket #${selectedTicket?.ticket_number}`}
+                isOpen={openUpdateModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="mb-4">
+                            <div className="row">
+                                <div className="col-md-8">
+                                    <h4 className="mb-2">
+                                        <strong>{selectedTicket.description}</strong>
+                                    </h4>
+                                    <p className="text-muted mb-1">
+                                        <strong>Job Type:</strong> {selectedTicket.job_type?.name || 'N/A'}
+                                    </p>
+                                    <p className="mb-0">
+                                        <strong>Status:</strong> {getStatusBadge(selectedTicket.status)}
+                                    </p>
+                                </div>
+                                <div className="col-md-4 text-right">
+                                    <h3 className="mb-1">
+                                        <span className={producedQuantity >= (selectedTicket.total_quantity || selectedTicket.quantity) ? "text-success" : "text-warning"}>
+                                            {producedQuantity} / {selectedTicket.total_quantity || selectedTicket.quantity}
+                                        </span>
+                                    </h3>
+                                    <small className="text-muted">Items Produced</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr className="my-4" />
+
+                        {/* Workflow Steps Progress */}
+                        {getActiveWorkflowSteps(selectedTicket).length > 0 && (
+                            <div className="mb-4">
+                                <h5 className="mb-3 font-weight-bold">
+                                    <i className="ti-layout-list-thumb mr-2"></i>Production Workflow
+                                </h5>
+                                <div className="workflow-stepper">
+                                    <div className="d-flex align-items-center justify-content-between position-relative" style={{ padding: '20px 0' }}>
+                                        {/* Progress Line */}
+                                        <div
+                                            className="position-absolute"
+                                            style={{
+                                                top: '50%',
+                                                left: '0',
+                                                right: '0',
+                                                height: '4px',
+                                                backgroundColor: '#e0e0e0',
+                                                zIndex: 0,
+                                                transform: 'translateY(-50%)'
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    height: '100%',
+                                                    backgroundColor: '#4CAF50',
+                                                    width: `${(getActiveWorkflowSteps(selectedTicket).findIndex(s => s.key === currentWorkflowStep) / (getActiveWorkflowSteps(selectedTicket).length - 1)) * 100}%`,
+                                                    transition: 'width 0.3s ease'
+                                                }}
+                                            />
+                                        </div>
+
+                                        {getActiveWorkflowSteps(selectedTicket).map((step, index) => {
+                                            const isCurrent = step.key === currentWorkflowStep;
+                                            const isPast = getActiveWorkflowSteps(selectedTicket).findIndex(s => s.key === currentWorkflowStep) > index;
+                                            const stepColor = isCurrent ? step.color : (isPast ? '#4CAF50' : '#ccc');
+
+                                            return (
+                                                <div
+                                                    key={step.key}
+                                                    className="text-center position-relative"
+                                                    style={{ flex: 1, zIndex: 1 }}
+                                                >
+                                                    <div
+                                                        className="d-inline-flex align-items-center justify-content-center rounded-circle shadow-sm mb-2"
+                                                        style={{
+                                                            width: '60px',
+                                                            height: '60px',
+                                                            backgroundColor: stepColor,
+                                                            border: isCurrent ? '4px solid #fff' : 'none',
+                                                            boxShadow: isCurrent ? `0 0 0 4px ${step.color}40` : '0 2px 4px rgba(0,0,0,0.1)',
+                                                            transition: 'all 0.3s ease',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        onClick={() => setCurrentWorkflowStep(step.key)}
+                                                    >
+                                                        <i className={`${step.icon} text-white`} style={{ fontSize: '1.5rem' }}></i>
+                                                    </div>
+                                                    <div>
+                                                        <small
+                                                            className={`d-block font-weight-bold ${isCurrent ? 'text-dark' : 'text-muted'}`}
+                                                            style={{ fontSize: '0.85rem' }}
+                                                        >
+                                                            {step.label}
+                                                        </small>
+                                                        {isCurrent && (
+                                                            <span className="badge badge-primary badge-pill mt-1" style={{ fontSize: '0.7rem' }}>
+                                                                Current
+                                                            </span>
+                                                        )}
+                                                        {isPast && (
+                                                            <i className="ti-check text-success d-block mt-1"></i>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Workflow Navigation Buttons */}
+                                <div className="d-flex justify-content-center gap-2 mt-4">
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary"
+                                        onClick={() => setCurrentWorkflowStep(getPreviousWorkflowStep(selectedTicket, currentWorkflowStep))}
+                                        disabled={!getPreviousWorkflowStep(selectedTicket, currentWorkflowStep)}
+                                    >
+                                        <i className="ti-arrow-left"></i> Previous Step
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-primary"
+                                        onClick={() => setCurrentWorkflowStep(getNextWorkflowStep(selectedTicket, currentWorkflowStep))}
+                                        disabled={!getNextWorkflowStep(selectedTicket, currentWorkflowStep)}
+                                    >
+                                        Next Step <i className="ti-arrow-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <hr className="my-4" />
+
+                        {/* Quantity Input */}
+                        <div className="mb-4">
+                            <h5 className="mb-3 font-weight-bold">
+                                <i className="ti-package mr-2"></i>Production Quantity
+                            </h5>
+                            <div className="row align-items-center">
+                                <div className="col-md-4">
+                                    <FormInput
+                                        label="Produced Quantity"
+                                        type="number"
+                                        name="produced_quantity"
+                                        value={producedQuantity}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 0;
+                                            setProducedQuantity(Math.min(val, selectedTicket.total_quantity || selectedTicket.quantity));
+                                        }}
+                                        placeholder="0"
+                                        min="0"
+                                        max={selectedTicket.total_quantity || selectedTicket.quantity}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="col-md-8">
+                                    <label className="block text-sm font-medium mb-2">Quick Add:</label>
+                                    <div className="d-flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(1)}
+                                        >
+                                            <i className="ti-plus"></i> +1
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(5)}
+                                        >
+                                            <i className="ti-plus"></i> +5
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(10)}
+                                        >
+                                            <i className="ti-plus"></i> +10
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => handleQuickAdd(50)}
+                                        >
+                                            <i className="ti-plus"></i> +50
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-secondary btn-sm"
+                                            onClick={() => setProducedQuantity(selectedTicket.total_quantity || selectedTicket.quantity)}
+                                        >
+                                            <i className="ti-check"></i> Set to Max
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="mt-3">
+                                <div className="d-flex justify-content-between mb-1">
+                                    <span className="text-muted small">Production Progress</span>
+                                    <span className="font-weight-bold">
+                                        {Math.round((producedQuantity / (selectedTicket.total_quantity || selectedTicket.quantity)) * 100)}%
+                                    </span>
+                                </div>
+                                <div className="progress" style={{ height: "20px" }}>
+                                    <div
+                                        className={`progress-bar ${producedQuantity >= (selectedTicket.total_quantity || selectedTicket.quantity)
+                                            ? "bg-success"
+                                            : "bg-warning"
+                                            }`}
+                                        role="progressbar"
+                                        style={{
+                                            width: `${(producedQuantity / (selectedTicket.total_quantity || selectedTicket.quantity)) * 100}%`,
+                                        }}
+                                    >
+                                        {Math.round((producedQuantity / (selectedTicket.total_quantity || selectedTicket.quantity)) * 100)}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr className="my-4" />
+
+                        {/* Action Buttons */}
+                        <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                                {currentWorkflowStep && (
+                                    <span className="text-muted">
+                                        <i className="ti-info-alt mr-1"></i>
+                                        Currently at: <strong>{WORKFLOW_STEPS.find(s => s.key === currentWorkflowStep)?.label}</strong>
+                                    </span>
+                                )}
+                            </div>
+                            <div className="d-flex gap-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={handleCloseModals}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleUpdateProgress}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <span>
+                                            <i className="ti-reload mr-2 animate-spin"></i> Saving...
+                                        </span>
+                                    ) : (
+                                        <span>
+                                            <i className="ti-save mr-2"></i> Save Progress
+                                        </span>
+                                    )}
+                                </button>
+                                {producedQuantity >= selectedTicket.quantity &&
+                                    currentWorkflowStep === getActiveWorkflowSteps(selectedTicket)[getActiveWorkflowSteps(selectedTicket).length - 1]?.key && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-success"
+                                            onClick={() => {
+                                                handleMarkCompleted(selectedTicket.id)
+                                            }}
+                                            disabled={loading}
+                                        >
+                                            <i className="ti-check mr-2"></i> Mark Completed
+                                        </button>
+                                    )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Stock Consumption Modal */}
+            <Modal
+                title={`Record Stock Consumption - Ticket #${selectedTicket?.ticket_number}`}
+                isOpen={openStockModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="mb-4">
+                            <h5>
+                                Job: <b>{selectedTicket.job_type?.name || 'N/A'}</b>
+                            </h5>
+                            <p>
+                                Quantity Produced: <b>{selectedTicket.produced_quantity || selectedTicket.quantity}</b> {selectedTicket.job_type?.price_by || 'pcs'}
+                            </p>
+                            {selectedTicket.job_type?.stock_requirements?.length > 0 && (
+                                <div className="alert alert-info">
+                                    <i className="ti-info"></i> Suggested stocks based on job type requirements are pre-filled. Adjust as needed.
+                                </div>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleRecordStockConsumption}>
+                            <div className="table-responsive">
+                                <table className="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock Item</th>
+                                            <th>Quantity</th>
+                                            <th>Unit</th>
+                                            <th>Available</th>
+                                            <th>Notes</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {stockConsumptions.map((consumption, index) => {
+                                            const stockItem = stockItems.find(si => si.id === parseInt(consumption.stock_item_id));
+                                            return (
+                                                <tr key={index}>
+                                                    <td>
+                                                        <select
+                                                            className="form-control"
+                                                            value={consumption.stock_item_id}
+                                                            onChange={(e) => handleStockConsumptionChange(index, 'stock_item_id', e.target.value)}
+                                                            required
+                                                        >
+                                                            <option value="">Select Stock Item</option>
+                                                            {stockItems.map((si) => (
+                                                                <option key={si.id} value={si.id}>
+                                                                    {si.name} ({si.sku}) - {parseFloat(si.current_stock).toFixed(2)} {si.base_unit_of_measure} available
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            step="0.01"
+                                                            min="0.01"
+                                                            value={consumption.quantity}
+                                                            onChange={(e) => handleStockConsumptionChange(index, 'quantity', e.target.value)}
+                                                            required
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        {stockItem ? stockItem.base_unit_of_measure : '-'}
+                                                    </td>
+                                                    <td>
+                                                        {stockItem ? (
+                                                            <span className={parseFloat(stockItem.current_stock) >= parseFloat(consumption.quantity || 0) ? 'text-success' : 'text-danger'}>
+                                                                {parseFloat(stockItem.current_stock).toFixed(2)} {stockItem.base_unit_of_measure}
+                                                            </span>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            value={consumption.notes}
+                                                            onChange={(e) => handleStockConsumptionChange(index, 'notes', e.target.value)}
+                                                            placeholder="Optional notes"
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        {stockConsumptions.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-danger"
+                                                                onClick={() => handleRemoveStockConsumption(index)}
+                                                            >
+                                                                <i className="ti-trash"></i>
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="d-flex justify-content-between align-items-center mt-3">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-primary"
+                                    onClick={handleAddStockConsumption}
+                                >
+                                    <i className="ti-plus"></i> Add Another Item
+                                </button>
+                                <div className="d-flex gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={handleCloseModals}
+                                    >
+                                        Skip (Record Later)
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn btn-success"
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <span><i className="ti-reload mr-2 animate-spin"></i> Recording...</span>
+                                        ) : (
+                                            <span><i className="ti-save"></i> Record Consumption</span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                )}
+            </Modal>
+
+            <section id="main-content">
+                <div className="content-wrap">
+                    <div className="main">
+                        <div className="container-fluid">
+                            <div className="row">
+                                <div className="col-lg-12">
+                                    <div className="card">
+                                        <div className="card-title mt-3">
+                                            <h4>Production Queue</h4>
+                                        </div>
+                                        <div className="card-body">
+                                            <div className="row mt-4 align-items-center">
+                                                <div className="col-md-5">
+                                                    <SearchBox
+                                                        placeholder="Search tickets..."
+                                                        initialValue={filters.search || ""}
+                                                        route={buildUrl("/queue")}
+                                                    />
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <FormInput
+                                                        label=""
+                                                        type="select"
+                                                        name="status"
+                                                        value={filters.status || "all"}
+                                                        onChange={(e) => {
+                                                            router.get(buildUrl("/queue"), {
+                                                                ...filters,
+                                                                status: e.target.value === "all" ? null : e.target.value
+                                                            }, {
+                                                                preserveState: false,
+                                                                preserveScroll: true,
+                                                            });
+                                                        }}
+                                                        options={[
+                                                            { value: "all", label: "All Status" },
+                                                            { value: "ready_to_print", label: "Ready to Print" },
+                                                            { value: "in_production", label: "In Progress" },
+                                                            { value: "completed", label: "Completed" },
+                                                        ]}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4">
+                                                <DataTable
+                                                    columns={ticketColumns}
+                                                    data={tickets.data}
+                                                    pagination={tickets}
+                                                    emptyMessage="No tickets ready for production."
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </AdminLayout>
+    );
+}

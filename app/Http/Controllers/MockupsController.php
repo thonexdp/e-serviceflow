@@ -17,7 +17,7 @@ class MockupsController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'jobType.category', 'files']);
+        $query = Ticket::with(['customer', 'jobType.category', 'files'])->whereNotNull('design_status');
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -36,11 +36,33 @@ class MockupsController extends Controller
             $query->where('design_status', $request->design_status);
         }
 
+        // Date range filtering
+        $dateRange = $request->get('date_range');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        // Filter by date range (only if date_range is not explicitly empty)
+        if ($dateRange !== '' && $dateRange !== null) {
+            if ($startDate) {
+                $query->whereDate('created_at', '>=', $startDate);
+            }
+
+            if ($endDate) {
+                $query->whereDate('created_at', '<=', $endDate);
+            }
+        }
+
         $tickets = $query->latest()->paginate($request->get('per_page', 15));
 
         return Inertia::render('Mock-ups', [
             'tickets' => $tickets,
-            'filters' => $request->only(['search', 'design_status']),
+            'filters' => [
+                'search' => $request->get('search'),
+                'design_status' => $request->get('design_status'),
+                'date_range' => $dateRange,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
         ]);
     }
 
@@ -77,18 +99,18 @@ class MockupsController extends Controller
         }
 
         foreach ($files as $file) {
-            $path = $file->store('tickets/mockups', 'public');
-            
+            $path = Storage::put('tickets/mockups', $file);
+
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'mockup',
             ]);
 
             $uploadedFiles[] = [
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
             ];
         }
 
@@ -159,11 +181,11 @@ class MockupsController extends Controller
     {
         $file = TicketFile::findOrFail($id);
 
-        if (!Storage::disk('public')->exists($file->filepath)) {
+        if (!Storage::exists($file->file_path)) {
             abort(404);
         }
 
-        return Storage::disk('public')->download($file->filepath, $file->filename);
+        return Storage::download($file->file_path, $file->file_name);
     }
 
     /**
@@ -172,7 +194,7 @@ class MockupsController extends Controller
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
         $triggeredBy = Auth::user();
-        
+
         if (!$triggeredBy) {
             Log::warning('Cannot send notification: No authenticated user');
             return;

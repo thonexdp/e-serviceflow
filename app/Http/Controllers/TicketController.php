@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers;
 
 use App\Models\Ticket;
@@ -12,6 +13,7 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Services\PaymentRecorder;
 use App\Events\TicketStatusChanged;
+use App\Http\Controllers\Traits\HasRoleBasedRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +22,8 @@ use Illuminate\Support\Str;
 
 class TicketController extends BaseCrudController
 {
+    use HasRoleBasedRoutes;
+
     protected $model = Ticket::class;
     protected $resourceName = 'tickets';
     protected $viewPath = 'Tickets';
@@ -58,13 +62,44 @@ class TicketController extends BaseCrudController
             $query->where('payment_status', $request->payment_status);
         }
 
+        // Filter by customer
+        if ($request->has('customer_id') && $request->customer_id) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        // Default to Last 30 Days if no date range is specified
+        $dateRange = $request->get('date_range');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        // If no date_range parameter exists at all, set default to last_30_days
+        if (!$request->has('date_range')) {
+            $dateRange = 'last_30_days';
+            $thirtyDaysAgo = now()->subDays(30)->format('Y-m-d');
+            $today = now()->format('Y-m-d');
+            $startDate = $thirtyDaysAgo;
+            $endDate = $today;
+        }
+
+        // Filter by date range (only if date_range is not explicitly empty)
+        if ($dateRange !== '') {
+            if ($startDate) {
+                $query->whereDate('created_at', '>=', $startDate);
+            }
+
+            if ($endDate) {
+                $query->whereDate('created_at', '<=', $endDate);
+            }
+        }
+
         $tickets = $query->with('jobType.category')
             ->orderByRaw("
                 CASE status
                     WHEN 'pending' THEN 1
-                    WHEN 'in_production' THEN 2
-                    WHEN 'completed' THEN 3
-                    WHEN 'cancelled' THEN 4
+                    WHEN 'in_designer' THEN 2
+                    WHEN 'in_production' THEN 3
+                    WHEN 'completed' THEN 4
+                    WHEN 'cancelled' THEN 5
                     ELSE 5
                 END
             ")
@@ -76,7 +111,7 @@ class TicketController extends BaseCrudController
         // Get job categories and types for ticket form
         $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
             $query->where('is_active', true)
-                ->with(['priceTiers', 'sizeRates'])
+                ->with(['priceTiers', 'sizeRates', 'promoRules'])
                 ->orderBy('sort_order')
                 ->orderBy('name');
         }])->orderBy('name')->get();
@@ -86,7 +121,14 @@ class TicketController extends BaseCrudController
             'customers' => $customers,
             'jobCategories' => $jobCategories,
             'selectedCustomer' => $request->get('customer_id') ? \App\Models\Customer::find($request->get('customer_id')) : null,
-            'filters' => $request->only(['search', 'status', 'payment_status']),
+            'filters' => [
+                'search' => $request->get('search'),
+                'status' => $request->get('status'),
+                'payment_status' => $request->get('payment_status'),
+                'date_range' => $dateRange,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
         ]);
     }
 
@@ -101,6 +143,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -112,7 +155,7 @@ class TicketController extends BaseCrudController
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
-            'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -139,20 +182,21 @@ class TicketController extends BaseCrudController
         // Handle legacy single file upload
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $path = $file->store('tickets/customer', 'public');
+            $path = Storage::put('tickets/customer', $file);
             $ticketData['file_path'] = $path;
         }
 
         $this->applyPricing($ticketData, $request);
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 
+
         $ticket = Ticket::create($ticketData);
 
         if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $request->file('file')->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $request->file('file')->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'customer',
             ]);
         }
@@ -162,11 +206,11 @@ class TicketController extends BaseCrudController
             if (!$attachment) {
                 continue;
             }
-            $storedPath = $attachment->store('tickets/customer', 'public');
+            $storedPath = Storage::put('tickets/customer', $attachment);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $attachment->getClientOriginalName(),
-                'filepath' => $storedPath,
+                'file_name' => $attachment->getClientOriginalName(),
+                'file_path' => $storedPath,
                 'type' => 'customer',
             ]);
         }
@@ -191,12 +235,12 @@ class TicketController extends BaseCrudController
         }
 
         // Notify designers when ticket is created (status: pending)
-        if ($ticket->status === 'pending') {
+        // if ($ticket->status === 'pending') {
+        if ($ticket->status === 'in_designer') {
             $this->notifyTicketCreated($ticket);
         }
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket created successfully.');
     }
 
@@ -213,6 +257,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -224,7 +269,7 @@ class TicketController extends BaseCrudController
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
-            'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -249,16 +294,16 @@ class TicketController extends BaseCrudController
         // Handle file upload
         if ($request->hasFile('file')) {
             if ($ticket->file_path) {
-                Storage::disk('public')->delete($ticket->file_path);
+                Storage::delete($ticket->file_path);
             }
             $file = $request->file('file');
-            $path = $file->store('tickets/customer', 'public');
+            $path = Storage::put('tickets/customer', $file);
             $ticketData['file_path'] = $path;
 
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'customer',
             ]);
         }
@@ -272,17 +317,16 @@ class TicketController extends BaseCrudController
             if (!$attachment) {
                 continue;
             }
-            $storedPath = $attachment->store('tickets/customer', 'public');
+            $storedPath = Storage::put('tickets/customer', $attachment);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $attachment->getClientOriginalName(),
-                'filepath' => $storedPath,
+                'file_name' => $attachment->getClientOriginalName(),
+                'file_path' => $storedPath,
                 'type' => 'customer',
             ]);
         }
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket updated successfully.');
     }
 
@@ -295,13 +339,12 @@ class TicketController extends BaseCrudController
 
         // Delete associated file
         if ($ticket->file_path) {
-            Storage::disk('public')->delete($ticket->file_path);
+            Storage::delete($ticket->file_path);
         }
 
         $ticket->delete();
 
-        return redirect()
-            ->route('tickets.index')
+        return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket deleted successfully.');
     }
 
@@ -375,12 +418,14 @@ class TicketController extends BaseCrudController
         $oldStatus = $ticket->status;
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,ready_to_print,in_production,completed,cancelled,approved,rejected',
+            'status' => 'required|in:pending,ready_to_print,in_designer,in_production,completed,cancelled,approved,rejected',
             'notes' => 'nullable|string|max:500',
+            'design_status' => 'nullable|in:pending,in_designer,cancelled',
         ]);
 
         // Update the status
         $ticket->status = $validated['status'];
+        $ticket->design_status = $validated['status'] === 'in_designer' ? 'pending' : null;
 
         // If there are notes, you can save them (add a notes field to your tickets table)
         if (!empty($validated['notes'])) {
@@ -453,6 +498,7 @@ class TicketController extends BaseCrudController
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
             'quantity' => 'nullable|integer|min:1',
+            'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
             'size_width' => 'nullable|numeric|min:0',
             'size_height' => 'nullable|numeric|min:0',
@@ -464,7 +510,7 @@ class TicketController extends BaseCrudController
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
-            'status' => 'nullable|string|in:pending,ready_to_print,in_production,completed,cancelled',
+            'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid',
         ];
     }
@@ -504,7 +550,8 @@ class TicketController extends BaseCrudController
         event(new TicketStatusChanged(
             $ticket,
             'new',
-            'pending',
+            // 'pending',
+            'in_designer',
             Auth::user(),
             $recipientIds,
             'ticket_created',
@@ -538,7 +585,6 @@ class TicketController extends BaseCrudController
 
             case 'rejected':
             case 'cancelled':
-                // Notify FrontDesk
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_rejected';
@@ -547,16 +593,20 @@ class TicketController extends BaseCrudController
                 break;
 
             case 'in_production':
-                // Notify FrontDesk (optional)
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_in_production';
                 $title = 'Ticket In Production';
                 $message = "Ticket {$ticket->ticket_number} is now in production.";
                 break;
-
+            case 'in_designer':
+                $frontDeskUsers = User::where('role', User::ROLE_DESIGNER)->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->toArray();
+                $notificationType = 'ticket_in_designer';
+                $title = 'Ticket In Designer';
+                $message = "Ticket {$ticket->ticket_number} is now in designer.";
+                break;
             case 'completed':
-                // Notify FrontDesk (optional)
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_completed';

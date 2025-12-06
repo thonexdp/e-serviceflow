@@ -1,21 +1,550 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
+import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
+import DataTable from "@/Components/Common/DataTable";
+import SearchBox from "@/Components/Common/SearchBox";
+import FlashMessage from "@/Components/Common/FlashMessage";
+import FormInput from "@/Components/Common/FormInput";
+import ProductionBoard from "@/Components/Production/ProductionBoard";
+import { formatDate } from "@/Utils/formatDate";
+import CardStatistics from "@/Components/Common/CardStatistics";
 
-export default function Dashboard({
+export default function Productions({
     user = {},
     notifications = [],
     messages = [],
+    tickets = { data: [] },
+    stockItems = [],
+    filters = {},
+    summary = {},
 }) {
-    const [openPaymentModal, setPaymentModalOpen] = useState(false);
+    const [activeView, setActiveView] = useState("table"); // "table" or "board"
+    const [openViewModal, setViewModalOpen] = useState(false);
+    const [openUpdateModal, setUpdateModalOpen] = useState(false);
+    const [openStockModal, setStockModalOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [producedQuantity, setProducedQuantity] = useState(0);
+    const [stockConsumptions, setStockConsumptions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const { flash, auth } = usePage().props;
 
-    const handleSave = () => {
-        console.log("save");
+    // Calculate summary statistics from tickets data
+    const calculateSummary = () => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const allTickets = tickets.data || [];
+        const total = allTickets.length;
+        const inProgress = allTickets.filter(
+            (t) => t.status === "in_production"
+        ).length;
+        const finished = allTickets.filter(
+            (t) => t.status === "completed"
+        ).length;
+        const delays = allTickets.filter((t) => {
+            if (!t.due_date) return false;
+            const dueDate = new Date(t.due_date);
+            dueDate.setHours(0, 0, 0, 0);
+            return dueDate < today && t.status !== "completed";
+        }).length;
+
+        return {
+            total: summary.total || total,
+            inProgress: summary.inProgress || inProgress,
+            finished: summary.finished || finished,
+            delays: summary.delays || delays,
+        };
     };
 
-    console.log("openPaymentModal:", openPaymentModal);
+    const stats = calculateSummary();
+
+    // Handle fullscreen mode
+    useEffect(() => {
+        if (isFullscreen) {
+            document.body.classList.add("production-fullscreen");
+            document.querySelector(".header")?.classList.add("d-none");
+            document.querySelector(".sidebar")?.classList.add("d-none");
+        } else {
+            document.body.classList.remove("production-fullscreen");
+            document.querySelector(".header")?.classList.remove("d-none");
+            document.querySelector(".sidebar")?.classList.remove("d-none");
+        }
+
+        return () => {
+            document.body.classList.remove("production-fullscreen");
+            document.querySelector(".header")?.classList.remove("d-none");
+            document.querySelector(".sidebar")?.classList.remove("d-none");
+        };
+    }, [isFullscreen]);
+
+    // WebSocket real-time updates
+    useEffect(() => {
+        if (!window.Echo) {
+            console.warn('Echo not initialized. Real-time updates disabled.');
+            return;
+        }
+
+
+        if (!auth?.user?.id) {
+            console.warn('User ID not available for WebSocket connection');
+            return;
+        }
+
+        console.log('🔌 Setting up production board real-time updates...');
+
+        // Subscribe to user's private channel for production updates
+        const channel = window.Echo.private(`user.${auth.user.id}`);
+
+        // Listen for ticket status changes
+        const handleTicketUpdate = (data) => {
+            console.log('📬 Production update received:', data);
+
+            // Refresh the page data to get updated tickets
+            router.reload({
+                only: ['tickets', 'summary'],
+                preserveScroll: true,
+                preserveState: true,
+            });
+
+            // Show a subtle notification in fullscreen mode
+            if (isFullscreen) {
+                const notification = document.createElement('div');
+                notification.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        top: 80px;
+                        right: 20px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 12px 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        z-index: 10000;
+                        animation: slideInRight 0.3s ease-out;
+                        font-size: 14px;
+                        font-weight: 500;
+                    ">
+                        <i class="ti-bell mr-2"></i>${data.notification?.message || 'Production updated'}
+                    </div>
+                `;
+                document.body.appendChild(notification);
+
+                // Remove notification after 3 seconds
+                setTimeout(() => {
+                    notification.style.animation = 'slideOutRight 0.3s ease-in';
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+        };
+
+        // Listen for the ticket status changed event
+        channel.listen('.ticket.status.changed', handleTicketUpdate);
+
+        // Add CSS animation if not already present
+        if (!document.getElementById('production-animations')) {
+            const style = document.createElement('style');
+            style.id = 'production-animations';
+            style.innerHTML = `
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                @keyframes slideOutRight {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Cleanup on unmount
+        return () => {
+            console.log('🔌 Cleaning up production board WebSocket...');
+            if (channel) {
+                channel.stopListening('.ticket.status.changed');
+            }
+        };
+    }, [isFullscreen]); // Re-run when fullscreen changes
+
+    const toggleFullscreen = () => {
+        if (!isFullscreen) {
+            setActiveView("board");
+        }
+        setIsFullscreen(!isFullscreen);
+    };
+
+    const handleView = (ticket) => {
+        setSelectedTicket(ticket);
+        setViewModalOpen(true);
+    };
+
+    const handleUpdate = (ticket) => {
+        setSelectedTicket(ticket);
+        setProducedQuantity(ticket.produced_quantity || 0);
+        setUpdateModalOpen(true);
+    };
+
+    const handleCloseModals = () => {
+        setViewModalOpen(false);
+        setUpdateModalOpen(false);
+        setStockModalOpen(false);
+        setSelectedTicket(null);
+        setProducedQuantity(0);
+        setStockConsumptions([]);
+    };
+
+    const handleStartProduction = (ticketId) => {
+        setLoading(true);
+        router.post(
+            `/production/${ticketId}/start`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => {
+                    setLoading(false);
+                },
+                onError: () => {
+                    setLoading(false);
+                },
+            }
+        );
+    };
+
+    const handleUpdateProgress = () => {
+        if (!selectedTicket) return;
+
+        const quantity = parseInt(producedQuantity) || 0;
+        if (quantity < 0 || quantity > selectedTicket.quantity) {
+            alert(`Quantity must be between 0 and ${selectedTicket.quantity}`);
+            return;
+        }
+
+        setLoading(true);
+        const status =
+            quantity >= selectedTicket.quantity ? "completed" : "in_production";
+
+        router.post(
+            `/production/${selectedTicket.id}/update`,
+            {
+                produced_quantity: quantity,
+                status: status,
+            },
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => {
+                    handleCloseModals();
+                    setLoading(false);
+                },
+                onError: () => {
+                    setLoading(false);
+                },
+            }
+        );
+    };
+
+    const handleMarkCompleted = (ticketId) => {
+        if (
+            !confirm(
+                "Mark this ticket as completed? Stock will be automatically deducted."
+            )
+        )
+            return;
+
+        setLoading(true);
+        router.post(
+            `/production/${ticketId}/complete`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => {
+                    setLoading(false);
+                },
+                onError: () => {
+                    setLoading(false);
+                },
+            }
+        );
+    };
+
+    const handleOpenStockModal = (ticket) => {
+        setSelectedTicket(ticket);
+
+        // Pre-populate with suggested stocks based on job type requirements
+        const initialConsumptions = [];
+        if (ticket.job_type?.stock_requirements) {
+            ticket.job_type.stock_requirements.forEach((req) => {
+                const requiredQty =
+                    parseFloat(req.quantity_per_unit) * ticket.quantity;
+                initialConsumptions.push({
+                    stock_item_id: req.stock_item_id,
+                    quantity: requiredQty.toFixed(2),
+                    notes: req.notes || "",
+                });
+            });
+        }
+
+        // If no requirements, add one empty row
+        if (initialConsumptions.length === 0) {
+            initialConsumptions.push({
+                stock_item_id: "",
+                quantity: "",
+                notes: "",
+            });
+        }
+
+        setStockConsumptions(initialConsumptions);
+        setStockModalOpen(true);
+    };
+
+    const handleAddStockConsumption = () => {
+        setStockConsumptions([
+            ...stockConsumptions,
+            {
+                stock_item_id: "",
+                quantity: "",
+                notes: "",
+            },
+        ]);
+    };
+
+    const handleRemoveStockConsumption = (index) => {
+        setStockConsumptions(stockConsumptions.filter((_, i) => i !== index));
+    };
+
+    const handleStockConsumptionChange = (index, field, value) => {
+        const updated = [...stockConsumptions];
+        updated[index][field] = value;
+        setStockConsumptions(updated);
+    };
+
+    const handleRecordStockConsumption = (e) => {
+        e.preventDefault();
+        if (!selectedTicket) return;
+
+        const validConsumptions = stockConsumptions.filter(
+            (c) => c.stock_item_id && parseFloat(c.quantity) > 0
+        );
+
+        if (validConsumptions.length === 0) {
+            alert("Please add at least one stock consumption record.");
+            return;
+        }
+
+        setLoading(true);
+        router.post(
+            `/production/${selectedTicket.id}/record-stock`,
+            {
+                stock_consumptions: validConsumptions.map((c) => ({
+                    stock_item_id: parseInt(c.stock_item_id),
+                    quantity: parseFloat(c.quantity),
+                    notes: c.notes || null,
+                })),
+            },
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => {
+                    handleCloseModals();
+                    setLoading(false);
+                },
+                onError: () => {
+                    setLoading(false);
+                },
+            }
+        );
+    };
+
+    const handleQuickAdd = (amount) => {
+        const current = parseInt(producedQuantity) || 0;
+        const newValue = Math.min(
+            current + amount,
+            selectedTicket?.quantity || 0
+        );
+        setProducedQuantity(newValue);
+    };
+
+    const getStatusBadge = (status) => {
+        const classes = {
+            ready_to_print: "badge-info",
+            in_production: "badge-warning",
+            completed: "badge-success",
+            pending: "badge-secondary",
+        };
+        const labels = {
+            ready_to_print: "Ready to Print",
+            in_production: "In Progress",
+            completed: "Completed",
+            pending: "Pending",
+        };
+        return (
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+                {labels[status] || status?.toUpperCase() || "PENDING"}
+            </div>
+        );
+    };
+
+    const getActionButton = (ticket) => {
+        if (ticket.status === "ready_to_print") {
+            return (
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleView(ticket)}
+                    >
+                        <i className="ti-eye"></i> View
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-green-500"
+                        onClick={() => handleStartProduction(ticket.id)}
+                        disabled={loading}
+                    >
+                        <i className="ti-play"></i> Start
+                    </button>
+                </div>
+            );
+        } else if (ticket.status === "in_production") {
+            return (
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleUpdate(ticket)}
+                    >
+                        <i className="ti-pencil"></i> Update
+                    </button>
+                    {ticket.produced_quantity >= ticket.quantity && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-success"
+                            onClick={() => handleMarkCompleted(ticket.id)}
+                            disabled={loading}
+                        >
+                            <i className="ti-check"></i> Complete
+                        </button>
+                    )}
+                </div>
+            );
+        } else if (ticket.status === "completed") {
+            return (
+                <span className="text-success">
+                    <i className="ti-check"></i> Completed
+                    {ticket.stock_consumptions &&
+                        ticket.stock_consumptions.length > 0 && (
+                            <small className="d-block text-muted">
+                                Stock deducted automatically
+                            </small>
+                        )}
+                </span>
+            );
+        } else {
+            return (
+                <button
+                    type="button"
+                    className="btn btn-link btn-sm text-blue-500"
+                    onClick={() => handleView(ticket)}
+                >
+                    <i className="ti-eye"></i> View
+                </button>
+            );
+        }
+    };
+
+    // Define table columns
+    const ticketColumns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) =>
+                (tickets.current_page - 1) * tickets.per_page + index + 1,
+        },
+        { label: "Ticket ID", key: "ticket_number" },
+        { label: "Description", key: "description" },
+        {
+            label: "Employee/Team",
+            key: "employee",
+            render: (row) => {
+                // Check if employee/team data exists, otherwise show placeholder
+                const employeeName =
+                    row.assigned_to?.name ||
+                    row.employee?.name ||
+                    row.team?.name ||
+                    "Unassigned";
+                const teamName = row.team?.name || row.employee?.team || "";
+                return (
+                    <div>
+                        <div className="font-weight-bold">{employeeName}</div>
+                        {teamName && (
+                            <small className="text-muted">{teamName}</small>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
+            label: "Quantity",
+            key: "quantity",
+            render: (row) => (
+                <span>
+                    <b
+                        className={
+                            row.produced_quantity >= row.quantity
+                                ? "text-success"
+                                : "text-warning"
+                        }
+                    >
+                        {row.produced_quantity || 0}
+                    </b>
+                    {" / "}
+                    <b>{row.quantity}</b>
+                </span>
+            ),
+        },
+        {
+            label: "Status",
+            key: "status",
+            render: (row) => getStatusBadge(row.status),
+        },
+        {
+            label: "Due Date",
+            key: "due_date",
+            render: (row) => {
+                const dueDate = row.due_date ? new Date(row.due_date) : null;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isOverdue =
+                    dueDate && dueDate < today && row.status !== "completed";
+                return (
+                    <span
+                        className={
+                            isOverdue ? "text-danger font-weight-bold" : ""
+                        }
+                    >
+                        {formatDate(row.due_date)}
+                        {isOverdue && <i className="ti-alert ml-1"></i>}
+                    </span>
+                );
+            },
+        },
+    ];
 
     return (
         <AdminLayout
@@ -25,621 +554,365 @@ export default function Dashboard({
         >
             <Head title="Dashboard" />
 
-            <div className="row">
-                <div className="col-lg-8 p-r-0 title-margin-right">
-                    <div className="page-header">
-                        <div className="page-title">
-                            <h1>
-                                Hello, <span>Welcome Here</span>
-                            </h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-4 p-l-0 title-margin-left">
-                    <div className="page-header">
-                        <div className="page-title">
-                            <ol className="breadcrumb">
-                                <li className="breadcrumb-item">
-                                    <a href="#">Dashboard</a>
-                                </li>
-                                <li className="breadcrumb-item active">Home</li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
+            {/* Fullscreen Toggle Button */}
+            {/* Fullscreen Toggle Button */}
+            <div
+                className="position-fixed"
+                style={{
+                    top: isFullscreen ? "5px" : "20px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 9999,
+                }}
+            >
+                <button
+                    type="button"
+                    className="btn shadow-sm"
+                    onClick={toggleFullscreen}
+                    style={{
+                        borderRadius: "10px",
+                        padding: "5px 10px",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        backgroundColor: isFullscreen ? "#dc3545" : "#007bff",
+                        border: "none",
+                        color: "white",
+                        transition: "all 0.3s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "scale(1.05)";
+                        e.currentTarget.style.boxShadow =
+                            "0 6px 16px rgba(0,0,0,0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.boxShadow =
+                            "0 4px 12px rgba(0,0,0,0.15)";
+                    }}
+                >
+                    {isFullscreen ? (
+                        <>
+                            <i className="ti-close"></i>
+                        </>
+                    ) : (
+                        <>
+                            <i className="ti-fullscreen"></i>
+                        </>
+                    )}
+                </button>
             </div>
 
-            <Modal
-                title="Payments"
-                isOpen={openPaymentModal}
-                onClose={() => setPaymentModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Record Payment"
-            >
-                <form>
-                    <div className="mb-4">
-                        <h3 className="mb-4">
-                            {" "}
-                            Record Payment for Ticket #20454-12
+            {/* Flash Messages */}
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
+
+            {/* Summary Cards */}
+
+
+            {!isFullscreen && (
+                <div className="row">
+                    <div className="col-lg-8 p-r-0 title-margin-right">
+                        <div className="page-header">
+                            <div className="page-title">
+                                <h1>
+                                    Production Queue <span>Management</span>
+                                </h1>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="col-lg-4 p-l-0 title-margin-left">
+                        <div className="page-header">
+                            <div className="page-title">
+                                <ol className="breadcrumb">
+                                    <li className="breadcrumb-item">
+                                        <a href="/dashboard">Dashboard</a>
+                                    </li>
+                                    <li className="breadcrumb-item active">
+                                        Production Queue
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+    {/* {isFullscreen && (
+                <div className="row mb-1">
+                    <div className="col-12 text-center">
+                        <h3
+                            className="font-weight-bold mb-2 text-3xl"
+                            style={{
+                                color: "#333",
+                                textShadow: "2px 2px 4px rgba(0,0,0,0.1)",
+                            }}
+                        >
+                            Production Queue Dashboard
                         </h3>
-                        <hr />
+                        <p
+                            className="text-muted mb-0"
+                            style={{
+                                fontSize: "20px",
+                                fontWeight: "500",
+                            }}
+                        >
+                            {new Date().toLocaleDateString("en-US", {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                            })}
+                        </p>
+                        <p className="text-muted" style={{ fontSize: "14px" }}>
+                            {new Date().toLocaleTimeString("en-US", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                            })}
+                        </p>
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Customer : <b>John Doe</b>
-                        </label>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">
-                            Amount Due : <b> P 2,000.00</b>
-                        </label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Paymeny Amount :
-                            </label>
-                            <input
-                                type="text"
-                                className="mt-1 w-full border"
-                                placeholder="0.00"
-                                value=""
-                                // value={forms.ticket.due_date}
-
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             due_date: e.target.value,
-                                //         },
-                                //     })
-                                // }
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Payment Method
-                            </label>
-                            <select class name="" id="">
-                                <option value="cash">Cash</option>
-                                <option value="cash">Card</option>
-                                <option value="cash">Gcash</option>
-                            </select>
+                    <div className="col-12">
+                        <div
+                            className="alert alert-info"
+                            role="alert"
+                        >
+                            <i className="fa fa-info-circle"></i>{" "}
+                            <strong>Quick Update:</strong> Click the
+                            pencil icon next to status or payment
+                            status to update them quickly.
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 mt-2">
-                        <div>
-                            <label className="block text-sm font-medium">
-                                Notes
-                            </label>
-                            <input
-                                type="text"
-                                className="mt-1 w-full border rounded-md p-2" // fixed small width
-                                placeholder=""
-                                value=""
-                                // value={forms.ticket.quantity}
-                                // onChange={(e) =>
-                                //     setForms({
-                                //         ...forms,
-                                //         ticket: {
-                                //             ...forms.ticket,
-                                //             quantity: e.target.value,
-                                //         },
-                                //     })
-                                // }
-                            />
-                        </div>
-                    </div>
-                </form>
-            </Modal>
+                </div>
+            )} */}
 
+            <div
+                className="row mb-4"
+                style={{
+                    marginTop: isFullscreen ? "20px" : "0",
+                    marginBottom: isFullscreen ? "30px" : "20px",
+                }}
+            >
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Total Items Produced Today"
+                        statistics={stats.total}
+                        icon="ti-package"
+                        color="bg-info"
+                    />
+                </div>
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Ready to Print"
+                        statistics={stats.inProgress}
+                        icon="ti-printer"
+                        color="bg-primary"
+                    />
+                </div>
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Finished"
+                        statistics={stats.finished}
+                        icon="ti-check-box"
+                        color="bg-success"
+                    />
+                </div>
+                <div className="col-lg-3 col-md-6 mb-3">
+                    <CardStatistics
+                        label="Delays"
+                        statistics={stats.delays}
+                        icon="ti-package"
+                        color="bg-danger"
+                    />
+                </div>
+            </div>
+        
             <section id="main-content">
-                <div className="row">
-                    {/* Ready to Print */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-primary">
-                                    <i className="ti-printer"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">
-                                        <b>34</b>
-                                    </div>
-                                    <div className="stat-text">
-                                        Ready to Print
-                                    </div>
-                                    
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* In Production */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-warning">
-                                    <i className="ti-reload"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit"><b>7</b></div>
-
-                                    <div className="stat-text">
-                                        In Production
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Completed */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-success">
-                                    <i className="ti-check-box"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit"><b>5</b></div>
-                                    <div className="stat-text">Completed</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Total Items Produced Today */}
-                    <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-info">
-                                    <i className="ti-package"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit"><b>120</b></div>
-                                    <div className="stat-text">
-                                        Total Items Produced Today
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* <div className="row">
-                    <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">Pending Payment</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th> <a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                > #3424234243</a></th>
-                                            </tr>
-                                            <tr>
-                                                <th> 
-                                                    <a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >
-                                                    #3424234243
-                                                </a></th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">In Progress</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th><a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >#TRE234FDF34</a></th>
-                                            </tr>
-                                            <tr>
-                                                <th><a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >#ERTEW235346</a></th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">Ready for Pick Up</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th><a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >#FGDG6456DFD</a></th>
-                                            </tr>
-                                            <tr>
-                                                <th><a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >#SDFSDFSD35345</a></th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">Completed</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th><a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >#345345DSFSD</a></th>
-                                            </tr>
-                                            <tr>
-                                                <th><a
-                                                    href="/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 underline"
-                                                >#DFGDFG3253</a></th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
-                <div className="row">
-                    <div className="col-lg-12">
-                        <div className="card">
-                            <div className="card-title pr">
-                                <h4>All Tickets</h4>
-                            </div>
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table student-data-table m-t-20">
-                                        <thead>
-                                            <tr>
-                                                <th>Ticket ID</th>
-                                                <th>Customer</th>
-                                                <th>Description</th>
-                                                <th>Due Date</th>
-                                                <th>
-                                                    Quantity
-                                                    <br />
-                                                    Done / Total
-                                                </th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>#43242</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    {" "}
-                                                    <b>0 / 50</b>{" "}
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-primary">
-                                                        Ready
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#7456345</td>
-                                                <td>Jan Dela Cruz</td>
-                                                <td>Print Mugs</td>
-                                                <td>Sept. 30, 2025</td>
-                                                <td>
-                                                    {" "}
-                                                    <b>10 / 30</b>{" "}
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-warning">
-                                                        In Progress
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#54653232</td>
-                                                <td>John Doe</td>
-                                                <td>Print 30 tshirt</td>
-                                                <td>Sept. 23, 2025</td>
-                                                <td>
-                                                    {" "}
-                                                    <b>20 / 20</b>{" "}
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-success badge-outline">
-                                                        Done
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* <div className="row">
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="year-calendar"></div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Notice Board </h4>
-
-                            </div>
-                            <div className="recent-comment m-t-15">
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-danger">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media no-border">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-info">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Timeline</h4>
-
-                            </div>
-                            <div className="card-body">
-                                <ul className="timeline">
-                                    <li>
-                                        <div className="timeline-badge primary"><i className="fa fa-smile-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">School promote video sharing</h5>
+                <div
+                    className="content-wrap"
+                    style={
+                        isFullscreen ? { marginLeft: "0", padding: "0" } : {}
+                    }
+                >
+                    <div
+                        className="main"
+                        style={isFullscreen ? { padding: "0" } : {}}
+                    >
+                        <div
+                            className="container-fluid"
+                            style={
+                                isFullscreen
+                                    ? { maxWidth: "100%", padding: "0 20px" }
+                                    : {}
+                            }
+                        >
+                            <div className="row">
+                                <div className="col-lg-12">
+                                    <div
+                                        className="card shadow-sm"
+                                        style={{
+                                            border: "none",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {!isFullscreen && (
+                                            <div className="card-title mt-3 px-4">
+                                                <div className="d-flex justify-content-between align-items-center">
+                                                    <h4>Production Queue</h4>
+                                                    <div className="btn-group" role="group">
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${activeView === 'table' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                                            onClick={() => setActiveView('table')}
+                                                        >
+                                                            <i className="ti-view-list"></i> Table View
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${activeView === 'board' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                                            onClick={() => setActiveView('board')}
+                                                        >
+                                                            <i className="ti-layout-grid2"></i> Board View
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="timeline-body">
-                                                <p>10 minutes ago</p>
+                                        )}
+                                        <div className="card-body">
+                                            {!isFullscreen && activeView === 'table' && (
+                                                <div className="row mt-4 align-items-center">
+                                                    <div className="col-md-5">
+                                                        <SearchBox
+                                                            placeholder="Search tickets..."
+                                                            initialValue={
+                                                                filters.search ||
+                                                                ""
+                                                            }
+                                                            route="/production"
+                                                        />
+                                                    </div>
+                                                    <div className="col-md-4">
+                                                        <FormInput
+                                                            label=""
+                                                            type="select"
+                                                            name="status"
+                                                            value={
+                                                                filters.status ||
+                                                                "all"
+                                                            }
+                                                            onChange={(e) => {
+                                                                router.get(
+                                                                    "/production",
+                                                                    {
+                                                                        ...filters,
+                                                                        status:
+                                                                            e
+                                                                                .target
+                                                                                .value ===
+                                                                                "all"
+                                                                                ? null
+                                                                                : e
+                                                                                    .target
+                                                                                    .value,
+                                                                    },
+                                                                    {
+                                                                        preserveState: false,
+                                                                        preserveScroll: true,
+                                                                    }
+                                                                );
+                                                            }}
+                                                            options={[
+                                                                {
+                                                                    value: "all",
+                                                                    label: "All Status",
+                                                                },
+                                                                {
+                                                                    value: "ready_to_print",
+                                                                    label: "Ready to Print",
+                                                                },
+                                                                {
+                                                                    value: "in_production",
+                                                                    label: "In Progress",
+                                                                },
+                                                                {
+                                                                    value: "completed",
+                                                                    label: "Completed",
+                                                                },
+                                                            ]}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div
+                                                className={
+                                                    isFullscreen || activeView === 'board'
+                                                        ? "mt-4"
+                                                        : "mt-4"
+                                                }
+                                            >
+                                                {activeView === 'board' ? (
+                                                    <ProductionBoard tickets={tickets.data} />
+                                                ) : (
+                                                    <div>
+                                                        <DataTable
+                                                            columns={ticketColumns}
+                                                            data={tickets.data}
+                                                            pagination={tickets}
+                                                            emptyMessage="No tickets ready for production."
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Ready our school website and online
-                                                    service</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge danger"><i className="fa fa-times-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Routine pubish our website form
-                                                    10/03/2017 </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>30 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge success"><i className="fa fa-check-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Principle quotation publish our website
-                                                </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>15 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Class schedule publish our website</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div> */}
-
-                <div class="w-full bg-white rounded-2xl shadow-lg p-4 space-y-3 border border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                        <span class="ti-bell text-blue-500 text-xl"></span>
-                        Notifications / Alerts
-                    </h2>
-
-                    <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
-                        <div class="flex-shrink-0 mt-1">
-                            <span class="ti-timer text-orange-500 text-lg"></span>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-700">
-                                <span class="font-semibold">Job #4534DFD</span>{" "}
-                                has been in production for <b>3 hours</b>.
-                            </p>
-                            <p class="text-xs text-gray-400">
-                                Updated 10 mins ago
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
-                        <div class="flex-shrink-0 mt-1">
-                            <span class="ti-calendar text-red-500 text-lg"></span>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-700">
-                                <span class="font-semibold">2 Jobs</span> have
-                                deadlines today.
-                            </p>
-                            <p class="text-xs text-gray-400">Check schedule</p>
-                        </div>
-                    </div>
-
-                    <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
-                        <div class="flex-shrink-0 mt-1">
-                            <span class="ti-check-box text-green-600 text-lg"></span>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-700">
-                                Mock-up approved for{" "}
-                                <span class="font-semibold">Job #6543ERT</span>{" "}
-                                → <b>Ready to Print</b>.
-                            </p>
-                            <p class="text-xs text-gray-400">1 hour ago</p>
-                        </div>
-                    </div>
-
-                    <div class="text-right">
-                        <button class="text-blue-500 text-sm hover:underline">
-                            View All
-                        </button>
                     </div>
                 </div>
             </section>
 
-            <Footer />
+            {/* {!isFullscreen && <Footer />} */}
+
+            {/* Fullscreen Mode Styles */}
+            <style>{`
+                body.production-fullscreen {
+                    overflow-x: hidden;
+                    // background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                    min-height: 100vh;
+                }
+                body.production-fullscreen .header,
+                body.production-fullscreen .sidebar {
+                    display: none !important;
+                }
+                body.production-fullscreen .content-wrap {
+                    margin-left: 0 !important;
+                    width: 100% !important;
+                    padding: 0 !important;
+                }
+                body.production-fullscreen #main-content {
+                    padding-top: 0 !important;
+                    background: transparent;
+                }
+                body.production-fullscreen .main {
+                    background: transparent;
+                }
+                // .production-fullscreen .card {
+                //     box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+                //     background: white;
+                // }
+                // .production-fullscreen .badge {
+                //     padding: 8px 16px;
+                //     font-size: 14px;
+                //     font-weight: 600;
+                //     border-radius: 20px;
+                // }
+            `}</style>
         </AdminLayout>
     );
 }

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
 import Modal from "@/Components/Main/Modal";
 import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
+import DateRangeFilter from "@/Components/Common/DateRangeFilter";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Mockups({
     user = {},
@@ -20,9 +21,12 @@ export default function Mockups({
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [uploadFiles, setUploadFiles] = useState([]);
+    const [dateRange, setDateRange] = useState(filters.date_range || "");
+
     const [notes, setNotes] = useState("");
     const [loading, setLoading] = useState(false);
     const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
     const handleReview = (ticket) => {
         setSelectedTicket(ticket);
@@ -54,9 +58,9 @@ export default function Mockups({
 
     const handleApprove = () => {
         if (!selectedTicket) return;
-        
+
         setLoading(true);
-        router.post(`/mock-ups/${selectedTicket.id}/approve`, {
+        router.post(buildUrl(`/mock-ups/${selectedTicket.id}/approve`), {
             notes: notes,
         }, {
             preserveScroll: true,
@@ -78,7 +82,7 @@ export default function Mockups({
         }
 
         setLoading(true);
-        router.post(`/mock-ups/${selectedTicket.id}/revision`, {
+        router.post(buildUrl(`/mock-ups/${selectedTicket.id}/revision`), {
             notes: notes,
         }, {
             preserveScroll: true,
@@ -108,7 +112,7 @@ export default function Mockups({
             formData.append("notes", notes);
         }
 
-        router.post(`/mock-ups/${selectedTicket.id}/upload`, formData, {
+        router.post(buildUrl(`/mock-ups/${selectedTicket.id}/upload`), formData, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -122,12 +126,11 @@ export default function Mockups({
     };
 
     const handleDownload = (fileId, filename) => {
-        window.open(`/mock-ups/files/${fileId}/download`, '_blank');
+        window.open(buildUrl(`/mock-ups/files/${fileId}/download`), '_blank');
     };
 
     const handlePreview = (filepath) => {
-        const imageUrl = `/storage/${filepath}`;
-        setSelectedImage(imageUrl);
+        setSelectedImage(filepath);
     };
 
     const getDesignStatusBadge = (status) => {
@@ -299,21 +302,21 @@ export default function Mockups({
                                             {customerFiles.length > 0 ? (
                                                 customerFiles.map((file) => (
                                                     <tr key={file.id}>
-                                                        <td>{file.filename}</td>
+                                                        <td>{file.file_name}</td>
                                                         <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                         <td>
                                                             <div className="btn-group">
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
-                                                                    onClick={() => handleDownload(file.id, file.filename)}
+                                                                    onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-green-500"
-                                                                    onClick={() => handlePreview(file.filepath)}
+                                                                    onClick={() => handlePreview(file.file_path)}
                                                                 >
                                                                     <i className="ti-eye"></i> Preview
                                                                 </button>
@@ -348,21 +351,21 @@ export default function Mockups({
                                                 <tbody>
                                                     {mockupFiles.map((file) => (
                                                         <tr key={file.id}>
-                                                            <td>{file.filename}</td>
+                                                            <td>{file.file_name}</td>
                                                             <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                             <td>
                                                                 <div className="btn-group">
                                                                     <button
                                                                         type="button"
                                                                         className="btn btn-link btn-sm text-blue-500"
-                                                                        onClick={() => handleDownload(file.id, file.filename)}
+                                                                        onClick={() => handleDownload(file.id, file.file_name)}
                                                                     >
                                                                         <i className="ti-download"></i> Download
                                                                     </button>
                                                                     <button
                                                                         type="button"
                                                                         className="btn btn-link btn-sm text-green-500"
-                                                                        onClick={() => handlePreview(file.filepath)}
+                                                                        onClick={() => handlePreview(file.file_path)}
                                                                     >
                                                                         <i className="ti-eye"></i> Preview
                                                                     </button>
@@ -482,21 +485,21 @@ export default function Mockups({
                                             {customerFiles.length > 0 ? (
                                                 customerFiles.map((file) => (
                                                     <tr key={file.id}>
-                                                        <td>{file.filename}</td>
+                                                        <td>{file.file_name}</td>
                                                         <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                         <td>
                                                             <div className="btn-group">
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
-                                                                    onClick={() => handleDownload(file.id, file.filename)}
+                                                                    onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-green-500"
-                                                                    onClick={() => handlePreview(file.filepath)}
+                                                                    onClick={() => handlePreview(file.file_path)}
                                                                 >
                                                                     <i className="ti-eye"></i> Preview
                                                                 </button>
@@ -638,7 +641,7 @@ export default function Mockups({
                                         </div>
                                         <div className="card-body">
                                             <div className="row mt-4 align-items-center">
-                                                <div className="col-md-5">
+                                                <div className="col-md-3">
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
@@ -652,7 +655,7 @@ export default function Mockups({
                                                         name="design_status"
                                                         value={filters.design_status || "all"}
                                                         onChange={(e) => {
-                                                            router.get("/mock-ups", {
+                                                            router.get(buildUrl("/mock-ups"), {
                                                                 ...filters,
                                                                 design_status: e.target.value === "all" ? null : e.target.value
                                                             }, {
@@ -670,6 +673,11 @@ export default function Mockups({
                                                         ]}
                                                     />
                                                 </div>
+                                                <DateRangeFilter
+                                                    filters={filters}
+                                                    route="/mock-ups"
+                                                    buildUrl={buildUrl}
+                                                />
                                             </div>
 
                                             <div className="mt-4">
@@ -689,7 +697,6 @@ export default function Mockups({
                 </div>
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }

@@ -20,12 +20,12 @@ class JobTypeController extends Controller
 
     public function index(Request $request)
     {
-        $jobTypes = JobType::with(['category', 'priceTiers', 'sizeRates'])
+        $jobTypes = JobType::with(['category', 'priceTiers', 'sizeRates', 'promoRules'])
             ->when(request('search'), function ($q) {
                 $search = request('search');
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('category', fn($c) => $c->where('name', 'like', "%{$search}%"));
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('category', fn($c) => $c->where('name', 'like', "%{$search}%"));
             })
             ->when(request('category_id'), fn($q) => $q->where('category_id', request('category_id')))
             ->when(request()->has('is_active'), fn($q) => $q->where('is_active', request('is_active')))
@@ -33,7 +33,7 @@ class JobTypeController extends Controller
             ->orderBy('name')
             ->paginate(request('per_page', 15));
 
-         $categories = JobCategory::query()
+        $categories = JobCategory::query()
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%");
             })
@@ -53,6 +53,7 @@ class JobTypeController extends Controller
         $validated = $request->validated();
         $jobType = JobType::create($validated);
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
+        $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
 
         return back()->with('success', 'Job type created successfully!');
     }
@@ -63,6 +64,7 @@ class JobTypeController extends Controller
 
         $jobType->update($validated);
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
+        $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
 
         return back()->with('success', 'Job type updated successfully!');
     }
@@ -72,5 +74,26 @@ class JobTypeController extends Controller
         $jobType->delete();
 
         return back()->with('success', 'Job type deleted successfully!');
+    }
+
+    /**
+     * Sync promo rules for a job type
+     */
+    private function syncPromoRules(JobType $jobType, array $promoRules)
+    {
+        // Delete existing promo rules for this job type
+        $jobType->promoRules()->delete();
+
+        // Create new promo rules
+        foreach ($promoRules as $rule) {
+            if (!empty($rule['buy_quantity']) && !empty($rule['free_quantity'])) {
+                $jobType->promoRules()->create([
+                    'buy_quantity' => $rule['buy_quantity'],
+                    'free_quantity' => $rule['free_quantity'],
+                    'description' => $rule['description'] ?? null,
+                    'is_active' => $rule['is_active'] ?? true,
+                ]);
+            }
+        }
     }
 }

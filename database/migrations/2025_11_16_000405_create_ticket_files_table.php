@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('ticket_files', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')->constrained('tickets')->onDelete('cascade');
-            $table->string('filename');
-            $table->string('filepath');
+            $table->string('file_name');
+            $table->string('file_path');
             $table->string('type')->default('customer'); // customer, mockup
             $table->timestamps();
         });

@@ -64,7 +64,7 @@ class PaymentRecorder
                 if (!$file instanceof UploadedFile) {
                     continue;
                 }
-                $storedPath = $file->store('payments', 'public');
+                $storedPath = \Illuminate\Support\Facades\Storage::put('payments', $file);
                 PaymentDocument::create([
                     'payment_id' => $payment->id,
                     'uploaded_by' => Auth::id(),
@@ -79,4 +79,3 @@ class PaymentRecorder
         });
     }
 }
-

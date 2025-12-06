@@ -1,7 +1,29 @@
+/**
+ * Admin Dashboard - Dynamic Sales Analytics
+ * 
+ * Features:
+ * - Real-time sales metrics from database
+ * - Dynamic date filtering (today, week, month, year)
+ * - Period-over-period comparison analytics
+ * - Daily orders line chart with full month view
+ * - Daily revenue stacked bar chart (Sales + Net Income)
+ * - Financial calculations: Total Sales, Net Income, COGS, Receivables
+ * - User activity tracking (FrontDesk, Designer, Production)
+ * 
+ * Data Sources:
+ * - Tickets: Order/ticket data with payment status
+ * - Payments: Payment ledger with posted transactions
+ * - Users: Role-based activity tracking
+ * 
+ * Calculations:
+ * - Total Sales: Sum of posted payments (excluding pending status)
+ * - Net Income: Sales - Discounts - COGS (30% estimate)
+ * - COGS: Cost of Goods Sold (estimated at 30% of sales for printing services)
+ * - Receivables: Outstanding balances (pending/partial payments)
+ */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
-import Footer from "@/Components/Layouts/Footer";
+import { Head, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
 import { LineChart } from "@mui/x-charts/LineChart";
 import {
@@ -13,98 +35,14 @@ import {
     Typography,
 } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
-
-const sampleData = [
-    { date: "2025-01-01", value: 30 },
-    { date: "2025-01-02", value: 45 },
-    { date: "2025-01-03", value: 57 },
-    { date: "2025-01-04", value: 89 },
-    { date: "2025-01-05", value: 47 },
-    { date: "2025-01-06", value: 90 },
-    { date: "2025-01-07", value: 10 },
-    { date: "2025-01-08", value: 69 },
-    { date: "2025-01-09", value: 5 },
-    { date: "2025-01-10", value: 140 },
-    { date: "2025-01-11", value: 30 },
-    { date: "2025-01-12", value: 45 },
-    { date: "2025-01-13", value: 57 },
-    { date: "2025-01-14", value: 89 },
-    { date: "2025-01-15", value: 47 },
-    { date: "2025-01-16", value: 90 },
-    { date: "2025-01-17", value: 10 },
-    { date: "2025-01-18", value: 69 },
-    { date: "2025-01-19", value: 5 },
-    { date: "2025-01-20", value: 140 },
-    { date: "2025-01-21", value: 30 },
-    { date: "2025-01-22", value: 45 },
-    { date: "2025-01-23", value: 57 },
-    { date: "2025-01-24", value: 89 },
-    { date: "2025-01-25", value: 47 },
-    { date: "2025-01-26", value: 90 },
-    { date: "2025-01-27", value: 10 },
-    { date: "2025-01-28", value: 69 },
-    { date: "2025-01-29", value: 5 },
-    { date: "2025-01-30", value: 140 },
-
-    { date: "2025-02-01", value: 50 },
-    { date: "2025-02-02", value: 45 },
-    { date: "2024-01-01", value: 60 },
-    { date: "2024-01-02", value: 70 },
-    { date: "2024-02-01", value: 80 },
-    { date: "2024-02-02", value: 75 },
-];
-
-const getRandomValue = (min = 2000, max = 40000) =>
-    Math.floor(Math.random() * (max - min + 1)) + min;
-
-let saleData = [
-    { date: "2025-01-01" },
-    { date: "2025-01-02" },
-    { date: "2025-01-03" },
-    { date: "2025-01-04" },
-    { date: "2025-01-05" },
-    { date: "2025-01-06" },
-    { date: "2025-01-07" },
-    { date: "2025-01-08" },
-    { date: "2025-01-09" },
-    { date: "2025-01-10" },
-    { date: "2025-01-11" },
-    { date: "2025-01-12" },
-    { date: "2025-01-13" },
-    { date: "2025-01-14" },
-    { date: "2025-01-15" },
-    { date: "2025-01-16" },
-    { date: "2025-01-17" },
-    { date: "2025-01-18" },
-    { date: "2025-01-19" },
-    { date: "2025-01-20" },
-    { date: "2025-01-21" },
-    { date: "2025-01-22" },
-    { date: "2025-01-23" },
-    { date: "2025-01-24" },
-    { date: "2025-01-25" },
-    { date: "2025-01-26" },
-    { date: "2025-01-27" },
-    { date: "2025-01-28" },
-    { date: "2025-01-29" },
-    { date: "2025-01-30" },
-    { date: "2025-02-01" },
-    { date: "2025-02-02" },
-    { date: "2024-01-01" },
-    { date: "2024-01-02" },
-    { date: "2024-02-01" },
-    { date: "2024-02-02" },
-];
-
-saleData = saleData.map((item) => ({
-    ...item,
-    value: getRandomValue(1000, 200000),
-}));
+import CardStatistics from "@/Components/Common/CardStatistics";
 
 export default function Dashboard({
     user = {},
     notifications = [],
     messages = [],
+    filters = {},
+    dashboardData = {},
 }) {
     const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
@@ -112,28 +50,36 @@ export default function Dashboard({
         console.log("save");
     };
 
-    const [year, setYear] = useState("2025");
-    const [month, setMonth] = useState("01");
+    const [year, setYear] = useState(filters.year || new Date().getFullYear().toString());
+    const [month, setMonth] = useState(filters.month || (new Date().getMonth() + 1).toString().padStart(2, '0'));
+    const [dateRange, setDateRange] = useState(filters.date_range || "this_month");
+    const [refreshing, setRefreshing] = useState(false);
 
-    // 🔹 Filter data based on year + month
-    const filteredData = useMemo(() => {
-        return sampleData.filter(
-            (d) => d.date.startsWith(year) && d.date.split("-")[1] === month
-        );
-    }, [year, month]);
 
-    const filteredDataSale = useMemo(() => {
-        return saleData.filter(
-            (d) => d.date.startsWith(year) && d.date.split("-")[1] === month
-        );
-    }, [year, month]);
+    // Extract data from backend
+    const currentStats = dashboardData.current_stats || {};
+    const previousStats = dashboardData.previous_stats || {};
+    const dailyOrders = dashboardData.daily_orders || [];
+    const dailyRevenue = dashboardData.daily_revenue || [];
 
-    const xData = filteredData.map((d) => d.date.split("-")[2]); // use day number only
-    const yData = filteredData.map((d) => d.value);
+    // Calculate percentage changes
+    const calculateChange = (current, previous) => {
+        if (!previous || previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+    };
 
-    // Extract days + revenue values
-    const xDataR = filteredDataSale.map((d) => d.date.split("-")[2]); // day numbers
-    const yDataR = filteredDataSale.map((d) => d.value);
+    const ordersChange = calculateChange(currentStats.total_orders, previousStats.total_orders);
+    const completedChange = calculateChange(currentStats.completed_orders, previousStats.completed_orders);
+    const salesChange = calculateChange(currentStats.total_sales, previousStats.total_sales);
+    const revenueChange = calculateChange(currentStats.net_income, previousStats.net_income);
+
+    // Prepare chart data
+    const xData = dailyOrders.map((d) => d.day.toString());
+    const yData = dailyOrders.map((d) => d.orders);
+
+    const xDataR = dailyRevenue.map((d) => d.day.toString());
+    const yDataSales = dailyRevenue.map((d) => d.sales);
+    const yDataNetIncome = dailyRevenue.map((d) => d.net_income);
 
     const pesoFormatter = (value) => {
         if (value >= 1_000_000_000) {
@@ -144,6 +90,55 @@ export default function Dashboard({
             return `${(value / 1_000).toFixed(1)}K`;
         }
         return `${value}`;
+    };
+
+    const refreshDashboard = () => {
+        setRefreshing(true);
+        router.get(
+            "/admin/",
+            { date_range: dateRange, year, month },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => setRefreshing(false),
+            }
+        );
+    };
+
+    const handleDateRangeChange = (range) => {
+        setDateRange(range);
+        router.get(
+            "/admin/",
+            { date_range: range, year, month },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
+    };
+
+    const handleYearChange = (newYear) => {
+        setYear(newYear);
+        router.get(
+            "/admin/",
+            { date_range: dateRange, year: newYear, month },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
+    };
+
+    const handleMonthChange = (newMonth) => {
+        setMonth(newMonth);
+        router.get(
+            "/admin/",
+            { date_range: dateRange, year, month: newMonth },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
     };
 
     return (
@@ -266,65 +261,83 @@ export default function Dashboard({
             </Modal>
 
             <section id="main-content">
+                {/* Date Filter Section */}
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
+                        <button
+                             onClick={refreshDashboard}
+                            className="btn btn-sm btn-link"
+                            disabled={refreshing}
+                        >
+                            <i className={`ti-reload "animate-spin"`}></i>
+                            {refreshing ? " Refreshing..." : " Refresh"}
+                        </button> |
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <select
+                            className="text-sm font-medium text-gray-700 border-none bg-transparent focus:ring-0 p-0 pr-6 cursor-pointer"
+                            value={dateRange}
+                            onChange={(e) => handleDateRangeChange(e.target.value)}
+                        >
+                            <option value="today">Today</option>
+                            <option value="this_week">This Week</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_30_days">Last 30 Days</option>
+                            <option value="this_year">This Year</option>
+                            {Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                                <option key={year} value={`year_${year}`}>
+                                    {year}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
                 <div className="row">
                     <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-facebook">
-                                    <i className="ti-ticket"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">120</div>
-                                    <div className="stat-text">Total Jobs</div>
-                                </div>
-                            </div>
-                        </div>
+                        <CardStatistics
+                            label="Total Orders"
+                            statistics={currentStats.total_orders || 0}
+                            icon="ti-ticket"
+                            color="bg-primary"
+                            statChange={true}
+                            changePercent={ordersChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                     <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-warning">
-                                    <i className="ti-time"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">45</div>
-                                    <div className="stat-text">
-                                        Pending Approvals
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <CardStatistics
+                            label="Complete Orders"
+                            statistics={currentStats.completed_orders || 0}
+                            icon="ti-check-box"
+                            color="bg-success"
+                            statChange={true}
+                            changePercent={completedChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                     <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-success">
-                                    <i className="ti-check-box"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit"> 34</div>
-                                    <div className="stat-text">
-                                        Complete Orders
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <CardStatistics
+                            label="Total Sales"
+                            statistics={`₱ ${(currentStats.total_sales || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            icon="ti-stats-up"
+                            color="bg-info"
+                            statChange={true}
+                            changePercent={salesChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                     <div className="col-lg-3">
-                        <div className="card p-0">
-                            <div className="stat-widget-three home-widget-three">
-                                <div className="stat-icon bg-info">
-                                    <i className="ti-money"></i>
-                                </div>
-                                <div className="stat-content">
-                                    <div className="stat-digit">₱ 23,909.89</div>
-                                    <div className="stat-text">
-                                        Revenue Today
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
+                        <CardStatistics
+                            label="Net Income"
+                            statistics={`₱ ${(currentStats.net_income || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            icon="ti-money"
+                            color="bg-success"
+                            statChange={true}
+                            changePercent={revenueChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                 </div>
                 <div className="row">
@@ -346,16 +359,15 @@ export default function Dashboard({
                                                 value={year}
                                                 label="Year"
                                                 onChange={(e) =>
-                                                    setYear(e.target.value)
+                                                    handleYearChange(e.target.value)
                                                 }
                                                 sx={{ minWidth: 100 }}
                                             >
-                                                <MenuItem value="2025">
-                                                    2025
-                                                </MenuItem>
-                                                <MenuItem value="2024">
-                                                    2024
-                                                </MenuItem>
+                                                {[2024, 2025, 2026].map((y) => (
+                                                    <MenuItem key={y} value={y.toString()}>
+                                                        {y}
+                                                    </MenuItem>
+                                                ))}
                                             </Select>
                                         </FormControl>
 
@@ -365,16 +377,16 @@ export default function Dashboard({
                                                 value={month}
                                                 label="Month"
                                                 onChange={(e) =>
-                                                    setMonth(e.target.value)
+                                                    handleMonthChange(e.target.value)
                                                 }
                                                 sx={{ minWidth: 100 }}
                                             >
-                                                <MenuItem value="01">
-                                                    January
-                                                </MenuItem>
-                                                <MenuItem value="02">
-                                                    February
-                                                </MenuItem>
+                                                {['January', 'February', 'March', 'April', 'May', 'June', 
+                                                  'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
+                                                    <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
+                                                        {m}
+                                                    </MenuItem>
+                                                ))}
                                             </Select>
                                         </FormControl>
                                     </Box>
@@ -425,16 +437,15 @@ export default function Dashboard({
                                             value={year}
                                             label="Year"
                                             onChange={(e) =>
-                                                setYear(e.target.value)
+                                                handleYearChange(e.target.value)
                                             }
                                             sx={{ minWidth: 100 }}
                                         >
-                                            <MenuItem value="2025">
-                                                2025
-                                            </MenuItem>
-                                            <MenuItem value="2024">
-                                                2024
-                                            </MenuItem>
+                                            {[2024, 2025, 2026].map((y) => (
+                                                <MenuItem key={y} value={y.toString()}>
+                                                    {y}
+                                                </MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
 
@@ -445,23 +456,23 @@ export default function Dashboard({
                                             value={month}
                                             label="Month"
                                             onChange={(e) =>
-                                                setMonth(e.target.value)
+                                                handleMonthChange(e.target.value)
                                             }
                                             sx={{ minWidth: 120 }}
                                         >
-                                            <MenuItem value="01">
-                                                January
-                                            </MenuItem>
-                                            <MenuItem value="02">
-                                                February
-                                            </MenuItem>
+                                            {['January', 'February', 'March', 'April', 'May', 'June', 
+                                              'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
+                                                <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
+                                                    {m}
+                                                </MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Box>
                             </Box>
                             <Box>
 
-                                {/* 🔹 Bar Chart */}
+                                {/* 🔹 Stacked Bar Chart - Sales vs Net Income */}
                                 <BarChart
                                     xAxis={[
                                         {
@@ -472,458 +483,148 @@ export default function Dashboard({
                                     ]}
                                     yAxis={[
                                         {
-                                            label: "Revenue (₱)",
+                                            label: "Amount (₱)",
                                             valueFormatter: pesoFormatter,
                                         },
                                     ]}
                                     series={[
                                         {
-                                            data: yDataR,
-                                            label: "Revenue (PHP)",
-                                            color: "#1da1f2",
-
+                                            data: yDataNetIncome,
+                                            label: "Net Income",
+                                            color: "#10b981",
+                                            stack: 'total',
+                                        },
+                                        {
+                                            data: yDataSales.map((sales, i) => sales - yDataNetIncome[i]),
+                                            label: "COGS",
+                                            color: "#f59e0b",
+                                            stack: 'total',
                                         },
                                     ]}
                                     width={800}
                                     height={400}
-
                                 />
                             </Box>
                         </div>
                     </div>
                 </div>
-                {/* <div className="row">
-                    <div className="col-lg-3">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Pending Payment
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    {" "}
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        {" "}
-                                                        #3424234243
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #3424234243
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    In Progress
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #TRE234FDF34
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #ERTEW235346
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Ready for Pick Up
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #FGDG6456DFD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #SDFSDFSD35345
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-3">
-                        <div className="card">
-
-                            <div className="card-body">
-                                <div className="table-responsive">
-                                    <table className="table w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-center">
-                                                    Completed
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #345345DSFSD
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                            <tr>
-                                                <th>
-                                                    <a
-                                                        href="/"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
-                                                    >
-                                                        #DFGDFG3253
-                                                    </a>
-                                                </th>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
+                
                 <div className="row">
-                    <div className="col-lg-6">
+                    <div className="col-lg-4">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>All Tickets</h4>
+                                <h4>Front Desk Activity</h4>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Tracking #</th>
-                                                <th>Customer</th>
-                                                <th>Status</th>
-                                                <th>Due Date</th>
+                                                <th>#</th>
+                                                <th>Name</th>
+                                                <th>Tickets</th>
+                                                <th>Last Activity</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr>
-                                                <td>#2901</td>
-                                                <td>
-                                                    John Doe
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-primary">Pending</span>
-                                                </td>
-                                                <td>
-                                                    Sept. 23, 2025
-                                                </td>
-                                            </tr>
-                                           <tr>
-                                                <td>#2901FD54r</td>
-                                                <td>
-                                                    Anne Dela Cruz
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-primary">Pending</span>
-                                                </td>
-                                                <td>
-                                                    Sept. 23, 2025
-                                                </td>
-                                            </tr>
+                                            {(dashboardData.frontdesk_transactions || []).length > 0 ? (
+                                                dashboardData.frontdesk_transactions.map((transaction, index) => (
+                                                    <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{transaction.name}</td>
+                                                        <td>{transaction.tickets_created}</td>
+                                                        <td>{transaction.last_activity}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="4" className="text-center">No activity</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="col-lg-6">
+                    <div className="col-lg-4">
                         <div className="card">
                             <div className="card-title pr">
-                                <h4>Pending Payments</h4>
+                                <h4>Designer Activity</h4>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table student-data-table m-t-20">
                                         <thead>
                                             <tr>
-                                                <th>Ticket ID</th>
-                                                <th>Customer</th>
-                                                <th>Amount</th>
+                                                <th>#</th>
+                                                <th>Name</th>
+                                                <th>Tickets</th>
+                                                <th>Last Activity</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr>
-                                                <td>#43242</td>
-                                                <td>John Doe</td>
-                                                <td>
-                                                    <b>P 2400.00</b>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>#43242</td>
-                                                <td>Anne Doe</td>
-                                                <td>
-                                                    <b>P 1500.00</b>
-                                                </td>
-                                            </tr>
-                                              <tr>
-                                                <td>#4JEO3242</td>
-                                                <td>Juan Dela Cruz</td>
-                                                <td>
-                                                    <b>P 400.00</b>
-                                                </td>
-                                            </tr>
+                                            {(dashboardData.designer_transactions || []).length > 0 ? (
+                                                dashboardData.designer_transactions.map((transaction, index) => (
+                                                    <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{transaction.name}</td>
+                                                        <td>{transaction.tickets_created}</td>
+                                                        <td>{transaction.last_activity}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="4" className="text-center">No activity</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <div className="col-lg-4">
+                        <div className="card">
+                            <div className="card-title pr">
+                                <h4>Production Activity</h4>
+                            </div>
+                            <div className="card-body">
+                                <div className="table-responsive">
+                                    <table className="table student-data-table m-t-20">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Name</th>
+                                                <th>Tickets</th>
+                                                <th>Last Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(dashboardData.production_transactions || []).length > 0 ? (
+                                                dashboardData.production_transactions.map((transaction, index) => (
+                                                    <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{transaction.name}</td>
+                                                        <td>{transaction.tickets_created}</td>
+                                                        <td>{transaction.last_activity}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="4" className="text-center">No activity</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                   
                 </div>
-                {/* <div className="row">
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-body">
-                                <div className="year-calendar"></div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Notice Board </h4>
-
-                            </div>
-                            <div className="recent-comment m-t-15">
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-danger">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-primary">john doe</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">10 min ago</p>
-                                    </div>
-                                </div>
-                                <div className="media">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-success">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <p className="comment-date">1 hour ago</p>
-                                    </div>
-                                </div>
-                                <div className="media no-border">
-                                    <div className="media-left">
-                                        <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
-                                    </div>
-                                    <div className="media-body">
-                                        <h4 className="media-heading color-info">Mr. John</h4>
-                                        <p>Cras sit amet nibh libero, in gravida nulla.</p>
-                                        <div className="comment-date">Yesterday</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-4">
-                        <div className="card">
-                            <div className="card-title">
-                                <h4>Timeline</h4>
-
-                            </div>
-                            <div className="card-body">
-                                <ul className="timeline">
-                                    <li>
-                                        <div className="timeline-badge primary"><i className="fa fa-smile-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">School promote video sharing</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>10 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Ready our school website and online
-                                                    service</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge danger"><i className="fa fa-times-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Routine pubish our website form
-                                                    10/03/2017 </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>30 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge success"><i className="fa fa-check-circle-o"></i>
-                                        </div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Principle quotation publish our website
-                                                </h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>15 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div className="timeline-badge warning"><i className="fa fa-sun-o"></i></div>
-                                        <div className="timeline-panel">
-                                            <div className="timeline-heading">
-                                                <h5 className="timeline-title">Class schedule publish our website</h5>
-                                            </div>
-                                            <div className="timeline-body">
-                                                <p>20 minutes ago</p>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
             </section>
 
-            <Footer />
         </AdminLayout>
     );
 }
