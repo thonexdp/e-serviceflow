@@ -5,6 +5,8 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import { formatDate } from "@/Utils/formatDate";
 import { formatPeso } from "@/Utils/currency";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import Modal from "@/Components/Main/Modal";
+import Confirmation from "@/Components/Common/Confirmation";
 
 export default function PurchaseOrdersShow({
     user = {},
@@ -14,28 +16,37 @@ export default function PurchaseOrdersShow({
 }) {
     const { flash } = usePage().props;
     const { buildUrl } = useRoleApi();
+    const [openApproveModal, setApproveModalOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [statusPO, setStatusPO] = useState("");
 
-    const handleApprove = () => {
-        if (!confirm("Approve this purchase order?")) return;
-        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/approve`), {}, {
-            preserveState: false,
-            preserveScroll: true,
-        });
+
+    const handleCloseModal = () => {
+        setApproveModalOpen(false);
     };
 
-    const handleMarkOrdered = () => {
-        if (!confirm("Mark this purchase order as ordered?")) return;
-        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/mark-ordered`), {}, {
-            preserveState: false,
-            preserveScroll: true,
-        });
-    };
+    const handleConfirmApprove = () => {
+        setLoading(true);
+        let pathend = "";
+        if (statusPO === 'cancel') {
+            pathend = "cancel";
+        } else if (statusPO === 'ordered') {
+            pathend = "mark-ordered";
+        } else if (statusPO === 'approve') {
+            pathend = "approve";
+        }
 
-    const handleCancel = () => {
-        if (!confirm("Cancel this purchase order?")) return;
-        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/cancel`), {}, {
+
+        router.post(buildUrl(`/purchase-orders/${purchaseOrder.id}/${pathend}`), {}, {
             preserveState: false,
             preserveScroll: true,
+            onSuccess: () => {
+                setLoading(false);
+                handleCloseModal();
+            },
+            onError: () => {
+                setLoading(false);
+            },
         });
     };
 
@@ -61,6 +72,23 @@ export default function PurchaseOrdersShow({
 
             {flash?.success && <FlashMessage type="success" message={flash.success} />}
             {flash?.error && <FlashMessage type="error" message={flash.error} />}
+
+            <Modal
+                title={statusPO === "cancel" ? "Cancel Purchase Order?" : statusPO === "approve" ? "Approve Purchase Order?" : "Mark Purchase Order?"}
+                isOpen={openApproveModal}
+                onClose={handleCloseModal}
+                size="md"
+                submitButtonText={null}
+            >
+                <Confirmation
+                    label={statusPO === "cancel" ? "Cancel" : statusPO === "approve" ? "Approve" : "Mark as Ordered"}
+                    loading={loading}
+                    onCancel={handleCloseModal}
+                    onSubmit={handleConfirmApprove}
+                    description={statusPO === "cancel" ? `Cancel this purchase order?` : statusPO === "approve" ? `Approve this purchase order?` : `Mark this purchase order as ordered?`}
+                    color={`${statusPO === "cancel" ? "danger" : statusPO === "approve" ? "success" : "warning"}`}
+                />
+            </Modal>
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
@@ -103,7 +131,10 @@ export default function PurchaseOrdersShow({
                                                 {purchaseOrder.status === "draft" && (
                                                     <button
                                                         className="btn btn-primary btn-sm ml-2"
-                                                        onClick={handleApprove}
+                                                        onClick={() => {
+                                                            setStatusPO("approve")
+                                                            setApproveModalOpen(true)
+                                                        }}
                                                     >
                                                         <i className="ti-check"></i> Approve
                                                     </button>
@@ -111,7 +142,10 @@ export default function PurchaseOrdersShow({
                                                 {purchaseOrder.status === "approved" && (
                                                     <button
                                                         className="btn btn-warning btn-sm ml-2"
-                                                        onClick={handleMarkOrdered}
+                                                        onClick={() => {
+                                                            setStatusPO("ordered")
+                                                            setApproveModalOpen(true)
+                                                        }}
                                                     >
                                                         <i className="ti-shopping-cart"></i> Mark as Ordered
                                                     </button>
@@ -119,7 +153,11 @@ export default function PurchaseOrdersShow({
                                                 {!["received", "cancelled"].includes(purchaseOrder.status) && (
                                                     <button
                                                         className="btn btn-danger btn-sm ml-2"
-                                                        onClick={handleCancel}
+                                                        onClick={() => {
+                                                            setStatusPO("cancel")
+                                                            setApproveModalOpen(true)
+                                                        }}
+                                                    // onClick={handleCancel}
                                                     >
                                                         <i className="ti-close"></i> Cancel
                                                     </button>

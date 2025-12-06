@@ -49,8 +49,8 @@ export default function InventoryMovements({
             label: "Quantity",
             key: "quantity",
             render: (row) => (
-                <span className={row.movement_type === "in" || row.movement_type === "adjustment" ? "text-success" : "text-danger"}>
-                    {row.movement_type === "in" || row.movement_type === "adjustment" ? "+" : "-"}
+                <span className={(row.movement_type === "in" || row.movement_type === "adjustment") && parseInt(row.quantity) > 0 ? "text-success" : "text-danger"}>
+                    {(row.movement_type === "in" || row.movement_type === "adjustment") && parseInt(row.quantity) > 0 ? "+" : "-"}
                     {parseFloat(row.quantity).toFixed(2)} {stockItem.base_unit_of_measure}
                 </span>
             ),

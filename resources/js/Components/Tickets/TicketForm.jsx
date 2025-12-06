@@ -87,6 +87,7 @@ export default function TicketForm({
     const [paymentProofs, setPaymentProofs] = useState([]);
     const [activeProofTab, setActiveProofTab] = useState(0);
     const [enableDiscount, setEnableDiscount] = useState(false);
+    const [uploadError, setUploadError] = useState(null);
 
     // Get available job types based on selected category
     const availableJobTypes = useMemo(() => {
@@ -475,12 +476,42 @@ export default function TicketForm({
         clearError(name);
     };
 
+    const MAX_FILE_SIZE_MB = 10;
+    const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
     const handleTicketAttachmentUpload = (event) => {
         const files = Array.from(event.target.files || []);
         if (!files.length) {
             return;
         }
-        const uploads = files.map((file) => ({
+
+        const validFiles = [];
+        const invalidFiles = [];
+
+        files.forEach((file) => {
+            if (file.size > MAX_FILE_SIZE_BYTES) {
+                invalidFiles.push(file.name);
+            } else {
+                validFiles.push(file);
+            }
+        });
+
+        if (invalidFiles.length > 0) {
+            setUploadError(
+                `The following files exceed the ${MAX_FILE_SIZE_MB}MB limit:\n${invalidFiles.join(
+                    "\n"
+                )}`
+            );
+        } else {
+            setUploadError(null);
+        }
+
+        if (validFiles.length === 0) {
+            event.target.value = "";
+            return;
+        }
+
+        const uploads = validFiles.map((file) => ({
             file,
             preview: URL.createObjectURL(file),
             existing: false,
@@ -505,6 +536,13 @@ export default function TicketForm({
     const handlePaymentProofUpload = (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
+
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            setUploadError(`File exceeds the ${MAX_FILE_SIZE_MB}MB limit.`);
+            event.target.value = "";
+            return;
+        }
+        setUploadError(null);
 
         const upload = {
             file,
@@ -1466,6 +1504,12 @@ export default function TicketForm({
                             )}
                         </button>
                     </div>
+                    {uploadError && (
+                        <div className="alert alert-danger mt-3">
+                            <i className="ti-alert mr-2"></i>
+                            {uploadError}
+                        </div>
+                    )}
                 </div>
             </form>
         </>

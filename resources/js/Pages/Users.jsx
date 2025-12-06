@@ -19,6 +19,8 @@ export default function Users({ users, availableRoles, availablePermissions }) {
     const [openDeleteModal, setDeleteModalOpen] = useState(false);
     const [selectedID, setSelectedID] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [generatedPassword, setGeneratedPassword] = useState("");
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm({
@@ -28,6 +30,8 @@ export default function Users({ users, availableRoles, availablePermissions }) {
             password_confirmation: "",
             role: "FrontDesk",
             permissions: {},
+            password_type: "auto", // 'auto' or 'custom'
+            is_active: true,
         });
 
     const hasPermission = (module, feature) => {
@@ -35,6 +39,16 @@ export default function Users({ users, availableRoles, availablePermissions }) {
         // Check if user has specific permission
         // The permissions prop is an array of strings "module.feature"
         return auth.user.permissions.includes(`${module}.${feature}`);
+    };
+
+    const generateSecurePassword = () => {
+        const length = 12;
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+        let password = "";
+        for (let i = 0; i < length; i++) {
+            password += charset.charAt(Math.floor(Math.random() * charset.length));
+        }
+        return password;
     };
 
     const userColumns = [
@@ -49,6 +63,19 @@ export default function Users({ users, availableRoles, availablePermissions }) {
         {
             label: "Role",
             key: "role",
+        },
+        {
+            label: "Status",
+            key: "is_active",
+            render: (user) => (
+                <span
+                    className={`badge ${
+                        user.is_active ? "badge-success" : "badge-danger"
+                    }`}
+                >
+                    {user.is_active ? "Active" : "Inactive"}
+                </span>
+            ),
         },
     ];
 
@@ -69,6 +96,8 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 password_confirmation: "",
                 role: user.role,
                 permissions: userPerms,
+                password_type: "auto",
+                is_active: user.is_active !== undefined ? user.is_active : true,
             });
         } else {
             setEditingUser(null);
@@ -79,6 +108,8 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 password_confirmation: "",
                 role: "FrontDesk",
                 permissions: {},
+                password_type: "auto",
+                is_active: true,
             });
         }
         setIsModalOpen(true);
@@ -91,15 +122,55 @@ export default function Users({ users, availableRoles, availablePermissions }) {
         reset();
     };
 
+    const handleClosePasswordModal = () => {
+        setShowPasswordModal(false);
+        setGeneratedPassword("");
+    };
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(generatedPassword);
+        alert("Password copied to clipboard!");
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
+        
+        // Prepare data to submit
+        let submitData = { ...data };
+        let showPassword = false;
+        
+        // Generate password if auto-generate is selected
+        if (data.password_type === "auto") {
+            const passwordToUse = generateSecurePassword();
+            submitData.password = passwordToUse;
+            submitData.password_confirmation = passwordToUse;
+            setGeneratedPassword(passwordToUse);
+            showPassword = true;
+        }
+
         if (editingUser) {
-            put(route("admin.users.update", editingUser.id), {
-                onSuccess: () => handleCloseModal(),
+            router.put(route("admin.users.update", editingUser.id), submitData, {
+                onSuccess: () => {
+                    handleCloseModal();
+                    if (showPassword) {
+                        setShowPasswordModal(true);
+                    }
+                },
+                onError: (errors) => {
+                    console.log('Errors:', errors);
+                },
             });
         } else {
-            post(route("admin.users.store"), {
-                onSuccess: () => handleCloseModal(),
+            router.post(route("admin.users.store"), submitData, {
+                onSuccess: () => {
+                    handleCloseModal();
+                    if (showPassword) {
+                        setShowPasswordModal(true);
+                    }
+                },
+                onError: (errors) => {
+                    console.log('Errors:', errors);
+                },
             });
         }
     };
@@ -263,51 +334,111 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <InputLabel
-                                    htmlFor="password"
-                                    value={
-                                        editingUser
-                                            ? "Password (leave blank to keep current)"
-                                            : "Password"
-                                    }
-                                />
-                                <TextInput
-                                    id="password"
-                                    type="password"
-                                    className="mt-1 block w-full"
-                                    value={data.password}
+                        <div>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <Checkbox
+                                    checked={data.is_active}
                                     onChange={(e) =>
-                                        setData("password", e.target.value)
+                                        setData("is_active", e.target.checked)
                                     }
-                                    required={!editingUser}
                                 />
-                                <InputError
-                                    message={errors.password}
-                                    className="mt-2"
-                                />
-                            </div>
+                                <span className="text-sm font-medium text-gray-700">
+                                    Active User
+                                </span>
+                            </label>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Inactive users cannot log in to the system
+                            </p>
+                        </div>
 
-                            <div>
-                                <InputLabel
-                                    htmlFor="password_confirmation"
-                                    value="Confirm Password"
-                                />
-                                <TextInput
-                                    id="password_confirmation"
-                                    type="password"
-                                    className="mt-1 block w-full"
-                                    value={data.password_confirmation}
-                                    onChange={(e) =>
-                                        setData(
-                                            "password_confirmation",
-                                            e.target.value
-                                        )
-                                    }
-                                    required={!editingUser}
-                                />
+                        <div>
+                            <InputLabel
+                                value={editingUser ? "Reset Password" : "Password"}
+                            />
+                            <div className="mt-2 space-y-3">
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="password_type"
+                                        value="auto"
+                                        checked={data.password_type === "auto"}
+                                        onChange={(e) => {
+                                            setData("password_type", e.target.value);
+                                            setData("password", "");
+                                            setData("password_confirmation", "");
+                                        }}
+                                        className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm text-gray-700">
+                                        Auto-generate secure password
+                                    </span>
+                                </label>
+
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="password_type"
+                                        value="custom"
+                                        checked={data.password_type === "custom"}
+                                        onChange={(e) =>
+                                            setData("password_type", e.target.value)
+                                        }
+                                        className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm text-gray-700">
+                                        Set custom password
+                                    </span>
+                                </label>
+
+                                {data.password_type === "custom" && (
+                                    <div className="ml-6 mt-3 space-y-4">
+                                        <div>
+                                            <InputLabel
+                                                htmlFor="password"
+                                                value="Password"
+                                            />
+                                            <TextInput
+                                                id="password"
+                                                type="password"
+                                                className="mt-1 block w-full"
+                                                value={data.password}
+                                                onChange={(e) =>
+                                                    setData("password", e.target.value)
+                                                }
+                                                required={data.password_type === "custom"}
+                                            />
+                                            <InputError
+                                                message={errors.password}
+                                                className="mt-2"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <InputLabel
+                                                htmlFor="password_confirmation"
+                                                value="Confirm Password"
+                                            />
+                                            <TextInput
+                                                id="password_confirmation"
+                                                type="password"
+                                                className="mt-1 block w-full"
+                                                value={data.password_confirmation}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        "password_confirmation",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                required={data.password_type === "custom"}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+                            <InputError
+                                message={errors.password}
+                                className="mt-2"
+                            />
                         </div>
 
                         {/* Permissions Section */}
@@ -379,20 +510,59 @@ export default function Users({ users, availableRoles, availablePermissions }) {
             </Modal>
 
             {/* Delete Confirmation Modal */}
-             <Modal
-                            title={"Delete User"}
-                            isOpen={openDeleteModal}
-                            onClose={handleCloseModal}
-                            size="md"
-                            submitButtonText={null}
-                        >
-                            <DeleteConfirmation
-                                label=" ticket"
-                                loading={loading}
-                                onSubmit={handleConfirmDelete}
-                                onCancel={handleCloseModal}
-                            />
-                        </Modal>
+            <Modal
+                title={"Delete User"}
+                isOpen={openDeleteModal}
+                onClose={handleCloseModal}
+                size="md"
+                submitButtonText={null}
+            >
+                <DeleteConfirmation
+                    label=" user"
+                    loading={loading}
+                    onSubmit={handleConfirmDelete}
+                    onCancel={handleCloseModal}
+                />
+            </Modal>
+
+            {/* Generated Password Display Modal */}
+            <Modal
+                title="Generated Password"
+                isOpen={showPasswordModal}
+                onClose={handleClosePasswordModal}
+                size="md"
+            >
+                <div className="p-6">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-4">
+                            The password has been auto-generated. Please copy and share it with the user securely.
+                        </p>
+                        <div className="bg-gray-50 border border-gray-300 rounded-md p-4">
+                            <div className="flex items-center justify-between">
+                                <code className="text-lg font-mono font-semibold text-gray-800">
+                                    {generatedPassword}
+                                </code>
+                                <button
+                                    type="button"
+                                    onClick={copyToClipboard}
+                                    className="ml-4 btn btn-sm btn-primary"
+                                    title="Copy to clipboard"
+                                >
+                                    <i className="ti-clipboard"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-xs text-red-600 mt-3">
+                            ⚠️ Important: This password will only be shown once. Make sure to copy it now.
+                        </p>
+                    </div>
+                    <div className="flex justify-end mt-6">
+                        <PrimaryButton onClick={handleClosePasswordModal}>
+                            I've Saved the Password
+                        </PrimaryButton>
+                    </div>
+                </div>
+            </Modal>
         </AdminLayout>
     );
 }

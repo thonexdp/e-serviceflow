@@ -39,6 +39,7 @@ export default function Tickets({
     const [loading, setLoading] = useState(false);
     const { api, buildUrl } = useRoleApi();
     const { flash, auth } = usePage().props;
+    const [error, setError] = useState(null);
 
 
     useEffect(() => {
@@ -241,13 +242,13 @@ export default function Tickets({
 
     // Handle payment update submission
     const handlePaymentUpdate = async () => {
+        setError("");
         if (!selectedTicket) return;
 
         if (!paymentFormData.amount) {
-            alert("Please enter the payment amount.");
+            setError("Please enter the payment amount.")
             return;
         }
-
         const formData = new FormData();
         formData.append("ticket_id", selectedTicket.id);
         formData.append("payment_method", paymentFormData.payment_method);
@@ -477,12 +478,6 @@ export default function Tickets({
             render: (row) => (
                 <div>
                     {getStatusBadge(row.status)}
-                    {row.current_workflow_step && row.status !== "completed" && (
-                        <div className="text-secondary small">
-                            <i className="ti-time mr-1"></i>
-                            <i>{row.current_workflow_step}</i>
-                        </div>
-                    )}
 
                     {row.status !== "completed" &&
                         row.status !== "cancelled" && (
@@ -495,6 +490,14 @@ export default function Tickets({
                                 <i className="ti-pencil"></i>
                             </button>
                         )}
+
+                    {row.current_workflow_step && row.status !== "completed" && (
+                        <div className="text-secondary small">
+                            <i className="ti-time mr-1"></i>
+                            <i>{row.current_workflow_step}</i>
+                        </div>
+                    )}
+
                 </div>
             ),
         },
@@ -590,13 +593,13 @@ export default function Tickets({
                                     <li className="breadcrumb-item active">
                                         Tickets
                                     </li>
-                                    <li className="breadcrumb-item">
+                                    {/* <li className="breadcrumb-item">
                                         <a href="#" className="text-blue-500" onClick={() => {
                                             router.get(buildUrl("tickets"));
                                         }}>
                                             <i className="ti-reload"></i> Refresh
                                         </a>
-                                    </li>
+                                    </li> */}
                                 </ol>
                             </div>
                         </div>
@@ -806,7 +809,7 @@ export default function Tickets({
                                     </label>
                                     <input
                                         type="number"
-                                        className="form-control"
+                                        className={`form-control ${error ? "border-danger" : ""}`}
                                         min="0"
                                         step="0.01"
                                         placeholder="Enter amount"
@@ -818,6 +821,7 @@ export default function Tickets({
                                             })
                                         }
                                     />
+                                    <span className="text-danger">{error}</span>
                                 </div>
                                 <div className="form-group">
                                     <label>Allocation</label>

@@ -113,6 +113,7 @@ class PublicTicketController extends Controller
                 'status' => $paymentStatusLabel,
             ],
             'status' => $this->getStatusLabel($ticket->status),
+            'current_workflow_step' => $ticket->status === 'in_production' ? $ticket->current_workflow_step : null,
             'timeline' => $timeline,
         ];
     }

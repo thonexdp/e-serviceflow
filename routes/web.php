@@ -359,6 +359,12 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+// Shared routes for all authenticated users (password update)
+Route::middleware('auth')->group(function () {
+    Route::put('/user/password', [ProfileController::class, 'updatePassword'])->name('user.password.update');
+});
+
 Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('frontdesk.')->group(function () {
     // Front Desk Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

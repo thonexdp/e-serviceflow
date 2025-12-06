@@ -2,6 +2,12 @@ import { router, usePage } from "@inertiajs/react";
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import Modal from "@/Components/Main/Modal";
+import InputLabel from "@/Components/InputLabel";
+import TextInput from "@/Components/TextInput";
+import InputError from "@/Components/InputError";
+import PrimaryButton from "@/Components/PrimaryButton";
+import SecondaryButton from "@/Components/SecondaryButton";
 
 export default function Header({
     user = {},
@@ -17,6 +23,19 @@ export default function Header({
     const [unreadCount, setUnreadCount] = useState(0);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+    const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+    const [passwordData, setPasswordData] = useState({
+        current_password: "",
+        new_password: "",
+        new_password_confirmation: "",
+    });
+    const [showPasswords, setShowPasswords] = useState({
+        current: false,
+        new: false,
+        confirm: false,
+    });
+    const [passwordErrors, setPasswordErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const echoInitialized = useRef(false);
     const notificationDropdownRef = useRef(null);
     const profileDropdownRef = useRef(null);
@@ -270,6 +289,79 @@ export default function Header({
         e.stopPropagation();
         setIsProfileDropdownOpen(!isProfileDropdownOpen);
     };
+
+    const handleResetPasswordClick = (e) => {
+        e.preventDefault();
+        setIsProfileDropdownOpen(false);
+        setIsResetPasswordModalOpen(true);
+        setPasswordData({
+            current_password: "",
+            new_password: "",
+            new_password_confirmation: "",
+        });
+        setPasswordErrors({});
+    };
+
+    const handleCloseResetPasswordModal = () => {
+        setIsResetPasswordModalOpen(false);
+        setPasswordData({
+            current_password: "",
+            new_password: "",
+            new_password_confirmation: "",
+        });
+        setPasswordErrors({});
+        setShowPasswords({
+            current: false,
+            new: false,
+            confirm: false,
+        });
+    };
+
+    const handlePasswordChange = (field, value) => {
+        setPasswordData((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+        // Clear error for this field when user starts typing
+        if (passwordErrors[field]) {
+            setPasswordErrors((prev) => ({
+                ...prev,
+                [field]: null,
+            }));
+        }
+    };
+
+    const togglePasswordVisibility = (field) => {
+        setShowPasswords((prev) => ({
+            ...prev,
+            [field]: !prev[field],
+        }));
+    };
+
+    const handleResetPasswordSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        setPasswordErrors({});
+
+        try {
+            await axios.put('/user/password', passwordData);
+            // Success
+            handleCloseResetPasswordModal();
+            // Optionally show a success message
+            alert('Password updated successfully');
+        } catch (error) {
+            if (error.response?.data?.errors) {
+                setPasswordErrors(error.response.data.errors);
+            } else {
+                setPasswordErrors({
+                    general: error.response?.data?.message || 'Failed to update password',
+                });
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     console.log("notificationList:", notificationList)
     return (
         <div className="header">
@@ -487,6 +579,16 @@ export default function Header({
                                                 <li>
                                                     <button
                                                         type="button"
+                                                        onClick={handleResetPasswordClick}
+                                                        className="dropdown-item"
+                                                    >
+                                                        <i className="ti-lock"></i>
+                                                        <span>Reset Password</span>
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button
+                                                        type="button"
                                                         onClick={handleLogout}
                                                         className="dropdown-item"
                                                     >
@@ -503,6 +605,120 @@ export default function Header({
                     </div>
                 </div>
             </div>
+
+            {/* Reset Password Modal */}
+            <Modal
+                isOpen={isResetPasswordModalOpen}
+                onClose={handleCloseResetPasswordModal}
+                title="Reset Password"
+                size="md"
+            >
+                <form onSubmit={handleResetPasswordSubmit} className="p-6">
+                    <div className="space-y-4">
+                        {passwordErrors.general && (
+                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                                {passwordErrors.general}
+                            </div>
+                        )}
+
+                        {/* Current Password */}
+                        <div>
+                            <InputLabel htmlFor="current_password" value="Current Password" />
+                            <div className="relative">
+                                <TextInput
+                                    id="current_password"
+                                    type={showPasswords.current ? "text" : "password"}
+                                    className="mt-1 block w-full pr-10"
+                                    value={passwordData.current_password}
+                                    onChange={(e) =>
+                                        handlePasswordChange("current_password", e.target.value)
+                                    }
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => togglePasswordVisibility("current")}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                    style={{ top: '4px' }}
+                                >
+                                    <i className={showPasswords.current ? "ti-eye-off" : "ti-eye"}></i>
+                                </button>
+                            </div>
+                            <InputError
+                                message={passwordErrors.current_password?.[0]}
+                                className="mt-2"
+                            />
+                        </div>
+
+                        {/* New Password */}
+                        <div>
+                            <InputLabel htmlFor="new_password" value="New Password" />
+                            <div className="relative">
+                                <TextInput
+                                    id="new_password"
+                                    type={showPasswords.new ? "text" : "password"}
+                                    className="mt-1 block w-full pr-10"
+                                    value={passwordData.new_password}
+                                    onChange={(e) =>
+                                        handlePasswordChange("new_password", e.target.value)
+                                    }
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => togglePasswordVisibility("new")}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                    style={{ top: '4px' }}
+                                >
+                                    <i className={showPasswords.new ? "ti-eye-off" : "ti-eye"}></i>
+                                </button>
+                            </div>
+                            <InputError
+                                message={passwordErrors.new_password?.[0]}
+                                className="mt-2"
+                            />
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div>
+                            <InputLabel htmlFor="new_password_confirmation" value="Confirm New Password" />
+                            <div className="relative">
+                                <TextInput
+                                    id="new_password_confirmation"
+                                    type={showPasswords.confirm ? "text" : "password"}
+                                    className="mt-1 block w-full pr-10"
+                                    value={passwordData.new_password_confirmation}
+                                    onChange={(e) =>
+                                        handlePasswordChange("new_password_confirmation", e.target.value)
+                                    }
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => togglePasswordVisibility("confirm")}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                    style={{ top: '4px' }}
+                                >
+                                    <i className={showPasswords.confirm ? "ti-eye-off" : "ti-eye"}></i>
+                                </button>
+                            </div>
+                            <InputError
+                                message={passwordErrors.new_password_confirmation?.[0]}
+                                className="mt-2"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-end space-x-3">
+                        <SecondaryButton type="button" onClick={handleCloseResetPasswordModal}>
+                            Cancel
+                        </SecondaryButton>
+                        <PrimaryButton type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? "Updating..." : "Update Password"}
+                        </PrimaryButton>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }

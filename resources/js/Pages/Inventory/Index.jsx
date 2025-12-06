@@ -38,8 +38,13 @@ export default function InventoryIndex({
         setIsAreaBased(stockItem?.is_area_based || false);
         setStockModalOpen(true);
     };
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
 
     const handleCloseModal = () => {
+
         setStockModalOpen(false);
         setAdjustModalOpen(false);
         setDeleteModalOpen(false);
@@ -127,7 +132,7 @@ export default function InventoryIndex({
 
     const handleDeleteStockItem = () => {
         if (!selectedID) return;
-        router.delete(`/inventory/${selectedID}`, {
+        router.delete(buildUrl(`/inventory/${selectedID}`), {
             preserveScroll: true,
             preserveState: false,
             onBefore: () => setLoading(true),
@@ -344,6 +349,7 @@ export default function InventoryIndex({
 
             {/* Stock Item Modal */}
             <Modal
+                key={editingStockItem?.id || 'new-stock-item'}
                 title={editingStockItem ? "Edit Stock Item" : "Add Stock Item"}
                 isOpen={openStockModal}
                 onClose={handleCloseModal}
@@ -581,6 +587,7 @@ export default function InventoryIndex({
 
             {/* Adjust Stock Modal */}
             <Modal
+                key={selectedStockItem?.id || 'adjust-stock'}
                 title={`Adjust Stock - ${selectedStockItem?.name}`}
                 isOpen={openAdjustModal}
                 onClose={handleCloseModal}
@@ -629,19 +636,17 @@ export default function InventoryIndex({
             </Modal>
 
             <Modal
-                title={"Delete Customer"}
+                title={"Delete Stock"}
                 isOpen={openDeleteModal}
                 onClose={handleCloseModal}
                 size="md"
                 submitButtonText={null}
             >
                 <DeleteConfirmation
-                    isOpen={openDeleteModal}
-                    onClose={handleCloseModal}
-                    onConfirm={handleDeleteStockItem}
+                    label="stock"
                     loading={loading}
-                    title="Delete Stock Item"
-                    message="Are you sure you want to delete this stock item? This action cannot be undone."
+                    onSubmit={handleDeleteStockItem}
+                    onCancel={handleCloseModal}
                 />
             </Modal>
 

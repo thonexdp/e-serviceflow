@@ -12,7 +12,7 @@ export default function AdminLayout({ children, user = {}, notifications = [], m
         const initializeOtherLibraries = () => {
             if (window.jQuery) {
                 const $ = window.jQuery;
-                
+
                 try {
                     // Initialize nano scroller
                     if ($.fn.nanoScroller) {
@@ -49,21 +49,23 @@ export default function AdminLayout({ children, user = {}, notifications = [], m
     };
 
     return (
-        <div>
-            <Sidebar isCollapsed={isCollapsed}  user={user}  />
-            <Header 
-                user={user} 
-                notifications={notifications} 
+        <div className="min-h-screen flex flex-col">
+            <Sidebar isCollapsed={isCollapsed} user={user} />
+            <Header
+                user={user}
+                notifications={notifications}
                 messages={messages}
                 onToggleSidebar={toggleSidebar}
             />
-            <div className="content-wrap" onClick={handleContentClick}>
-                <div className="main">
+            <div className="content-wrap flex-grow flex flex-col" onClick={handleContentClick}>
+                <div className="main flex-grow">
                     <div className="container-fluid">
                         {children}
                     </div>
                 </div>
-                <Footer/>
+                <div className="container-fluid">
+                    <Footer />
+                </div>
             </div>
         </div>
     );

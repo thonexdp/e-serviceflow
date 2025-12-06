@@ -29,6 +29,15 @@ return new class extends Migration
             $table->string('status_notes')->nullable();
             $table->decimal('amount_paid', 10, 2)->default(0);
             $table->text('file_path')->nullable();
+            $table->foreignId('created_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->foreignId('updated_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
         });
