@@ -33,8 +33,11 @@ jobs:
 
       - name: Build and Push Laravel App Image
         run: |
+          # Build with VITE_* arguments for frontend Pusher config
           docker build \
             -f Dockerfile.app \
+            --build-arg VITE_PUSHER_APP_KEY=${{ secrets.PUSHER_APP_KEY }} \
+            --build-arg VITE_PUSHER_APP_CLUSTER=${{ secrets.PUSHER_APP_CLUSTER }} \
             -t asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.APP_SERVICE_NAME }}:${{ github.sha }} \
             -t asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.APP_SERVICE_NAME }}:latest \
             .
@@ -55,7 +58,7 @@ jobs:
             --min-instances=0 \
             --max-instances=5 \
             --set-cloudsql-instances=${{ secrets.DB_INSTANCE_CONNECTION_NAME }} \
-            --set-env-vars="APP_ENV=staging,APP_DEBUG=false,APP_KEY=${{ secrets.APP_KEY }},APP_URL=${{ secrets.APP_URL }},DB_CONNECTION=mysql,DB_HOST=localhost,DB_PORT=3306,DB_DATABASE=${{ secrets.DB_DATABASE }},DB_USERNAME=${{ secrets.DB_USERNAME }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_SOCKET=/cloudsql/${{ secrets.DB_INSTANCE_CONNECTION_NAME }},BROADCAST_DRIVER=log,CACHE_DRIVER=file,QUEUE_CONNECTION=database,SESSION_DRIVER=file,FILESYSTEM_DISK=gcs,GOOGLE_CLOUD_PROJECT_ID=${{ env.PROJECT_ID }},GOOGLE_CLOUD_STORAGE_BUCKET=${{ secrets.GCS_BUCKET }}"
+            --set-env-vars="APP_ENV=staging,APP_DEBUG=false,APP_KEY=${{ secrets.APP_KEY }},APP_URL=${{ secrets.APP_URL }},DB_CONNECTION=mysql,DB_HOST=localhost,DB_PORT=3306,DB_DATABASE=${{ secrets.DB_DATABASE }},DB_USERNAME=${{ secrets.DB_USERNAME }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_SOCKET=/cloudsql/${{ secrets.DB_INSTANCE_CONNECTION_NAME }},BROADCAST_DRIVER=pusher,PUSHER_APP_ID=${{ secrets.PUSHER_APP_ID }},PUSHER_APP_KEY=${{ secrets.PUSHER_APP_KEY }},PUSHER_APP_SECRET=${{ secrets.PUSHER_APP_SECRET }},PUSHER_APP_CLUSTER=${{ secrets.PUSHER_APP_CLUSTER }},CACHE_DRIVER=file,QUEUE_CONNECTION=database,SESSION_DRIVER=file,FILESYSTEM_DISK=gcs,GOOGLE_CLOUD_PROJECT_ID=${{ env.PROJECT_ID }},GOOGLE_CLOUD_STORAGE_BUCKET=${{ secrets.GCS_BUCKET }}"
 
       - name: Output URLs
         run: |
