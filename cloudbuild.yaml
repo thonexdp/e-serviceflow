@@ -8,12 +8,12 @@ substitutions:
 
   # Backend variables
   _PUSHER_APP_SECRET: "staging-secret"
-  _SERVICE_NAME: "e-serviceflow"
-  _REGION: "asia-southeast1"
+  _SERVICE_NAME: "e-serviceflow-app"
+  _REGION: "us-central1"
 
   # GCS variables
   _GCS_BUCKET: "rcshoppe-buckets"
-  _GCP_PROJECT_ID: "YOUR-PROJECT-ID" # CHANGE THIS!
+  _GCP_PROJECT_ID: "rcprintshoppe-479314"
 
 steps:
   # Build the Docker image with VITE build args
@@ -33,7 +33,7 @@ steps:
       - "--build-arg"
       - "VITE_PUSHER_APP_CLUSTER=${_VITE_PUSHER_APP_CLUSTER}"
       - "-t"
-      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$BUILD_ID"
       - "-t"
       - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest"
       - "."
@@ -42,7 +42,7 @@ steps:
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "push"
-      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest"
 
   # Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
@@ -51,7 +51,7 @@ steps:
       - "deploy"
       - "${_SERVICE_NAME}"
       - "--image"
-      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest"
       - "--region"
       - "${_REGION}"
       - "--platform"
@@ -60,9 +60,7 @@ steps:
       - "--set-env-vars"
       - "BROADCAST_DRIVER=pusher,PUSHER_APP_ID=e-serviceflow,PUSHER_APP_KEY=${_VITE_PUSHER_APP_KEY},PUSHER_APP_SECRET=${_PUSHER_APP_SECRET},PUSHER_HOST=${_VITE_PUSHER_HOST},PUSHER_PORT=${_VITE_PUSHER_PORT},PUSHER_SCHEME=${_VITE_PUSHER_SCHEME},PUSHER_APP_CLUSTER=${_VITE_PUSHER_APP_CLUSTER},FILESYSTEM_DISK=gcs,GOOGLE_CLOUD_STORAGE_BUCKET=${_GCS_BUCKET},GOOGLE_CLOUD_PROJECT_ID=${_GCP_PROJECT_ID}"
 
-
 images:
-  - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA"
   - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest"
 
 options:

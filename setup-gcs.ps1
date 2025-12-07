@@ -4,10 +4,10 @@
 # ============================================
 # STEP 1: Set Your Variables
 # ============================================
-$PROJECT_ID = "your-gcp-project-id"  # CHANGE THIS!
+$PROJECT_ID = "rcprintshoppe-479314"
 $BUCKET_NAME = "rcshoppe-buckets"
-$REGION = "asia-southeast1"
-$SERVICE_NAME = "e-serviceflow"
+$REGION = "us-central1"
+$SERVICE_NAME = "e-serviceflow-app"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Google Cloud Storage Setup" -ForegroundColor Cyan

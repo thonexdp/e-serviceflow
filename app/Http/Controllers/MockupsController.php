@@ -103,14 +103,14 @@ class MockupsController extends Controller
 
             TicketFile::create([
                 'ticket_id' => $ticket->id,
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
                 'type' => 'mockup',
             ]);
 
             $uploadedFiles[] = [
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
             ];
         }
 
@@ -181,11 +181,11 @@ class MockupsController extends Controller
     {
         $file = TicketFile::findOrFail($id);
 
-        if (!Storage::exists($file->filepath)) {
+        if (!Storage::exists($file->file_path)) {
             abort(404);
         }
 
-        return Storage::download($file->filepath, $file->filename);
+        return Storage::download($file->file_path, $file->file_name);
     }
 
     /**
