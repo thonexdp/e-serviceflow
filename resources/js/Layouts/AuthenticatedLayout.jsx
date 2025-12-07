@@ -1,11 +1,13 @@
 import React from 'react';
+import NotificationToast from '@/Components/NotificationToast';
 
-export default function AuthenticatedLayout({ 
-    user = null, 
-    header, 
-    children, 
-    notifications = [], 
-    messages = [] 
+
+export default function AuthenticatedLayout({
+    user = null,
+    header,
+    children,
+    notifications = [],
+    messages = []
 }) {
     // Safe user access with fallbacks
     const userName = user?.name || 'Guest';
@@ -14,6 +16,9 @@ export default function AuthenticatedLayout({
 
     return (
         <div className="min-h-screen bg-gray-100">
+            {/* Real-time notifications */}
+            <NotificationToast />
+
             {/* Your existing layout structure */}
             <nav className="bg-white border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
