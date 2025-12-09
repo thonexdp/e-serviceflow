@@ -32,6 +32,7 @@ class Ticket extends Model
         'payment_method',
         'status',
         'current_workflow_step',
+        'assigned_to_user_id',
         'design_status',
         'design_notes',
         'payment_status',
@@ -196,6 +197,22 @@ class Ticket extends Model
     }
 
     /**
+     * Get workflow progress records for this ticket.
+     */
+    public function workflowProgress()
+    {
+        return $this->hasMany(TicketWorkflowProgress::class);
+    }
+
+    /**
+     * Get the user assigned to this ticket.
+     */
+    public function assignedToUser()
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    /**
      * Parse size_value to extract width and height.
      * 
      * @return array{width: float|null, height: float|null}
@@ -277,5 +294,70 @@ class Ticket extends Model
     public function getTotalQuantityAttribute(): int
     {
         return (int)($this->quantity ?? 0) + (int)($this->free_quantity ?? 0);
+    }
+
+    /**
+     * Check if a user can edit this ticket based on workflow permissions.
+     * 
+     * @param User|null $user The user to check (defaults to current auth user)
+     * @return bool
+     */
+    public function canUserEdit(?User $user = null): bool
+    {
+        // Default to current authenticated user
+        if (!$user) {
+            $user = auth()->user();
+        }
+
+        if (!$user) {
+            return false;
+        }
+
+        // Admin can always edit
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // FrontDesk can edit tickets in certain statuses
+        if ($user->isFrontDesk()) {
+            return in_array($this->status, ['pending', 'ready_to_print', 'in_designer']);
+        }
+
+        // Designer can edit tickets in designer status
+        if ($user->isDesigner()) {
+            return $this->status === 'in_designer';
+        }
+
+        // Production users can only edit if ticket is in their assigned workflow step
+        if ($user->isProduction()) {
+            // For ready_to_print tickets, check if user is assigned to first workflow step
+            if ($this->status === 'ready_to_print') {
+                $firstStep = $this->getFirstWorkflowStep();
+                return $firstStep && $user->isAssignedToWorkflowStep($firstStep);
+            }
+
+            // For in_production tickets, check if current workflow step matches user's assignment
+            if ($this->status === 'in_production' && $this->current_workflow_step) {
+                return $user->isAssignedToWorkflowStep($this->current_workflow_step);
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the user-friendly label for the current workflow step.
+     * 
+     * @return string|null
+     */
+    public function getCurrentWorkflowStepLabel(): ?string
+    {
+        if (!$this->current_workflow_step) {
+            return null;
+        }
+
+        return ucfirst(str_replace('_', ' ', $this->current_workflow_step));
     }
 }

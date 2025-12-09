@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Permission;
+use App\Models\UserActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
@@ -16,7 +17,17 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::with('permissions')->orderBy('created_at', 'desc')->get();
+        $users = User::with(['permissions', 'workflowSteps'])->orderBy('created_at', 'desc')->get();
+
+        // Define available workflow steps
+        $availableWorkflowSteps = [
+            'design' => 'Design',
+            'printing' => 'Printing',
+            'lamination_heatpress' => 'Lamination/Heatpress',
+            'cutting' => 'Cutting',
+            'sewing' => 'Sewing',
+            'dtf_press' => 'DTF Press',
+        ];
 
         return Inertia::render('Users', [
             'users' => $users,
@@ -27,7 +38,21 @@ class UserController extends Controller
                 User::ROLE_PRODUCTION,
             ],
             'availablePermissions' => Permission::all()->groupBy('module'),
+            'availableWorkflowSteps' => $availableWorkflowSteps,
         ]);
+    }
+
+    /**
+     * Get activity logs for a specific user
+     */
+    public function getActivityLogs(User $user)
+    {
+        $logs = $user->activityLogs()
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
+
+        return response()->json(['data' => $logs]);
     }
 
     /**
@@ -37,11 +62,13 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|max:255|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => 'required|in:admin,FrontDesk,Designer,Production',
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
+            'workflow_steps' => 'nullable|array',
+            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -58,6 +85,19 @@ class UserController extends Controller
             $this->syncUserPermissions($user, $validated['permissions']);
         }
 
+        // Sync workflow steps if provided and user is Production
+        if ($user->isProduction() && isset($validated['workflow_steps'])) {
+            $user->syncWorkflowSteps($validated['workflow_steps']);
+        }
+
+        // Log user creation
+        UserActivityLog::log(
+            auth()->id(),
+            'created_user',
+            "Created new user: {$user->name} ({$user->email})",
+            $user
+        );
+
         return redirect()->back()->with('success', 'User created successfully.');
     }
 
@@ -68,13 +108,23 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'email' => 'required|string|max:255|unique:users,email,' . $user->id,
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
+            'update_password' => 'nullable|boolean', // Toggle to update password
             'role' => 'required|in:admin,FrontDesk,Designer,Production',
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
+            'workflow_steps' => 'nullable|array',
+            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press',
             'is_active' => 'nullable|boolean',
         ]);
+
+        $oldData = [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'is_active' => $user->is_active,
+        ];
 
         $user->update([
             'name' => $validated['name'],
@@ -83,16 +133,50 @@ class UserController extends Controller
             'is_active' => $validated['is_active'] ?? $user->is_active,
         ]);
 
-        // Update password if provided
-        if (!empty($validated['password'])) {
+        // Update password only if update_password is true and password is provided
+        if (!empty($validated['update_password']) && !empty($validated['password'])) {
             $user->update([
                 'password' => Hash::make($validated['password']),
             ]);
+            
+            // Log password change
+            UserActivityLog::log(
+                auth()->id(),
+                'updated_user_password',
+                "Updated password for user: {$user->name}",
+                $user
+            );
+        }
+
+        // Log user update
+        $changes = [];
+        foreach ($oldData as $key => $oldValue) {
+            if (isset($validated[$key]) && $validated[$key] != $oldValue) {
+                $changes[$key] = ['old' => $oldValue, 'new' => $validated[$key]];
+            }
+        }
+
+        if (!empty($changes)) {
+            UserActivityLog::log(
+                auth()->id(),
+                'updated_user',
+                "Updated user: {$user->name}",
+                $user,
+                $changes
+            );
         }
 
         // Sync permissions if provided
         if (isset($validated['permissions'])) {
             $this->syncUserPermissions($user, $validated['permissions']);
+        }
+
+        // Sync workflow steps if provided and user is Production
+        if ($user->isProduction() && isset($validated['workflow_steps'])) {
+            $user->syncWorkflowSteps($validated['workflow_steps']);
+        } elseif (!$user->isProduction()) {
+            // Remove workflow steps if user is no longer Production
+            $user->workflowSteps()->delete();
         }
 
         return redirect()->back()->with('success', 'User updated successfully.');
@@ -107,6 +191,17 @@ class UserController extends Controller
         if ($user->id === auth()->id()) {
             return redirect()->back()->withErrors(['error' => 'You cannot delete your own account.']);
         }
+
+        $userName = $user->name;
+        $userEmail = $user->email;
+
+        // Log user deletion before deleting
+        UserActivityLog::log(
+            auth()->id(),
+            'deleted_user',
+            "Deleted user: {$userName} ({$userEmail})",
+            null
+        );
 
         $user->delete();
 

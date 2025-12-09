@@ -55,12 +55,12 @@ export default function Login({ status, canResetPassword }) {
                             <div>
                                 <InputLabel
                                     htmlFor="email"
-                                    value="Email Address"
+                                    value="Username"
                                     className="text-gray-700 font-medium mb-2"
                                 />
                                 <TextInput
                                     id="email"
-                                    type="email"
+                                    type="text"
                                     name="email"
                                     value={data.email}
                                     className="mt-1 block w-full px-4 py-2.5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm"
@@ -101,7 +101,7 @@ export default function Login({ status, canResetPassword }) {
                                     />
                                     <span className="ml-2 text-sm text-gray-700">Remember me</span>
                                 </label>
-
+                               {/* 
                                 {canResetPassword && (
                                     <Link
                                         href={route('password.request')}
@@ -109,7 +109,7 @@ export default function Login({ status, canResetPassword }) {
                                     >
                                         Forgot password?
                                     </Link>
-                                )}
+                                )} */}
                             </div>
 
                             <PrimaryButton
