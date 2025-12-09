@@ -12,7 +12,7 @@ import Checkbox from "@/Components/Checkbox";
 import DataTable from "@/Components/Common/DataTable";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 
-export default function Users({ users, availableRoles, availablePermissions }) {
+export default function Users({ users, availableRoles, availablePermissions, availableWorkflowSteps = {} }) {
     const { auth } = usePage().props;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
@@ -30,9 +30,17 @@ export default function Users({ users, availableRoles, availablePermissions }) {
             password_confirmation: "",
             role: "FrontDesk",
             permissions: {},
+            workflow_steps: [],
             password_type: "auto", // 'auto' or 'custom'
+            update_password: false, // Toggle for updating password
             is_active: true,
         });
+    
+    const [activeTab, setActiveTab] = useState("basic"); // 'basic', 'permissions', 'workflow', 'history'
+    const [activityLogs, setActivityLogs] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [selectedUserForHistory, setSelectedUserForHistory] = useState(null);
 
     const hasPermission = (module, feature) => {
         if (auth.user.role === "admin") return true;
@@ -57,7 +65,7 @@ export default function Users({ users, availableRoles, availablePermissions }) {
             key: "name",
         },
         {
-            label: "Email",
+            label: "Username",
             key: "email",
         },
         {
@@ -69,8 +77,8 @@ export default function Users({ users, availableRoles, availablePermissions }) {
             key: "is_active",
             render: (user) => (
                 <span
-                    className={`badge ${
-                        user.is_active ? "badge-success" : "badge-danger"
+                    className={`${
+                        user.is_active ? "text-success" : "text-danger"
                     }`}
                 >
                     {user.is_active ? "Active" : "Inactive"}
@@ -89,6 +97,11 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 userPerms[p.id] = true; // or p.pivot.granted if we want to be specific, but here we assume presence means granted
             });
 
+            // Get workflow steps assigned to user
+            const userWorkflowSteps = user.workflow_steps 
+                ? user.workflow_steps.map(ws => ws.workflow_step || ws)
+                : [];
+
             setData({
                 name: user.name,
                 email: user.email,
@@ -96,7 +109,9 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 password_confirmation: "",
                 role: user.role,
                 permissions: userPerms,
+                workflow_steps: userWorkflowSteps,
                 password_type: "auto",
+                update_password: false,
                 is_active: user.is_active !== undefined ? user.is_active : true,
             });
         } else {
@@ -108,9 +123,12 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 password_confirmation: "",
                 role: "FrontDesk",
                 permissions: {},
+                workflow_steps: [],
                 password_type: "auto",
+                update_password: false,
                 is_active: true,
             });
+        setActiveTab("basic");
         }
         setIsModalOpen(true);
     };
@@ -139,16 +157,23 @@ export default function Users({ users, availableRoles, availablePermissions }) {
         let submitData = { ...data };
         let showPassword = false;
         
-        // Generate password if auto-generate is selected
-        if (data.password_type === "auto") {
-            const passwordToUse = generateSecurePassword();
-            submitData.password = passwordToUse;
-            submitData.password_confirmation = passwordToUse;
-            setGeneratedPassword(passwordToUse);
-            showPassword = true;
-        }
-
         if (editingUser) {
+            // For editing: only include password if update_password is true
+            if (!data.update_password) {
+                delete submitData.password;
+                delete submitData.password_confirmation;
+                delete submitData.password_type;
+            } else {
+                // Generate password if auto-generate is selected
+                if (data.password_type === "auto") {
+                    const passwordToUse = generateSecurePassword();
+                    submitData.password = passwordToUse;
+                    submitData.password_confirmation = passwordToUse;
+                    setGeneratedPassword(passwordToUse);
+                    showPassword = true;
+                }
+            }
+            
             router.put(route("admin.users.update", editingUser.id), submitData, {
                 onSuccess: () => {
                     handleCloseModal();
@@ -161,6 +186,16 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 },
             });
         } else {
+            // For new user: always require password
+            // Generate password if auto-generate is selected
+            if (data.password_type === "auto") {
+                const passwordToUse = generateSecurePassword();
+                submitData.password = passwordToUse;
+                submitData.password_confirmation = passwordToUse;
+                setGeneratedPassword(passwordToUse);
+                showPassword = true;
+            }
+            
             router.post(route("admin.users.store"), submitData, {
                 onSuccess: () => {
                     handleCloseModal();
@@ -198,6 +233,14 @@ export default function Users({ users, availableRoles, availablePermissions }) {
         });
     };
 
+    const handleWorkflowStepChange = (workflowStep, checked) => {
+        if (checked) {
+            setData("workflow_steps", [...(data.workflow_steps || []), workflowStep]);
+        } else {
+            setData("workflow_steps", (data.workflow_steps || []).filter(ws => ws !== workflowStep));
+        }
+    };
+
     const handleDeleteUser = (id) => {
         // Prevent deleting the currently authenticated user
         if (id === auth.user.id) return;
@@ -208,6 +251,20 @@ export default function Users({ users, availableRoles, availablePermissions }) {
     const handleEditTicket = (user) => {
         if (!hasPermission("users", "update")) return;
         openModal(user);
+    };
+
+    const loadActivityLogs = async (userId) => {
+        setLoadingLogs(true);
+        setSelectedUserForHistory(userId);
+        try {
+            const response = await fetch(`/admin/users/${userId}/activity-logs`);
+            const result = await response.json();
+            setActivityLogs(result.data || []);
+            setLoadingLogs(false);
+        } catch (error) {
+            console.error('Error loading activity logs:', error);
+            setLoadingLogs(false);
+        }
     };
 
     return (
@@ -275,178 +332,338 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                 size="5xl"
             >
                 <form onSubmit={handleSubmit} className="p-6">
-                    <div className="grid grid-cols-1 gap-6">
-                        <div>
-                            <InputLabel htmlFor="name" value="Name" />
-                            <TextInput
-                                id="name"
-                                type="text"
-                                className="mt-1 block w-full"
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData("name", e.target.value)
-                                }
-                                required
-                            />
-                            <InputError
-                                message={errors.name}
-                                className="mt-2"
-                            />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="email" value="Email" />
-                            <TextInput
-                                id="email"
-                                type="email"
-                                className="mt-1 block w-full"
-                                value={data.email}
-                                onChange={(e) =>
-                                    setData("email", e.target.value)
-                                }
-                                required
-                            />
-                            <InputError
-                                message={errors.email}
-                                className="mt-2"
-                            />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="role" value="Role" />
-                            <select
-                                id="role"
-                                className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                                value={data.role}
-                                onChange={(e) =>
-                                    setData("role", e.target.value)
-                                }
+                    {/* Tabs Navigation */}
+                    <div className="border-b border-gray-200 mb-4">
+                        <nav className="-mb-px flex space-x-8">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("basic")}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                    activeTab === "basic"
+                                        ? "border-indigo-500 text-indigo-600"
+                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                }`}
                             >
-                                {availableRoles.map((role) => (
-                                    <option key={role} value={role}>
-                                        {role}
-                                    </option>
-                                ))}
-                            </select>
-                            <InputError
-                                message={errors.role}
-                                className="mt-2"
-                            />
-                        </div>
+                                <i className="ti-user mr-1"></i> Basic Info
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("permissions")}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                    activeTab === "permissions"
+                                        ? "border-indigo-500 text-indigo-600"
+                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                }`}
+                            >
+                                <i className="ti-lock mr-1"></i> Permissions
+                            </button>
+                            {data.role === "Production" && (
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab("workflow")}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                        activeTab === "workflow"
+                                            ? "border-indigo-500 text-indigo-600"
+                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <i className="ti-layout-list-thumb mr-1"></i> Workflow
+                                </button>
+                            )}
+                            {editingUser && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveTab("history");
+                                        loadActivityLogs(editingUser.id);
+                                    }}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                        activeTab === "history"
+                                            ? "border-indigo-500 text-indigo-600"
+                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <i className="ti-time mr-1"></i> Activity History
+                                </button>
+                            )}
+                        </nav>
+                    </div>
 
-                        <div>
-                            <label className="flex items-center space-x-2 cursor-pointer">
-                                <Checkbox
-                                    checked={data.is_active}
-                                    onChange={(e) =>
-                                        setData("is_active", e.target.checked)
-                                    }
-                                />
-                                <span className="text-sm font-medium text-gray-700">
-                                    Active User
-                                </span>
-                            </label>
-                            <p className="mt-1 text-xs text-gray-500">
-                                Inactive users cannot log in to the system
-                            </p>
-                        </div>
-
-                        <div>
-                            <InputLabel
-                                value={editingUser ? "Reset Password" : "Password"}
-                            />
-                            <div className="mt-2 space-y-3">
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="password_type"
-                                        value="auto"
-                                        checked={data.password_type === "auto"}
-                                        onChange={(e) => {
-                                            setData("password_type", e.target.value);
-                                            setData("password", "");
-                                            setData("password_confirmation", "");
-                                        }}
-                                        className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                                    />
-                                    <span className="text-sm text-gray-700">
-                                        Auto-generate secure password
-                                    </span>
-                                </label>
-
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="password_type"
-                                        value="custom"
-                                        checked={data.password_type === "custom"}
+                    {/* Tab Content */}
+                    <div className="tab-content">
+                        {/* Basic Info Tab */}
+                        {activeTab === "basic" && (
+                            <div className="grid grid-cols-1 gap-6">
+                                <div>
+                                    <InputLabel htmlFor="name" value="Name" />
+                                    <TextInput
+                                        id="name"
+                                        type="text"
+                                        className="mt-1 block w-full"
+                                        value={data.name}
                                         onChange={(e) =>
-                                            setData("password_type", e.target.value)
+                                            setData("name", e.target.value)
                                         }
-                                        className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                        required
                                     />
-                                    <span className="text-sm text-gray-700">
-                                        Set custom password
-                                    </span>
-                                </label>
+                                    <InputError
+                                        message={errors.name}
+                                        className="mt-2"
+                                    />
+                                </div>
 
-                                {data.password_type === "custom" && (
-                                    <div className="ml-6 mt-3 space-y-4">
-                                        <div>
-                                            <InputLabel
-                                                htmlFor="password"
-                                                value="Password"
-                                            />
-                                            <TextInput
-                                                id="password"
-                                                type="password"
-                                                className="mt-1 block w-full"
-                                                value={data.password}
-                                                onChange={(e) =>
-                                                    setData("password", e.target.value)
-                                                }
-                                                required={data.password_type === "custom"}
-                                            />
-                                            <InputError
-                                                message={errors.password}
-                                                className="mt-2"
-                                            />
-                                        </div>
+                                <div>
+                                    <InputLabel htmlFor="email" value="Username" />
+                                    <TextInput
+                                        id="email"
+                                        type="text"
+                                        className="mt-1 block w-full"
+                                        value={data.email}
+                                        onChange={(e) =>
+                                            setData("email", e.target.value)
+                                        }
+                                        required
+                                    />
+                                    <InputError
+                                        message={errors.email}
+                                        className="mt-2"
+                                    />
+                                </div>
 
-                                        <div>
-                                            <InputLabel
-                                                htmlFor="password_confirmation"
-                                                value="Confirm Password"
-                                            />
-                                            <TextInput
-                                                id="password_confirmation"
-                                                type="password"
-                                                className="mt-1 block w-full"
-                                                value={data.password_confirmation}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        "password_confirmation",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                required={data.password_type === "custom"}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                <div>
+                                    <InputLabel htmlFor="role" value="Role" />
+                                    <select
+                                        id="role"
+                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                        value={data.role}
+                                        onChange={(e) =>
+                                            setData("role", e.target.value)
+                                        }
+                                    >
+                                        {availableRoles.map((role) => (
+                                            <option key={role} value={role}>
+                                                {role}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError
+                                        message={errors.role}
+                                        className="mt-2"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <Checkbox
+                                            checked={data.is_active}
+                                            onChange={(e) =>
+                                                setData("is_active", e.target.checked)
+                                            }
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">
+                                            Active User
+                                        </span>
+                                    </label>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Inactive users cannot log in to the system
+                                    </p>
+                                </div>
+
+                                {/* Password Section */}
+                                <div>
+                                    {editingUser ? (
+                                        <>
+                                            <label className="flex items-center space-x-2 cursor-pointer mb-3">
+                                                <Checkbox
+                                                    checked={data.update_password}
+                                                    onChange={(e) => {
+                                                        setData("update_password", e.target.checked);
+                                                        if (!e.target.checked) {
+                                                            setData("password", "");
+                                                            setData("password_confirmation", "");
+                                                            setData("password_type", "auto");
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium text-gray-700">
+                                                    Update Password
+                                                </span>
+                                            </label>
+                                            {data.update_password && (
+                                                <div className="ml-6 space-y-3">
+                                                    <div>
+                                                        <label className="flex items-center space-x-2 cursor-pointer">
+                                                            <input
+                                                                type="radio"
+                                                                name="password_type"
+                                                                value="auto"
+                                                                checked={data.password_type === "auto"}
+                                                                onChange={(e) => {
+                                                                    setData("password_type", e.target.value);
+                                                                    setData("password", "");
+                                                                    setData("password_confirmation", "");
+                                                                }}
+                                                                className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                                            />
+                                                            <span className="text-sm text-gray-700">
+                                                                Auto-generate secure password
+                                                            </span>
+                                                        </label>
+                                                    </div>
+                                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="password_type"
+                                                            value="custom"
+                                                            checked={data.password_type === "custom"}
+                                                            onChange={(e) =>
+                                                                setData("password_type", e.target.value)
+                                                            }
+                                                            className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                                        />
+                                                        <span className="text-sm text-gray-700">
+                                                            Set custom password
+                                                        </span>
+                                                    </label>
+                                                    {data.password_type === "custom" && (
+                                                        <div className="ml-6 mt-3 space-y-4">
+                                                            <div>
+                                                                <InputLabel
+                                                                    htmlFor="password"
+                                                                    value="Password"
+                                                                />
+                                                                <TextInput
+                                                                    id="password"
+                                                                    type="password"
+                                                                    className="mt-1 block w-full"
+                                                                    value={data.password}
+                                                                    onChange={(e) =>
+                                                                        setData("password", e.target.value)
+                                                                    }
+                                                                    required={data.password_type === "custom"}
+                                                                />
+                                                                <InputError
+                                                                    message={errors.password}
+                                                                    className="mt-2"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <InputLabel
+                                                                    htmlFor="password_confirmation"
+                                                                    value="Confirm Password"
+                                                                />
+                                                                <TextInput
+                                                                    id="password_confirmation"
+                                                                    type="password"
+                                                                    className="mt-1 block w-full"
+                                                                    value={data.password_confirmation}
+                                                                    onChange={(e) =>
+                                                                        setData(
+                                                                            "password_confirmation",
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                    required={data.password_type === "custom"}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <InputLabel value="Password" />
+                                            <div className="mt-2 space-y-3">
+                                                <label className="flex items-center space-x-2 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="password_type"
+                                                        value="auto"
+                                                        checked={data.password_type === "auto"}
+                                                        onChange={(e) => {
+                                                            setData("password_type", e.target.value);
+                                                            setData("password", "");
+                                                            setData("password_confirmation", "");
+                                                        }}
+                                                        className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">
+                                                        Auto-generate secure password
+                                                    </span>
+                                                </label>
+                                                <label className="flex items-center space-x-2 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="password_type"
+                                                        value="custom"
+                                                        checked={data.password_type === "custom"}
+                                                        onChange={(e) =>
+                                                            setData("password_type", e.target.value)
+                                                        }
+                                                        className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">
+                                                        Set custom password
+                                                    </span>
+                                                </label>
+                                                {data.password_type === "custom" && (
+                                                    <div className="ml-6 mt-3 space-y-4">
+                                                        <div>
+                                                            <InputLabel
+                                                                htmlFor="password"
+                                                                value="Password"
+                                                            />
+                                                            <TextInput
+                                                                id="password"
+                                                                type="password"
+                                                                className="mt-1 block w-full"
+                                                                value={data.password}
+                                                                onChange={(e) =>
+                                                                    setData("password", e.target.value)
+                                                                }
+                                                                required={data.password_type === "custom"}
+                                                            />
+                                                            <InputError
+                                                                message={errors.password}
+                                                                className="mt-2"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <InputLabel
+                                                                htmlFor="password_confirmation"
+                                                                value="Confirm Password"
+                                                            />
+                                                            <TextInput
+                                                                id="password_confirmation"
+                                                                type="password"
+                                                                className="mt-1 block w-full"
+                                                                value={data.password_confirmation}
+                                                                onChange={(e) =>
+                                                                    setData(
+                                                                        "password_confirmation",
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                required={data.password_type === "custom"}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                    <InputError
+                                        message={errors.password}
+                                        className="mt-2"
+                                    />
+                                </div>
                             </div>
-                            <InputError
-                                message={errors.password}
-                                className="mt-2"
-                            />
-                        </div>
+                        )}
 
-                        {/* Permissions Section */}
-                        <div className="mt-4">
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Permissions
-                            </h3>
-                            <div className="space-y-4">
+                        {/* Permissions Tab */}
+                        {activeTab === "permissions" && (
+                            <div className="space-y-4 max-h-96 overflow-y-auto">
                                 {Object.entries(availablePermissions).map(
                                     ([module, permissions]) => (
                                         <div
@@ -462,7 +679,7 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                                                 </span>
                                             </div>
                                             <div className="px-4 py-3">
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                                     {permissions.map((permission) => (
                                                         <label
                                                             key={permission.id}
@@ -495,7 +712,91 @@ export default function Users({ users, availableRoles, availablePermissions }) {
                                     )
                                 )}
                             </div>
-                        </div>
+                        )}
+
+                        {/* Workflow Tab */}
+                        {activeTab === "workflow" && data.role === "Production" && (
+                            <div>
+                                <InputLabel value="Workflow Step Assignments" />
+                                <p className="mt-1 mb-3 text-xs text-gray-500">
+                                    Select the workflow steps this production user can work on. They will only see tickets assigned to their workflow steps.
+                                </p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                                    {Object.entries(availableWorkflowSteps).map(([key, label]) => (
+                                        <label
+                                            key={key}
+                                            htmlFor={`workflow-${key}`}
+                                            className="flex items-center space-x-2 rounded-md px-3 py-2 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                                        >
+                                            <Checkbox
+                                                id={`workflow-${key}`}
+                                                checked={(data.workflow_steps || []).includes(key)}
+                                                onChange={(e) =>
+                                                    handleWorkflowStepChange(key, e.target.checked)
+                                                }
+                                            />
+                                            <span className="text-sm text-gray-700">{label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <InputError
+                                    message={errors.workflow_steps}
+                                    className="mt-2"
+                                />
+                            </div>
+                        )}
+
+                        {/* Activity History Tab */}
+                        {activeTab === "history" && editingUser && (
+                            <div>
+                                <div className="mb-3">
+                                    <h5 className="font-semibold">Activity History for {editingUser.name}</h5>
+                                    <p className="text-sm text-gray-500">View all actions performed by this user</p>
+                                </div>
+                                {loadingLogs ? (
+                                    <div className="text-center py-8">
+                                        <i className="ti-reload animate-spin text-2xl text-gray-400"></i>
+                                        <p className="mt-2 text-gray-500">Loading activity logs...</p>
+                                    </div>
+                                ) : activityLogs.length > 0 ? (
+                                    <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                        <table className="table table-sm table-striped">
+                                            <thead className="sticky top-0 bg-white">
+                                                <tr>
+                                                    <th>Date/Time</th>
+                                                    <th>Action</th>
+                                                    <th>Description</th>
+                                                    <th>Related Item</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {activityLogs.map((log) => (
+                                                    <tr key={log.id}>
+                                                        <td className="text-xs">
+                                                            {new Date(log.created_at).toLocaleString()}
+                                                        </td>
+                                                        <td>
+                                                            <span className="badge badge-info badge-sm">
+                                                                {log.action.replace(/_/g, ' ')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="text-sm">{log.description || '-'}</td>
+                                                        <td className="text-xs text-muted">
+                                                            {log.model_type ? log.model_type.split('\\').pop() : '-'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <i className="ti-time text-3xl mb-2"></i>
+                                        <p>No activity logs found for this user.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-6 flex justify-end">

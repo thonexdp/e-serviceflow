@@ -904,13 +904,45 @@ function ReceiptsReport({ data }) {
 
 function StaffPerformanceReport({ data }) {
     const { staff = [], summary = {} } = data;
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [activityLogs, setActivityLogs] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+    const [showLogsModal, setShowLogsModal] = useState(false);
+
+    const loadUserActivityLogs = async (userId) => {
+        setLoadingLogs(true);
+        setSelectedUser(staff.find(s => s.id === userId));
+        try {
+            const response = await fetch(`/admin/users/${userId}/activity-logs`);
+            const result = await response.json();
+            setActivityLogs(result.data || []);
+            setShowLogsModal(true);
+            setLoadingLogs(false);
+        } catch (error) {
+            console.error('Error loading activity logs:', error);
+            setLoadingLogs(false);
+        }
+    };
 
     return (
         <div>
             <h4>Staff Report</h4>
-            {/* <div className="alert alert-info">
-                <p><strong>Note:</strong> To track individual staff performance, add a <code>created_by</code> field to the tickets table to track who created each ticket.</p>
-            </div> */}
+            <div className="row mb-3">
+                <div className="col-md-3">
+                    <div className="stat-card">
+                        <h6>Total Staff</h6>
+                        <h3>{summary.total_staff || 0}</h3>
+                    </div>
+                </div>
+                {summary.by_role && Object.entries(summary.by_role).map(([role, count]) => (
+                    <div key={role} className="col-md-3">
+                        <div className="stat-card">
+                            <h6>{role}</h6>
+                            <h3>{count}</h3>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
             <table className="table">
                 <thead>
@@ -918,7 +950,10 @@ function StaffPerformanceReport({ data }) {
                         <th>Name</th>
                         <th>Role</th>
                         <th>Email</th>
+                        <th>Total Activities</th>
+                        <th>Recent Activities</th>
                         <th>Last Active</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -927,11 +962,112 @@ function StaffPerformanceReport({ data }) {
                             <td>{member.name}</td>
                             <td><i>{member.role}</i></td>
                             <td>{member.email}</td>
+                            <td>{member.total_activities || 0}</td>
+                            <td>{member.recent_activities || 0}</td>
                             <td>{new Date(member.last_active).toLocaleDateString()}</td>
+                            <td>
+                                <button
+                                    className="btn btn-sm btn-info"
+                                    onClick={() => loadUserActivityLogs(member.id)}
+                                    title="View Activity Logs"
+                                >
+                                    <i className="ti-time"></i> View Logs
+                                </button>
+                            </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {/* Activity Logs Modal */}
+            {showLogsModal && (
+                <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+                    <div className="modal-dialog modal-lg">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">
+                                    Activity Logs - {selectedUser?.name}
+                                </h5>
+                                <button
+                                    type="button"
+                                    className="close"
+                                    onClick={() => {
+                                        setShowLogsModal(false);
+                                        setActivityLogs([]);
+                                        setSelectedUser(null);
+                                    }}
+                                >
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+                            <div className="modal-body">
+                                {loadingLogs ? (
+                                    <div className="text-center py-4">
+                                        <i className="ti-reload animate-spin text-2xl text-gray-400"></i>
+                                        <p className="mt-2 text-gray-500">Loading activity logs...</p>
+                                    </div>
+                                ) : activityLogs.length > 0 ? (
+                                    <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                                        <table className="table table-sm table-striped">
+                                            <thead className="sticky top-0 bg-white">
+                                                <tr>
+                                                    <th>Date/Time</th>
+                                                    <th>Action</th>
+                                                    <th>Description</th>
+                                                    <th>Related Item</th>
+                                                    <th>IP Address</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {activityLogs.map((log) => (
+                                                    <tr key={log.id}>
+                                                        <td className="text-xs">
+                                                            {new Date(log.created_at).toLocaleString()}
+                                                        </td>
+                                                        <td>
+                                                            <span className="badge badge-info badge-sm">
+                                                                {log.action.replace(/_/g, ' ')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="text-sm">{log.description || '-'}</td>
+                                                        <td className="text-xs text-muted">
+                                                            {log.model_type ? log.model_type.split('\\').pop() : '-'}
+                                                        </td>
+                                                        <td className="text-xs text-muted">
+                                                            {log.ip_address || '-'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <i className="ti-time text-3xl mb-2"></i>
+                                        <p>No activity logs found for this user.</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowLogsModal(false);
+                                        setActivityLogs([]);
+                                        setSelectedUser(null);
+                                    }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showLogsModal && (
+                <div className="modal-backdrop fade show"></div>
+            )}
         </div>
     );
 }

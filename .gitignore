@@ -21,7 +21,4 @@ yarn-error.log
 /.agent
 /.docs
 
-# GCP Deployment Keys
-github-key.json
-*.key
-*.pem
+*.md

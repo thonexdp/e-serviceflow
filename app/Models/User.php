@@ -185,4 +185,79 @@ class User extends Authenticatable
         }
         $this->permissions()->sync($sync);
     }
+
+    /**
+     * Get workflow steps assigned to this user (for Production users)
+     */
+    public function workflowSteps()
+    {
+        return $this->hasMany(\App\Models\UserWorkflowStep::class);
+    }
+
+    /**
+     * Get list of workflow step names assigned to this user
+     * 
+     * @return array
+     */
+    public function getAssignedWorkflowSteps(): array
+    {
+        return $this->workflowSteps()->pluck('workflow_step')->toArray();
+    }
+
+    /**
+     * Check if user is assigned to a specific workflow step
+     * 
+     * @param string $workflowStep
+     * @return bool
+     */
+    public function isAssignedToWorkflowStep(string $workflowStep): bool
+    {
+        // Admin and non-production users can see all tickets
+        if (!$this->isProduction() || $this->isAdmin()) {
+            return true;
+        }
+
+        return $this->workflowSteps()->where('workflow_step', $workflowStep)->exists();
+    }
+
+    /**
+     * Sync workflow steps for production users
+     * 
+     * @param array $workflowSteps Array of workflow step names
+     */
+    public function syncWorkflowSteps(array $workflowSteps)
+    {
+        // Only sync for production users
+        if (!$this->isProduction()) {
+            return;
+        }
+
+        // Delete existing assignments
+        $this->workflowSteps()->delete();
+
+        // Create new assignments
+        foreach ($workflowSteps as $step) {
+            $this->workflowSteps()->create([
+                'workflow_step' => $step,
+            ]);
+        }
+    }
+
+    /**
+     * Get activity logs for this user
+     */
+    public function activityLogs()
+    {
+        return $this->hasMany(UserActivityLog::class)->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get all users assigned to a specific workflow step
+     */
+    public static function getUsersAssignedToWorkflowStep(string $workflowStep): \Illuminate\Database\Eloquent\Collection
+    {
+        return self::whereHas('workflowSteps', function ($query) use ($workflowStep) {
+            $query->where('workflow_step', $workflowStep);
+        })->where('is_active', true)->get();
+    }
 }

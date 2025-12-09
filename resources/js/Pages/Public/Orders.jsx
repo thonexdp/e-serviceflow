@@ -33,6 +33,25 @@ export default function CustomerPOSOrder() {
     const [paymentProofs, setPaymentProofs] = useState([]);
     const [activeProofTab, setActiveProofTab] = useState(0);
     const [submittedTicket, setSubmittedTicket] = useState(null);
+    const [settings, setSettings] = useState(null);
+    const [qrcodeError, setQrcodeError] = useState(false);
+
+    // Fetch settings on component mount
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const response = await fetch('/api/public/settings');
+                const data = await response.json();
+                if (data.success) {
+                    setSettings(data.data);
+                    setQrcodeError(false); // Reset QR code error when settings are fetched
+                }
+            } catch (err) {
+                console.error('Error fetching settings:', err);
+            }
+        };
+        fetchSettings();
+    }, []);
 
     const availableJobTypes = useMemo(() => {
         if (!formData.category_id) return [];
@@ -99,13 +118,13 @@ export default function CustomerPOSOrder() {
         // Price tier pricing
         else if (priceTiers.length > 0) {
             const tier = [...priceTiers]
-                .filter(tier => 
-                    quantity >= tier.min_quantity && 
+                .filter(tier =>
+                    quantity >= tier.min_quantity &&
                     (!tier.max_quantity || quantity <= tier.max_quantity)
                 )
                 .sort((a, b) => a.min_quantity - b.min_quantity)
                 .pop();
-            
+
             const unitPrice = tier ? parseFloat(tier.price) : parseFloat(selectedJobType.price || 0);
             calculated = unitPrice * quantity;
         }
@@ -123,10 +142,10 @@ export default function CustomerPOSOrder() {
             if (activeRules.length > 0) {
                 // Sort by buy_quantity descending to apply largest rules first
                 const sortedRules = [...activeRules].sort((a, b) => b.buy_quantity - a.buy_quantity);
-                
+
                 // Find the best matching rule
                 const applicableRule = sortedRules.find(r => quantity >= r.buy_quantity);
-                
+
                 if (applicableRule) {
                     const sets = Math.floor(quantity / applicableRule.buy_quantity);
                     const totalFree = sets * applicableRule.free_quantity;
@@ -193,7 +212,7 @@ export default function CustomerPOSOrder() {
             });
 
             const data = await response.json();
-            
+
             if (data.success && data.customer) {
                 setFormData(prev => ({ ...prev, customer_id: data.customer.id }));
                 return data.customer.id;
@@ -240,10 +259,10 @@ export default function CustomerPOSOrder() {
             if (formData.file) {
                 orderData.append('file', formData.file);
             }
-            
+
             // Add payment method
             orderData.append('payment_method', paymentMethod);
-            
+
             // Add payment proofs if any
             paymentProofs.forEach((proof, index) => {
                 if (proof.file) {
@@ -299,17 +318,17 @@ export default function CustomerPOSOrder() {
             <div className="bg-white shadow-sm border-b sticky top-0 z-50">
                 <div className="max-w-4xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                            <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
-                        </div>
-                            <div onClick={() => router.visit('/', { preserveState: true, preserveScroll: true, replace: true })}>
-                                <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
-                                <p className="text-sm text-gray-600">Track Your Order</p>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                                    <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
+                                </div>
+                                <div onClick={() => router.visit('/', { preserveState: true, preserveScroll: true, replace: true })}>
+                                    <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
+                                    <p className="text-sm text-gray-600">Track Your Order</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
                         {/* Step Indicator */}
                         <div className="hidden sm:flex items-center gap-2">
@@ -806,47 +825,68 @@ export default function CustomerPOSOrder() {
                             </div>
 
                             {/* GCash Payment Info */}
-                            {paymentMethod === 'gcash' && (
+                            {paymentMethod === 'gcash' && settings?.payment?.gcash && (
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                                     <h3 className="font-semibold text-green-900 mb-4">GCash Payment Details</h3>
                                     <div className="space-y-3">
-                                        <div>
-                                            <p className="text-sm font-medium text-green-800">Account Name:</p>
-                                            <p className="text-lg font-bold text-green-900">RC PrintShoppe</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-green-800">GCash Number:</p>
-                                            <p className="text-lg font-bold text-green-900">0912 345 6789</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-green-800 mb-2">QR Code:</p>
-                                            <div className="bg-white p-4 rounded border border-green-300 inline-block">
-                                                <div className="w-32 h-32 bg-gray-200 flex items-center justify-center text-xs text-gray-500">
-                                                    QR Code Sample
+                                        {settings.payment.gcash.account_name && (
+                                            <div>
+                                                <p className="text-sm font-medium text-green-800">Account Name:</p>
+                                                <p className="text-lg font-bold text-green-900">{settings.payment.gcash.account_name}</p>
+                                            </div>
+                                        )}
+                                        {settings.payment.gcash.number && (
+                                            <div>
+                                                <p className="text-sm font-medium text-green-800">GCash Number:</p>
+                                                <p className="text-lg font-bold text-green-900">{settings.payment.gcash.number}</p>
+                                            </div>
+                                        )}
+                                        {settings.payment.gcash.qrcode && (
+                                            <div>
+                                                <p className="text-sm font-medium text-green-800 mb-2">QR Code:</p>
+                                                <div className="bg-white p-4 rounded border border-green-300 inline-block">
+                                                    {!qrcodeError ? (
+                                                        <img 
+                                                            src={settings.payment.gcash.qrcode} 
+                                                            alt="GCash QR Code" 
+                                                            className="w-32 h-32 object-contain"
+                                                            onError={() => setQrcodeError(true)}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-32 h-32 bg-gray-200 flex items-center justify-center text-xs text-gray-500">
+                                                            QR Code not available
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
                             {/* Bank Transfer Payment Info */}
-                            {paymentMethod === 'bank' && (
+                            {paymentMethod === 'bank' && settings?.payment?.bank && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                                     <h3 className="font-semibold text-blue-900 mb-4">Bank Transfer Details</h3>
                                     <div className="space-y-3">
-                                        <div>
-                                            <p className="text-sm font-medium text-blue-800">Bank Name:</p>
-                                            <p className="text-lg font-bold text-blue-900">BDO (Banco de Oro)</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-blue-800">Account Name:</p>
-                                            <p className="text-lg font-bold text-blue-900">RC PrintShoppe</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-blue-800">Account Number:</p>
-                                            <p className="text-lg font-bold text-blue-900">1234 5678 9012</p>
-                                        </div>
+                                        {settings.payment.bank.bank_name && (
+                                            <div>
+                                                <p className="text-sm font-medium text-blue-800">Bank Name:</p>
+                                                <p className="text-lg font-bold text-blue-900">{settings.payment.bank.bank_name}</p>
+                                            </div>
+                                        )}
+                                        {settings.payment.bank.account_name && (
+                                            <div>
+                                                <p className="text-sm font-medium text-blue-800">Account Name:</p>
+                                                <p className="text-lg font-bold text-blue-900">{settings.payment.bank.account_name}</p>
+                                            </div>
+                                        )}
+                                        {settings.payment.bank.account_number && (
+                                            <div>
+                                                <p className="text-sm font-medium text-blue-800">Account Number:</p>
+                                                <p className="text-lg font-bold text-blue-900">{settings.payment.bank.account_number}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -946,21 +986,19 @@ export default function CustomerPOSOrder() {
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm font-medium text-gray-700">Status:</span>
-                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                        submittedTicket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         submittedTicket.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                        'bg-blue-100 text-blue-800'
-                                    }`}>
+                                            'bg-blue-100 text-blue-800'
+                                        }`}>
                                         {submittedTicket.status.toUpperCase()}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center pt-3 border-t">
                                     <span className="text-sm font-medium text-gray-700">Payment Status:</span>
-                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                        submittedTicket.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         submittedTicket.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-                                        'bg-blue-100 text-blue-800'
-                                    }`}>
+                                            'bg-blue-100 text-blue-800'
+                                        }`}>
                                         {submittedTicket.payment_status.toUpperCase()}
                                     </span>
                                 </div>
@@ -973,7 +1011,7 @@ export default function CustomerPOSOrder() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <p className="text-sm text-blue-800">
-                                    <strong>Important:</strong> Please save your ticket number <strong>{submittedTicket.ticket_number}</strong> for tracking your order. 
+                                    <strong>Important:</strong> Please save your ticket number <strong>{submittedTicket.ticket_number}</strong> for tracking your order.
                                     We'll contact you within 24 hours to confirm your order and discuss payment options.
                                 </p>
                             </div>

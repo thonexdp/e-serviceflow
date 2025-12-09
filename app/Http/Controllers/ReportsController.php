@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\Expense;
 use App\Models\Customer;
 use App\Models\User;
+use App\Models\UserActivityLog;
 use App\Models\ProductionStockConsumption;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -575,15 +576,22 @@ class ReportsController extends Controller
     private function getStaffPerformanceReport($dates)
     {
         $users = User::whereIn('role', ['FrontDesk', 'Designer', 'Production'])
+            ->withCount('activityLogs')
             ->get()
             ->map(function ($user) use ($dates) {
-                // Since tickets don't have created_by, we'll show aggregate stats
+                // Get recent activity count
+                $recentActivityCount = \App\Models\UserActivityLog::where('user_id', $user->id)
+                    ->whereBetween('created_at', [$dates['start'], $dates['end']])
+                    ->count();
+
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'role' => $user->role,
                     'email' => $user->email,
                     'last_active' => $user->updated_at,
+                    'total_activities' => $user->activity_logs_count,
+                    'recent_activities' => $recentActivityCount,
                 ];
             });
 
