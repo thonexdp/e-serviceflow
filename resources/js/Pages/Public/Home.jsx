@@ -98,24 +98,25 @@ export default function PrintShoppeLanding() {
                             </div>
                             <p className="text-gray-600 mb-4 text-sm">Enter your tracking number to view order status</p>
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-2 sm:gap-3">
                                 <div className="flex-1">
                                     <input
                                         type="text"
                                         value={trackingNumber}
                                         onChange={(e) => setTrackingNumber(e.target.value)}
                                         placeholder="Enter tracking number (e.g., TKT-000001)"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
                                         onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                                     />
                                 </div>
                                 <button
                                     onClick={handleSearch}
                                     disabled={isSearching || !trackingNumber}
-                                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-colors"
+                                    className="px-3 py-2 sm:px-6 sm:py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2 font-medium transition-colors text-sm sm:text-base whitespace-nowrap"
                                 >
-                                    <Search className="w-5 h-5" />
-                                    {isSearching ? 'Searching...' : 'Track'}
+                                    <Search className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                                    <span className="hidden xs:inline">{isSearching ? 'Searching...' : 'Track'}</span>
+                                    <span className="xs:hidden">{isSearching ? '...' : ''}</span>
                                 </button>
                             </div>
 
@@ -324,7 +325,7 @@ export default function PrintShoppeLanding() {
                                     {/* Support for additional dynamic days */}
                                     {Object.entries(settings.business_hours).map(([key, value]) => {
                                         if (!['monday_friday', 'saturday', 'sunday'].includes(key) && value) {
-                                            const dayLabel = key.split('_').map(word => 
+                                            const dayLabel = key.split('_').map(word =>
                                                 word.charAt(0).toUpperCase() + word.slice(1)
                                             ).join(' ');
                                             return (

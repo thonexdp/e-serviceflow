@@ -81,7 +81,7 @@ export default function PurchaseOrdersShow({
                 submitButtonText={null}
             >
                 <Confirmation
-                    label={statusPO === "cancel" ? "Cancel" : statusPO === "approve" ? "Approve" : "Mark as Ordered"}
+                    label={statusPO === "cancel" ? "Confirm" : statusPO === "approve" ? "Approve" : "Mark as Ordered"}
                     loading={loading}
                     onCancel={handleCloseModal}
                     onSubmit={handleConfirmApprove}

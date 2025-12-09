@@ -266,7 +266,7 @@ export default function Dashboard({
                     <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
                         <button
-                             onClick={refreshDashboard}
+                            onClick={refreshDashboard}
                             className="btn btn-sm btn-link"
                             disabled={refreshing}
                         >
@@ -381,17 +381,17 @@ export default function Dashboard({
                                                 }
                                                 sx={{ minWidth: 100 }}
                                             >
-                                                {['January', 'February', 'March', 'April', 'May', 'June', 
-                                                  'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
-                                                    <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
-                                                        {m}
-                                                    </MenuItem>
-                                                ))}
+                                                {['January', 'February', 'March', 'April', 'May', 'June',
+                                                    'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
+                                                        <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
+                                                            {m}
+                                                        </MenuItem>
+                                                    ))}
                                             </Select>
                                         </FormControl>
                                     </Box>
                                 </Box>
-                                <Box>
+                                <Box sx={{ width: '100%', overflowX: 'auto' }}>
                                     {/* 🔹 Chart */}
                                     <LineChart
                                         xAxis={[
@@ -413,8 +413,8 @@ export default function Dashboard({
                                                 color: "#0b84ff",
                                             },
                                         ]}
-                                        width={800}
                                         height={400}
+                                        sx={{ width: '100%', minWidth: 300 }}
                                     />
                                 </Box>
                             </div>
@@ -460,17 +460,17 @@ export default function Dashboard({
                                             }
                                             sx={{ minWidth: 120 }}
                                         >
-                                            {['January', 'February', 'March', 'April', 'May', 'June', 
-                                              'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
-                                                <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
-                                                    {m}
-                                                </MenuItem>
-                                            ))}
+                                            {['January', 'February', 'March', 'April', 'May', 'June',
+                                                'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
+                                                    <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
+                                                        {m}
+                                                    </MenuItem>
+                                                ))}
                                         </Select>
                                     </FormControl>
                                 </Box>
                             </Box>
-                            <Box>
+                            <Box sx={{ width: '100%', overflowX: 'auto' }}>
 
                                 {/* 🔹 Stacked Bar Chart - Sales vs Net Income */}
                                 <BarChart
@@ -501,14 +501,14 @@ export default function Dashboard({
                                             stack: 'total',
                                         },
                                     ]}
-                                    width={800}
                                     height={400}
+                                    sx={{ width: '100%', minWidth: 300 }}
                                 />
                             </Box>
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="row">
                     <div className="col-lg-4">
                         <div className="card">
@@ -621,7 +621,7 @@ export default function Dashboard({
                             </div>
                         </div>
                     </div>
-                   
+
                 </div>
             </section>
 
