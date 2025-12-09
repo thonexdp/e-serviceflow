@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Package, Phone, Mail, MapPin, Plus, CheckCircle, Clock, Printer, Truck } from 'lucide-react';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
@@ -8,6 +8,22 @@ export default function PrintShoppeLanding() {
     const [orderData, setOrderData] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState(null);
+    const [settings, setSettings] = useState(null);
+
+    // Fetch settings on component mount
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const response = await axios.get('/api/public/settings');
+                if (response.data.success) {
+                    setSettings(response.data.data);
+                }
+            } catch (err) {
+                console.error('Error fetching settings:', err);
+            }
+        };
+        fetchSettings();
+    }, []);
 
     const handleSearch = async () => {
         if (!trackingNumber.trim()) {
@@ -238,27 +254,44 @@ export default function PrintShoppeLanding() {
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Us</h3>
                             <div className="space-y-4">
-                                <div className="flex items-start gap-3">
-                                    <Phone className="w-5 h-5 text-indigo-600 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">Phone</p>
-                                        <p className="text-sm text-gray-600">+63 917 123 4567</p>
+                                {settings?.contact?.phone && (
+                                    <div className="flex items-start gap-3">
+                                        <Phone className="w-5 h-5 text-indigo-600 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">Phone</p>
+                                            <p className="text-sm text-gray-600">{settings.contact.phone}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-start gap-3">
-                                    <Mail className="w-5 h-5 text-indigo-600 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">Email</p>
-                                        <p className="text-sm text-gray-600">info@rcprintshoppe.com</p>
+                                )}
+                                {settings?.contact?.email && (
+                                    <div className="flex items-start gap-3">
+                                        <Mail className="w-5 h-5 text-indigo-600 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">Email</p>
+                                            <p className="text-sm text-gray-600">{settings.contact.email}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-start gap-3">
-                                    <MapPin className="w-5 h-5 text-indigo-600 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">Address</p>
-                                        <p className="text-sm text-gray-600">Paranaque City, Metro Manila, Philippines</p>
+                                )}
+                                {settings?.contact?.facebook && (
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-5 h-5 text-indigo-600 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">Facebook</p>
+                                            <p className="text-sm text-gray-600">{settings.contact.facebook}</p>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+                                {settings?.contact?.address && (
+                                    <div className="flex items-start gap-3">
+                                        <MapPin className="w-5 h-5 text-indigo-600 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">Address</p>
+                                            <p className="text-sm text-gray-600">{settings.contact.address}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <button disabled={true} className="w-full mt-4 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm">
                                 Send us a message
@@ -266,23 +299,46 @@ export default function PrintShoppeLanding() {
                         </div>
 
                         {/* Business Hours */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Business Hours</h3>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Monday - Friday</span>
-                                    <span className="font-medium text-gray-900">8AM - 6PM</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Saturday</span>
-                                    <span className="font-medium text-gray-900">9AM - 3PM</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Sunday</span>
-                                    <span className="font-medium text-gray-900">Closed</span>
+                        {settings?.business_hours && (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-3">Business Hours</h3>
+                                <div className="space-y-2 text-sm">
+                                    {settings.business_hours.monday_friday && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Monday - Friday</span>
+                                            <span className="font-medium text-gray-900">{settings.business_hours.monday_friday}</span>
+                                        </div>
+                                    )}
+                                    {settings.business_hours.saturday && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Saturday</span>
+                                            <span className="font-medium text-gray-900">{settings.business_hours.saturday}</span>
+                                        </div>
+                                    )}
+                                    {settings.business_hours.sunday && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Sunday</span>
+                                            <span className="font-medium text-gray-900">{settings.business_hours.sunday}</span>
+                                        </div>
+                                    )}
+                                    {/* Support for additional dynamic days */}
+                                    {Object.entries(settings.business_hours).map(([key, value]) => {
+                                        if (!['monday_friday', 'saturday', 'sunday'].includes(key) && value) {
+                                            const dayLabel = key.split('_').map(word => 
+                                                word.charAt(0).toUpperCase() + word.slice(1)
+                                            ).join(' ');
+                                            return (
+                                                <div key={key} className="flex justify-between">
+                                                    <span className="text-gray-600">{dayLabel}</span>
+                                                    <span className="font-medium text-gray-900">{value}</span>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })}
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>

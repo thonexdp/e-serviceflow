@@ -17,6 +17,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicTicketController;
 use App\Http\Controllers\PublicOrderController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SettingsController;
 use App\Models\JobCategory;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -43,186 +44,6 @@ Route::get('/', function () {
     // TODO: Implement customer-facing homepage
     return Inertia::render('Public/Home');
 })->name('home');
-
-// Debug route - Nice UI page (TEMPORARY - REMOVE IN PRODUCTION!)
-Route::get('/test-env', function () {
-    $serverEnv = [
-        'APP_ENV' => env('APP_ENV'),
-        'APP_DEBUG' => env('APP_DEBUG'),
-        'APP_URL' => env('APP_URL'),
-        'BROADCAST_DRIVER' => env('BROADCAST_DRIVER'),
-        'PUSHER_APP_ID' => env('PUSHER_APP_ID'),
-        'PUSHER_APP_KEY' => env('PUSHER_APP_KEY'),
-        'PUSHER_APP_SECRET' => substr(env('PUSHER_APP_SECRET', 'not-set'), 0, 5) . '***', // Partially hide secret
-        'PUSHER_HOST' => env('PUSHER_HOST'),
-        'PUSHER_PORT' => env('PUSHER_PORT'),
-        'PUSHER_SCHEME' => env('PUSHER_SCHEME'),
-        'PUSHER_APP_CLUSTER' => env('PUSHER_APP_CLUSTER'),
-    ];
-
-    $broadcastingConfig = [
-        'default' => config('broadcasting.default'),
-        'connections.pusher.key' => config('broadcasting.connections.pusher.key'),
-        'connections.pusher.secret' => substr(config('broadcasting.connections.pusher.secret', 'not-set'), 0, 5) . '***',
-        'connections.pusher.app_id' => config('broadcasting.connections.pusher.app_id'),
-        'connections.pusher.options.host' => config('broadcasting.connections.pusher.options.host'),
-        'connections.pusher.options.port' => config('broadcasting.connections.pusher.options.port'),
-        'connections.pusher.options.scheme' => config('broadcasting.connections.pusher.options.scheme'),
-        'connections.pusher.options.cluster' => config('broadcasting.connections.pusher.options.cluster'),
-    ];
-
-    return Inertia::render('Debug/EnvTest', [
-        'serverEnv' => $serverEnv,
-        'broadcastingConfig' => $broadcastingConfig,
-    ]);
-});
-
-// Debug route - Simple JSON response (TEMPORARY - REMOVE IN PRODUCTION!)
-Route::get('/test-env-json', function () {
-    $data = [
-        'server_env' => [
-            'APP_ENV' => env('APP_ENV'),
-            'APP_DEBUG' => env('APP_DEBUG'),
-            'APP_URL' => env('APP_URL'),
-            'BROADCAST_DRIVER' => env('BROADCAST_DRIVER'),
-            'PUSHER_APP_ID' => env('PUSHER_APP_ID'),
-            'PUSHER_APP_KEY' => env('PUSHER_APP_KEY'),
-            'PUSHER_APP_SECRET' => substr(env('PUSHER_APP_SECRET', 'not-set'), 0, 5) . '***',
-            'PUSHER_HOST' => env('PUSHER_HOST'),
-            'PUSHER_PORT' => env('PUSHER_PORT'),
-            'PUSHER_SCHEME' => env('PUSHER_SCHEME'),
-            'PUSHER_APP_CLUSTER' => env('PUSHER_APP_CLUSTER'),
-        ],
-        'broadcasting_config' => [
-            'default' => config('broadcasting.default'),
-            'pusher_key' => config('broadcasting.connections.pusher.key'),
-            'pusher_secret' => substr(config('broadcasting.connections.pusher.secret', 'not-set'), 0, 5) . '***',
-            'pusher_app_id' => config('broadcasting.connections.pusher.app_id'),
-            'pusher_host' => config('broadcasting.connections.pusher.options.host'),
-            'pusher_port' => config('broadcasting.connections.pusher.options.port'),
-            'pusher_scheme' => config('broadcasting.connections.pusher.options.scheme'),
-            'pusher_cluster' => config('broadcasting.connections.pusher.options.cluster'),
-        ],
-        'all_env_pusher' => [
-            'VITE_PUSHER_APP_KEY' => env('VITE_PUSHER_APP_KEY'),
-            'VITE_PUSHER_HOST' => env('VITE_PUSHER_HOST'),
-            'VITE_PUSHER_PORT' => env('VITE_PUSHER_PORT'),
-            'VITE_PUSHER_SCHEME' => env('VITE_PUSHER_SCHEME'),
-            'VITE_PUSHER_APP_CLUSTER' => env('VITE_PUSHER_APP_CLUSTER'),
-        ],
-    ];
-
-    return response()->json($data, 200, [], JSON_PRETTY_PRINT);
-});
-
-// Debug route - File Storage Configuration (TEMPORARY - REMOVE IN PRODUCTION!)
-Route::get('/test-storage', function () {
-    try {
-        $storageInfo = [
-            'environment_variables' => [
-                'FILESYSTEM_DISK' => env('FILESYSTEM_DISK', 'NOT SET'),
-                'GOOGLE_CLOUD_STORAGE_BUCKET' => env('GOOGLE_CLOUD_STORAGE_BUCKET', 'NOT SET'),
-                'GOOGLE_CLOUD_PROJECT_ID' => env('GOOGLE_CLOUD_PROJECT_ID', 'NOT SET'),
-                'GCP_PROJECT_ID' => env('GCP_PROJECT_ID', 'NOT SET'),
-            ],
-            'config_values' => [
-                'default_disk' => config('filesystems.default'),
-                'gcs_driver' => config('filesystems.disks.gcs.driver'),
-                'gcs_project_id' => config('filesystems.disks.gcs.project_id'),
-                'gcs_bucket' => config('filesystems.disks.gcs.bucket'),
-            ],
-            'disk_availability' => [
-                'local_exists' => array_key_exists('local', config('filesystems.disks')),
-                'public_exists' => array_key_exists('public', config('filesystems.disks')),
-                'gcs_exists' => array_key_exists('gcs', config('filesystems.disks')),
-            ],
-        ];
-
-        // Try to test the default disk
-        try {
-            $defaultDisk = \Illuminate\Support\Facades\Storage::getDefaultDriver();
-            $storageInfo['test_results']['default_disk'] = $defaultDisk;
-
-            // Try to create a test file
-            $testContent = 'Test file created at ' . now()->toDateTimeString();
-            $testPath = 'test-' . time() . '.txt';
-
-            \Illuminate\Support\Facades\Storage::put($testPath, $testContent);
-            $storageInfo['test_results']['file_created'] = 'SUCCESS';
-            $storageInfo['test_results']['file_path'] = $testPath;
-
-            // Check if file exists
-            if (\Illuminate\Support\Facades\Storage::exists($testPath)) {
-                $storageInfo['test_results']['file_exists'] = 'YES';
-
-                // Get file URL
-                try {
-                    $url = \Illuminate\Support\Facades\Storage::url($testPath);
-                    $storageInfo['test_results']['file_url'] = $url;
-                } catch (\Exception $e) {
-                    $storageInfo['test_results']['file_url'] = 'ERROR: ' . $e->getMessage();
-                }
-
-                // Delete test file
-                \Illuminate\Support\Facades\Storage::delete($testPath);
-                $storageInfo['test_results']['file_deleted'] = 'SUCCESS';
-            } else {
-                $storageInfo['test_results']['file_exists'] = 'NO - UPLOAD FAILED!';
-            }
-        } catch (\Exception $e) {
-            $storageInfo['test_results']['error'] = $e->getMessage();
-            $storageInfo['test_results']['trace'] = $e->getTraceAsString();
-        }
-
-        return response()->json($storageInfo, 200, [], JSON_PRETTY_PRINT);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => 'Failed to test storage',
-            'message' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ], 500, [], JSON_PRETTY_PRINT);
-    }
-});
-
-// Debug route to test database connection
-Route::get('/testdb', function () {
-    try {
-        $dbConfig = [
-            'DB_CONNECTION' => config('database.default'),
-            'DB_HOST' => config('database.connections.mysql.host'),
-            'DB_PORT' => config('database.connections.mysql.port'),
-            'DB_DATABASE' => config('database.connections.mysql.database'),
-            'DB_USERNAME' => config('database.connections.mysql.username'),
-            'DB_SOCKET' => config('database.connections.mysql.unix_socket'),
-            'APP_ENV' => config('app.env'),
-        ];
-
-        // Test connection
-        \DB::connection()->getPdo();
-        $tables = \DB::select('SHOW TABLES');
-
-        // Get users if table exists
-        $users = [];
-        try {
-            $users = \DB::table('users')->select('id', 'name', 'email', 'role', 'created_at')->get();
-        } catch (\Exception $e) {
-            $users = ['error' => 'Users table not found or empty'];
-        }
-
-        return response()->json([
-            'status' => 'Connected successfully!',
-            'config' => $dbConfig,
-            'tables' => $tables,
-            'users' => $users,
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'Connection failed',
-            'error' => $e->getMessage(),
-            'config' => $dbConfig ?? [],
-        ], 500);
-    }
-});
 
 // Order tracking (public)
 Route::get('/track', function () {
@@ -335,9 +156,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/reports/export-pdf', [App\Http\Controllers\ReportsController::class, 'exportPdf'])->name('reports.export-pdf');
 
     // Settings
-    Route::get('/settings', function () {
-        return Inertia::render('Settings');
-    })->name('settings');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+    Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
