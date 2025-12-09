@@ -52,7 +52,7 @@ class MockupsController extends Controller
             }
         }
 
-        $tickets = $query->latest()->paginate($request->get('per_page', 15));
+        $tickets = $query->latest('updated_at')->paginate($request->get('per_page', 15));
 
         return Inertia::render('Mock-ups', [
             'tickets' => $tickets,

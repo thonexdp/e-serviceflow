@@ -102,9 +102,19 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
     };
 
     const TicketCard = ({ ticket }) => {
-        const progress = getProgressPercentage(ticket);
+        // Calculate progress based on quantity, not workflow step
+        const totalQty = ticket.total_quantity || (ticket.quantity || 0) + (ticket.free_quantity || 0);
+        const currentQty = ticket.produced_quantity || 0;
+        const quantityProgress = totalQty > 0 ? Math.round((currentQty / totalQty) * 100) : 0;
+        
         const isOverdue = ticket.due_date && new Date(ticket.due_date) < new Date() && ticket.status !== 'completed';
         const isHighlighted = highlightedTickets.has(ticket.id);
+        
+        // Get current workflow step label
+        const currentStep = ticket.current_workflow_step;
+        const stepLabel = currentStep 
+            ? WORKFLOW_STEPS.find(s => s.key === currentStep)?.label || currentStep
+            : ticket.status === 'completed' ? 'Completed' : 'Not Started';
 
         return (
             <div
@@ -139,9 +149,28 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                     <p className="mb-1 text-muted" style={{ fontSize: isFullscreen ? '0.9rem' : '0.75rem' }}>
                         {ticket.description || ticket.job_type?.name || 'N/A'}
                     </p>
+                    
+                    {/* Assigned User */}
+                    {ticket.assigned_to_user && (
+                        <div className="mb-1">
+                            <small className="text-info" style={{ fontSize: isFullscreen ? '0.85rem' : '0.75rem' }}>
+                                <i className="ti-user mr-1"></i>
+                                <strong>{ticket.assigned_to_user.name}</strong>
+                            </small>
+                        </div>
+                    )}
+                    
+                    {/* Workflow Status
+                    <div className="mb-1">
+                        <small className={ticket.status === 'completed' ? "badge badge-success" : "badge badge-info"} style={{ fontSize: isFullscreen ? '0.85rem' : '0.75rem' }}>
+                            <i className={ticket.status === 'completed' ? "ti-check mr-1" : "ti-layout-list-thumb mr-1"}></i>
+                            {stepLabel}
+                        </small>
+                    </div> */}
+                    
                     <div className="d-flex justify-content-between align-items-center mb-1">
                         <small className="text-muted" style={{ fontSize: isFullscreen ? '0.85rem' : '0.75rem' }}>
-                            <i className="ti-package"></i> {ticket.produced_quantity || 0}/{ticket.total_quantity || ticket.quantity}
+                            <i className="ti-package"></i> {currentQty}/{totalQty}
                         </small>
                         <small className="text-muted" style={{ fontSize: isFullscreen ? '0.85rem' : '0.75rem' }}>
                             {ticket.due_date ? new Date(ticket.due_date).toLocaleDateString() : 'No due date'}
@@ -149,15 +178,17 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                     </div>
                     <div className="progress" style={{ height: isFullscreen ? '6px' : '4px' }}>
                         <div
-                            className="progress-bar"
+                            className={`progress-bar ${quantityProgress >= 100 ? 'bg-success' : isOverdue ? 'bg-danger' : 'bg-warning'}`}
                             role="progressbar"
                             style={{
-                                width: `${progress}%`,
-                                backgroundColor: isOverdue ? '#F44336' : '#4CAF50',
+                                width: `${Math.min(quantityProgress, 100)}%`,
                                 transition: 'width 0.5s ease'
                             }}
                         ></div>
                     </div>
+                    <small className="text-muted d-block mt-1" style={{ fontSize: isFullscreen ? '0.8rem' : '0.7rem' }}>
+                        {quantityProgress}% Complete
+                    </small>
                 </div>
             </div>
         );

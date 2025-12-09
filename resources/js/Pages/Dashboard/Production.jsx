@@ -29,6 +29,56 @@ export default function Productions({
     const [loading, setLoading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const { flash, auth } = usePage().props;
+    const isAdmin = auth?.user?.role === 'admin';
+    const assignedWorkflowSteps = auth?.user?.workflow_steps || [];
+
+    // Check if user can update this ticket
+    const canUpdateTicket = (ticket) => {
+        if (isAdmin) return true;
+        if (!auth?.user?.is_production) return false;
+        
+        // If no workflow steps assigned, cannot update
+        if (!assignedWorkflowSteps || assignedWorkflowSteps.length === 0) {
+            return false;
+        }
+        
+        // For ready_to_print, check if user is assigned to first workflow step
+        if (ticket.status === 'ready_to_print') {
+            // Get first workflow step from ticket's job type
+            if (ticket.job_type?.workflow_steps) {
+                const workflowOrder = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
+                for (const step of workflowOrder) {
+                    if (ticket.job_type.workflow_steps[step]) {
+                        const canUpdate = assignedWorkflowSteps.includes(step);
+                        if (!canUpdate) {
+                            console.log('Ready to print - User not assigned to first step:', {
+                                firstStep: step,
+                                assignedSteps: assignedWorkflowSteps,
+                                ticket: ticket.ticket_number
+                            });
+                        }
+                        return canUpdate;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // For in_production, check if user is assigned to current workflow step
+        if (ticket.current_workflow_step) {
+            const canUpdate = assignedWorkflowSteps.includes(ticket.current_workflow_step);
+            if (!canUpdate) {
+                console.log('In production - User not assigned to current step:', {
+                    currentStep: ticket.current_workflow_step,
+                    assignedSteps: assignedWorkflowSteps,
+                    ticket: ticket.ticket_number
+                });
+            }
+            return canUpdate;
+        }
+        
+        return false;
+    };
 
     // Calculate summary statistics from tickets data
     const calculateSummary = () => {
@@ -401,6 +451,8 @@ export default function Productions({
     };
 
     const getActionButton = (ticket) => {
+        const canUpdate = canUpdateTicket(ticket);
+        
         if (ticket.status === "ready_to_print") {
             return (
                 <div className="btn-group">
@@ -415,7 +467,8 @@ export default function Productions({
                         type="button"
                         className="btn btn-link btn-sm text-green-500"
                         onClick={() => handleStartProduction(ticket.id)}
-                        disabled={loading}
+                        disabled={loading || !canUpdate}
+                        title={!canUpdate ? "You are not assigned to this workflow step" : ""}
                     >
                         <i className="ti-play"></i> Start
                     </button>
@@ -428,10 +481,12 @@ export default function Productions({
                         type="button"
                         className="btn btn-link btn-sm text-blue-500"
                         onClick={() => handleUpdate(ticket)}
+                        disabled={!canUpdate}
+                        title={!canUpdate ? "You are not assigned to this workflow step" : ""}
                     >
                         <i className="ti-pencil"></i> Update
                     </button>
-                    {ticket.produced_quantity >= ticket.quantity && (
+                    {ticket.produced_quantity >= ticket.quantity && canUpdate && (
                         <button
                             type="button"
                             className="btn btn-link btn-sm text-success"
@@ -440,6 +495,11 @@ export default function Productions({
                         >
                             <i className="ti-check"></i> Complete
                         </button>
+                    )}
+                    {!canUpdate && (
+                        <span className="text-muted small">
+                            <i className="ti-lock"></i> Not your turn
+                        </span>
                     )}
                 </div>
             );
@@ -479,44 +539,80 @@ export default function Productions({
         { label: "Ticket ID", key: "ticket_number" },
         { label: "Description", key: "description" },
         {
-            label: "Employee/Team",
-            key: "employee",
+            label: "Assigned To",
+            key: "assigned_to",
             render: (row) => {
-                // Check if employee/team data exists, otherwise show placeholder
-                const employeeName =
-                    row.assigned_to?.name ||
-                    row.employee?.name ||
-                    row.team?.name ||
-                    "Unassigned";
-                const teamName = row.team?.name || row.employee?.team || "";
-                return (
-                    <div>
-                        <div className="font-weight-bold">{employeeName}</div>
-                        {teamName && (
-                            <small className="text-muted">{teamName}</small>
-                        )}
-                    </div>
-                );
+                if (row.assigned_to_user) {
+                    const isAssignedToMe = row.assigned_to_user_id === auth?.user?.id;
+                    return (
+                        <span className={isAssignedToMe ? "text-success font-weight-bold" : "text-info"}>
+                            <i className="ti-user mr-1"></i>
+                            {row.assigned_to_user.name}
+                            {isAssignedToMe && <small className="ml-1">(You)</small>}
+                        </span>
+                    );
+                }
+                return <span className="text-muted">Unassigned</span>;
             },
         },
         {
-            label: "Quantity",
+            label: "Quantity / Workflow",
             key: "quantity",
-            render: (row) => (
-                <span>
-                    <b
-                        className={
-                            row.produced_quantity >= row.quantity
-                                ? "text-success"
-                                : "text-warning"
+            render: (row) => {
+                const isCompleted = row.status === 'completed';
+                const currentStep = row.current_workflow_step;
+                let stepLabel = 'Not Started';
+                let stepQuantity = 0;
+                let totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
+                
+                if (isCompleted) {
+                    // If ticket is completed, show completed status and 100% quantity
+                    stepLabel = 'Completed';
+                    stepQuantity = totalQty; // Always show 100% when completed
+                } else if (currentStep) {
+                    const WORKFLOW_STEPS = [
+                        { key: 'design', label: 'Design' },
+                        { key: 'printing', label: 'Printing' },
+                        { key: 'lamination_heatpress', label: 'Lamination/Heatpress' },
+                        { key: 'cutting', label: 'Cutting' },
+                        { key: 'sewing', label: 'Sewing' },
+                        { key: 'dtf_press', label: 'DTF Press' },
+                    ];
+                    stepLabel = WORKFLOW_STEPS.find(s => s.key === currentStep)?.label || currentStep;
+                    
+                    // Get quantity for current workflow step from workflow progress
+                    if (row.workflow_progress) {
+                        const stepProgress = row.workflow_progress.find(wp => wp.workflow_step === currentStep);
+                        if (stepProgress) {
+                            stepQuantity = stepProgress.completed_quantity || 0;
                         }
-                    >
-                        {row.produced_quantity || 0}
-                    </b>
-                    {" / "}
-                    <b>{row.quantity}</b>
-                </span>
-            ),
+                    } else {
+                        // Fallback to ticket's produced_quantity if no workflow progress
+                        stepQuantity = row.produced_quantity || 0;
+                    }
+                } else {
+                    // No current step, use produced_quantity
+                    stepQuantity = row.produced_quantity || 0;
+                }
+                
+                return (
+                    <div>
+                        <span>
+                            <b className={stepQuantity >= totalQty ? "text-success" : "text-warning"}>
+                                {stepQuantity}
+                            </b>
+                            {" / "}
+                            <b>{totalQty}</b>
+                        </span>
+                        <div className="mt-1">
+                            <small className={isCompleted ? "badge badge-success" : "badge badge-info"}>
+                                <i className={isCompleted ? "ti-check mr-1" : "ti-layout-list-thumb mr-1"}></i>
+                                {stepLabel}
+                            </small>
+                        </div>
+                    </div>
+                );
+            },
         },
         {
             label: "Status",

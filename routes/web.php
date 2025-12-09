@@ -79,12 +79,12 @@ Route::get('/orders', function () {
 })->name('orders');
 
 
-// // Notifications
-// Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-// Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
-// Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
-// Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
-// Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+// Notifications
+Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
 Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->group(function () {
     // Admin Dashboard
@@ -173,6 +173,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     Route::get('/permissions', [UserController::class, 'getPermissions'])->name('permissions.index');
     Route::get('/users/{user}/permissions', [UserController::class, 'getUserPermissions'])->name('users.permissions');
+    Route::get('/users/{user}/activity-logs', [UserController::class, 'getActivityLogs'])->name('users.activity-logs');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -266,6 +267,8 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     Route::post('/queue/{id}/update', [ProductionQueueController::class, 'updateProgress'])->name('queue.update');
     Route::post('/queue/{id}/complete', [ProductionQueueController::class, 'markCompleted'])->name('queue.complete');
     Route::post('/queue/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->name('queue.record-stock');
+    Route::post('/queue/{id}/claim', [ProductionQueueController::class, 'claimTicket'])->name('queue.claim');
+    Route::post('/queue/{id}/release', [ProductionQueueController::class, 'releaseTicket'])->name('queue.release');
 
     // Inventory (View for stock consumption)
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
