@@ -6,10 +6,14 @@ use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketFile;
 use App\Models\JobType;
+use App\Models\User;
+use App\Models\Notification;
+use App\Events\UserNotification;
 use App\Services\PaymentRecorder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class PublicOrderController extends Controller
 {
@@ -154,6 +158,69 @@ class PublicOrderController extends Controller
                 ],
                 $request->file('payment_proofs', [])
             );
+        }
+
+        // Notify all FrontDesk users about the new order
+        try {
+            // Get all active frontdesk users
+            $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
+                ->where('is_active', true)
+                ->get();
+
+            if ($frontDeskUsers->isNotEmpty()) {
+                $customerName = $ticket->customer->full_name ?? 'Unknown Customer';
+                $ticketNumber = $ticket->ticket_number;
+
+                // Create notification title and message
+                $notificationTitle = 'New Order from Customer';
+                $notificationMessage = "{$customerName} has created a new order ({$ticketNumber})";
+
+                // Store notification in database for each frontdesk user
+                foreach ($frontDeskUsers as $user) {
+                    Notification::create([
+                        'user_id' => $user->id,
+                        'type' => 'order_created',
+                        'notifiable_id' => $ticket->id,
+                        'notifiable_type' => Ticket::class,
+                        'title' => $notificationTitle,
+                        'message' => $notificationMessage,
+                        'read' => false,
+                        'data' => [
+                            'ticket_id' => $ticket->id,
+                            'ticket_number' => $ticketNumber,
+                            'customer_name' => $customerName,
+                            'total_amount' => $ticket->total_amount,
+                        ],
+                    ]);
+                }
+
+                // Broadcast real-time notification
+                $userIds = $frontDeskUsers->pluck('id')->toArray();
+                event(new UserNotification(
+                    $notificationTitle,
+                    $notificationMessage,
+                    'info',
+                    $userIds,
+                    [
+                        'ticket_id' => $ticket->id,
+                        'ticket_number' => $ticketNumber,
+                        'customer_name' => $customerName,
+                        'total_amount' => $ticket->total_amount,
+                        'url' => route('tickets.index', ['search' => $ticketNumber]),
+                    ]
+                ));
+
+                Log::info('Notification sent to frontdesk users', [
+                    'ticket_id' => $ticket->id,
+                    'frontdesk_users_count' => $frontDeskUsers->count(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Log error but don't fail the order creation
+            Log::error('Failed to send notification to frontdesk users', [
+                'ticket_id' => $ticket->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return response()->json([

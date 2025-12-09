@@ -35,6 +35,19 @@ export default function CustomerPOSOrder() {
     const [submittedTicket, setSubmittedTicket] = useState(null);
     const [settings, setSettings] = useState(null);
     const [qrcodeError, setQrcodeError] = useState(false);
+    const [savedCustomers, setSavedCustomers] = useState([]);
+
+    // Load saved customers from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('rc_printshop_customers');
+        if (saved) {
+            try {
+                setSavedCustomers(JSON.parse(saved));
+            } catch (e) {
+                console.error('Error loading saved customers:', e);
+            }
+        }
+    }, []);
 
     // Fetch settings on component mount
     useEffect(() => {
@@ -195,6 +208,37 @@ export default function CustomerPOSOrder() {
         });
     };
 
+    // Save customer to localStorage
+    const saveCustomerToLocal = (customerData) => {
+        try {
+            const customers = savedCustomers.filter(c => c.email !== customerData.email);
+            customers.unshift(customerData); // Add to beginning
+            const limited = customers.slice(0, 20); // Keep only last 20 emails
+            setSavedCustomers(limited);
+            localStorage.setItem('rc_printshop_customers', JSON.stringify(limited));
+        } catch (e) {
+            console.error('Error saving customer:', e);
+        }
+    };
+
+    // Handle email change and autofill
+    const handleEmailChange = (e) => {
+        const email = e.target.value;
+        setFormData(prev => ({ ...prev, customer_email: email }));
+
+        // Check if this email exists in saved customers
+        const savedCustomer = savedCustomers.find(c => c.email === email);
+        if (savedCustomer) {
+            setFormData(prev => ({
+                ...prev,
+                customer_email: email,
+                customer_name: savedCustomer.name || prev.customer_name,
+                customer_phone: savedCustomer.phone || prev.customer_phone,
+                customer_facebook: savedCustomer.facebook || prev.customer_facebook,
+            }));
+        }
+    };
+
     const findOrCreateCustomer = async () => {
         try {
             const response = await fetch('/api/public/orders/customer/find-or-create', {
@@ -214,6 +258,14 @@ export default function CustomerPOSOrder() {
             const data = await response.json();
 
             if (data.success && data.customer) {
+                // Save customer info to localStorage for future use
+                saveCustomerToLocal({
+                    email: formData.customer_email,
+                    name: formData.customer_name,
+                    phone: formData.customer_phone,
+                    facebook: formData.customer_facebook,
+                });
+
                 setFormData(prev => ({ ...prev, customer_id: data.customer.id }));
                 return data.customer.id;
             } else {
@@ -377,10 +429,22 @@ export default function CustomerPOSOrder() {
                                 <input
                                     type="email"
                                     value={formData.customer_email}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
+                                    onChange={handleEmailChange}
+                                    list="email-suggestions"
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                     placeholder="juan@example.com"
+                                    autoComplete="email"
                                 />
+                                <datalist id="email-suggestions">
+                                    {savedCustomers.map((customer, index) => (
+                                        <option key={index} value={customer.email}>
+                                            {customer.name}
+                                        </option>
+                                    ))}
+                                </datalist>
+                                {savedCustomers.length > 0 && formData.customer_email === '' && (
+                                    <p className="text-xs text-gray-500 mt-1">💡 Previously used emails will appear as you type</p>
+                                )}
                             </div>
 
                             <div>
@@ -399,6 +463,7 @@ export default function CustomerPOSOrder() {
                                 <input
                                     type="tel"
                                     value={formData.customer_phone}
+                                    maxLength={11}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                     placeholder="09XX XXX XXXX"
@@ -846,9 +911,9 @@ export default function CustomerPOSOrder() {
                                                 <p className="text-sm font-medium text-green-800 mb-2">QR Code:</p>
                                                 <div className="bg-white p-4 rounded border border-green-300 inline-block">
                                                     {!qrcodeError ? (
-                                                        <img 
-                                                            src={settings.payment.gcash.qrcode} 
-                                                            alt="GCash QR Code" 
+                                                        <img
+                                                            src={settings.payment.gcash.qrcode}
+                                                            alt="GCash QR Code"
                                                             className="w-32 h-32 object-contain"
                                                             onError={() => setQrcodeError(true)}
                                                         />
@@ -970,7 +1035,7 @@ export default function CustomerPOSOrder() {
                     <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
                         <div className="text-center mb-8">
                             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-20 h-20 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
