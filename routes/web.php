@@ -240,9 +240,9 @@ Route::prefix('designer')->middleware(['auth', 'role:admin,Designer'])->name('de
     Route::post('/mock-ups/{id}/revision', [MockupsController::class, 'requestRevision'])->name('mockups.revision');
     Route::get('/mock-ups/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('mockups.download');
 
-    // Tickets (View-only for context)
-    Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
-    Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
+    // // Tickets (View-only for context)
+    // Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
+    // Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -334,5 +334,23 @@ Route::get('/dashboard', function () {
 Route::get('/tracking', function () {
     return redirect()->route('track');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Error Page Test Routes (Remove in Production)
+|--------------------------------------------------------------------------
+| These routes allow you to test the custom error pages during development.
+| Comment out or remove these routes before deploying to production.
+*/
+
+if (config('app.debug')) {
+    Route::get('/test-error-401', fn() => abort(401))->name('test.error.401');
+    Route::get('/test-error-403', fn() => abort(403))->name('test.error.403');
+    Route::get('/test-error-404', fn() => abort(404))->name('test.error.404');
+    Route::get('/test-error-419', fn() => abort(419))->name('test.error.419');
+    Route::get('/test-error-429', fn() => abort(429))->name('test.error.429');
+    Route::get('/test-error-500', fn() => abort(500))->name('test.error.500');
+    Route::get('/test-error-503', fn() => abort(503))->name('test.error.503');
+}
 
 require __DIR__ . '/auth.php';

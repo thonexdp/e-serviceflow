@@ -27,4 +27,52 @@ class Handler extends ExceptionHandler
             //
         });
     }
+
+    /**
+     * Render an exception into an HTTP response.
+     */
+    public function render($request, Throwable $e)
+    {
+        // For API routes, always return JSON
+        if ($request->is('api/*')) {
+            // Handle validation exceptions
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+
+            // Handle file upload errors (file too large, etc.)
+            if ($e instanceof \Illuminate\Http\Exceptions\PostTooLargeException) {
+                return response()->json([
+                    'message' => 'File upload failed',
+                    'errors' => [
+                        'file' => ['The uploaded file is too large. Maximum size is 10MB.']
+                    ]
+                ], 413);
+            }
+
+            // Handle other exceptions
+            return response()->json([
+                'message' => $e->getMessage() ?: 'An error occurred',
+                'errors' => [
+                    'general' => [$e->getMessage() ?: 'Server error occurred']
+                ]
+            ], 500);
+        }
+
+        // For web routes, use Inertia error pages
+        $response = parent::render($request, $e);
+        $status = $response->getStatusCode();
+
+        // Map status codes to Inertia error pages
+        if (in_array($status, [401, 403, 404, 419, 429, 500, 503]) && !$request->expectsJson()) {
+            return \Inertia\Inertia::render("Errors/{$status}")
+                ->toResponse($request)
+                ->setStatusCode($status);
+        }
+
+        return $response;
+    }
 }

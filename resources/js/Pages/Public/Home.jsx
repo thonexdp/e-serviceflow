@@ -40,7 +40,6 @@ export default function PrintShoppeLanding() {
                 ticket_number: trackingNumber.trim(),
             });
 
-            console.log(response.data);
 
             if (response.data.success) {
                 setOrderData(response.data.data);
@@ -294,7 +293,7 @@ export default function PrintShoppeLanding() {
                                     </div>
                                 )}
                             </div>
-                            <button disabled={true} className="w-full mt-4 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm">
+                            <button disabled={true} className="w-full mt-4 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-lg font-medium text-sm">
                                 Send us a message
                             </button>
                         </div>

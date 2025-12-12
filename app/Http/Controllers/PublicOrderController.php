@@ -8,7 +8,7 @@ use App\Models\TicketFile;
 use App\Models\JobType;
 use App\Models\User;
 use App\Models\Notification;
-use App\Events\UserNotification;
+use App\Events\TicketStatusChanged;
 use App\Services\PaymentRecorder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -75,6 +75,7 @@ class PublicOrderController extends Controller
      */
     public function storeOrder(Request $request)
     {
+
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'description' => 'required|string',
@@ -91,6 +92,7 @@ class PublicOrderController extends Controller
             'total_amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:walkin,gcash,bank',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
@@ -144,6 +146,22 @@ class PublicOrderController extends Controller
             ]);
         }
 
+        // Store any additional attachments (design files)
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments', []) as $attachment) {
+                if (!$attachment) {
+                    continue;
+                }
+                $storedPath = Storage::put('tickets/customer', $attachment);
+                TicketFile::create([
+                    'ticket_id' => $ticket->id,
+                    'file_name' => $attachment->getClientOriginalName(),
+                    'file_path' => $storedPath,
+                    'type' => 'customer',
+                ]);
+            }
+        }
+
         // Record initial payment if payment proofs are provided
         if ($request->hasFile('payment_proofs') && ($paymentMethod === 'gcash' || $paymentMethod === 'bank')) {
             $this->paymentRecorder->record(
@@ -194,20 +212,20 @@ class PublicOrderController extends Controller
                     ]);
                 }
 
-                // Broadcast real-time notification
+                // Broadcast real-time notification using TicketStatusChanged event
+                // Use a system user as the trigger (first frontdesk user or create a dummy user)
+                $systemUser = $frontDeskUsers->first();
                 $userIds = $frontDeskUsers->pluck('id')->toArray();
-                event(new UserNotification(
-                    $notificationTitle,
-                    $notificationMessage,
-                    'info',
+
+                event(new TicketStatusChanged(
+                    $ticket,
+                    'new',
+                    'pending',
+                    $systemUser, // Use first frontdesk user as the trigger
                     $userIds,
-                    [
-                        'ticket_id' => $ticket->id,
-                        'ticket_number' => $ticketNumber,
-                        'customer_name' => $customerName,
-                        'total_amount' => $ticket->total_amount,
-                        'url' => route('tickets.index', ['search' => $ticketNumber]),
-                    ]
+                    'order_created',
+                    $notificationTitle,
+                    $notificationMessage
                 ));
 
                 Log::info('Notification sent to frontdesk users', [

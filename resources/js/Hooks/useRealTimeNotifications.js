@@ -38,7 +38,6 @@ export default function useRealTimeNotifications() {
 
         // Listen for generic user notifications
         channel.listen('.user.notification', (data) => {
-            console.log('📬 Notification received:', data);
 
             // Add notification with unique ID
             const notification = {
@@ -56,7 +55,6 @@ export default function useRealTimeNotifications() {
 
         // Listen for ticket status changes
         channel.listen('.ticket.status.changed', (data) => {
-            console.log('🎫 Ticket status changed:', data);
 
             const notification = {
                 id: Date.now(),
@@ -76,7 +74,6 @@ export default function useRealTimeNotifications() {
 
         // Cleanup on unmount
         return () => {
-            console.log('Leaving user channel');
             window.Echo.leave(`user.${auth.user.id}`);
         };
     }, [auth?.user?.id]);

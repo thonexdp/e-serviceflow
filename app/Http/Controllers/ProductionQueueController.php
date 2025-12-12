@@ -7,6 +7,8 @@ use App\Services\StockManagementService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProductionQueueController extends Controller
 {
@@ -36,7 +38,7 @@ class ProductionQueueController extends Controller
     public function getData(Request $request)
     {
         $user = Auth::user();
-        
+
         $query = Ticket::with([
             'jobType.category',
             'jobType.stockRequirements.stockItem',
@@ -85,7 +87,7 @@ class ProductionQueueController extends Controller
         $currentPage = $request->get('page', 1);
         $total = $tickets->count();
         $tickets = $tickets->slice(($currentPage - 1) * $perPage, $perPage)->values();
-        
+
         // Create paginator manually
         $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
             $tickets,
@@ -201,7 +203,7 @@ class ProductionQueueController extends Controller
                     return redirect()->back()->with('error', 'You cannot update this ticket. It is currently in the "' . $stepLabel . '" step, which is not assigned to you.');
                 }
             }
-            
+
             // If user is trying to manually change workflow step, validate they're assigned to the new step
             if ($request->has('current_workflow_step') && $request->current_workflow_step) {
                 if ($request->current_workflow_step !== $ticket->current_workflow_step) {
@@ -221,7 +223,7 @@ class ProductionQueueController extends Controller
         }
 
         $maxQuantity = $ticket->total_quantity ?? $ticket->quantity;
-        
+
         $validated = $request->validate([
             'produced_quantity' => 'required|integer|min:0|max:' . $maxQuantity,
             'status' => 'nullable|string|in:in_production,completed',
@@ -240,13 +242,13 @@ class ProductionQueueController extends Controller
         $isNowCompleted = $newStatus === 'completed';
 
         try {
-            \DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted, $oldStatus, $user, $newWorkflowStep, $workflowStepChanged) {
+            DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted, $oldStatus, $user, $newWorkflowStep, $workflowStepChanged) {
                 // If workflow step changed, check if there's existing progress for the new step
                 if ($workflowStepChanged && $newWorkflowStep) {
                     $existingProgress = \App\Models\TicketWorkflowProgress::where('ticket_id', $ticket->id)
                         ->where('workflow_step', $newWorkflowStep)
                         ->first();
-                    
+
                     // If no record exists for the new step, reset quantity to 0
                     if (!$existingProgress) {
                         $validated['produced_quantity'] = 0;
@@ -324,8 +326,8 @@ class ProductionQueueController extends Controller
             }
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
-            \Log::error("Update progress failed for ticket {$id}: " . $e->getMessage());
-            \Log::error("Stack trace: " . $e->getTraceAsString());
+            Log::error("Update progress failed for ticket {$id}: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
 
             return redirect()->back()->with(
                 'warning',
@@ -347,7 +349,7 @@ class ProductionQueueController extends Controller
         $oldStatus = $ticket->status;
 
         try {
-            \DB::transaction(function () use ($ticket) {
+            DB::transaction(function () use ($ticket) {
                 // Update ticket status first
                 $ticket->update([
                     'status' => 'completed',
@@ -358,7 +360,7 @@ class ProductionQueueController extends Controller
                 $ticket->refresh();
 
                 // Automatically consume stock based on job type requirements
-                $consumptions = $this->stockService->autoConsumeStockForProduction($ticket);
+                $this->stockService->autoConsumeStockForProduction($ticket);
             });
 
             $message = 'Ticket marked as completed successfully.';
@@ -377,8 +379,8 @@ class ProductionQueueController extends Controller
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
             // If auto-consumption fails, still mark as completed but show warning
-            \Log::error("Auto-consumption failed for ticket {$id}: " . $e->getMessage());
-            \Log::error("Stack trace: " . $e->getTraceAsString());
+            Log::error("Auto-consumption failed for ticket {$id}: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
 
             return redirect()->back()->with(
                 'warning',
@@ -502,8 +504,8 @@ class ProductionQueueController extends Controller
                 $message
             ));
         } catch (\Exception $e) {
-            \Log::error("Error Notification: " . $e->getMessage());
-            \Log::error("Error trace: " . $e->getTraceAsString());
+            Log::error("Error Notification: " . $e->getMessage());
+            Log::error("Error trace: " . $e->getTraceAsString());
         }
     }
 
@@ -570,8 +572,8 @@ class ProductionQueueController extends Controller
                 $message
             ));
         } catch (\Exception $e) {
-            \Log::error("Error Production Update Notification: " . $e->getMessage());
-            \Log::error("Error trace: " . $e->getTraceAsString());
+            Log::error("Error Production Update Notification: " . $e->getMessage());
+            Log::error("Error trace: " . $e->getTraceAsString());
         }
     }
 
@@ -591,14 +593,14 @@ class ProductionQueueController extends Controller
         // Use total_quantity which includes free_quantity
         $maxQuantity = $ticket->total_quantity ?? (($ticket->quantity ?? 0) + ($ticket->free_quantity ?? 0));
         $progress->is_completed = $quantity >= $maxQuantity;
-        
+
         if ($progress->is_completed && !$progress->completed_at) {
             $progress->completed_at = now();
             $progress->completed_by = $user ? $user->id : null;
         }
 
         $progress->save();
-        
+
         return $progress;
     }
 
@@ -609,7 +611,7 @@ class ProductionQueueController extends Controller
     {
         try {
             $users = \App\Models\User::getUsersAssignedToWorkflowStep($nextWorkflowStep);
-            
+
             if ($users->isEmpty()) {
                 return;
             }
@@ -647,7 +649,7 @@ class ProductionQueueController extends Controller
                 $message
             ));
         } catch (\Exception $e) {
-            \Log::error("Error notifying next workflow step users: " . $e->getMessage());
+            Log::error("Error notifying next workflow step users: " . $e->getMessage());
         }
     }
 

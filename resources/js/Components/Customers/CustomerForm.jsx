@@ -71,7 +71,6 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel, json
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log(formData);
 
         if (!validateForm()) {
             return;

@@ -274,19 +274,19 @@ class ReportsController extends Controller
             // Expenses table doesn't exist
         }
 
-        // COGS estimation (can be refined with actual inventory tracking)
-        $estimatedCOGS = $revenue * 0.30;
+        // Calculate actual COGS from inventory consumption
+        $actualCOGS = $this->calculateActualCOGS($dates['start'], $dates['end']);
 
         // Net income calculation
-        $netIncome = $revenue - $discounts - $estimatedCOGS - $expenses;
-        $grossProfit = $revenue - $discounts - $estimatedCOGS;
+        $netIncome = $revenue - $discounts - $actualCOGS - $expenses;
+        $grossProfit = $revenue - $discounts - $actualCOGS;
         $grossMargin = $revenue > 0 ? (($grossProfit / $revenue) * 100) : 0;
         $netMargin = $revenue > 0 ? (($netIncome / $revenue) * 100) : 0;
 
         return [
             'revenue' => $revenue,
             'discounts' => $discounts,
-            'cogs' => $estimatedCOGS,
+            'cogs' => $actualCOGS,
             'gross_profit' => $grossProfit,
             'operating_expenses' => $expenses,
             'net_income' => $netIncome,
@@ -344,14 +344,17 @@ class ReportsController extends Controller
 
         $byJobType = $tickets->groupBy('job_type_id')->map(function ($items) {
             $totalRevenue = $items->sum('amount_paid');
-            $totalCost = $totalRevenue * 0.30; // Estimated COGS
+            // Calculate actual COGS for these tickets
+            $ticketIds = $items->pluck('id');
+            $totalCost = \App\Models\ProductionStockConsumption::whereIn('ticket_id', $ticketIds)
+                ->sum('total_cost') ?? 0;
             $profit = $totalRevenue - $totalCost;
             
             return [
                 'job_type' => $items->first()->jobType->name ?? 'Unknown',
                 'quantity' => $items->sum('quantity'),
                 'revenue' => $totalRevenue,
-                'estimated_cost' => $totalCost,
+                'actual_cost' => $totalCost,
                 'profit' => $profit,
                 'margin' => $totalRevenue > 0 ? (($profit / $totalRevenue) * 100) : 0,
             ];
@@ -602,6 +605,28 @@ class ReportsController extends Controller
                 'by_role' => $users->groupBy('role')->map->count(),
             ],
         ];
+    }
+
+    /**
+     * Calculate actual COGS from inventory consumption
+     * Handles both unit-based (mugs) and area-based (tarpaulin) items
+     */
+    private function calculateActualCOGS($startDate, $endDate)
+    {
+        try {
+            // Get all stock consumptions for tickets in the date range
+            // COGS is calculated when materials are consumed during production
+            $cogs = \App\Models\ProductionStockConsumption::whereHas('ticket', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('created_at', [$startDate, $endDate])
+                    ->where('status', '!=', 'cancelled');
+            })
+            ->sum('total_cost');
+
+            return $cogs ?? 0;
+        } catch (\Exception $e) {
+            // If ProductionStockConsumption table doesn't exist, return 0
+            return 0;
+        }
     }
 
     /**

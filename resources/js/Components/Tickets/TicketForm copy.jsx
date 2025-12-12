@@ -34,7 +34,7 @@ const PromoBox = ({ text }) => (
 
 export default function TicketForm({ ticket = null, customerId = null, onSubmit, onCancel }) {
     const { jobCategories = [] } = usePage().props;
-    
+
     const [formData, setFormData] = useState({
         customer_id: customerId || "",
         description: "",
@@ -66,7 +66,7 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
     const [selectedSizeRateId, setSelectedSizeRateId] = useState(null);
 
     const [selectedImage, setSelectedImage] = useState(null);
-    
+
     // Get available job types based on selected category
     const availableJobTypes = useMemo(() => {
         if (!formData.category_id) return [];
@@ -92,7 +92,7 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
                     }
                 }
             }
-            
+
             const parsedSize = parseSizeValue(ticket.size_value);
 
             setFormData({
@@ -128,14 +128,11 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
         }
     }, [ticket, customerId, jobCategories]);
 
-    // Update selected job type when job_type_id changes
     useEffect(() => {
         if (formData.job_type_id) {
             const jobType = availableJobTypes.find(jt => jt.id.toString() === formData.job_type_id.toString());
             setSelectedJobType(jobType || null);
-            
-            // Auto-fill price and promo if job type is selected
-            console.log("Selected Job Type:", jobType);
+
             if (jobType) {
                 setFormData(prev => ({
                     ...prev,
@@ -143,7 +140,6 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
                     subtotal: (jobType.price * (prev.quantity || 1)).toFixed(2),
                 }));
             }
-            console.log("Form Data after job type change:", formData);
         } else {
             setSelectedJobType(null);
         }
@@ -178,10 +174,10 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
 
         // Calculate discount amount
         const discountAmount = (subtotal * discountPercent) / 100;
-        
+
         // Calculate total amount (subtotal - discount)
         const totalAmount = subtotal - discountAmount;
-        
+
         // Calculate balance (total - downpayment)
         const balance = totalAmount - downpayment;
 
@@ -199,8 +195,8 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
     const hasSizeRates = sizeRates.length > 0;
     const currentSizeRate = hasSizeRates
         ? sizeRates.find((rate) => rate.id?.toString() === (selectedSizeRateId || "").toString()) ||
-          sizeRates.find((rate) => rate.is_default) ||
-          sizeRates[0]
+        sizeRates.find((rate) => rate.is_default) ||
+        sizeRates[0]
         : null;
 
     useEffect(() => {
@@ -372,7 +368,7 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
         }
 
         setProcessing(true);
-        
+
         // Prepare data for submission
         const submitData = {
             ...formData,
@@ -434,321 +430,320 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
 
     return (
         <>
-        <form onSubmit={handleSubmit} className="row">
+            <form onSubmit={handleSubmit} className="row">
 
-    {/* LEFT COLUMN — IMAGE PREVIEW */}
-    <div className="col-md-4">
-        <div className="sticky-top" style={{ top: '20px' }}>
-            <FormInput
-                label="Attachment (Optional)"
-                type="file"
-                name="file"
-                onChange={handleChange}
-                error={errors.file}
-            />
+                {/* LEFT COLUMN — IMAGE PREVIEW */}
+                <div className="col-md-4">
+                    <div className="sticky-top" style={{ top: '20px' }}>
+                        <FormInput
+                            label="Attachment (Optional)"
+                            type="file"
+                            name="file"
+                            onChange={handleChange}
+                            error={errors.file}
+                        />
 
-            <div className="mt-3">
-                <h6 className="mb-2">Image Preview</h6>
+                        <div className="mt-3">
+                            <h6 className="mb-2">Image Preview</h6>
 
-                {selectedImage ? (
-                    <div className="border rounded p-2 bg-light">
-                        <img src={selectedImage} className="img-fluid rounded" />
-                    </div>
-                ) : (
-                    <div className="border rounded p-5 text-center text-muted bg-light">
-                        <i className="ti-image" style={{ fontSize: "40px" }}></i>
-                        <p className="mt-2">No image selected</p>
-                    </div>
-                )}
-            </div>
-               <div className="flex items-center my-4">
-                    <div className="flex-grow border-t border-gray-300"></div>
-                    <span className="px-4 text-gray-500 text-sm font-semibold">Pricing & Payment</span>
-                    <div className="flex-grow border-t border-gray-300"></div>
-                </div>
-                <div className="mt-4 space-y-3">
-
-                    {/* Subtotal */}
-                    <div className="p-2 bg-white rounded-md border shadow-sm flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wider">Subtotal</span>
-                        <span className="text-md font-bold text-gray-700">
-                            ₱{parseFloat(formData.subtotal || 0).toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
-                        </span>
-                    </div>
-
-                    {/* Discount */}
-                    <div className="p-2 bg-white rounded-md border shadow-sm flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wider">Discount</span>
-                        <span className="text-md font-bold text-red-600">
-                            -₱{parseFloat(formData.discount_amount || 0).toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
-                        </span>
-                    </div>
-
-                    {/* Total Amount */}
-                    <div className="p-3 bg-blue-50 rounded-md border border-blue-300 shadow-sm flex justify-between items-center">
-                        <span className="text-xs text-blue-700 uppercase font-semibold tracking-wider">Total Amount</span>
-                        <span className="text-xl font-extrabold text-blue-700">
-                            ₱{parseFloat(formData.total_amount || 0).toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
-                        </span>
-                    </div>
-
-                    {/* Balance */}
-                    <div className="p-2 bg-white rounded-md border shadow-sm flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wider">Balance</span>
-                        <span
-                            className={`text-md font-bold ${
-                                parseFloat(formData.balance || 0) > 0
-                                    ? 'text-orange-600'
-                                    : 'text-green-600'
-                            }`}
-                        >
-                            ₱{parseFloat(formData.balance || 0).toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
-                        </span>
-                    </div>
-
-                </div>
-
-        </div>
-    </div>
-
-    {/* RIGHT COLUMN — ALL FORM FIELDS */}
-    <div className="col-md-8">
-
-        {/* JOB DETAILS */}
-        <Section title="Job Details">
-             <div className="row">
-                <div className="col-md-12">
-                    <FormInput
-                        label="Description"
-                        type="textarea"
-                        name="description"
-                        value={formData.description}
-                        onChange={handleChange}
-                        error={errors.description}
-                        placeholder="Enter ticket description"
-                        required
-                        rows={1}
-                    />
-                </div>
-            </div>
-
-            <div className="row">
-                <div className="col-md-5">
-                    <FormInput
-                        label="Category"
-                        type="select"
-                        name="category_id"
-                        value={formData.category_id}
-                        onChange={handleChange}
-                        error={errors.category_id}
-                        options={categoryOptions}
-                        placeholder="Select Category"
-                    />
-                </div>
-
-                <div className="col-md-5">
-                    <FormInput
-                        label="Job Type"
-                        type="select"
-                        name="job_type_id"
-                        value={formData.job_type_id}
-                        onChange={handleChange}
-                        error={errors.job_type_id}
-                        options={jobTypeOptions}
-                        placeholder={formData.category_id ? "Select Job Type" : "Select category first"}
-                        disabled={!formData.category_id}
-                    />
-                </div>
-                 <div className="col-md-2">
-                    <FormInput
-                        label="Quantity"
-                        type="number"
-                        name="quantity"
-                        value={formData.quantity}
-                        onChange={handleChange}
-                        error={errors.quantity}
-                        placeholder="Enter quantity"
-                        required
-                        min="1"
-                        step="1"
-                    />
-                </div>
-            </div>
-
-            {/* Promo Display */}
-            {selectedJobType?.promo_text && (
-                <div className="row mb-3">
-                    <div className="col-md-12">
-                        <div className="alert alert-info" role="alert">
-                            <i className="ti-gift mr-2"></i>
-                            <strong>Promo:</strong> {selectedJobType.promo_text}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </Section>
-
-         {hasPriceTiers && (
-                <div className="alert alert-light border mt-3">
-                    <h6 className="mb-2">Bulk Pricing</h6>
-                    <div className="table-responsive">
-                        <table className="table table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Label</th>
-                                    <th>Quantity Range</th>
-                                    <th>Price / Unit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {priceTiers.map((tier) => (
-                                    <tr key={tier.id || `${tier.min_quantity}-${tier.max_quantity}`}>
-                                        <td>{tier.label || "Tier"}</td>
-                                        <td>
-                                            {tier.min_quantity}
-                                            {tier.max_quantity ? ` - ${tier.max_quantity}` : "+"}
-                                        </td>
-                                        <td>₱{parseFloat(tier.price).toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-       {selectedJobType?.promo_text && (
-                <PromoBox text={selectedJobType.promo_text} />
-            )}
-            {hasSizeRates && (
-                <div className="card mt-3">
-                    <div className="card-body">
-                        <h5 className="mb-3">Size-Based Pricing</h5>
-                        <div className="row">
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Print Option"
-                                    type="select"
-                                    name="size_rate_id"
-                                    value={selectedSizeRateId || ""}
-                                    onChange={(e) => setSelectedSizeRateId(e.target.value)}
-                                    options={sizeRates.map((rate) => ({
-                                        value: rate.id?.toString(),
-                                        label: `${rate.variant_name || "Variant"} - ₱${parseFloat(rate.rate).toFixed(2)} per ${rate.calculation_method === "length" ? rate.dimension_unit : `${rate.dimension_unit}²`}`,
-                                    }))}
-                                />
-                            </div>
-                            <div className="col-md-4">
-                                <FormInput
-                                    label={`Width (${currentSizeRate?.dimension_unit || "unit"})`}
-                                    type="number"
-                                    name="size_width"
-                                    value={sizeDimensions.width}
-                                    onChange={(e) => {
-                                        setSizeDimensions((prev) => ({ ...prev, width: e.target.value }));
-                                        clearError("size_width");
-                                    }}
-                                    error={errors.size_width}
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="Width"
-                                />
-                            </div>
-                            {currentSizeRate?.calculation_method !== "length" && (
-                                <div className="col-md-4">
-                                    <FormInput
-                                        label={`Height (${currentSizeRate?.dimension_unit || "unit"})`}
-                                        type="number"
-                                        name="size_height"
-                                        value={sizeDimensions.height}
-                                        onChange={(e) => {
-                                            setSizeDimensions((prev) => ({ ...prev, height: e.target.value }));
-                                            clearError("size_height");
-                                        }}
-                                        error={errors.size_height}
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="Height"
-                                    />
+                            {selectedImage ? (
+                                <div className="border rounded p-2 bg-light">
+                                    <img src={selectedImage} className="img-fluid rounded" />
+                                </div>
+                            ) : (
+                                <div className="border rounded p-5 text-center text-muted bg-light">
+                                    <i className="ti-image" style={{ fontSize: "40px" }}></i>
+                                    <p className="mt-2">No image selected</p>
                                 </div>
                             )}
                         </div>
-                        {currentSizeRate && (
-                            <p className="text-muted text-sm mt-2">
-                                Rate: ₱{parseFloat(currentSizeRate.rate).toFixed(2)} per{" "}
-                                {currentSizeRate.calculation_method === "length"
-                                    ? currentSizeRate.dimension_unit
-                                    : `${currentSizeRate.dimension_unit}²`}
-                            </p>
-                        )}
+                        <div className="flex items-center my-4">
+                            <div className="flex-grow border-t border-gray-300"></div>
+                            <span className="px-4 text-gray-500 text-sm font-semibold">Pricing & Payment</span>
+                            <div className="flex-grow border-t border-gray-300"></div>
+                        </div>
+                        <div className="mt-4 space-y-3">
+
+                            {/* Subtotal */}
+                            <div className="p-2 bg-white rounded-md border shadow-sm flex justify-between items-center">
+                                <span className="text-xs text-gray-500 uppercase tracking-wider">Subtotal</span>
+                                <span className="text-md font-bold text-gray-700">
+                                    ₱{parseFloat(formData.subtotal || 0).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </div>
+
+                            {/* Discount */}
+                            <div className="p-2 bg-white rounded-md border shadow-sm flex justify-between items-center">
+                                <span className="text-xs text-gray-500 uppercase tracking-wider">Discount</span>
+                                <span className="text-md font-bold text-red-600">
+                                    -₱{parseFloat(formData.discount_amount || 0).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </div>
+
+                            {/* Total Amount */}
+                            <div className="p-3 bg-blue-50 rounded-md border border-blue-300 shadow-sm flex justify-between items-center">
+                                <span className="text-xs text-blue-700 uppercase font-semibold tracking-wider">Total Amount</span>
+                                <span className="text-xl font-extrabold text-blue-700">
+                                    ₱{parseFloat(formData.total_amount || 0).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </div>
+
+                            {/* Balance */}
+                            <div className="p-2 bg-white rounded-md border shadow-sm flex justify-between items-center">
+                                <span className="text-xs text-gray-500 uppercase tracking-wider">Balance</span>
+                                <span
+                                    className={`text-md font-bold ${parseFloat(formData.balance || 0) > 0
+                                            ? 'text-orange-600'
+                                            : 'text-green-600'
+                                        }`}
+                                >
+                                    ₱{parseFloat(formData.balance || 0).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </div>
+
+                        </div>
+
                     </div>
                 </div>
-            )}
 
-        {/* SCHEDULE & PAYMENT */}
-        <Section title="Schedule & Payment">
-            <div className="row">
-                <div className="col-md-4">
-                    <FormInput
-                        label="Due Date"
-                        type="date"
-                        name="due_date"
-                        value={formData.due_date}
-                        onChange={handleChange}
-                        error={errors.due_date}
-                        required
-                    />
-                </div>
+                {/* RIGHT COLUMN — ALL FORM FIELDS */}
+                <div className="col-md-8">
 
-                <div className="col-md-4">
-                    <FormInput
-                        label="Payment Method"
-                        type="select"
-                        name="payment_method"
-                        value={formData.payment_method}
-                        onChange={handleChange}
-                        error={errors.payment_method}
-                        options={paymentMethodOptions}
-                        required
-                    />
-                </div>
-                <div className="col-md-4">
-                    <FormInput
-                        label="Payment Status"
-                        type="select"
-                        name="payment_status"
-                        value={formData.payment_status}
-                        onChange={handleChange}
-                        error={errors.payment_status}
-                        options={paymentStatusOptions}
-                        required
-                    />
-                </div>
-            </div>
-        </Section>
+                    {/* JOB DETAILS */}
+                    <Section title="Job Details">
+                        <div className="row">
+                            <div className="col-md-12">
+                                <FormInput
+                                    label="Description"
+                                    type="textarea"
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleChange}
+                                    error={errors.description}
+                                    placeholder="Enter ticket description"
+                                    required
+                                    rows={1}
+                                />
+                            </div>
+                        </div>
 
-        {/* BILLING */}
-        <Section title="Billing">
-           <div className="flex items-center my-4">
-                <div className="flex-grow border-t border-gray-300"></div>
-                <span className="px-4 text-gray-500 text-sm font-semibold">Pricing & Payment</span>
-                <div className="flex-grow border-t border-gray-300"></div>
-            </div>
+                        <div className="row">
+                            <div className="col-md-5">
+                                <FormInput
+                                    label="Category"
+                                    type="select"
+                                    name="category_id"
+                                    value={formData.category_id}
+                                    onChange={handleChange}
+                                    error={errors.category_id}
+                                    options={categoryOptions}
+                                    placeholder="Select Category"
+                                />
+                            </div>
 
-            <div className="row">
-                {/* <div className="col-md-3">
+                            <div className="col-md-5">
+                                <FormInput
+                                    label="Job Type"
+                                    type="select"
+                                    name="job_type_id"
+                                    value={formData.job_type_id}
+                                    onChange={handleChange}
+                                    error={errors.job_type_id}
+                                    options={jobTypeOptions}
+                                    placeholder={formData.category_id ? "Select Job Type" : "Select category first"}
+                                    disabled={!formData.category_id}
+                                />
+                            </div>
+                            <div className="col-md-2">
+                                <FormInput
+                                    label="Quantity"
+                                    type="number"
+                                    name="quantity"
+                                    value={formData.quantity}
+                                    onChange={handleChange}
+                                    error={errors.quantity}
+                                    placeholder="Enter quantity"
+                                    required
+                                    min="1"
+                                    step="1"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Promo Display */}
+                        {selectedJobType?.promo_text && (
+                            <div className="row mb-3">
+                                <div className="col-md-12">
+                                    <div className="alert alert-info" role="alert">
+                                        <i className="ti-gift mr-2"></i>
+                                        <strong>Promo:</strong> {selectedJobType.promo_text}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </Section>
+
+                    {hasPriceTiers && (
+                        <div className="alert alert-light border mt-3">
+                            <h6 className="mb-2">Bulk Pricing</h6>
+                            <div className="table-responsive">
+                                <table className="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Label</th>
+                                            <th>Quantity Range</th>
+                                            <th>Price / Unit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {priceTiers.map((tier) => (
+                                            <tr key={tier.id || `${tier.min_quantity}-${tier.max_quantity}`}>
+                                                <td>{tier.label || "Tier"}</td>
+                                                <td>
+                                                    {tier.min_quantity}
+                                                    {tier.max_quantity ? ` - ${tier.max_quantity}` : "+"}
+                                                </td>
+                                                <td>₱{parseFloat(tier.price).toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedJobType?.promo_text && (
+                        <PromoBox text={selectedJobType.promo_text} />
+                    )}
+                    {hasSizeRates && (
+                        <div className="card mt-3">
+                            <div className="card-body">
+                                <h5 className="mb-3">Size-Based Pricing</h5>
+                                <div className="row">
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label="Print Option"
+                                            type="select"
+                                            name="size_rate_id"
+                                            value={selectedSizeRateId || ""}
+                                            onChange={(e) => setSelectedSizeRateId(e.target.value)}
+                                            options={sizeRates.map((rate) => ({
+                                                value: rate.id?.toString(),
+                                                label: `${rate.variant_name || "Variant"} - ₱${parseFloat(rate.rate).toFixed(2)} per ${rate.calculation_method === "length" ? rate.dimension_unit : `${rate.dimension_unit}²`}`,
+                                            }))}
+                                        />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label={`Width (${currentSizeRate?.dimension_unit || "unit"})`}
+                                            type="number"
+                                            name="size_width"
+                                            value={sizeDimensions.width}
+                                            onChange={(e) => {
+                                                setSizeDimensions((prev) => ({ ...prev, width: e.target.value }));
+                                                clearError("size_width");
+                                            }}
+                                            error={errors.size_width}
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="Width"
+                                        />
+                                    </div>
+                                    {currentSizeRate?.calculation_method !== "length" && (
+                                        <div className="col-md-4">
+                                            <FormInput
+                                                label={`Height (${currentSizeRate?.dimension_unit || "unit"})`}
+                                                type="number"
+                                                name="size_height"
+                                                value={sizeDimensions.height}
+                                                onChange={(e) => {
+                                                    setSizeDimensions((prev) => ({ ...prev, height: e.target.value }));
+                                                    clearError("size_height");
+                                                }}
+                                                error={errors.size_height}
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="Height"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                {currentSizeRate && (
+                                    <p className="text-muted text-sm mt-2">
+                                        Rate: ₱{parseFloat(currentSizeRate.rate).toFixed(2)} per{" "}
+                                        {currentSizeRate.calculation_method === "length"
+                                            ? currentSizeRate.dimension_unit
+                                            : `${currentSizeRate.dimension_unit}²`}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SCHEDULE & PAYMENT */}
+                    <Section title="Schedule & Payment">
+                        <div className="row">
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Due Date"
+                                    type="date"
+                                    name="due_date"
+                                    value={formData.due_date}
+                                    onChange={handleChange}
+                                    error={errors.due_date}
+                                    required
+                                />
+                            </div>
+
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Payment Method"
+                                    type="select"
+                                    name="payment_method"
+                                    value={formData.payment_method}
+                                    onChange={handleChange}
+                                    error={errors.payment_method}
+                                    options={paymentMethodOptions}
+                                    required
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <FormInput
+                                    label="Payment Status"
+                                    type="select"
+                                    name="payment_status"
+                                    value={formData.payment_status}
+                                    onChange={handleChange}
+                                    error={errors.payment_status}
+                                    options={paymentStatusOptions}
+                                    required
+                                />
+                            </div>
+                        </div>
+                    </Section>
+
+                    {/* BILLING */}
+                    <Section title="Billing">
+                        <div className="flex items-center my-4">
+                            <div className="flex-grow border-t border-gray-300"></div>
+                            <span className="px-4 text-gray-500 text-sm font-semibold">Pricing & Payment</span>
+                            <div className="flex-grow border-t border-gray-300"></div>
+                        </div>
+
+                        <div className="row">
+                            {/* <div className="col-md-3">
                     <FormInput
                         label="Subtotal"
                         type="number"
@@ -764,60 +759,60 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
                     />
                 </div> */}
 
-                 <div className="col-md-5">
-                    <FormInput
-                        label="Downpayment"
-                        type="number"
-                        name="downpayment"
-                        value={formData.downpayment}
-                        onChange={handleChange}
-                        error={errors.downpayment}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                    />
+                            <div className="col-md-5">
+                                <FormInput
+                                    label="Downpayment"
+                                    type="number"
+                                    name="downpayment"
+                                    value={formData.downpayment}
+                                    onChange={handleChange}
+                                    error={errors.downpayment}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                />
+                            </div>
+
+                            <div className="col-md-3">
+                                <FormInput
+                                    label="Discount (%)"
+                                    type="number"
+                                    name="discount"
+                                    value={formData.discount}
+                                    onChange={handleChange}
+                                    error={errors.discount}
+                                    placeholder="0"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                />
+                            </div>
+                            <div className="col-md-3">
+                                <FormInput
+                                    label="Discount Amount"
+                                    type="number"
+                                    name="discount_amount"
+                                    value={formData.discount_amount}
+                                    readOnly
+                                    className="bg-gray-50"
+                                />
+                            </div>
+                            <div className="col-md-1"></div>
+
+                        </div>
+
+                    </Section>
+
+                    {/* ACTION BUTTONS */}
+                    <div className="mt-4 d-flex justify-content-end gap-3">
+                        <button type="button" className="btn btn-light" onClick={onCancel}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" disabled={processing}>
+                            {processing ? "Saving..." : "Save Ticket"}
+                        </button>
+                    </div>
+
                 </div>
-
-                <div className="col-md-3">
-                    <FormInput
-                        label="Discount (%)"
-                        type="number"
-                        name="discount"
-                        value={formData.discount}
-                        onChange={handleChange}
-                        error={errors.discount}
-                        placeholder="0"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                    />
-                </div>
-                <div className="col-md-3">
-                    <FormInput
-                        label="Discount Amount"
-                        type="number"
-                        name="discount_amount"
-                        value={formData.discount_amount}
-                        readOnly
-                        className="bg-gray-50"
-                    />
-                </div>
-                <div className="col-md-1"></div>
-
-            </div>
-
-        </Section>
-
-        {/* ACTION BUTTONS */}
-        <div className="mt-4 d-flex justify-content-end gap-3">
-            <button type="button" className="btn btn-light" onClick={onCancel}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={processing}>
-                {processing ? "Saving..." : "Save Ticket"}
-            </button>
-        </div>
-
-    </div>
-</form>
+            </form>
 
         </>
     );

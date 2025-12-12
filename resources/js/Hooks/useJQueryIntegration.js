@@ -7,7 +7,6 @@ export default function useJQueryIntegration() {
         if (window.jQuery) {
             // Sidebar toggle
             window.jQuery('.sidebar-toggle').on('click', function() {
-                console.log('side bar');
                 
             });
 

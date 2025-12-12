@@ -80,6 +80,7 @@ export default function Dashboard({
     const xDataR = dailyRevenue.map((d) => d.day.toString());
     const yDataSales = dailyRevenue.map((d) => d.sales);
     const yDataNetIncome = dailyRevenue.map((d) => d.net_income);
+    const yDataCOGS = dailyRevenue.map((d) => d.cogs || 0); // Use actual COGS from backend
 
     const pesoFormatter = (value) => {
         if (value >= 1_000_000_000) {
@@ -495,8 +496,8 @@ export default function Dashboard({
                                             stack: 'total',
                                         },
                                         {
-                                            data: yDataSales.map((sales, i) => sales - yDataNetIncome[i]),
-                                            label: "COGS",
+                                            data: yDataCOGS,
+                                            label: "COGS (Actual)",
                                             color: "#f59e0b",
                                             stack: 'total',
                                         },
