@@ -53,12 +53,15 @@ export default function DataTable({
                                                         type="button"
                                                         className="btn btn-link btn-sm text-primary"
                                                         onClick={() => onEdit(row)}
-                                                         title="Edit"
+                                                         title={`Edit ${row.status !== 'completed' ? 'Edit' : 'View'}`}
                                                     >
-                                                       <small><i className="ti-pencil"></i> Edit</small> 
+                                                       <small>
+                                                        {row.status !== 'completed' ? <i className="ti-pencil"></i> : <i className="ti-eye"></i>}
+                                                        
+                                                        {row.status !== 'completed' ? ' Edit' : ' View'}</small> 
                                                     </button>
                                                     )}
-                                                    {onDelete && (
+                                                    {onDelete && row.status !== 'completed' && (
                                                     <button
                                                         type="button"
                                                         className="btn btn-link btn-sm text-danger"

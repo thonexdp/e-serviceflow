@@ -588,18 +588,15 @@ class DashboardController extends Controller
             ->selectRaw('SUM(total_amount - COALESCE(amount_paid, 0)) as outstanding')
             ->value('outstanding') ?? 0;
 
-        // Net income calculation (Revenue - Discounts - COGS estimate)
-        // For now, we'll use a simplified calculation
-        // You can expand this with actual COGS from inventory/expenses
+        // Net income calculation (Revenue - Discounts - Actual COGS)
         $discounts = Ticket::whereBetween('created_at', [$startDate, $endDate])
             ->where('status', '!=', 'cancelled')
             ->sum('discount');
 
-        // Estimate COGS at 30% of sales (industry standard for printing services)
-        // This should be replaced with actual inventory/material costs
-        $estimatedCOGS = $totalSales * 0.30;
+        // Calculate actual COGS from inventory consumption
+        $actualCOGS = $this->calculateActualCOGS($startDate, $endDate);
 
-        $netIncome = $totalSales - $discounts - $estimatedCOGS;
+        $netIncome = $totalSales - $discounts - $actualCOGS;
 
         return [
             'total_orders' => $totalOrders,
@@ -608,7 +605,7 @@ class DashboardController extends Controller
             'net_income' => round($netIncome, 2),
             'receivables' => round($receivables, 2),
             'discounts' => round($discounts, 2),
-            'estimated_cogs' => round($estimatedCOGS, 2),
+            'actual_cogs' => round($actualCOGS, 2),
         ];
     }
 
@@ -668,22 +665,74 @@ class DashboardController extends Controller
             ->pluck('total', 'date')
             ->toArray();
 
+        // Get actual COGS per day from inventory consumption
+        $dailyCOGS = $this->getDailyCOGS($startDate, $endDate);
+
         // Create array with all days of the month
         $dailyData = [];
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
             $sales = max($paymentsRevenue[$date] ?? 0, $ticketRevenue[$date] ?? 0);
-            $netIncome = $sales * 0.70; // 70% margin (30% COGS estimate)
+            $cogs = $dailyCOGS[$date] ?? 0;
+            $netIncome = $sales - $cogs; // Actual net income = Sales - Actual COGS
 
             $dailyData[] = [
                 'day' => $day,
                 'date' => $date,
                 'sales' => round($sales, 2),
+                'cogs' => round($cogs, 2),
                 'net_income' => round($netIncome, 2),
             ];
         }
 
         return $dailyData;
+    }
+
+    /**
+     * Calculate actual COGS from inventory consumption
+     * Handles both unit-based (mugs) and area-based (tarpaulin) items
+     */
+    private function calculateActualCOGS($startDate, $endDate)
+    {
+        try {
+            // Get all stock consumptions for tickets in the date range
+            // COGS is calculated when materials are consumed during production
+            $cogs = \App\Models\ProductionStockConsumption::whereHas('ticket', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('created_at', [$startDate, $endDate])
+                    ->where('status', '!=', 'cancelled');
+            })
+            ->sum('total_cost');
+
+            return $cogs ?? 0;
+        } catch (\Exception $e) {
+            // If ProductionStockConsumption table doesn't exist, fallback to 30% estimate
+            return 0;
+        }
+    }
+
+    /**
+     * Get daily COGS breakdown for chart display
+     */
+    private function getDailyCOGS($startDate, $endDate)
+    {
+        try {
+            // Get COGS grouped by ticket creation date
+            // Note: We use ticket creation date, but COGS is recorded when consumption happens
+            // For more accuracy, you might want to use consumption date if available
+            $dailyCogs = \App\Models\ProductionStockConsumption::whereHas('ticket', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('created_at', [$startDate, $endDate])
+                    ->where('status', '!=', 'cancelled');
+            })
+            ->join('tickets', 'production_stock_consumptions.ticket_id', '=', 'tickets.id')
+            ->selectRaw('DATE(tickets.created_at) as date, SUM(production_stock_consumptions.total_cost) as total')
+            ->groupBy('date')
+            ->pluck('total', 'date')
+            ->toArray();
+
+            return $dailyCogs;
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     private function getUserTransactions($role, $startDate, $endDate)

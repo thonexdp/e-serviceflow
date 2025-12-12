@@ -101,6 +101,7 @@ export default function TicketForm({
     // Populate form if editing
     useEffect(() => {
         if (ticket) {
+            
             const jobTypeId = ticket.job_type_id?.toString() || "";
             // Try to get category from job_type relationship, or find it from jobCategories
             let categoryId = "";
@@ -1482,7 +1483,7 @@ export default function TicketForm({
                         <button
                             type="submit"
                             className="btn btn-primary"
-                            disabled={processing}
+                            disabled={processing || ticket?.status === 'completed'}
                         >
                             {processing ? (
                                 <>

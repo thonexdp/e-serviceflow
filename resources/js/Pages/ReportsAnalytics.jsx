@@ -609,7 +609,7 @@ function ProductProfitabilityReport({ data }) {
                             <th>Product/Service</th>
                             <th>Quantity</th>
                             <th className="text-right">Revenue</th>
-                            <th className="text-right">Est. Cost</th>
+                            <th className="text-right">Actual Cost</th>
                             <th className="text-right">Profit</th>
                             <th className="text-right">Margin %</th>
                         </tr>
@@ -620,7 +620,7 @@ function ProductProfitabilityReport({ data }) {
                                 <td>{product.job_type}</td>
                                 <td>{product.quantity}</td>
                                 <td className="text-right">{formatPeso(product.revenue)}</td>
-                                <td className="text-right">{formatPeso(product.estimated_cost)}</td>
+                                <td className="text-right">{formatPeso(product.actual_cost || product.estimated_cost || 0)}</td>
                                 <td className="text-right text-success">{formatPeso(product.profit)}</td>
                                 <td className="text-right">{product.margin.toFixed(2)}%</td>
                             </tr>

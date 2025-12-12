@@ -266,6 +266,7 @@ export default function Productions({
         const ticket = tickets.data.find(t => t.id === ticketId);
         if (ticket && !ticket.assigned_to_user_id) {
             // First claim, then start
+            setLoading(true);
             router.post(buildUrl(`/queue/${ticketId}/claim`), {}, {
                 preserveScroll: true,
                 preserveState: false,
@@ -273,7 +274,23 @@ export default function Productions({
                     router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
                         preserveScroll: true,
                         preserveState: false,
+                        onSuccess: () => {
+                            setLoading(false);
+                        },
+                        onError: () => {
+                            setLoading(false);
+                        },
+                        onFinish: () => {
+                            setLoading(false); 
+                        },
                     });
+                },
+                onError: (errors) => {
+                    console.error('❌ Error claiming ticket:', errors);
+                    setLoading(false);
+                },
+                onFinish: () => {
+                    setLoading(false); 
                 },
             });
         } else {
@@ -286,6 +303,9 @@ export default function Productions({
                 },
                 onError: () => {
                     setLoading(false);
+                },
+                onFinish: () => {
+                    setLoading(false); 
                 },
             });
         }
