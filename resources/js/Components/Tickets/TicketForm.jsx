@@ -172,7 +172,6 @@ export default function TicketForm({
             setSelectedJobType(jobType || null);
 
             // Auto-fill price and promo if job type is selected
-            console.log("Selected Job Type:", jobType);
             if (jobType) {
                 setFormData((prev) => ({
                     ...prev,
@@ -180,7 +179,6 @@ export default function TicketForm({
                     subtotal: (jobType.price * (prev.quantity || 1)).toFixed(2),
                 }));
             }
-            console.log("Form Data after job type change:", formData);
         } else {
             setSelectedJobType(null);
         }
@@ -229,7 +227,6 @@ export default function TicketForm({
         if (ticket && ticket.payments && ticket.payments.length > 0) {
             const firstPayment = ticket.payments[0];
             if (firstPayment.documents && firstPayment.documents.length > 0) {
-                console.log("firstPayment.documents:", firstPayment.documents);
                 const existingProofs = firstPayment.documents.map((doc, index) => ({
                     preview: doc.file_path,
                     file: null,
@@ -237,7 +234,6 @@ export default function TicketForm({
                     id: doc.id,
                     name: `Proof ${index + 1}`,
                 }));
-                console.log("existingProofs:", existingProofs);
                 setPaymentProofs(existingProofs);
                 setActiveProofTab(0);
             }
@@ -1138,6 +1134,7 @@ export default function TicketForm({
                                     onChange={handleChange}
                                     error={errors.due_date}
                                     required
+                                    min={new Date().toISOString().split("T")[0]}
                                 />
                             </div>
 

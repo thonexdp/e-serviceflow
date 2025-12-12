@@ -10,6 +10,7 @@ class StockItem extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $dates = ['deleted_at'];
     protected $fillable = [
         'job_type_id',
         'sku',
@@ -143,4 +144,3 @@ class StockItem extends Model
         }
     }
 }
-

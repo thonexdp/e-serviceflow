@@ -8,13 +8,6 @@
     <title inertia>RC PrintShoppe</title>
 
     <!-- Favicon -->
-    <link rel="shortcut icon" href="http://placehold.it/64.png/000/fff">
-    <link rel="apple-touch-icon" sizes="144x144" href="http://placehold.it/144.png/000/fff">
-    <link rel="apple-touch-icon" sizes="114x114" href="http://placehold.it/114.png/000/fff">
-    <link rel="apple-touch-icon" sizes="72x72" href="http://placehold.it/72.png/000/fff">
-    <link rel="apple-touch-icon" sizes="57x57" href="http://placehold.it/57.png/000/fff">
-
-    <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicons/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicons/favicon-16x16.png') }}">
 
@@ -66,12 +59,12 @@
     <script src="{{ asset('js/lib/weather/weather-init.js') }}"></script>
     <script src="{{ asset('js/lib/circle-progress/circle-progress.min.js') }}"></script>
     <script src="{{ asset('js/lib/circle-progress/circle-progress-init.js') }}"></script>
-    <script src="{{ asset('js/lib/chartist/chartist.min.js') }}"></script>
+    {{-- <script src="{{ asset('js/lib/chartist/chartist.min.js') }}"></script> --}}
     <script src="{{ asset('js/lib/sparklinechart/jquery.sparkline.min.js') }}"></script>
     <script src="{{ asset('js/lib/sparklinechart/sparkline.init.js') }}"></script>
     <script src="{{ asset('js/lib/owl-carousel/owl.carousel.min.js') }}"></script>
     <script src="{{ asset('js/lib/owl-carousel/owl.carousel-init.js') }}"></script>
-    <script src="{{ asset('js/dashboard2.js') }}"></script>
+    {{-- <script src="{{ asset('js/dashboard2.js') }}"></script> --}}
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

@@ -199,7 +199,6 @@ export default function Tickets({
 
     // Open payment update modal
     const handleOpenPaymentModal = (ticket) => {
-        console.log(ticket);
         setSelectedTicket(ticket);
         setPaymentFormData({
             ticket_id: ticket.id,
@@ -297,7 +296,6 @@ export default function Tickets({
     };
 
     const handleEditTicket = (ticket) => {
-        console.log(ticket);
         setSelectedCustomer(ticket?.customer);
         setEditingTicket(ticket);
         setTicketModalOpen(true);

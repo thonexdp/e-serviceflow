@@ -169,12 +169,12 @@ export default function ReportsAnalytics({
                                                     >
                                                         <i className="ti-printer"></i> Print
                                                     </button>
-                                                    <button
+                                                    {/* <button
                                                         className="btn btn-success btn-sm"
-                                                        onClick={handleExport}
+                                                        // onClick={handleExport}
                                                     >
                                                         <i className="ti-download"></i> Export
-                                                    </button>
+                                                    </button> */}
                                                 </div>
                                             </div>
                                         </div>
@@ -671,7 +671,9 @@ function ProductionReport({ data }) {
 }
 
 function CustomerInsightsReport({ data }) {
-    const { customers = [], summary = {} } = data;
+    const { customers: customersData = [], summary = {} } = data;
+    // Ensure customers is always an array (handle if backend sends object)
+    const customers = Array.isArray(customersData) ? customersData : Object.values(customersData || {});
 
     return (
         <div>
@@ -708,7 +710,7 @@ function CustomerInsightsReport({ data }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {customers?.slice(0, 20).map((customer) => (
+                    {customers.slice(0, 20).map((customer) => (
                         <tr key={customer.id}>
                             <td>{customer.name}</td>
                             <td>{customer.total_orders}</td>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import { formatPeso } from '@/Utils/currency';
 
 export default function CustomerPOSOrder() {
     const { jobCategories = [] } = usePage().props;
@@ -23,7 +24,8 @@ export default function CustomerPOSOrder() {
         file: null
     });
 
-    const [imagePreview, setImagePreview] = useState(null);
+    const [designFiles, setDesignFiles] = useState([]);
+    const [activeDesignTab, setActiveDesignTab] = useState(0);
     const [selectedJobType, setSelectedJobType] = useState(null);
     const [selectedSizeRate, setSelectedSizeRate] = useState(null);
     const [subtotal, setSubtotal] = useState(0);
@@ -174,14 +176,30 @@ export default function CustomerPOSOrder() {
         }
     }, [selectedJobType, selectedSizeRate, formData.quantity, formData.size_width, formData.size_height]);
 
-    const handleImageUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setFormData(prev => ({ ...prev, file }));
-            const reader = new FileReader();
-            reader.onloadend = () => setImagePreview(reader.result);
-            reader.readAsDataURL(file);
-        }
+    const handleImageUpload = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
+
+        const uploads = files.map((file) => ({
+            file,
+            preview: URL.createObjectURL(file),
+            name: file.name,
+        }));
+
+        setDesignFiles((prev) => [...prev, ...uploads]);
+        event.target.value = "";
+    };
+
+    const removeDesignFile = (index) => {
+        setDesignFiles((prev) => {
+            const updated = prev.filter((_, i) => i !== index);
+            if (activeDesignTab >= updated.length && activeDesignTab > 0) {
+                setActiveDesignTab(updated.length - 1);
+            } else if (updated.length === 0) {
+                setActiveDesignTab(0);
+            }
+            return updated;
+        });
     };
 
     const handlePaymentProofUpload = (event) => {
@@ -308,9 +326,13 @@ export default function CustomerPOSOrder() {
             if (formData.size_height) {
                 orderData.append('size_height', formData.size_height);
             }
-            if (formData.file) {
-                orderData.append('file', formData.file);
-            }
+
+            // Add design files if any
+            designFiles.forEach((designFile, index) => {
+                if (designFile.file) {
+                    orderData.append(`attachments[]`, designFile.file);
+                }
+            });
 
             // Add payment method
             orderData.append('payment_method', paymentMethod);
@@ -331,7 +353,42 @@ export default function CustomerPOSOrder() {
                 body: orderData,
             });
 
-            const data = await response.json();
+            // Try to parse JSON response
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                console.error('Failed to parse response as JSON:', parseError);
+                // Server returned HTML (likely a 500 error or file too large)
+                setErrors({
+                    general: [
+                        'Server error: The file you uploaded may be too large or of an invalid type.',
+                        'Please ensure your file is less than 10MB and is a JPG, JPEG, PNG, or PDF.'
+                    ]
+                });
+                return;
+            }
+
+
+            // Check if validation errors exist (422 status or errors in response)
+            if (!response.ok) {
+                if (response.status === 422 && data.errors) {
+                    // Laravel validation errors
+                    setErrors(data.errors);
+                } else if (response.status === 413) {
+                    // File too large (payload too large)
+                    setErrors(data.errors || {
+                        file: ['The uploaded file is too large. Maximum size is 10MB.']
+                    });
+                } else if (data.message) {
+                    // Other error with message
+                    setErrors({ general: [data.message] });
+                } else {
+                    // Unknown error
+                    setErrors({ general: [`Server error (${response.status}). Please try again.`] });
+                }
+                return;
+            }
 
             if (data.success) {
                 // Store submitted ticket info
@@ -343,11 +400,12 @@ export default function CustomerPOSOrder() {
                 // Move to step 5 (success page)
                 setCurrentStep(5);
             } else {
-                throw new Error(data.message || 'Failed to submit order');
+                // Handle other errors
+                setErrors({ general: [data.message || 'Failed to submit order'] });
             }
         } catch (error) {
             console.error('Error submitting order:', error);
-            alert('Failed to submit order. Please try again.');
+            setErrors({ general: ['Failed to submit order. Please check your connection and try again.'] });
         } finally {
             setProcessing(false);
         }
@@ -413,16 +471,6 @@ export default function CustomerPOSOrder() {
                         </div>
 
                         <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
-                                <input
-                                    type="text"
-                                    value={formData.customer_name}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="Juan Dela Cruz"
-                                />
-                            </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
@@ -446,6 +494,19 @@ export default function CustomerPOSOrder() {
                                     <p className="text-xs text-gray-500 mt-1">💡 Previously used emails will appear as you type</p>
                                 )}
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                                <input
+                                    type="text"
+                                    value={formData.customer_name}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="Juan Dela Cruz"
+                                />
+                            </div>
+
+
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Facebook *</label>
@@ -550,7 +611,7 @@ export default function CustomerPOSOrder() {
                                                             )}
                                                         </div>
                                                         {!hasSizeRates && !hasPriceTiers && (
-                                                            <span className="text-indigo-600 font-bold">₱{parseFloat(jobType.price || 0).toFixed(2)}</span>
+                                                            <span className="text-indigo-600 font-bold">{formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
                                                         )}
                                                     </div>
                                                 </button>
@@ -594,7 +655,7 @@ export default function CustomerPOSOrder() {
                                                 <span className="text-blue-800">
                                                     {tier.min_quantity}{tier.max_quantity ? ` - ${tier.max_quantity}` : '+'} pcs:
                                                 </span>
-                                                <span className="font-semibold text-blue-900">₱{parseFloat(tier.price).toFixed(2)}/unit</span>
+                                                <span className="font-semibold text-blue-900">{formatPeso(parseFloat(tier.price).toFixed(2))}/unit</span>
                                             </div>
                                         ))}
                                     </div>
@@ -612,7 +673,7 @@ export default function CustomerPOSOrder() {
                                     >
                                         {sizeRates.map(rate => (
                                             <option key={rate.id} value={rate.id}>
-                                                {rate.variant_name} - ₱{parseFloat(rate.rate).toFixed(2)}/{rate.calculation_method === 'length' ? rate.dimension_unit : `${rate.dimension_unit}²`}
+                                                {rate.variant_name} - {formatPeso(parseFloat(rate.rate).toFixed(2))}/{rate.calculation_method === 'length' ? rate.dimension_unit : `${rate.dimension_unit}²`}
                                             </option>
                                         ))}
                                     </select>
@@ -647,7 +708,7 @@ export default function CustomerPOSOrder() {
                                     </div>
                                     {selectedSizeRate && (
                                         <p className="text-xs text-gray-500 mt-2">
-                                            Rate: ₱{parseFloat(selectedSizeRate.rate).toFixed(2)} per {selectedSizeRate.calculation_method === 'length' ? selectedSizeRate.dimension_unit : `${selectedSizeRate.dimension_unit}²`}
+                                            Rate: {formatPeso(parseFloat(selectedSizeRate.rate).toFixed(2))} per {selectedSizeRate.calculation_method === 'length' ? selectedSizeRate.dimension_unit : `${selectedSizeRate.dimension_unit}²`}
                                         </p>
                                     )}
                                 </div>
@@ -668,12 +729,14 @@ export default function CustomerPOSOrder() {
                                 <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
                                     <div className="flex justify-between items-center">
                                         <span className="text-gray-700 font-medium">Estimated Price:</span>
-                                        <span className="text-2xl font-bold text-indigo-600">₱{subtotal.toFixed(2)}</span>
+                                        <span className="text-2xl font-bold text-indigo-600">{formatPeso(subtotal.toFixed(2))}</span>
                                     </div>
                                 </div>
                             )}
 
+
                             <div className="flex gap-3">
+
                                 <button
                                     onClick={() => setCurrentStep(1)}
                                     className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
@@ -733,36 +796,56 @@ export default function CustomerPOSOrder() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Upload Design/Reference (Optional)</label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors">
-                                    {imagePreview ? (
-                                        <div className="space-y-3">
-                                            <img src={imagePreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleImageUpload}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">You can upload multiple images (PNG, JPG up to 10MB each)</p>
+
+                                {designFiles.length > 0 && (
+                                    <div className="mt-4">
+                                        {designFiles.length > 1 && (
+                                            <div className="flex gap-2 mb-3 overflow-x-auto">
+                                                {designFiles.map((_, index) => (
+                                                    <button
+                                                        key={index}
+                                                        type="button"
+                                                        onClick={() => setActiveDesignTab(index)}
+                                                        className={`px-3 py-1 rounded text-sm whitespace-nowrap ${activeDesignTab === index
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'bg-gray-200 text-gray-700'
+                                                            }`}
+                                                    >
+                                                        Design {index + 1}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+                                            <img
+                                                src={designFiles[activeDesignTab]?.preview}
+                                                alt={`Design ${activeDesignTab + 1}`}
+                                                className="max-h-64 mx-auto rounded"
+                                            />
+                                            <div className="text-center mt-2 text-sm text-gray-600">
+                                                {designFiles[activeDesignTab]?.name}
+                                            </div>
+                                            <div className="text-center mt-1 text-xs text-gray-500">
+                                                {activeDesignTab + 1} of {designFiles.length}
+                                            </div>
                                             <button
-                                                onClick={() => {
-                                                    setImagePreview(null);
-                                                    setFormData(prev => ({ ...prev, file: null }));
-                                                }}
-                                                className="text-red-600 text-sm hover:underline"
+                                                type="button"
+                                                onClick={() => removeDesignFile(activeDesignTab)}
+                                                className="w-full mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                                             >
-                                                Remove
+                                                Remove File
                                             </button>
                                         </div>
-                                    ) : (
-                                        <label className="cursor-pointer">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleImageUpload}
-                                                className="hidden"
-                                            />
-                                            <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            <p className="text-gray-600">Click to upload or drag and drop</p>
-                                            <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</p>
-                                        </label>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3">
@@ -800,6 +883,7 @@ export default function CustomerPOSOrder() {
                             <p className="text-gray-500 mt-2">Review your order and choose payment method</p>
                         </div>
 
+
                         <div className="space-y-6">
                             {/* Order Summary */}
                             <div className="bg-gray-50 rounded-lg p-6 space-y-4">
@@ -833,7 +917,7 @@ export default function CustomerPOSOrder() {
                                 <div className="border-t pt-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-                                        <span className="text-3xl font-bold text-indigo-600">₱{subtotal.toFixed(2)}</span>
+                                        <span className="text-3xl font-bold text-indigo-600">{formatPeso(subtotal.toFixed(2))}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1010,9 +1094,48 @@ export default function CustomerPOSOrder() {
                                 </div>
                             )}
 
+                            {/* Validation Errors Display */}
+                            {Object.keys(errors).length > 0 && (
+                                <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-semibold text-red-800 mb-2">Errors:</h3>
+                                            <div className="space-y-1">
+                                                {Object.entries(errors).map(([field, messages]) => (
+                                                    <div key={field} className="flex flex-wrap gap-2">
+                                                        {Array.isArray(messages) ? messages.map((message, idx) => (
+                                                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
+                                                                <strong>{field.replace(/_/g, ' ')}:</strong> {message}
+                                                            </span>
+                                                        )) : (
+                                                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
+                                                                <strong>{field.replace(/_/g, ' ')}:</strong> {messages}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => setErrors({})}
+                                                className="mt-3 text-xs text-red-700 hover:text-red-900 font-medium underline"
+                                            >
+                                                Dismiss
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setCurrentStep(3)}
+                                    onClick={() => {
+                                        setCurrentStep(3)
+                                        setErrors({});
+                                    }
+                                    }
                                     disabled={processing}
                                     className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
                                 >
@@ -1021,7 +1144,7 @@ export default function CustomerPOSOrder() {
                                 <button
                                     onClick={handleSubmit}
                                     disabled={processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0)}
-                                    className={`flex-1 py-4 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     {processing ? 'Submitting...' : 'Submit Order ✓'}
                                 </button>
@@ -1101,7 +1224,8 @@ export default function CustomerPOSOrder() {
                                     due_date: '',
                                     file: null
                                 });
-                                setImagePreview(null);
+                                setDesignFiles([]);
+                                setActiveDesignTab(0);
                                 setPaymentProofs([]);
                                 setPaymentMethod('walkin');
                                 setSubmittedTicket(null);

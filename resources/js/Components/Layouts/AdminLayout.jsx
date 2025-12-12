@@ -24,8 +24,6 @@ export default function AdminLayout({ children, user = {}, notifications = [], m
                         $('[data-toggle="dropdown"]').dropdown();
                     }
 
-                    // Initialize other plugins but NOT the sidebar
-                    console.log('jQuery plugins initialized (excluding sidebar)');
                 } catch (error) {
                     console.warn('jQuery initialization error:', error);
                 }

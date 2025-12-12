@@ -43,7 +43,6 @@ export default function Customers({
     };
 
     const handleCustomerSubmit = (data) => {
-        console.log('handleCustomerSubmit', data);
         if (editingCustomer) {
             router.put(buildUrl(`/customers/${editingCustomer.id}`), data, {
                 onSuccess: () => {

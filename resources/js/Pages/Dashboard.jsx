@@ -9,11 +9,9 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
     const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
     const handleSave = () => {
-        console.log('save');
 
     }
 
-    console.log('openPaymentModal:', openPaymentModal);
 
     return (
         <AdminLayout user={user} notifications={notifications} messages={messages}>
@@ -322,7 +320,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                                     Sept. 23, 2025
                                                 </td>
                                             </tr>
-                                           <tr>
+                                            <tr>
                                                 <td>#2901FD54r</td>
                                                 <td>
                                                     Anne Dela Cruz

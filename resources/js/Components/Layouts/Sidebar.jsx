@@ -13,8 +13,6 @@ export default function Sidebar({ isCollapsed }) {
         return currentPath.startsWith(path);
     };
 
-    console.log("Auth side", auth);
-
     const sidebarClasses = [
         "sidebar",
         "sidebar-hide-to-small",
