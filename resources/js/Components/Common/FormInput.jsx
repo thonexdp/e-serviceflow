@@ -12,6 +12,7 @@ export default function FormInput({
   required = false,
   disabled = false,
   className = "",
+  maxLength = "",
   rows = 3,
   options = [], // For select inputs
   defaultChecked, // For checkbox
@@ -95,6 +96,7 @@ export default function FormInput({
             placeholder={placeholder}
             required={required}
             disabled={disabled}
+            maxLength={maxLength}
             min={min}
             className={`${baseClasses} p-2.5`}
           />

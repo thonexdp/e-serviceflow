@@ -191,6 +191,9 @@ export default function Productions({
             onError: () => {
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
     };
 
@@ -207,6 +210,9 @@ export default function Productions({
                 setLoading(false);
             },
             onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
                 setLoading(false);
             },
         });
@@ -261,6 +267,17 @@ export default function Productions({
         setConfirmationData(null);
     };
 
+    const handleDownload = (fileId, filename) => {
+        const url = buildUrl(`/files/${fileId}/download`);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleStartProduction = (ticketId) => {
         // Auto-claim ticket when starting production if not already claimed
         const ticket = tickets.data.find(t => t.id === ticketId);
@@ -281,7 +298,7 @@ export default function Productions({
                             setLoading(false);
                         },
                         onFinish: () => {
-                            setLoading(false); 
+                            setLoading(false);
                         },
                     });
                 },
@@ -290,7 +307,7 @@ export default function Productions({
                     setLoading(false);
                 },
                 onFinish: () => {
-                    setLoading(false); 
+                    setLoading(false);
                 },
             });
         } else {
@@ -305,7 +322,7 @@ export default function Productions({
                     setLoading(false);
                 },
                 onFinish: () => {
-                    setLoading(false); 
+                    setLoading(false);
                 },
             });
         }
@@ -364,6 +381,9 @@ export default function Productions({
                 setUpdateModalMessage({ type: 'error', text: errors?.message || 'Failed to update progress. Please try again.' });
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
     };
 
@@ -373,7 +393,7 @@ export default function Productions({
 
     const confirmMarkCompleted = (ticketId) => {
         console.log('✅ confirmMarkCompleted called with ticketId:', ticketId);
-        
+
         if (!ticketId) {
             console.error('❌ No ticketId provided to confirmMarkCompleted');
             return;
@@ -381,7 +401,7 @@ export default function Productions({
 
         setLoading(true);
         console.log('🚀 Making API call to complete ticket:', ticketId);
-        
+
         router.post(buildUrl(`/queue/${ticketId}/complete`), {}, {
             preserveScroll: true,
             preserveState: false,
@@ -392,6 +412,9 @@ export default function Productions({
             },
             onError: (errors) => {
                 console.error('❌ Error marking ticket as completed:', errors);
+                setLoading(false);
+            },
+            onFinish: () => {
                 setLoading(false);
             },
         });
@@ -474,8 +497,10 @@ export default function Productions({
             onError: () => {
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
-        setLoading(false);
     };
 
     const handleQuickAdd = (amount) => {
@@ -861,16 +886,16 @@ export default function Productions({
                                                 <tbody>
                                                     {mockupFiles.map((file) => (
                                                         <tr key={file.id}>
-                                                            <td>{file.file_name}</td>
+                                                            <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
                                                             <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                             <td>
-                                                                <a
-                                                                    href={`/mock-ups/files/${file.id}/download`}
-                                                                    target="_blank"
+                                                                <button
+                                                                    type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
+                                                                    onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
-                                                                </a>
+                                                                </button>
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
@@ -1412,14 +1437,14 @@ export default function Productions({
                                 <div className="d-flex gap-2">
                                     <button
                                         type="button"
-                                        className="btn btn-secondary"
+                                        className="btn btn-sm btn-secondary"
                                         onClick={handleCloseModals}
                                     >
                                         Skip (Record Later)
                                     </button>
                                     <button
                                         type="submit"
-                                        className="btn btn-success"
+                                        className="btn btn-sm btn-success"
                                         disabled={loading}
                                     >
                                         {loading ? (
@@ -1471,7 +1496,7 @@ export default function Productions({
                     onCancel={handleCloseConfirmationModal}
                     onSubmit={() => {
                         console.log('Confirmation onSubmit triggered. Type:', confirmationType, 'Data:', confirmationData);
-                        
+
                         // Handle action confirmations
                         if (confirmationType === 'release_ticket') {
                             const ticketId = confirmationData?.ticketId;

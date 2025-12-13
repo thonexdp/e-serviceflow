@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title inertia>RC PrintShoppe</title>
+    <title>RC PrintShoppe</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicons/favicon-32x32.png') }}">
@@ -28,7 +28,7 @@
     <link href="{{ asset('css/lib/themify-icons.css') }}" rel="stylesheet">
     <link href="{{ asset('css/lib/owl.carousel.min.css') }}" rel="stylesheet">
     <link href="{{ asset('css/lib/owl.theme.default.min.css') }}" rel="stylesheet">
-    <link href="{{ asset('css/lib/weather-icons.css') }}" rel="stylesheet">
+    <!-- <link href="{{ asset('css/lib/weather-icons.css') }}" rel="stylesheet"> -->
     <link href="{{ asset('css/lib/menubar/sidebar.css') }}" rel="stylesheet">
     <link href="{{ asset('css/lib/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('css/lib/helper.css') }}" rel="stylesheet">
@@ -55,8 +55,8 @@
     <script src="{{ asset('js/lib/calendar-2/moment.latest.min.js') }}"></script>
     <script src="{{ asset('js/lib/calendar-2/pignose.calendar.min.js') }}"></script>
     <script src="{{ asset('js/lib/calendar-2/pignose.init.js') }}"></script>
-    <script src="{{ asset('js/lib/weather/jquery.simpleWeather.min.js') }}"></script>
-    <script src="{{ asset('js/lib/weather/weather-init.js') }}"></script>
+    <!-- <script src="{{ asset('js/lib/weather/jquery.simpleWeather.min.js') }}"></script>
+    <script src="{{ asset('js/lib/weather/weather-init.js') }}"></script> -->
     <script src="{{ asset('js/lib/circle-progress/circle-progress.min.js') }}"></script>
     <script src="{{ asset('js/lib/circle-progress/circle-progress-init.js') }}"></script>
     {{-- <script src="{{ asset('js/lib/chartist/chartist.min.js') }}"></script> --}}

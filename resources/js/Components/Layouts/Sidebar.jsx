@@ -138,7 +138,7 @@ export default function Sidebar({ isCollapsed }) {
                                 </li>
                                 <li className={isActive("/admin/customers") ? "active" : ""}>
                                     <Link href="/admin/customers">
-                                        <i className="ti-user"></i> Clients
+                                        <i className="ti-user"></i> Customers
                                     </Link>
                                 </li>
                                 <li className={isActive("/admin/tickets") ? "active" : ""}>

@@ -480,7 +480,7 @@ export default function CustomerPOSOrder() {
                                     onChange={handleEmailChange}
                                     list="email-suggestions"
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="juan@example.com"
+                                    placeholder="e.g., juan@example.com"
                                     autoComplete="email"
                                 />
                                 <datalist id="email-suggestions">
@@ -502,7 +502,7 @@ export default function CustomerPOSOrder() {
                                     value={formData.customer_name}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="Juan Dela Cruz"
+                                    placeholder="e.g., Juan Dela Cruz"
                                 />
                             </div>
 
@@ -515,7 +515,7 @@ export default function CustomerPOSOrder() {
                                     value={formData.customer_facebook}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_facebook: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="ana.fb"
+                                    placeholder="e.g., juancruz"
                                 />
                             </div>
 
