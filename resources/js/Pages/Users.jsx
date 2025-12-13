@@ -35,7 +35,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             update_password: false, // Toggle for updating password
             is_active: true,
         });
-    
+
     const [activeTab, setActiveTab] = useState("basic"); // 'basic', 'permissions', 'workflow', 'history'
     const [activityLogs, setActivityLogs] = useState([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
@@ -77,9 +77,8 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             key: "is_active",
             render: (user) => (
                 <span
-                    className={`${
-                        user.is_active ? "text-success" : "text-danger"
-                    }`}
+                    className={`${user.is_active ? "text-success" : "text-danger"
+                        }`}
                 >
                     {user.is_active ? "Active" : "Inactive"}
                 </span>
@@ -98,7 +97,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             });
 
             // Get workflow steps assigned to user
-            const userWorkflowSteps = user.workflow_steps 
+            const userWorkflowSteps = user.workflow_steps
                 ? user.workflow_steps.map(ws => ws.workflow_step || ws)
                 : [];
 
@@ -128,7 +127,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 update_password: false,
                 is_active: true,
             });
-        setActiveTab("basic");
+            setActiveTab("basic");
         }
         setIsModalOpen(true);
     };
@@ -152,11 +151,11 @@ export default function Users({ users, availableRoles, availablePermissions, ava
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         // Prepare data to submit
         let submitData = { ...data };
         let showPassword = false;
-        
+
         if (editingUser) {
             // For editing: only include password if update_password is true
             if (!data.update_password) {
@@ -173,7 +172,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                     showPassword = true;
                 }
             }
-            
+
             router.put(route("admin.users.update", editingUser.id), submitData, {
                 onSuccess: () => {
                     handleCloseModal();
@@ -195,7 +194,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 setGeneratedPassword(passwordToUse);
                 showPassword = true;
             }
-            
+
             router.post(route("admin.users.store"), submitData, {
                 onSuccess: () => {
                     handleCloseModal();
@@ -304,9 +303,9 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                 <button
                                     type="button"
                                     onClick={() => openModal()}
-                                    className="btn btn-primary text-medium float-end"
+                                    className="btn btn-primary btn-sm float-end"
                                 >
-                                    <i className="ti-plus"></i> Add User
+                                    <i className="ti-plus text-xs"></i> Add User
                                 </button>
                             )}
                         </div>
@@ -338,22 +337,20 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                             <button
                                 type="button"
                                 onClick={() => setActiveTab("basic")}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === "basic"
-                                        ? "border-indigo-500 text-indigo-600"
-                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                }`}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "basic"
+                                    ? "border-indigo-500 text-indigo-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    }`}
                             >
                                 <i className="ti-user mr-1"></i> Basic Info
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setActiveTab("permissions")}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === "permissions"
-                                        ? "border-indigo-500 text-indigo-600"
-                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                }`}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "permissions"
+                                    ? "border-indigo-500 text-indigo-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    }`}
                             >
                                 <i className="ti-lock mr-1"></i> Permissions
                             </button>
@@ -361,11 +358,10 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab("workflow")}
-                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                        activeTab === "workflow"
-                                            ? "border-indigo-500 text-indigo-600"
-                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                    }`}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "workflow"
+                                        ? "border-indigo-500 text-indigo-600"
+                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                        }`}
                                 >
                                     <i className="ti-layout-list-thumb mr-1"></i> Workflow
                                 </button>
@@ -377,11 +373,10 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                         setActiveTab("history");
                                         loadActivityLogs(editingUser.id);
                                     }}
-                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                        activeTab === "history"
-                                            ? "border-indigo-500 text-indigo-600"
-                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                    }`}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "history"
+                                        ? "border-indigo-500 text-indigo-600"
+                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                        }`}
                                 >
                                     <i className="ti-time mr-1"></i> Activity History
                                 </button>
@@ -690,7 +685,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                                                 id={`permission-${permission.id}`}
                                                                 checked={
                                                                     data.permissions[
-                                                                        permission.id
+                                                                    permission.id
                                                                     ] || false
                                                                 }
                                                                 onChange={(e) =>

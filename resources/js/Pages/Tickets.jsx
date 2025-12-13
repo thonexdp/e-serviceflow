@@ -674,7 +674,7 @@ export default function Tickets({
                         <div className="modal-footer border-top pt-3">
                             <button
                                 type="button"
-                                className="btn btn-secondary"
+                                className="btn btn-secondary btn-sm"
                                 onClick={closeStatusModal}
                                 disabled={isUpdating}
                             >
@@ -682,7 +682,7 @@ export default function Tickets({
                             </button>
                             <button
                                 type="button"
-                                className="btn btn-primary"
+                                className="btn btn-primary btn-sm"
                                 onClick={handleStatusUpdate}
                                 disabled={isUpdating}
                             >
@@ -976,7 +976,7 @@ export default function Tickets({
                         <div className="modal-footer border-top pt-3">
                             <button
                                 type="button"
-                                className="btn btn-secondary"
+                                className="btn btn-secondary btn-sm"
                                 onClick={closePaymentModal}
                                 disabled={isUpdating}
                             >
@@ -984,7 +984,7 @@ export default function Tickets({
                             </button>
                             <button
                                 type="button"
-                                className="btn btn-success"
+                                className="btn btn-success btn-sm"
                                 onClick={handlePaymentUpdate}
                                 disabled={isUpdating}
                             >
@@ -1014,10 +1014,10 @@ export default function Tickets({
                                         <h4>Search Customer</h4>
                                         <button
                                             type="button"
-                                            className="btn btn-primary text-medium float-end"
+                                            className="btn btn-primary btn-sm float-end"
                                             onClick={() => setCustomerModalOpen(true)}
                                         >
-                                            <i className="ti-plus"></i> Add Customer
+                                            <i className="ti-plus text-xs"></i> Add Customer
                                         </button>
                                     </div>
                                     <div className="card-body">
@@ -1135,7 +1135,8 @@ export default function Tickets({
                                             onClick={() => {
                                                 router.get(buildUrl("tickets"));
                                             }}
-                                            className="px-3 py-2 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
+                                            className="btn btn-sm btn-outline-info mr-2"
+                                            title="Refresh"
                                         >
                                             <i className="ti-reload"></i>
                                         </button>
@@ -1148,9 +1149,9 @@ export default function Tickets({
                                                     setTicketModalOpen(true)
                                                 }
                                                 disabled={!_selectedCustomer}
-                                                className="btn btn-primary text-medium float-end"
+                                                className="btn btn-sm btn-primary"
                                             >
-                                                <i className="ti-plus"></i> Add
+                                                <i className="ti-plus text-xs"></i> Add
                                                 Tickets
                                             </button>
                                         )}

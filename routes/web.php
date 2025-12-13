@@ -288,6 +288,7 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     // Tickets (View-only for context)
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
+    Route::get('/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('files.download');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');

@@ -12,7 +12,14 @@ export default function DataTable({
 }) {
     const handlePageChange = (url) => {
         if (url) {
-            router.get(url, {}, {
+            // Auto-correct to HTTPS if we are on HTTPS but the link is HTTP
+            // This happens often with Laravel pagination behind a load balancer if TrustProxies isn't set
+            let finalUrl = url;
+            if (typeof window !== 'undefined' && window.location.protocol === 'https:' && finalUrl.startsWith('http:')) {
+                finalUrl = finalUrl.replace('http:', 'https:');
+            }
+
+            router.get(finalUrl, {}, {
                 preserveState: true,
                 preserveScroll: true,
             });
@@ -49,29 +56,29 @@ export default function DataTable({
                                             ) : (
                                                 <div className="btn-group">
                                                     {onEdit && (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-link btn-sm text-primary"
-                                                        onClick={() => onEdit(row)}
-                                                         title={`Edit ${row.status !== 'completed' ? 'Edit' : 'View'}`}
-                                                    >
-                                                       <small>
-                                                        {row.status !== 'completed' ? <i className="ti-pencil"></i> : <i className="ti-eye"></i>}
-                                                        
-                                                        {row.status !== 'completed' ? ' Edit' : ' View'}</small> 
-                                                    </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-link btn-sm text-primary"
+                                                            onClick={() => onEdit(row)}
+                                                            title={`Edit ${row.status !== 'completed' ? 'Edit' : 'View'}`}
+                                                        >
+                                                            <small>
+                                                                {row.status !== 'completed' ? <i className="ti-pencil"></i> : <i className="ti-eye"></i>}
+
+                                                                {row.status !== 'completed' ? ' Edit' : ' View'}</small>
+                                                        </button>
                                                     )}
                                                     {onDelete && row.status !== 'completed' && (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-link btn-sm text-danger"
-                                                        onClick={() => onDelete(row.id)}
-                                                         title="Delete"
-                                                    >
-                                                       <small> <i className="ti-trash"></i> Delete</small>
-                                                    </button>
-                                                     )}
-                                                </div> 
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-link btn-sm text-danger"
+                                                            onClick={() => onDelete(row.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <small> <i className="ti-trash"></i> Delete</small>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                     )}
@@ -96,9 +103,8 @@ export default function DataTable({
                             {pagination.links.map((link, index) => (
                                 <li
                                     key={index}
-                                    className={`page-item ${link.active ? "active" : ""} ${
-                                        !link.url ? "disabled" : ""
-                                    }`}
+                                    className={`page-item ${link.active ? "active" : ""} ${!link.url ? "disabled" : ""
+                                        }`}
                                 >
                                     {link.url ? (
                                         <a

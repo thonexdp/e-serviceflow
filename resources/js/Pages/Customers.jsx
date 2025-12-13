@@ -50,6 +50,7 @@ export default function Customers({
                 },
                 preserveState: false,
                 preserveScroll: true,
+                onFinish: () => setLoading(false),
             });
         } else {
             router.post(buildUrl("/customers"), data, {
@@ -58,6 +59,7 @@ export default function Customers({
                 },
                 preserveState: false,
                 preserveScroll: true,
+                onFinish: () => setLoading(false),
             });
         }
     };
@@ -235,7 +237,8 @@ export default function Customers({
                                                         onClick={() =>
                                                             router.replace(buildUrl("/customers"))
                                                         }
-                                                        className="px-3 mr-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none transition"
+                                                        className="btn btn-sm btn-outline-info mr-2"
+                                                        title="Refresh"
                                                     >
                                                         <i className="ti-reload"></i>
                                                     </button>
@@ -246,9 +249,9 @@ export default function Customers({
                                                             onClick={() =>
                                                                 handleOpenModal()
                                                             }
-                                                            className="px-3 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+                                                            className="btn btn-sm btn-primary"
                                                         >
-                                                            <i className="ti-plus"></i>{" "}
+                                                            <i className="ti-plus text-xs"></i>{" "}
                                                             Add Customer
                                                         </button>
                                                     )}

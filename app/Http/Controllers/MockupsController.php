@@ -180,12 +180,12 @@ class MockupsController extends Controller
     public function downloadFile($id)
     {
         $file = TicketFile::findOrFail($id);
+        $path = $file->getRawOriginal('file_path');
 
-        if (!Storage::exists($file->file_path)) {
+        if (!Storage::exists($path)) {
             abort(404);
         }
-
-        return Storage::download($file->file_path, $file->file_name);
+        return Storage::download($path, $file->file_name);
     }
 
     /**

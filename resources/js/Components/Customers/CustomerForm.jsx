@@ -117,6 +117,7 @@ export default function CustomerForm({ customer = null, onSubmit, onCancel, json
                     <FormInput
                         label="Phone"
                         name="phone"
+                        maxLength={11}
                         value={formData.phone}
                         onChange={handleChange}
                         error={errors.phone}
