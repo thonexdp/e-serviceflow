@@ -61,30 +61,34 @@ RUN rm -f /etc/nginx/sites-enabled/default
 # supervisor to manage php-fpm and nginx
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Create startup script with database retry logic
+# Create startup script that starts services immediately
 RUN echo '#!/bin/bash\n\
-set -e\n\
 cd /var/www/html\n\
 \n\
-# Wait for database to be ready\n\
-echo "Waiting for database connection..."\n\
-max_attempts=30\n\
-attempt=0\n\
-until php artisan db:show 2>/dev/null || [ $attempt -eq $max_attempts ]; do\n\
-  attempt=$((attempt+1))\n\
-  echo "Database not ready, attempt $attempt/$max_attempts..."\n\
-  sleep 2\n\
-done\n\
+# Function to run migrations in background\n\
+run_migrations() {\n\
+  echo "Waiting for database connection..."\n\
+  max_attempts=5\n\
+  attempt=0\n\
+  until php artisan db:show 2>/dev/null || [ $attempt -eq $max_attempts ]; do\n\
+    attempt=$((attempt+1))\n\
+    echo "Database not ready, attempt $attempt/$max_attempts..."\n\
+    sleep 2\n\
+  done\n\
+  \n\
+  if [ $attempt -eq $max_attempts ]; then\n\
+    echo "Warning: Could not connect to database, skipping migrations"\n\
+  else\n\
+    echo "Database connected, running migrations..."\n\
+    php artisan migrate --force\n\
+  fi\n\
+}\n\
 \n\
-if [ $attempt -eq $max_attempts ]; then\n\
-  echo "Failed to connect to database after $max_attempts attempts"\n\
-  exit 1\n\
-fi\n\
+# Run migrations in background (non-blocking)\n\
+run_migrations &\n\
 \n\
-echo "Database connected, running migrations..."\n\
-php artisan migrate --force\n\
-\n\
-echo "Starting services..."\n\
+# Start web services immediately\n\
+echo "Starting web services..."\n\
 exec supervisord -n' > /start.sh && chmod +x /start.sh
 
 EXPOSE 8080
