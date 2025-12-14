@@ -1206,28 +1206,28 @@ export default function Productions({
                                             className="btn btn-outline-primary btn-sm"
                                             onClick={() => handleQuickAdd(1)}
                                         >
-                                            <i className="ti-plus"></i> +1
+                                            +1
                                         </button>
                                         <button
                                             type="button"
                                             className="btn btn-outline-primary btn-sm"
                                             onClick={() => handleQuickAdd(5)}
                                         >
-                                            <i className="ti-plus"></i> +5
+                                            +5
                                         </button>
                                         <button
                                             type="button"
                                             className="btn btn-outline-primary btn-sm"
                                             onClick={() => handleQuickAdd(10)}
                                         >
-                                            <i className="ti-plus"></i> +10
+                                            +10
                                         </button>
                                         <button
                                             type="button"
                                             className="btn btn-outline-primary btn-sm"
                                             onClick={() => handleQuickAdd(50)}
                                         >
-                                            <i className="ti-plus"></i> +50
+                                            +50
                                         </button>
                                         <button
                                             type="button"

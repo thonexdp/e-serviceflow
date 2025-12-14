@@ -50,7 +50,7 @@ export default function Sidebar({ isCollapsed }) {
                     </div>
 
                     <ul>
-                        <li className="label">Main</li>
+                        <li className="label">Menu</li>
                     </ul>
                     {role === "FrontDesk" ? (
                         <ul>

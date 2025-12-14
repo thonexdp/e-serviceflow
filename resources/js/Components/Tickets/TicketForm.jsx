@@ -101,7 +101,7 @@ export default function TicketForm({
     // Populate form if editing
     useEffect(() => {
         if (ticket) {
-            
+
             const jobTypeId = ticket.job_type_id?.toString() || "";
             // Try to get category from job_type relationship, or find it from jobCategories
             let categoryId = "";
@@ -1350,7 +1350,7 @@ export default function TicketForm({
                                     <div className="border rounded p-4 text-center text-muted bg-light mt-3">
                                         <i className="ti-receipt" style={{ fontSize: "32px" }}></i>
                                         <p className="mt-2 small mb-0">
-                                            Upload screenshots or PDFs of payment confirmations
+                                            Upload screenshots of payment confirmations
                                         </p>
                                     </div>
                                 )}
@@ -1368,7 +1368,7 @@ export default function TicketForm({
                                 <input
                                     type="file"
                                     className="form-control"
-                                    accept="image/*,application/pdf"
+                                    accept="image/*"
                                     multiple
                                     onChange={handleTicketAttachmentUpload}
                                 />

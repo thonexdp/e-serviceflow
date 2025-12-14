@@ -18,6 +18,7 @@ export default function Header({
     const { auth } = usePage().props;
 
     const userName = auth?.user?.name || "Guest";
+    const role = auth?.user?.role;
     const userAvatar = auth?.user?.avatar || "images/icons/chat.png";
     const [notificationList, setNotificationList] = useState(notifications || []);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -243,6 +244,8 @@ export default function Header({
     const handleNotificationClick = (notification, e) => {
         e.preventDefault();
 
+        console.log("notification:", notification);
+
         // Mark as read if unread
         if (!notification.read) {
             handleMarkAsRead(notification.id, e);
@@ -251,7 +254,8 @@ export default function Header({
         // Navigate to ticket if available
         if (notification.data?.ticket_id || notification.notifiable_id) {
             // const ticketId = notification.data?.ticket_id || notification.notifiable_id;
-            router.visit(buildUrl(`/tickets`));
+            const route_path = role !== "Designer" ? `/tickets` : `/mock-ups`;
+            router.visit(buildUrl(route_path));
         }
     };
 
