@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { formatPeso } from '@/Utils/currency';
 
@@ -30,7 +30,6 @@ export default function CustomerPOSOrder() {
     const [selectedSizeRate, setSelectedSizeRate] = useState(null);
     const [subtotal, setSubtotal] = useState(0);
     const [processing, setProcessing] = useState(false);
-    const [errors, setErrors] = useState({});
     const [paymentMethod, setPaymentMethod] = useState('walkin');
     const [paymentProofs, setPaymentProofs] = useState([]);
     const [activeProofTab, setActiveProofTab] = useState(0);
@@ -38,6 +37,14 @@ export default function CustomerPOSOrder() {
     const [settings, setSettings] = useState(null);
     const [qrcodeError, setQrcodeError] = useState(false);
     const [savedCustomers, setSavedCustomers] = useState([]);
+
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadStatus, setUploadStatus] = useState('');
+    const [errors, setErrors] = useState({});
+    const [retryCount, setRetryCount] = useState(0);
+    const retryTimeoutRef = useRef(null);
+
+    const MAX_RETRIES = 3;
 
     // Load saved customers from localStorage on mount
     useEffect(() => {
@@ -295,18 +302,37 @@ export default function CustomerPOSOrder() {
         }
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (isRetry = false, retryAttempt = 0) => {
+        // Clear any pending retry timeout
+        if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
+        }
+
+        const currentRetryCount = isRetry ? retryAttempt : 0;
+
+        console.log('retryCount...:', currentRetryCount);
         setProcessing(true);
         setErrors({});
+        setUploadProgress(0);
+        setUploadStatus('preparing');
+
+        // If this is not a retry, reset retry count
+        if (!isRetry) {
+            setRetryCount(0);
+        }
 
         try {
             // Step 1: Find or create customer
+            setUploadStatus('customer');
             let customerId = formData.customer_id;
             if (!customerId) {
                 customerId = await findOrCreateCustomer();
             }
+            setUploadProgress(10);
 
             // Step 2: Prepare order data
+            setUploadStatus('preparing');
             const orderData = new FormData();
             orderData.append('customer_id', customerId);
             orderData.append('description', formData.description);
@@ -327,89 +353,400 @@ export default function CustomerPOSOrder() {
                 orderData.append('size_height', formData.size_height);
             }
 
-            // Add design files if any
-            designFiles.forEach((designFile, index) => {
+            designFiles.forEach((designFile) => {
                 if (designFile.file) {
                     orderData.append(`attachments[]`, designFile.file);
                 }
             });
 
-            // Add payment method
             orderData.append('payment_method', paymentMethod);
 
-            // Add payment proofs if any
-            paymentProofs.forEach((proof, index) => {
+            paymentProofs.forEach((proof) => {
                 if (proof.file) {
                     orderData.append(`payment_proofs[]`, proof.file);
                 }
             });
 
-            // Step 3: Submit order
-            const response = await fetch('/api/public/orders', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: orderData,
+            setUploadProgress(15);
+            setUploadStatus('uploading');
+
+            // Step 3: Submit with XMLHttpRequest
+            const response = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 70) + 15;
+                        setUploadProgress(percentComplete);
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    setUploadProgress(90);
+                    setUploadStatus('processing');
+
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            resolve({ ok: true, status: xhr.status, data });
+                        } catch (e) {
+                            reject(new Error('Failed to parse response'));
+                        }
+                    } else {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            resolve({ ok: false, status: xhr.status, data });
+                        } catch (e) {
+                            reject(new Error(`Server error (${xhr.status})`));
+                        }
+                    }
+                });
+
+                xhr.addEventListener('error', () => reject(new Error('Network error')));
+                xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+                xhr.open('POST', '/api/public/orders');
+                xhr.setRequestHeader('X-CSRF-TOKEN',
+                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                );
+                xhr.send(orderData);
             });
 
-            // Try to parse JSON response
-            let data;
-            try {
-                data = await response.json();
-            } catch (parseError) {
-                console.error('Failed to parse response as JSON:', parseError);
-                // Server returned HTML (likely a 500 error or file too large)
-                setErrors({
-                    general: [
-                        'Server error: The file you uploaded may be too large or of an invalid type.',
-                        'Please ensure your file is less than 10MB and is a JPG, JPEG, PNG, or PDF.'
-                    ]
-                });
-                return;
-            }
+            setUploadProgress(95);
 
-
-            // Check if validation errors exist (422 status or errors in response)
+            // Handle response
             if (!response.ok) {
-                if (response.status === 422 && data.errors) {
-                    // Laravel validation errors
-                    setErrors(data.errors);
+                let errorData = {};
+
+                if (response.status === 422 && response.data.errors) {
+                    errorData = response.data.errors;
                 } else if (response.status === 413) {
-                    // File too large (payload too large)
-                    setErrors(data.errors || {
-                        file: ['The uploaded file is too large. Maximum size is 10MB.']
-                    });
-                } else if (data.message) {
-                    // Other error with message
-                    setErrors({ general: [data.message] });
+                    errorData = {
+                        general: ['One or more files are too large. Each file must be less than 10MB.']
+                    };
+                } else if (response.status === 500) {
+                    errorData = {
+                        general: ['Server error occurred. This might be due to a file upload issue. Please check your files and try again.']
+                    };
+                } else if (response.data.message) {
+                    errorData = { general: [response.data.message] };
                 } else {
-                    // Unknown error
-                    setErrors({ general: [`Server error (${response.status}). Please try again.`] });
+                    errorData = {
+                        general: ['An unexpected error occurred. Please try again or contact support if the problem persists.']
+                    };
                 }
+
+                // Check if we should retry
+                if (isRetryableError(errorData) && currentRetryCount < MAX_RETRIES) {
+                    const nextRetry = currentRetryCount + 1;
+                    setRetryCount(nextRetry);
+                    setUploadStatus('retrying');
+
+                    console.log(`Retrying submission... Attempt ${nextRetry} of ${MAX_RETRIES}`);
+
+                    // Wait 2 seconds before retrying (progressive delay: 2s, 4s, 6s)
+                    const delay = nextRetry * 2000;
+                    retryTimeoutRef.current = setTimeout(() => {
+                        handleSubmit(true, nextRetry);
+                    }, delay);
+
+                    return; // Don't show error yet, we're retrying
+                }
+
+                // If we've exhausted retries or error is not retryable, show error
+                if (currentRetryCount >= MAX_RETRIES && isRetryableError(errorData)) {
+                    errorData.general = [
+                        ...(errorData.general || []),
+                        `Failed after ${MAX_RETRIES} attempts. Please try again later.`
+                    ];
+                }
+
+                setErrors(errorData);
+                setUploadStatus('');
+                setRetryCount(0);
                 return;
             }
 
-            if (data.success) {
-                // Store submitted ticket info
+            if (response.data.success) {
+                setUploadProgress(100);
+                setUploadStatus('complete');
+                setRetryCount(0); // Reset retry count on success
+
                 setSubmittedTicket({
-                    ticket_number: data.ticket_number,
-                    status: data.ticket?.status || 'pending',
-                    payment_status: data.ticket?.payment_status || 'pending',
+                    ticket_number: response.data.ticket_number,
+                    status: response.data.ticket?.status || 'pending',
+                    payment_status: response.data.ticket?.payment_status || 'pending',
                 });
-                // Move to step 5 (success page)
-                setCurrentStep(5);
+
+                setTimeout(() => {
+                    setCurrentStep(5);
+                    setUploadStatus('');
+                }, 800);
             } else {
-                // Handle other errors
-                setErrors({ general: [data.message || 'Failed to submit order'] });
+                setErrors({ general: [response.data.message || 'Failed to submit order'] });
+                setUploadStatus('');
+                setRetryCount(0);
             }
         } catch (error) {
             console.error('Error submitting order:', error);
-            setErrors({ general: ['Failed to submit order. Please check your connection and try again.'] });
+            let errorMessage = 'Unable to submit your order. ';
+
+            if (error.message.includes('Network error')) {
+                errorMessage += 'Please check your internet connection and try again.';
+            } else if (error.message.includes('Failed to parse')) {
+                errorMessage += 'The server response was invalid. Your files may be too large.';
+            } else {
+                errorMessage += 'Please try again or contact support if the issue continues.';
+            }
+
+            const errorData = { general: [errorMessage] };
+
+            // Check if we should retry
+            if (isRetryableError(errorData) && currentRetryCount < MAX_RETRIES) {
+                const nextRetry = currentRetryCount + 1;
+                setRetryCount(nextRetry);
+                setUploadStatus('retrying');
+
+                console.log(`Retrying submission... Attempt ${nextRetry} of ${MAX_RETRIES}`);
+
+                const delay = nextRetry * 2000;
+                retryTimeoutRef.current = setTimeout(() => {
+                    handleSubmit(true, nextRetry);
+                }, delay);
+
+                return;
+            }
+
+            if (currentRetryCount >= MAX_RETRIES) {
+                errorData.general = [
+                    ...errorData.general,
+                    `Failed after ${MAX_RETRIES} attempts. Please try again later.`
+                ];
+            }
+
+            setErrors(errorData);
+            setUploadStatus('');
+            setRetryCount(0);
         } finally {
             setProcessing(false);
         }
     };
+
+
+    const isRetryableError = (errorObj) => {
+        if (!errorObj || Object.keys(errorObj).length === 0) return false;
+
+        // Check for general errors that are retryable
+        if (errorObj.general) {
+            const generalErrors = Array.isArray(errorObj.general) ? errorObj.general : [errorObj.general];
+            return generalErrors.some(msg =>
+                msg.includes('Server error') ||
+                msg.includes('server response') ||
+                msg.includes('connection') ||
+                msg.includes('Network error') ||
+                msg.includes('try again')
+            );
+        }
+
+        return false;
+    };
+
+    const formatErrorMessage = (field, message) => {
+        // Field name mapping for better readability
+        const fieldNames = {
+            'customer_id': 'Customer',
+            'description': 'Description',
+            'job_type_id': 'Job Type',
+            'quantity': 'Quantity',
+            'free_quantity': 'Free Quantity',
+            'size_rate_id': 'Size Rate',
+            'size_width': 'Width',
+            'size_height': 'Height',
+            'due_date': 'Due Date',
+            'subtotal': 'Subtotal',
+            'total_amount': 'Total Amount',
+            'payment_method': 'Payment Method',
+            'file': 'Design File',
+            'general': ''
+        };
+
+        // Handle array field names (like attachments.0, payment_proofs.1)
+        let friendlyFieldName = field;
+
+        // Check if it's an attachment field
+        if (field.match(/^attachments\.\d+$/)) {
+            const index = parseInt(field.split('.')[1]) + 1;
+            friendlyFieldName = `Design File #${index}`;
+        } else if (field.match(/^payment_proofs\.\d+$/)) {
+            const index = parseInt(field.split('.')[1]) + 1;
+            friendlyFieldName = `Payment Proof #${index}`;
+        } else {
+            friendlyFieldName = fieldNames[field] || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        // Message transformation for common validation errors
+        let friendlyMessage = message;
+
+        // File size errors
+        if (message.includes('must not be greater than 10240 kilobytes')) {
+            friendlyMessage = 'File is too large. Maximum size is 10MB.';
+        } else if (message.includes('kilobytes')) {
+            friendlyMessage = 'File size exceeds the allowed limit.';
+        }
+
+        // File type errors
+        if (message.includes('must be a file of type')) {
+            friendlyMessage = 'Invalid file type. Please upload JPG, JPEG, PNG, or PDF only.';
+        }
+
+        // Required field errors
+        if (message.includes('field is required')) {
+            friendlyMessage = 'This field is required.';
+        }
+
+        // Numeric errors
+        if (message.includes('must be a number') || message.includes('must be an integer')) {
+            friendlyMessage = 'Please enter a valid number.';
+        }
+
+        // Min/Max errors
+        if (message.includes('must be at least')) {
+            const match = message.match(/must be at least (\d+)/);
+            if (match) {
+                friendlyMessage = `Minimum value is ${match[1]}.`;
+            }
+        }
+
+        // Date errors
+        if (message.includes('is not a valid date')) {
+            friendlyMessage = 'Please enter a valid date.';
+        }
+
+        // Exists validation (foreign key)
+        if (message.includes('selected') && message.includes('is invalid')) {
+            friendlyMessage = 'Invalid selection. Please choose a valid option.';
+        }
+
+        return { field: friendlyFieldName, message: friendlyMessage };
+    };
+
+
+
+    // const handleSubmit = async () => {
+    //     setProcessing(true);
+    //     setErrors({});
+
+    //     try {
+    //         // Step 1: Find or create customer
+    //         let customerId = formData.customer_id;
+    //         if (!customerId) {
+    //             customerId = await findOrCreateCustomer();
+    //         }
+
+    //         // Step 2: Prepare order data
+    //         const orderData = new FormData();
+    //         orderData.append('customer_id', customerId);
+    //         orderData.append('description', formData.description);
+    //         orderData.append('job_type_id', formData.job_type_id);
+    //         orderData.append('quantity', formData.quantity);
+    //         orderData.append('free_quantity', formData.free_quantity || 0);
+    //         orderData.append('due_date', formData.due_date);
+    //         orderData.append('subtotal', subtotal.toFixed(2));
+    //         orderData.append('total_amount', subtotal.toFixed(2));
+
+    //         if (formData.size_rate_id) {
+    //             orderData.append('size_rate_id', formData.size_rate_id);
+    //         }
+    //         if (formData.size_width) {
+    //             orderData.append('size_width', formData.size_width);
+    //         }
+    //         if (formData.size_height) {
+    //             orderData.append('size_height', formData.size_height);
+    //         }
+
+    //         // Add design files if any
+    //         designFiles.forEach((designFile, index) => {
+    //             if (designFile.file) {
+    //                 orderData.append(`attachments[]`, designFile.file);
+    //             }
+    //         });
+
+    //         // Add payment method
+    //         orderData.append('payment_method', paymentMethod);
+
+    //         // Add payment proofs if any
+    //         paymentProofs.forEach((proof, index) => {
+    //             if (proof.file) {
+    //                 orderData.append(`payment_proofs[]`, proof.file);
+    //             }
+    //         });
+
+    //         // Step 3: Submit order
+    //         const response = await fetch('/api/public/orders', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+    //             },
+    //             body: orderData,
+    //         });
+
+    //         // Try to parse JSON response
+    //         let data;
+    //         try {
+    //             data = await response.json();
+    //         } catch (parseError) {
+    //             console.error('Failed to parse response as JSON:', parseError);
+    //             // Server returned HTML (likely a 500 error or file too large)
+    //             setErrors({
+    //                 general: [
+    //                     'Server error: The file you uploaded may be too large or of an invalid type.',
+    //                     'Please ensure your file is less than 10MB and is a JPG, JPEG, PNG, or PDF.'
+    //                 ]
+    //             });
+    //             return;
+    //         }
+
+
+    //         // Check if validation errors exist (422 status or errors in response)
+    //         if (!response.ok) {
+    //             if (response.status === 422 && data.errors) {
+    //                 // Laravel validation errors
+    //                 setErrors(data.errors);
+    //             } else if (response.status === 413) {
+    //                 // File too large (payload too large)
+    //                 setErrors(data.errors || {
+    //                     file: ['The uploaded file is too large. Maximum size is 10MB.']
+    //                 });
+    //             } else if (data.message) {
+    //                 // Other error with message
+    //                 setErrors({ general: [data.message] });
+    //             } else {
+    //                 // Unknown error
+    //                 setErrors({ general: [`Server error (${response.status}). Please try again.`] });
+    //             }
+    //             return;
+    //         }
+
+    //         if (data.success) {
+    //             // Store submitted ticket info
+    //             setSubmittedTicket({
+    //                 ticket_number: data.ticket_number,
+    //                 status: data.ticket?.status || 'pending',
+    //                 payment_status: data.ticket?.payment_status || 'pending',
+    //             });
+    //             // Move to step 5 (success page)
+    //             setCurrentStep(5);
+    //         } else {
+    //             // Handle other errors
+    //             setErrors({ general: [data.message || 'Failed to submit order'] });
+    //         }
+    //     } catch (error) {
+    //         console.error('Error submitting order:', error);
+    //         setErrors({ general: ['Failed to submit order. Please check your connection and try again.'] });
+    //     } finally {
+    //         setProcessing(false);
+    //     }
+    // };
 
     const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone;
     const canProceedStep2 = formData.category_id && formData.job_type_id && formData.quantity > 0;
@@ -421,6 +758,78 @@ export default function CustomerPOSOrder() {
     const hasPriceTiers = priceTiers.length > 0;
     const hasSizeRates = sizeRates.length > 0;
     const hasPromoRules = promoRules.length > 0;
+
+    const UploadProgressIndicator = () => {
+        const statusMessages = {
+            preparing: 'Preparing your order...',
+            customer: 'Verifying customer information...',
+            uploading: 'Uploading files...',
+            processing: 'Processing your order...',
+            retrying: `Connection issue detected. Retrying... (Attempt ${retryCount} of ${MAX_RETRIES})`,
+            complete: 'Order submitted successfully!'
+        };
+
+        if (!uploadStatus) return null;
+
+        const totalFiles = designFiles.length + paymentProofs.length;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4">
+                    <div className="text-center mb-6">
+                        {uploadStatus === 'complete' ? (
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                        ) : uploadStatus === 'retrying' ? (
+                            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-yellow-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+                        )}
+
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">
+                            {statusMessages[uploadStatus] || 'Processing...'}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                            {uploadStatus === 'retrying' ? 'Please wait, we\'re trying to reconnect...' : 'Please don\'t close this window'}
+                        </p>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                            className={`absolute top-0 left-0 h-full transition-all duration-300 ease-out ${uploadStatus === 'retrying' ? 'bg-gradient-to-r from-yellow-500 to-orange-600' : 'bg-gradient-to-r from-indigo-500 to-purple-600'
+                                }`}
+                            style={{ width: `${uploadProgress}%` }}
+                        >
+                            <div className="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
+                        </div>
+                    </div>
+
+                    <div className="text-center mt-3">
+                        <span className="text-sm font-semibold text-gray-700">
+                            {uploadProgress}%
+                        </span>
+                    </div>
+
+                    {/* File info */}
+                    {totalFiles > 0 && uploadStatus === 'uploading' && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-xs text-gray-600">
+                                Uploading {totalFiles} file(s)...
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
@@ -1102,47 +1511,78 @@ export default function CustomerPOSOrder() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         <div className="flex-1">
-                                            <h3 className="text-sm font-semibold text-red-800 mb-2">Errors:</h3>
-                                            <div className="space-y-1">
-                                                {Object.entries(errors).map(([field, messages]) => (
-                                                    <div key={field} className="flex flex-wrap gap-2">
-                                                        {Array.isArray(messages) ? messages.map((message, idx) => (
-                                                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
-                                                                <strong>{field.replace(/_/g, ' ')}:</strong> {message}
-                                                            </span>
-                                                        )) : (
-                                                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
-                                                                <strong>{field.replace(/_/g, ' ')}:</strong> {messages}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                            <div className="space-y-2">
+                                                {Object.entries(errors).map(([field, messages]) => {
+                                                    const messageArray = Array.isArray(messages) ? messages : [messages];
+                                                    return messageArray.map((message, idx) => {
+                                                        const formatted = formatErrorMessage(field, message);
+                                                        return (
+                                                            <div key={`${field}-${idx}`} className="flex items-start gap-2 bg-white p-3 rounded-lg border border-red-200">
+                                                                <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                                                </svg>
+                                                                <div className="flex-1">
+                                                                    {formatted.field && (
+                                                                        <span className="font-semibold text-red-900 text-sm">
+                                                                            {formatted.field}:{' '}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-red-700 text-sm">
+                                                                        {formatted.message}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })}
                                             </div>
-                                            <button
-                                                onClick={() => setErrors({})}
-                                                className="mt-3 text-xs text-red-700 hover:text-red-900 font-medium underline"
-                                            >
-                                                Dismiss
-                                            </button>
+                                            <div className="mt-4 flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setErrors({});
+                                                        setRetryCount(0);
+                                                    }}
+                                                    className="px-4 py-2 text-sm text-red-700 hover:text-white hover:bg-red-600 font-medium border border-red-300 rounded-lg transition-colors"
+                                                >
+                                                    Dismiss
+                                                </button>
+                                                {/* Manual retry button - still available after auto-retry exhausted */}
+                                                <button
+                                                    onClick={() => {
+                                                        setErrors({});
+                                                        setRetryCount(0);
+                                                        handleSubmit(false);
+                                                    }}
+                                                    disabled={processing}
+                                                    className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {processing ? 'Retrying...' : 'Try Again'}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
+                            {uploadStatus && <UploadProgressIndicator />}
+
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => {
-                                        setCurrentStep(3)
+                                        setCurrentStep(3);
                                         setErrors({});
-                                    }
-                                    }
+                                        setRetryCount(0);
+                                        if (retryTimeoutRef.current) {
+                                            clearTimeout(retryTimeoutRef.current);
+                                        }
+                                    }}
                                     disabled={processing}
-                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                                 >
                                     ← Back
                                 </button>
                                 <button
-                                    onClick={handleSubmit}
+                                    onClick={() => handleSubmit(false)}
                                     disabled={processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0)}
                                     className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
