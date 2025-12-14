@@ -191,6 +191,8 @@ export default function CustomerPOSOrder() {
             file,
             preview: URL.createObjectURL(file),
             name: file.name,
+            invalid: file.size > 10 * 1024 * 1024,
+            errorMessage: file.size > 10 * 1024 * 1024 ? 'File too large (max 10MB)' : null
         }));
 
         setDesignFiles((prev) => [...prev, ...uploads]);
@@ -212,10 +214,13 @@ export default function CustomerPOSOrder() {
     const handlePaymentProofUpload = (event) => {
         const files = Array.from(event.target.files || []);
         if (!files.length) return;
+
         const uploads = files.map((file) => ({
             file,
             preview: URL.createObjectURL(file),
             name: file.name,
+            invalid: file.size > 10 * 1024 * 1024,
+            errorMessage: file.size > 10 * 1024 * 1024 ? 'File too large (max 10MB)' : null
         }));
         setPaymentProofs((prev) => [...prev, ...uploads]);
         event.target.value = "";
@@ -312,6 +317,33 @@ export default function CustomerPOSOrder() {
         const currentRetryCount = isRetry ? retryAttempt : 0;
 
         console.log('retryCount...:', currentRetryCount);
+
+        // Pre-submission validation for file sizes
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const largeFiles = [];
+
+        designFiles.forEach(f => {
+            if (f.file && f.file.size > MAX_FILE_SIZE) {
+                largeFiles.push(`${f.name} (${(f.file.size / (1024 * 1024)).toFixed(2)}MB)`);
+            }
+        });
+
+        paymentProofs.forEach(f => {
+            if (f.file && f.file.size > MAX_FILE_SIZE) {
+                largeFiles.push(`${f.name} (${(f.file.size / (1024 * 1024)).toFixed(2)}MB)`);
+            }
+        });
+
+        if (largeFiles.length > 0) {
+            setErrors({
+                general: [
+                    'Unable to proceed. The following files exceed the 10MB limit:',
+                    ...largeFiles
+                ]
+            });
+            return;
+        }
+
         setProcessing(true);
         setErrors({});
         setUploadProgress(0);
@@ -494,7 +526,8 @@ export default function CustomerPOSOrder() {
             if (error.message.includes('Network error')) {
                 errorMessage += 'Please check your internet connection and try again.';
             } else if (error.message.includes('Failed to parse')) {
-                errorMessage += 'The server response was invalid. Your files may be too large.';
+                // Avoid using "server response" to prevent auto-retry on file size/content issues
+                errorMessage += 'The upload failed. Your files may be too large for the server to process.';
             } else {
                 errorMessage += 'Please try again or contact support if the issue continues.';
             }
@@ -539,6 +572,16 @@ export default function CustomerPOSOrder() {
         // Check for general errors that are retryable
         if (errorObj.general) {
             const generalErrors = Array.isArray(errorObj.general) ? errorObj.general : [errorObj.general];
+
+            // Explicitly do NOT retry for file size errors
+            if (generalErrors.some(msg =>
+                msg.includes('too large') ||
+                msg.includes('maximum size') ||
+                msg.includes('Maximum size')
+            )) {
+                return false;
+            }
+
             return generalErrors.some(msg =>
                 msg.includes('Server error') ||
                 msg.includes('server response') ||
@@ -750,7 +793,8 @@ export default function CustomerPOSOrder() {
 
     const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone;
     const canProceedStep2 = formData.category_id && formData.job_type_id && formData.quantity > 0;
-    const canProceedStep3 = formData.description && formData.due_date;
+    const hasInvalidDesignFiles = designFiles.some(f => f.invalid);
+    const canProceedStep3 = formData.description && formData.due_date && !hasInvalidDesignFiles;
 
     const priceTiers = selectedJobType?.price_tiers || [];
     const sizeRates = selectedJobType?.size_rates || [];
@@ -1212,7 +1256,21 @@ export default function CustomerPOSOrder() {
                                     onChange={handleImageUpload}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">You can upload multiple images (PNG, JPG up to 10MB each)</p>
+                                {/* <p className="text-xs text-gray-500 mt-1">You can upload multiple images (PNG, JPG up to 10MB each)</p> */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-1">
+                                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="text-sm text-blue-800">
+                                        <p className="font-medium">File Requirements:</p>
+                                        <ul className="mt-1 space-y-0.5 text-xs">
+                                            <li>• Maximum size: <strong>10MB per file</strong></li>
+                                            <li>• Accepted formats: <strong>JPG, JPEG, PNG, PDF</strong></li>
+                                            <li>• You can upload multiple files</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
 
                                 {designFiles.length > 0 && (
                                     <div className="mt-4">
@@ -1233,7 +1291,15 @@ export default function CustomerPOSOrder() {
                                                 ))}
                                             </div>
                                         )}
-                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+                                        <div className={`border-2 border-dashed rounded-lg p-4 ${designFiles[activeDesignTab]?.invalid ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'}`}>
+                                            {designFiles[activeDesignTab]?.invalid && (
+                                                <div className="flex items-center gap-2 text-red-600 mb-2 justify-center">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="text-sm font-bold">{designFiles[activeDesignTab].errorMessage}</span>
+                                                </div>
+                                            )}
                                             <img
                                                 src={designFiles[activeDesignTab]?.preview}
                                                 alt={`Design ${activeDesignTab + 1}`}
@@ -1481,7 +1547,15 @@ export default function CustomerPOSOrder() {
                                                     ))}
                                                 </div>
                                             )}
-                                            <div className="border rounded-lg p-4 bg-gray-50">
+                                            <div className={`border rounded-lg p-4 ${paymentProofs[activeProofTab]?.invalid ? 'border-red-400 bg-red-50' : 'bg-gray-50'}`}>
+                                                {paymentProofs[activeProofTab]?.invalid && (
+                                                    <div className="flex items-center gap-2 text-red-600 mb-2 justify-center">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        <span className="text-sm font-bold">{paymentProofs[activeProofTab].errorMessage}</span>
+                                                    </div>
+                                                )}
                                                 <img
                                                     src={paymentProofs[activeProofTab]?.preview}
                                                     alt={`Payment proof ${activeProofTab + 1}`}
@@ -1583,8 +1657,16 @@ export default function CustomerPOSOrder() {
                                 </button>
                                 <button
                                     onClick={() => handleSubmit(false)}
-                                    disabled={processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0)}
-                                    className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={
+                                        processing ||
+                                        ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
+                                        paymentProofs.some(p => p.invalid)
+                                    }
+                                    className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing ||
+                                            ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
+                                            paymentProofs.some(p => p.invalid)
+                                            ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
                                 >
                                     {processing ? 'Submitting...' : 'Submit Order ✓'}
                                 </button>
