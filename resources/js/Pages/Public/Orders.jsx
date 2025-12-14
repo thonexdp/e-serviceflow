@@ -639,7 +639,7 @@ export default function CustomerPOSOrder() {
 
         // File type errors
         if (message.includes('must be a file of type')) {
-            friendlyMessage = 'Invalid file type. Please upload JPG, JPEG, PNG only.';
+            friendlyMessage = 'Invalid file type. Please upload JPG, JPEG, PNG, or PDF only.';
         }
 
         // Required field errors
@@ -1265,7 +1265,7 @@ export default function CustomerPOSOrder() {
                                         <p className="font-medium">File Requirements:</p>
                                         <ul className="mt-1 space-y-0.5 text-xs">
                                             <li>• Maximum size: <strong>10MB per file</strong></li>
-                                            <li>• Accepted formats: <strong>JPG, JPEG, PNG</strong></li>
+                                            <li>• Accepted formats: <strong>JPG, JPEG, PNG, PDF</strong></li>
                                             <li>• You can upload multiple files</li>
                                         </ul>
                                     </div>
@@ -1523,7 +1523,7 @@ export default function CustomerPOSOrder() {
                                     </label>
                                     <input
                                         type="file"
-                                        accept="image/*"
+                                        accept="image/*,application/pdf"
                                         multiple
                                         onChange={handlePaymentProofUpload}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg"
@@ -1663,9 +1663,9 @@ export default function CustomerPOSOrder() {
                                         paymentProofs.some(p => p.invalid)
                                     }
                                     className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing ||
-                                        ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
-                                        paymentProofs.some(p => p.invalid)
-                                        ? 'opacity-50 cursor-not-allowed' : ''
+                                            ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
+                                            paymentProofs.some(p => p.invalid)
+                                            ? 'opacity-50 cursor-not-allowed' : ''
                                         }`}
                                 >
                                     {processing ? 'Submitting...' : 'Submit Order ✓'}
