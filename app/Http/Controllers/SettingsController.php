@@ -75,11 +75,13 @@ class SettingsController extends Controller
             // Delete old QR code if exists
             $oldQRCode = Setting::where('key', 'payment_gcash_qrcode')->first();
             if ($oldQRCode && $oldQRCode->value) {
-                Storage::delete($oldQRCode->value);
+                // Get the raw value from database to delete the actual file
+                $rawValue = $oldQRCode->getRawOriginal('value');
+                Storage::delete($rawValue);
             }
 
-            // Store new QR code
-            $path = $request->file('payment_gcash_qrcode')->store('settings/qrcodes', 'public');
+            // Store new QR code using the default disk (GCS in production, public locally)
+            $path = $request->file('payment_gcash_qrcode')->store('settings/qrcodes');
             Setting::set('payment_gcash_qrcode', $path, 'image');
         }
 
@@ -108,7 +110,7 @@ class SettingsController extends Controller
             'saturday' => '9AM - 3PM',
             'sunday' => 'Closed'
         ]);
-        
+
         // Ensure business_hours is always an array
         if (!is_array($businessHours)) {
             $businessHours = [

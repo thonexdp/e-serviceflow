@@ -31,33 +31,19 @@ class Setting extends Model
                 // For GCS, generate the full public URL
                 if ($disk === 'gcs') {
                     $bucket = config('filesystems.disks.gcs.bucket');
-                    // Remove any leading slashes from the value
-                    $cleanValue = ltrim($value, '/');
-                    return "https://storage.googleapis.com/{$bucket}/{$cleanValue}";
+                    return "https://storage.googleapis.com/{$bucket}/{$value}";
                 }
 
                 // For local/public storage, use the /storage/ prefix
                 if ($disk === 'public' || $disk === 'local') {
-                    // Remove any leading slashes and ensure /storage/ prefix
-                    $cleanValue = ltrim($value, '/');
-                    // Check if it already starts with 'storage/' to avoid duplication
-                    if (strpos($cleanValue, 'storage/') === 0) {
-                        return "/{$cleanValue}";
-                    }
-                    return "/storage/{$cleanValue}";
+                    return "/storage/{$value}";
                 }
 
                 // Fallback: try to use Storage::url()
                 try {
-                    $url = Storage::url($value);
-                    // If URL is relative, ensure it starts with /
-                    if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                        return $url;
-                    }
-                    return $url;
+                    return Storage::url($value);
                 } catch (\Exception $e) {
-                    $cleanValue = ltrim($value, '/');
-                    return "/storage/{$cleanValue}";
+                    return "/storage/{$value}";
                 }
             }
         );

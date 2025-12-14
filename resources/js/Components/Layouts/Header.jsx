@@ -250,8 +250,8 @@ export default function Header({
 
         // Navigate to ticket if available
         if (notification.data?.ticket_id || notification.notifiable_id) {
-            const ticketId = notification.data?.ticket_id || notification.notifiable_id;
-            router.visit(`/tickets?highlight=${ticketId}`);
+            // const ticketId = notification.data?.ticket_id || notification.notifiable_id;
+            router.visit(buildUrl(`/tickets`));
         }
     };
 
