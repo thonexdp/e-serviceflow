@@ -23,7 +23,6 @@ export default function Dashboard({
     const [openUploadModal, setUploadModalOpen] = useState(false);
 
     const handleSave = () => {
-        console.log("Form submitted:", forms);
         setCustomerModalOpen(false);
         setForms([
             {
@@ -131,16 +130,16 @@ export default function Dashboard({
                             className="mt-1 w-full border p-2" // fixed small width
                             placeholder=""
                             value=""
-                            // value={forms.ticket.quantity}
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             quantity: e.target.value,
-                            //         },
-                            //     })
-                            // }
+                        // value={forms.ticket.quantity}
+                        // onChange={(e) =>
+                        //     setForms({
+                        //         ...forms,
+                        //         ticket: {
+                        //             ...forms.ticket,
+                        //             quantity: e.target.value,
+                        //         },
+                        //     })
+                        // }
                         />
                     </div>
                 </form>
@@ -202,13 +201,13 @@ export default function Dashboard({
                         <hr className="my-3" />
                         <div>
                             <h6>Mock Files Here : </h6>
-                             <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-green-800"
-                                        >
-                                            <span className="ti-eye"></span>{" "}
-                                            Preview
-                                        </button>
+                            <button
+                                type="button"
+                                class="btn btn-link btn-outline btn-sm text-green-800"
+                            >
+                                <span className="ti-eye"></span>{" "}
+                                Preview
+                            </button>
                             <div className="mt-4">
                                 <div className="flex items-center justify-center w-full">
                                     <label
@@ -271,16 +270,16 @@ export default function Dashboard({
                             className="mt-1 w-full border p-2" // fixed small width
                             placeholder=""
                             value=""
-                            // value={forms.ticket.quantity}
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             quantity: e.target.value,
-                            //         },
-                            //     })
-                            // }
+                        // value={forms.ticket.quantity}
+                        // onChange={(e) =>
+                        //     setForms({
+                        //         ...forms,
+                        //         ticket: {
+                        //             ...forms.ticket,
+                        //             quantity: e.target.value,
+                        //         },
+                        //     })
+                        // }
                         />
                     </div>
                 </form>

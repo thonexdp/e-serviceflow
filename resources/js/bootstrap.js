@@ -39,7 +39,7 @@ if (import.meta.env.VITE_PUSHER_APP_KEY) {
 
     // Add connection event listeners for debugging
     window.Echo.connector.pusher.connection.bind('connected', () => {
-        console.log('✅ WebSocket connected to Pusher');
+        console.log('✅ WP');
     });
 
     window.Echo.connector.pusher.connection.bind('disconnected', () => {

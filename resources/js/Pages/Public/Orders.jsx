@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import { formatPeso } from '@/Utils/currency';
 
 export default function CustomerPOSOrder() {
     const { jobCategories = [] } = usePage().props;
@@ -23,18 +24,39 @@ export default function CustomerPOSOrder() {
         file: null
     });
 
-    const [imagePreview, setImagePreview] = useState(null);
+    const [designFiles, setDesignFiles] = useState([]);
+    const [activeDesignTab, setActiveDesignTab] = useState(0);
     const [selectedJobType, setSelectedJobType] = useState(null);
     const [selectedSizeRate, setSelectedSizeRate] = useState(null);
     const [subtotal, setSubtotal] = useState(0);
     const [processing, setProcessing] = useState(false);
-    const [errors, setErrors] = useState({});
     const [paymentMethod, setPaymentMethod] = useState('walkin');
     const [paymentProofs, setPaymentProofs] = useState([]);
     const [activeProofTab, setActiveProofTab] = useState(0);
     const [submittedTicket, setSubmittedTicket] = useState(null);
     const [settings, setSettings] = useState(null);
     const [qrcodeError, setQrcodeError] = useState(false);
+    const [savedCustomers, setSavedCustomers] = useState([]);
+
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadStatus, setUploadStatus] = useState('');
+    const [errors, setErrors] = useState({});
+    const [retryCount, setRetryCount] = useState(0);
+    const retryTimeoutRef = useRef(null);
+
+    const MAX_RETRIES = 3;
+
+    // Load saved customers from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('rc_printshop_customers');
+        if (saved) {
+            try {
+                setSavedCustomers(JSON.parse(saved));
+            } catch (e) {
+                console.error('Error loading saved customers:', e);
+            }
+        }
+    }, []);
 
     // Fetch settings on component mount
     useEffect(() => {
@@ -161,23 +183,44 @@ export default function CustomerPOSOrder() {
         }
     }, [selectedJobType, selectedSizeRate, formData.quantity, formData.size_width, formData.size_height]);
 
-    const handleImageUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setFormData(prev => ({ ...prev, file }));
-            const reader = new FileReader();
-            reader.onloadend = () => setImagePreview(reader.result);
-            reader.readAsDataURL(file);
-        }
+    const handleImageUpload = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
+
+        const uploads = files.map((file) => ({
+            file,
+            preview: URL.createObjectURL(file),
+            name: file.name,
+            invalid: file.size > 10 * 1024 * 1024,
+            errorMessage: file.size > 10 * 1024 * 1024 ? 'File too large (max 10MB)' : null
+        }));
+
+        setDesignFiles((prev) => [...prev, ...uploads]);
+        event.target.value = "";
+    };
+
+    const removeDesignFile = (index) => {
+        setDesignFiles((prev) => {
+            const updated = prev.filter((_, i) => i !== index);
+            if (activeDesignTab >= updated.length && activeDesignTab > 0) {
+                setActiveDesignTab(updated.length - 1);
+            } else if (updated.length === 0) {
+                setActiveDesignTab(0);
+            }
+            return updated;
+        });
     };
 
     const handlePaymentProofUpload = (event) => {
         const files = Array.from(event.target.files || []);
         if (!files.length) return;
+
         const uploads = files.map((file) => ({
             file,
             preview: URL.createObjectURL(file),
             name: file.name,
+            invalid: file.size > 10 * 1024 * 1024,
+            errorMessage: file.size > 10 * 1024 * 1024 ? 'File too large (max 10MB)' : null
         }));
         setPaymentProofs((prev) => [...prev, ...uploads]);
         event.target.value = "";
@@ -193,6 +236,37 @@ export default function CustomerPOSOrder() {
             }
             return updated;
         });
+    };
+
+    // Save customer to localStorage
+    const saveCustomerToLocal = (customerData) => {
+        try {
+            const customers = savedCustomers.filter(c => c.email !== customerData.email);
+            customers.unshift(customerData); // Add to beginning
+            const limited = customers.slice(0, 20); // Keep only last 20 emails
+            setSavedCustomers(limited);
+            localStorage.setItem('rc_printshop_customers', JSON.stringify(limited));
+        } catch (e) {
+            console.error('Error saving customer:', e);
+        }
+    };
+
+    // Handle email change and autofill
+    const handleEmailChange = (e) => {
+        const email = e.target.value;
+        setFormData(prev => ({ ...prev, customer_email: email }));
+
+        // Check if this email exists in saved customers
+        const savedCustomer = savedCustomers.find(c => c.email === email);
+        if (savedCustomer) {
+            setFormData(prev => ({
+                ...prev,
+                customer_email: email,
+                customer_name: savedCustomer.name || prev.customer_name,
+                customer_phone: savedCustomer.phone || prev.customer_phone,
+                customer_facebook: savedCustomer.facebook || prev.customer_facebook,
+            }));
+        }
     };
 
     const findOrCreateCustomer = async () => {
@@ -214,6 +288,14 @@ export default function CustomerPOSOrder() {
             const data = await response.json();
 
             if (data.success && data.customer) {
+                // Save customer info to localStorage for future use
+                saveCustomerToLocal({
+                    email: formData.customer_email,
+                    name: formData.customer_name,
+                    phone: formData.customer_phone,
+                    facebook: formData.customer_facebook,
+                });
+
                 setFormData(prev => ({ ...prev, customer_id: data.customer.id }));
                 return data.customer.id;
             } else {
@@ -225,18 +307,64 @@ export default function CustomerPOSOrder() {
         }
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (isRetry = false, retryAttempt = 0) => {
+        // Clear any pending retry timeout
+        if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
+        }
+
+        const currentRetryCount = isRetry ? retryAttempt : 0;
+
+        console.log('retryCount...:', currentRetryCount);
+
+        // Pre-submission validation for file sizes
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const largeFiles = [];
+
+        designFiles.forEach(f => {
+            if (f.file && f.file.size > MAX_FILE_SIZE) {
+                largeFiles.push(`${f.name} (${(f.file.size / (1024 * 1024)).toFixed(2)}MB)`);
+            }
+        });
+
+        paymentProofs.forEach(f => {
+            if (f.file && f.file.size > MAX_FILE_SIZE) {
+                largeFiles.push(`${f.name} (${(f.file.size / (1024 * 1024)).toFixed(2)}MB)`);
+            }
+        });
+
+        if (largeFiles.length > 0) {
+            setErrors({
+                general: [
+                    'Unable to proceed. The following files exceed the 10MB limit:',
+                    ...largeFiles
+                ]
+            });
+            return;
+        }
+
         setProcessing(true);
         setErrors({});
+        setUploadProgress(0);
+        setUploadStatus('preparing');
+
+        // If this is not a retry, reset retry count
+        if (!isRetry) {
+            setRetryCount(0);
+        }
 
         try {
             // Step 1: Find or create customer
+            setUploadStatus('customer');
             let customerId = formData.customer_id;
             if (!customerId) {
                 customerId = await findOrCreateCustomer();
             }
+            setUploadProgress(10);
 
             // Step 2: Prepare order data
+            setUploadStatus('preparing');
             const orderData = new FormData();
             orderData.append('customer_id', customerId);
             orderData.append('description', formData.description);
@@ -256,54 +384,417 @@ export default function CustomerPOSOrder() {
             if (formData.size_height) {
                 orderData.append('size_height', formData.size_height);
             }
-            if (formData.file) {
-                orderData.append('file', formData.file);
-            }
 
-            // Add payment method
+            designFiles.forEach((designFile) => {
+                if (designFile.file) {
+                    orderData.append(`attachments[]`, designFile.file);
+                }
+            });
+
             orderData.append('payment_method', paymentMethod);
 
-            // Add payment proofs if any
-            paymentProofs.forEach((proof, index) => {
+            paymentProofs.forEach((proof) => {
                 if (proof.file) {
                     orderData.append(`payment_proofs[]`, proof.file);
                 }
             });
 
-            // Step 3: Submit order
-            const response = await fetch('/api/public/orders', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: orderData,
+            setUploadProgress(15);
+            setUploadStatus('uploading');
+
+            // Step 3: Submit with XMLHttpRequest
+            const response = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 70) + 15;
+                        setUploadProgress(percentComplete);
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    setUploadProgress(90);
+                    setUploadStatus('processing');
+
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            resolve({ ok: true, status: xhr.status, data });
+                        } catch (e) {
+                            reject(new Error('Failed to parse response'));
+                        }
+                    } else {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            resolve({ ok: false, status: xhr.status, data });
+                        } catch (e) {
+                            reject(new Error(`Server error (${xhr.status})`));
+                        }
+                    }
+                });
+
+                xhr.addEventListener('error', () => reject(new Error('Network error')));
+                xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+                xhr.open('POST', '/api/public/orders');
+                xhr.setRequestHeader('X-CSRF-TOKEN',
+                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                );
+                xhr.send(orderData);
             });
 
-            const data = await response.json();
+            setUploadProgress(95);
 
-            if (data.success) {
-                // Store submitted ticket info
+            // Handle response
+            if (!response.ok) {
+                let errorData = {};
+
+                if (response.status === 422 && response.data.errors) {
+                    errorData = response.data.errors;
+                } else if (response.status === 413) {
+                    errorData = {
+                        general: ['One or more files are too large. Each file must be less than 10MB.']
+                    };
+                } else if (response.status === 500) {
+                    errorData = {
+                        general: ['Server error occurred. This might be due to a file upload issue. Please check your files and try again.']
+                    };
+                } else if (response.data.message) {
+                    errorData = { general: [response.data.message] };
+                } else {
+                    errorData = {
+                        general: ['An unexpected error occurred. Please try again or contact support if the problem persists.']
+                    };
+                }
+
+                // Check if we should retry
+                if (isRetryableError(errorData) && currentRetryCount < MAX_RETRIES) {
+                    const nextRetry = currentRetryCount + 1;
+                    setRetryCount(nextRetry);
+                    setUploadStatus('retrying');
+
+                    console.log(`Retrying submission... Attempt ${nextRetry} of ${MAX_RETRIES}`);
+
+                    // Wait 2 seconds before retrying (progressive delay: 2s, 4s, 6s)
+                    const delay = nextRetry * 2000;
+                    retryTimeoutRef.current = setTimeout(() => {
+                        handleSubmit(true, nextRetry);
+                    }, delay);
+
+                    return; // Don't show error yet, we're retrying
+                }
+
+                // If we've exhausted retries or error is not retryable, show error
+                if (currentRetryCount >= MAX_RETRIES && isRetryableError(errorData)) {
+                    errorData.general = [
+                        ...(errorData.general || []),
+                        `Failed after ${MAX_RETRIES} attempts. Please try again later.`
+                    ];
+                }
+
+                setErrors(errorData);
+                setUploadStatus('');
+                setRetryCount(0);
+                return;
+            }
+
+            if (response.data.success) {
+                setUploadProgress(100);
+                setUploadStatus('complete');
+                setRetryCount(0); // Reset retry count on success
+
                 setSubmittedTicket({
-                    ticket_number: data.ticket_number,
-                    status: data.ticket?.status || 'pending',
-                    payment_status: data.ticket?.payment_status || 'pending',
+                    ticket_number: response.data.ticket_number,
+                    status: response.data.ticket?.status || 'pending',
+                    payment_status: response.data.ticket?.payment_status || 'pending',
                 });
-                // Move to step 5 (success page)
-                setCurrentStep(5);
+
+                setTimeout(() => {
+                    setCurrentStep(5);
+                    setUploadStatus('');
+                }, 800);
             } else {
-                throw new Error(data.message || 'Failed to submit order');
+                setErrors({ general: [response.data.message || 'Failed to submit order'] });
+                setUploadStatus('');
+                setRetryCount(0);
             }
         } catch (error) {
             console.error('Error submitting order:', error);
-            alert('Failed to submit order. Please try again.');
+            let errorMessage = 'Unable to submit your order. ';
+
+            if (error.message.includes('Network error')) {
+                errorMessage += 'Please check your internet connection and try again.';
+            } else if (error.message.includes('Failed to parse')) {
+                // Avoid using "server response" to prevent auto-retry on file size/content issues
+                errorMessage += 'The upload failed. Your files may be too large for the server to process.';
+            } else {
+                errorMessage += 'Please try again or contact support if the issue continues.';
+            }
+
+            const errorData = { general: [errorMessage] };
+
+            // Check if we should retry
+            if (isRetryableError(errorData) && currentRetryCount < MAX_RETRIES) {
+                const nextRetry = currentRetryCount + 1;
+                setRetryCount(nextRetry);
+                setUploadStatus('retrying');
+
+                console.log(`Retrying submission... Attempt ${nextRetry} of ${MAX_RETRIES}`);
+
+                const delay = nextRetry * 2000;
+                retryTimeoutRef.current = setTimeout(() => {
+                    handleSubmit(true, nextRetry);
+                }, delay);
+
+                return;
+            }
+
+            if (currentRetryCount >= MAX_RETRIES) {
+                errorData.general = [
+                    ...errorData.general,
+                    `Failed after ${MAX_RETRIES} attempts. Please try again later.`
+                ];
+            }
+
+            setErrors(errorData);
+            setUploadStatus('');
+            setRetryCount(0);
         } finally {
             setProcessing(false);
         }
     };
 
+
+    const isRetryableError = (errorObj) => {
+        if (!errorObj || Object.keys(errorObj).length === 0) return false;
+
+        // Check for general errors that are retryable
+        if (errorObj.general) {
+            const generalErrors = Array.isArray(errorObj.general) ? errorObj.general : [errorObj.general];
+
+            // Explicitly do NOT retry for file size errors
+            if (generalErrors.some(msg =>
+                msg.includes('too large') ||
+                msg.includes('maximum size') ||
+                msg.includes('Maximum size')
+            )) {
+                return false;
+            }
+
+            return generalErrors.some(msg =>
+                msg.includes('Server error') ||
+                msg.includes('server response') ||
+                msg.includes('connection') ||
+                msg.includes('Network error') ||
+                msg.includes('try again')
+            );
+        }
+
+        return false;
+    };
+
+    const formatErrorMessage = (field, message) => {
+        // Field name mapping for better readability
+        const fieldNames = {
+            'customer_id': 'Customer',
+            'description': 'Description',
+            'job_type_id': 'Job Type',
+            'quantity': 'Quantity',
+            'free_quantity': 'Free Quantity',
+            'size_rate_id': 'Size Rate',
+            'size_width': 'Width',
+            'size_height': 'Height',
+            'due_date': 'Due Date',
+            'subtotal': 'Subtotal',
+            'total_amount': 'Total Amount',
+            'payment_method': 'Payment Method',
+            'file': 'Design File',
+            'general': ''
+        };
+
+        // Handle array field names (like attachments.0, payment_proofs.1)
+        let friendlyFieldName = field;
+
+        // Check if it's an attachment field
+        if (field.match(/^attachments\.\d+$/)) {
+            const index = parseInt(field.split('.')[1]) + 1;
+            friendlyFieldName = `Design File #${index}`;
+        } else if (field.match(/^payment_proofs\.\d+$/)) {
+            const index = parseInt(field.split('.')[1]) + 1;
+            friendlyFieldName = `Payment Proof #${index}`;
+        } else {
+            friendlyFieldName = fieldNames[field] || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        // Message transformation for common validation errors
+        let friendlyMessage = message;
+
+        // File size errors
+        if (message.includes('must not be greater than 10240 kilobytes')) {
+            friendlyMessage = 'File is too large. Maximum size is 10MB.';
+        } else if (message.includes('kilobytes')) {
+            friendlyMessage = 'File size exceeds the allowed limit.';
+        }
+
+        // File type errors
+        if (message.includes('must be a file of type')) {
+            friendlyMessage = 'Invalid file type. Please upload JPG, JPEG, PNG only.';
+        }
+
+        // Required field errors
+        if (message.includes('field is required')) {
+            friendlyMessage = 'This field is required.';
+        }
+
+        // Numeric errors
+        if (message.includes('must be a number') || message.includes('must be an integer')) {
+            friendlyMessage = 'Please enter a valid number.';
+        }
+
+        // Min/Max errors
+        if (message.includes('must be at least')) {
+            const match = message.match(/must be at least (\d+)/);
+            if (match) {
+                friendlyMessage = `Minimum value is ${match[1]}.`;
+            }
+        }
+
+        // Date errors
+        if (message.includes('is not a valid date')) {
+            friendlyMessage = 'Please enter a valid date.';
+        }
+
+        // Exists validation (foreign key)
+        if (message.includes('selected') && message.includes('is invalid')) {
+            friendlyMessage = 'Invalid selection. Please choose a valid option.';
+        }
+
+        return { field: friendlyFieldName, message: friendlyMessage };
+    };
+
+
+
+    // const handleSubmit = async () => {
+    //     setProcessing(true);
+    //     setErrors({});
+
+    //     try {
+    //         // Step 1: Find or create customer
+    //         let customerId = formData.customer_id;
+    //         if (!customerId) {
+    //             customerId = await findOrCreateCustomer();
+    //         }
+
+    //         // Step 2: Prepare order data
+    //         const orderData = new FormData();
+    //         orderData.append('customer_id', customerId);
+    //         orderData.append('description', formData.description);
+    //         orderData.append('job_type_id', formData.job_type_id);
+    //         orderData.append('quantity', formData.quantity);
+    //         orderData.append('free_quantity', formData.free_quantity || 0);
+    //         orderData.append('due_date', formData.due_date);
+    //         orderData.append('subtotal', subtotal.toFixed(2));
+    //         orderData.append('total_amount', subtotal.toFixed(2));
+
+    //         if (formData.size_rate_id) {
+    //             orderData.append('size_rate_id', formData.size_rate_id);
+    //         }
+    //         if (formData.size_width) {
+    //             orderData.append('size_width', formData.size_width);
+    //         }
+    //         if (formData.size_height) {
+    //             orderData.append('size_height', formData.size_height);
+    //         }
+
+    //         // Add design files if any
+    //         designFiles.forEach((designFile, index) => {
+    //             if (designFile.file) {
+    //                 orderData.append(`attachments[]`, designFile.file);
+    //             }
+    //         });
+
+    //         // Add payment method
+    //         orderData.append('payment_method', paymentMethod);
+
+    //         // Add payment proofs if any
+    //         paymentProofs.forEach((proof, index) => {
+    //             if (proof.file) {
+    //                 orderData.append(`payment_proofs[]`, proof.file);
+    //             }
+    //         });
+
+    //         // Step 3: Submit order
+    //         const response = await fetch('/api/public/orders', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+    //             },
+    //             body: orderData,
+    //         });
+
+    //         // Try to parse JSON response
+    //         let data;
+    //         try {
+    //             data = await response.json();
+    //         } catch (parseError) {
+    //             console.error('Failed to parse response as JSON:', parseError);
+    //             // Server returned HTML (likely a 500 error or file too large)
+    //             setErrors({
+    //                 general: [
+    //                     'Server error: The file you uploaded may be too large or of an invalid type.',
+    //                     'Please ensure your file is less than 10MB and is a JPG, JPEG, PNG, or PDF.'
+    //                 ]
+    //             });
+    //             return;
+    //         }
+
+
+    //         // Check if validation errors exist (422 status or errors in response)
+    //         if (!response.ok) {
+    //             if (response.status === 422 && data.errors) {
+    //                 // Laravel validation errors
+    //                 setErrors(data.errors);
+    //             } else if (response.status === 413) {
+    //                 // File too large (payload too large)
+    //                 setErrors(data.errors || {
+    //                     file: ['The uploaded file is too large. Maximum size is 10MB.']
+    //                 });
+    //             } else if (data.message) {
+    //                 // Other error with message
+    //                 setErrors({ general: [data.message] });
+    //             } else {
+    //                 // Unknown error
+    //                 setErrors({ general: [`Server error (${response.status}). Please try again.`] });
+    //             }
+    //             return;
+    //         }
+
+    //         if (data.success) {
+    //             // Store submitted ticket info
+    //             setSubmittedTicket({
+    //                 ticket_number: data.ticket_number,
+    //                 status: data.ticket?.status || 'pending',
+    //                 payment_status: data.ticket?.payment_status || 'pending',
+    //             });
+    //             // Move to step 5 (success page)
+    //             setCurrentStep(5);
+    //         } else {
+    //             // Handle other errors
+    //             setErrors({ general: [data.message || 'Failed to submit order'] });
+    //         }
+    //     } catch (error) {
+    //         console.error('Error submitting order:', error);
+    //         setErrors({ general: ['Failed to submit order. Please check your connection and try again.'] });
+    //     } finally {
+    //         setProcessing(false);
+    //     }
+    // };
+
     const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone;
     const canProceedStep2 = formData.category_id && formData.job_type_id && formData.quantity > 0;
-    const canProceedStep3 = formData.description && formData.due_date;
+    const hasInvalidDesignFiles = designFiles.some(f => f.invalid);
+    const canProceedStep3 = formData.description && formData.due_date && !hasInvalidDesignFiles;
 
     const priceTiers = selectedJobType?.price_tiers || [];
     const sizeRates = selectedJobType?.size_rates || [];
@@ -311,6 +802,78 @@ export default function CustomerPOSOrder() {
     const hasPriceTiers = priceTiers.length > 0;
     const hasSizeRates = sizeRates.length > 0;
     const hasPromoRules = promoRules.length > 0;
+
+    const UploadProgressIndicator = () => {
+        const statusMessages = {
+            preparing: 'Preparing your order...',
+            customer: 'Verifying customer information...',
+            uploading: 'Uploading files...',
+            processing: 'Processing your order...',
+            retrying: `Connection issue detected. Retrying... (Attempt ${retryCount} of ${MAX_RETRIES})`,
+            complete: 'Order submitted successfully!'
+        };
+
+        if (!uploadStatus) return null;
+
+        const totalFiles = designFiles.length + paymentProofs.length;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4">
+                    <div className="text-center mb-6">
+                        {uploadStatus === 'complete' ? (
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                        ) : uploadStatus === 'retrying' ? (
+                            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-yellow-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+                        )}
+
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">
+                            {statusMessages[uploadStatus] || 'Processing...'}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                            {uploadStatus === 'retrying' ? 'Please wait, we\'re trying to reconnect...' : 'Please don\'t close this window'}
+                        </p>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                            className={`absolute top-0 left-0 h-full transition-all duration-300 ease-out ${uploadStatus === 'retrying' ? 'bg-gradient-to-r from-yellow-500 to-orange-600' : 'bg-gradient-to-r from-indigo-500 to-purple-600'
+                                }`}
+                            style={{ width: `${uploadProgress}%` }}
+                        >
+                            <div className="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
+                        </div>
+                    </div>
+
+                    <div className="text-center mt-3">
+                        <span className="text-sm font-semibold text-gray-700">
+                            {uploadProgress}%
+                        </span>
+                    </div>
+
+                    {/* File info */}
+                    {totalFiles > 0 && uploadStatus === 'uploading' && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-xs text-gray-600">
+                                Uploading {totalFiles} file(s)...
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
@@ -361,6 +924,30 @@ export default function CustomerPOSOrder() {
                         </div>
 
                         <div className="space-y-6">
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                                <input
+                                    type="email"
+                                    value={formData.customer_email}
+                                    onChange={handleEmailChange}
+                                    list="email-suggestions"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="e.g., juan@example.com"
+                                    autoComplete="email"
+                                />
+                                <datalist id="email-suggestions">
+                                    {savedCustomers.map((customer, index) => (
+                                        <option key={index} value={customer.email}>
+                                            {customer.name}
+                                        </option>
+                                    ))}
+                                </datalist>
+                                {savedCustomers.length > 0 && formData.customer_email === '' && (
+                                    <p className="text-xs text-gray-500 mt-1">💡 Previously used emails will appear as you type</p>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
                                 <input
@@ -368,20 +955,11 @@ export default function CustomerPOSOrder() {
                                     value={formData.customer_name}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="Juan Dela Cruz"
+                                    placeholder="e.g., Juan Dela Cruz"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
-                                <input
-                                    type="email"
-                                    value={formData.customer_email}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="juan@example.com"
-                                />
-                            </div>
+
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Facebook *</label>
@@ -390,7 +968,7 @@ export default function CustomerPOSOrder() {
                                     value={formData.customer_facebook}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_facebook: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="ana.fb"
+                                    placeholder="e.g., juancruz"
                                 />
                             </div>
 
@@ -399,6 +977,7 @@ export default function CustomerPOSOrder() {
                                 <input
                                     type="tel"
                                     value={formData.customer_phone}
+                                    maxLength={11}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                     placeholder="09XX XXX XXXX"
@@ -485,7 +1064,7 @@ export default function CustomerPOSOrder() {
                                                             )}
                                                         </div>
                                                         {!hasSizeRates && !hasPriceTiers && (
-                                                            <span className="text-indigo-600 font-bold">₱{parseFloat(jobType.price || 0).toFixed(2)}</span>
+                                                            <span className="text-indigo-600 font-bold">{formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
                                                         )}
                                                     </div>
                                                 </button>
@@ -529,7 +1108,7 @@ export default function CustomerPOSOrder() {
                                                 <span className="text-blue-800">
                                                     {tier.min_quantity}{tier.max_quantity ? ` - ${tier.max_quantity}` : '+'} pcs:
                                                 </span>
-                                                <span className="font-semibold text-blue-900">₱{parseFloat(tier.price).toFixed(2)}/unit</span>
+                                                <span className="font-semibold text-blue-900">{formatPeso(parseFloat(tier.price).toFixed(2))}/unit</span>
                                             </div>
                                         ))}
                                     </div>
@@ -547,7 +1126,7 @@ export default function CustomerPOSOrder() {
                                     >
                                         {sizeRates.map(rate => (
                                             <option key={rate.id} value={rate.id}>
-                                                {rate.variant_name} - ₱{parseFloat(rate.rate).toFixed(2)}/{rate.calculation_method === 'length' ? rate.dimension_unit : `${rate.dimension_unit}²`}
+                                                {rate.variant_name} - {formatPeso(parseFloat(rate.rate).toFixed(2))}/{rate.calculation_method === 'length' ? rate.dimension_unit : `${rate.dimension_unit}²`}
                                             </option>
                                         ))}
                                     </select>
@@ -582,7 +1161,7 @@ export default function CustomerPOSOrder() {
                                     </div>
                                     {selectedSizeRate && (
                                         <p className="text-xs text-gray-500 mt-2">
-                                            Rate: ₱{parseFloat(selectedSizeRate.rate).toFixed(2)} per {selectedSizeRate.calculation_method === 'length' ? selectedSizeRate.dimension_unit : `${selectedSizeRate.dimension_unit}²`}
+                                            Rate: {formatPeso(parseFloat(selectedSizeRate.rate).toFixed(2))} per {selectedSizeRate.calculation_method === 'length' ? selectedSizeRate.dimension_unit : `${selectedSizeRate.dimension_unit}²`}
                                         </p>
                                     )}
                                 </div>
@@ -603,12 +1182,14 @@ export default function CustomerPOSOrder() {
                                 <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
                                     <div className="flex justify-between items-center">
                                         <span className="text-gray-700 font-medium">Estimated Price:</span>
-                                        <span className="text-2xl font-bold text-indigo-600">₱{subtotal.toFixed(2)}</span>
+                                        <span className="text-2xl font-bold text-indigo-600">{formatPeso(subtotal.toFixed(2))}</span>
                                     </div>
                                 </div>
                             )}
 
+
                             <div className="flex gap-3">
+
                                 <button
                                     onClick={() => setCurrentStep(1)}
                                     className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
@@ -668,36 +1249,78 @@ export default function CustomerPOSOrder() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Upload Design/Reference (Optional)</label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors">
-                                    {imagePreview ? (
-                                        <div className="space-y-3">
-                                            <img src={imagePreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleImageUpload}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                />
+                                {/* <p className="text-xs text-gray-500 mt-1">You can upload multiple images (PNG, JPG up to 10MB each)</p> */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-1">
+                                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="text-sm text-blue-800">
+                                        <p className="font-medium">File Requirements:</p>
+                                        <ul className="mt-1 space-y-0.5 text-xs">
+                                            <li>• Maximum size: <strong>10MB per file</strong></li>
+                                            <li>• Accepted formats: <strong>JPG, JPEG, PNG</strong></li>
+                                            <li>• You can upload multiple files</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+
+                                {designFiles.length > 0 && (
+                                    <div className="mt-4">
+                                        {designFiles.length > 1 && (
+                                            <div className="flex gap-2 mb-3 overflow-x-auto">
+                                                {designFiles.map((_, index) => (
+                                                    <button
+                                                        key={index}
+                                                        type="button"
+                                                        onClick={() => setActiveDesignTab(index)}
+                                                        className={`px-3 py-1 rounded text-sm whitespace-nowrap ${activeDesignTab === index
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'bg-gray-200 text-gray-700'
+                                                            }`}
+                                                    >
+                                                        Design {index + 1}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className={`border-2 border-dashed rounded-lg p-4 ${designFiles[activeDesignTab]?.invalid ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'}`}>
+                                            {designFiles[activeDesignTab]?.invalid && (
+                                                <div className="flex items-center gap-2 text-red-600 mb-2 justify-center">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="text-sm font-bold">{designFiles[activeDesignTab].errorMessage}</span>
+                                                </div>
+                                            )}
+                                            <img
+                                                src={designFiles[activeDesignTab]?.preview}
+                                                alt={`Design ${activeDesignTab + 1}`}
+                                                className="max-h-64 mx-auto rounded"
+                                            />
+                                            <div className="text-center mt-2 text-sm text-gray-600">
+                                                {designFiles[activeDesignTab]?.name}
+                                            </div>
+                                            <div className="text-center mt-1 text-xs text-gray-500">
+                                                {activeDesignTab + 1} of {designFiles.length}
+                                            </div>
                                             <button
-                                                onClick={() => {
-                                                    setImagePreview(null);
-                                                    setFormData(prev => ({ ...prev, file: null }));
-                                                }}
-                                                className="text-red-600 text-sm hover:underline"
+                                                type="button"
+                                                onClick={() => removeDesignFile(activeDesignTab)}
+                                                className="w-full mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                                             >
-                                                Remove
+                                                Remove File
                                             </button>
                                         </div>
-                                    ) : (
-                                        <label className="cursor-pointer">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleImageUpload}
-                                                className="hidden"
-                                            />
-                                            <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            <p className="text-gray-600">Click to upload or drag and drop</p>
-                                            <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</p>
-                                        </label>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3">
@@ -735,6 +1358,7 @@ export default function CustomerPOSOrder() {
                             <p className="text-gray-500 mt-2">Review your order and choose payment method</p>
                         </div>
 
+
                         <div className="space-y-6">
                             {/* Order Summary */}
                             <div className="bg-gray-50 rounded-lg p-6 space-y-4">
@@ -768,7 +1392,7 @@ export default function CustomerPOSOrder() {
                                 <div className="border-t pt-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-                                        <span className="text-3xl font-bold text-indigo-600">₱{subtotal.toFixed(2)}</span>
+                                        <span className="text-3xl font-bold text-indigo-600">{formatPeso(subtotal.toFixed(2))}</span>
                                     </div>
                                 </div>
                             </div>
@@ -846,9 +1470,9 @@ export default function CustomerPOSOrder() {
                                                 <p className="text-sm font-medium text-green-800 mb-2">QR Code:</p>
                                                 <div className="bg-white p-4 rounded border border-green-300 inline-block">
                                                     {!qrcodeError ? (
-                                                        <img 
-                                                            src={settings.payment.gcash.qrcode} 
-                                                            alt="GCash QR Code" 
+                                                        <img
+                                                            src={settings.payment.gcash.qrcode}
+                                                            alt="GCash QR Code"
                                                             className="w-32 h-32 object-contain"
                                                             onError={() => setQrcodeError(true)}
                                                         />
@@ -899,7 +1523,7 @@ export default function CustomerPOSOrder() {
                                     </label>
                                     <input
                                         type="file"
-                                        accept="image/*,application/pdf"
+                                        accept="image/*"
                                         multiple
                                         onChange={handlePaymentProofUpload}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg"
@@ -923,7 +1547,15 @@ export default function CustomerPOSOrder() {
                                                     ))}
                                                 </div>
                                             )}
-                                            <div className="border rounded-lg p-4 bg-gray-50">
+                                            <div className={`border rounded-lg p-4 ${paymentProofs[activeProofTab]?.invalid ? 'border-red-400 bg-red-50' : 'bg-gray-50'}`}>
+                                                {paymentProofs[activeProofTab]?.invalid && (
+                                                    <div className="flex items-center gap-2 text-red-600 mb-2 justify-center">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        <span className="text-sm font-bold">{paymentProofs[activeProofTab].errorMessage}</span>
+                                                    </div>
+                                                )}
                                                 <img
                                                     src={paymentProofs[activeProofTab]?.preview}
                                                     alt={`Payment proof ${activeProofTab + 1}`}
@@ -945,18 +1577,96 @@ export default function CustomerPOSOrder() {
                                 </div>
                             )}
 
+                            {/* Validation Errors Display */}
+                            {Object.keys(errors).length > 0 && (
+                                <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div className="flex-1">
+                                            <div className="space-y-2">
+                                                {Object.entries(errors).map(([field, messages]) => {
+                                                    const messageArray = Array.isArray(messages) ? messages : [messages];
+                                                    return messageArray.map((message, idx) => {
+                                                        const formatted = formatErrorMessage(field, message);
+                                                        return (
+                                                            <div key={`${field}-${idx}`} className="flex items-start gap-2 bg-white p-3 rounded-lg border border-red-200">
+                                                                <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                                                </svg>
+                                                                <div className="flex-1">
+                                                                    {formatted.field && (
+                                                                        <span className="font-semibold text-red-900 text-sm">
+                                                                            {formatted.field}:{' '}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-red-700 text-sm">
+                                                                        {formatted.message}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })}
+                                            </div>
+                                            <div className="mt-4 flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setErrors({});
+                                                        setRetryCount(0);
+                                                    }}
+                                                    className="px-4 py-2 text-sm text-red-700 hover:text-white hover:bg-red-600 font-medium border border-red-300 rounded-lg transition-colors"
+                                                >
+                                                    Dismiss
+                                                </button>
+                                                {/* Manual retry button - still available after auto-retry exhausted */}
+                                                <button
+                                                    onClick={() => {
+                                                        setErrors({});
+                                                        setRetryCount(0);
+                                                        handleSubmit(false);
+                                                    }}
+                                                    disabled={processing}
+                                                    className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {processing ? 'Retrying...' : 'Try Again'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {uploadStatus && <UploadProgressIndicator />}
+
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setCurrentStep(3)}
+                                    onClick={() => {
+                                        setCurrentStep(3);
+                                        setErrors({});
+                                        setRetryCount(0);
+                                        if (retryTimeoutRef.current) {
+                                            clearTimeout(retryTimeoutRef.current);
+                                        }
+                                    }}
                                     disabled={processing}
-                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                                    className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                                 >
                                     ← Back
                                 </button>
                                 <button
-                                    onClick={handleSubmit}
-                                    disabled={processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0)}
-                                    className={`flex-1 py-4 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing || ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    onClick={() => handleSubmit(false)}
+                                    disabled={
+                                        processing ||
+                                        ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
+                                        paymentProofs.some(p => p.invalid)
+                                    }
+                                    className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing ||
+                                        ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
+                                        paymentProofs.some(p => p.invalid)
+                                        ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
                                 >
                                     {processing ? 'Submitting...' : 'Submit Order ✓'}
                                 </button>
@@ -970,7 +1680,7 @@ export default function CustomerPOSOrder() {
                     <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
                         <div className="text-center mb-8">
                             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-20 h-20 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
@@ -1036,7 +1746,8 @@ export default function CustomerPOSOrder() {
                                     due_date: '',
                                     file: null
                                 });
-                                setImagePreview(null);
+                                setDesignFiles([]);
+                                setActiveDesignTab(0);
                                 setPaymentProofs([]);
                                 setPaymentMethod('walkin');
                                 setSubmittedTicket(null);

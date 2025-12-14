@@ -6,6 +6,7 @@ use App\Models\StockItem;
 use App\Models\StockMovement;
 use App\Services\StockManagementService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -90,43 +91,53 @@ class InventoryController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'job_type_id' => 'required|exists:job_types,id',
-            'sku' => 'required|string|unique:stock_items,sku|max:255',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'base_unit_of_measure' => 'required|string|max:50',
-            'is_area_based' => 'boolean',
-            'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
-            'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
-            'current_stock' => 'nullable|numeric|min:0',
-            'minimum_stock_level' => 'nullable|numeric|min:0',
-            'maximum_stock_level' => 'nullable|numeric|min:0',
-            'unit_cost' => 'nullable|numeric|min:0',
-            'supplier' => 'nullable|string|max:255',
-            'location' => 'nullable|string|max:255',
-            'is_active' => 'boolean',
-        ]);
+        try {
 
-        // Create stock item with 0 stock initially to avoid double counting
-        $initialStock = $validated['current_stock'] ?? 0;
-        $validated['current_stock'] = 0; // Set to 0 first
-        $stockItem = StockItem::create($validated);
+            $validated = $request->validate([
+                'job_type_id' => 'required|exists:job_types,id',
+                'sku' => [
+                    'required',
+                    'string',
+                    Rule::unique('stock_items', 'sku')->whereNull('deleted_at'),
+                    'max:255',
+                ],
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'base_unit_of_measure' => 'required|string|max:50',
+                'is_area_based' => 'boolean',
+                'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
+                'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
+                'current_stock' => 'nullable|numeric|min:0',
+                'minimum_stock_level' => 'nullable|numeric|min:0',
+                'maximum_stock_level' => 'nullable|numeric|min:0',
+                'unit_cost' => 'nullable|numeric|min:0',
+                'supplier' => 'nullable|string|max:255',
+                'location' => 'nullable|string|max:255',
+                'is_active' => 'boolean',
+            ]);
 
-        // Record initial stock movement if stock is provided (this will add it properly)
-        if ($initialStock > 0) {
-            $this->stockService->recordMovement(
-                $stockItem,
-                'adjustment',
-                $initialStock,
-                $validated['unit_cost'] ?? 0,
-                null,
-                null,
-                'Initial stock'
-            );
+            // Create stock item with 0 stock initially to avoid double counting
+            $initialStock = $validated['current_stock'] ?? 0;
+            $validated['current_stock'] = 0; // Set to 0 first
+            $stockItem = StockItem::create($validated);
+
+            // Record initial stock movement if stock is provided (this will add it properly)
+            if ($initialStock > 0) {
+                $this->stockService->recordMovement(
+                    $stockItem,
+                    'adjustment',
+                    $initialStock,
+                    $validated['unit_cost'] ?? 0,
+                    null,
+                    null,
+                    'Initial stock'
+                );
+            }
+
+            return redirect()->back()->with('success', 'Stock item created successfully.');
+        } catch (\Throwable $th) {
+            dd($th);
         }
-
-        return redirect()->back()->with('success', 'Stock item created successfully.');
     }
 
     /**
@@ -138,7 +149,6 @@ class InventoryController extends Controller
 
         $validated = $request->validate([
             'job_type_id' => 'required|exists:job_types,id',
-            'sku' => 'required|string|unique:stock_items,sku,' . $id . '|max:255',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'base_unit_of_measure' => 'required|string|max:50',
@@ -152,6 +162,8 @@ class InventoryController extends Controller
             'location' => 'nullable|string|max:255',
             'is_active' => 'boolean',
         ]);
+
+
 
         $stockItem->update($validated);
 

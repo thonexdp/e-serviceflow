@@ -53,18 +53,18 @@ class JobTypeStockRequirement extends Model
         ?float $length = null
     ): float {
         $calculationType = $this->calculation_type ?? 'quantity';
-        
+
         switch ($calculationType) {
             case 'area':
                 // For area-based: quantity_per_unit is per sqm
                 // Example: 0.5 sqm per sqm of production = 0.5 * area
                 return $this->quantity_per_unit * ($area ?? 0);
-                
+
             case 'length':
                 // For length-based: quantity_per_unit is per meter
                 // Example: 0.1 meters per meter of production = 0.1 * length
                 return $this->quantity_per_unit * ($length ?? 0);
-                
+
             case 'quantity':
             default:
                 // For quantity-based: quantity_per_unit is per piece
@@ -73,4 +73,3 @@ class JobTypeStockRequirement extends Model
         }
     }
 }
-

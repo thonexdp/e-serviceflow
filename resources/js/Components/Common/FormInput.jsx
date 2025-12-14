@@ -5,15 +5,18 @@ export default function FormInput({
   type = "text",
   name,
   value,
+  defaultValue,
   onChange,
   error = null,
   placeholder = "",
   required = false,
   disabled = false,
   className = "",
+  maxLength = "",
   rows = 3,
   options = [], // For select inputs
   defaultChecked, // For checkbox
+  min,
 }) {
   const baseClasses = `
     w-full text-sm rounded-md border border-gray-300 
@@ -25,6 +28,9 @@ export default function FormInput({
     ${className}
   `;
 
+  // Determine if this is a controlled or uncontrolled component
+  const isControlled = value !== undefined;
+
   const renderInput = () => {
     switch (type) {
       case "checkbox":
@@ -33,8 +39,7 @@ export default function FormInput({
             <input
               type="checkbox"
               name={name}
-              checked={value}
-              defaultChecked={defaultChecked}
+              {...(isControlled ? { checked: value } : { defaultChecked })}
               onChange={(e) =>
                 onChange
                   ? onChange({
@@ -53,7 +58,7 @@ export default function FormInput({
         return (
           <textarea
             name={name}
-            value={value}
+            {...(isControlled ? { value } : { defaultValue })}
             onChange={onChange}
             placeholder={placeholder}
             required={required}
@@ -67,13 +72,12 @@ export default function FormInput({
         return (
           <select
             name={name}
-            value={value}
+            {...(isControlled ? { value } : { defaultValue })}
             onChange={onChange}
             required={required}
             disabled={disabled}
             className={`${baseClasses} p-2.5`}
           >
-            <option value="">Select {label}</option>
             {options.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -87,11 +91,13 @@ export default function FormInput({
           <input
             type={type}
             name={name}
-            value={value}
+            {...(isControlled ? { value } : { defaultValue })}
             onChange={onChange}
             placeholder={placeholder}
             required={required}
             disabled={disabled}
+            maxLength={maxLength}
+            min={min}
             className={`${baseClasses} p-2.5`}
           />
         );

@@ -32,7 +32,7 @@ export default function Login({ status, canResetPassword }) {
                     {/* Logo and Brand */}
                     <div className="text-center mb-8">
                         <div className="inline-flex w-20 h-20 bg-white rounded-2xl items-center justify-center mb-4 shadow-md border border-gray-200">
-                            <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12" />
+                            <img src="/images/logo.jpg" alt="RC PrintShoppe" className="w-12 h-12 rounded-full" />
                         </div>
                         <h1 className="text-3xl font-bold text-gray-900 mb-2">RC PrintShoppe</h1>
                         <p className="text-gray-600">Professional Printing Solutions</p>
@@ -67,7 +67,7 @@ export default function Login({ status, canResetPassword }) {
                                     autoComplete="username"
                                     isFocused={true}
                                     onChange={(e) => setData('email', e.target.value)}
-                                    placeholder="you@example.com"
+                                    placeholder="Enter your username"
                                 />
                                 <InputError message={errors.email} className="mt-2" />
                             </div>
@@ -101,7 +101,7 @@ export default function Login({ status, canResetPassword }) {
                                     />
                                     <span className="ml-2 text-sm text-gray-700">Remember me</span>
                                 </label>
-                               {/* 
+                                {/* 
                                 {canResetPassword && (
                                     <Link
                                         href={route('password.request')}
@@ -113,7 +113,7 @@ export default function Login({ status, canResetPassword }) {
                             </div>
 
                             <PrimaryButton
-                                className="w-full justify-center py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-150"
+                                className="w-full justify-center py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-150"
                                 disabled={processing}
                             >
                                 {processing ? 'Signing in...' : 'Sign In'}

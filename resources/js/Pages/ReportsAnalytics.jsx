@@ -169,12 +169,12 @@ export default function ReportsAnalytics({
                                                     >
                                                         <i className="ti-printer"></i> Print
                                                     </button>
-                                                    <button
+                                                    {/* <button
                                                         className="btn btn-success btn-sm"
-                                                        onClick={handleExport}
+                                                        // onClick={handleExport}
                                                     >
                                                         <i className="ti-download"></i> Export
-                                                    </button>
+                                                    </button> */}
                                                 </div>
                                             </div>
                                         </div>
@@ -609,7 +609,7 @@ function ProductProfitabilityReport({ data }) {
                             <th>Product/Service</th>
                             <th>Quantity</th>
                             <th className="text-right">Revenue</th>
-                            <th className="text-right">Est. Cost</th>
+                            <th className="text-right">Actual Cost</th>
                             <th className="text-right">Profit</th>
                             <th className="text-right">Margin %</th>
                         </tr>
@@ -620,7 +620,7 @@ function ProductProfitabilityReport({ data }) {
                                 <td>{product.job_type}</td>
                                 <td>{product.quantity}</td>
                                 <td className="text-right">{formatPeso(product.revenue)}</td>
-                                <td className="text-right">{formatPeso(product.estimated_cost)}</td>
+                                <td className="text-right">{formatPeso(product.actual_cost || product.estimated_cost || 0)}</td>
                                 <td className="text-right text-success">{formatPeso(product.profit)}</td>
                                 <td className="text-right">{product.margin.toFixed(2)}%</td>
                             </tr>
@@ -671,7 +671,9 @@ function ProductionReport({ data }) {
 }
 
 function CustomerInsightsReport({ data }) {
-    const { customers = [], summary = {} } = data;
+    const { customers: customersData = [], summary = {} } = data;
+    // Ensure customers is always an array (handle if backend sends object)
+    const customers = Array.isArray(customersData) ? customersData : Object.values(customersData || {});
 
     return (
         <div>
@@ -708,7 +710,7 @@ function CustomerInsightsReport({ data }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {customers?.slice(0, 20).map((customer) => (
+                    {customers.slice(0, 20).map((customer) => (
                         <tr key={customer.id}>
                             <td>{customer.name}</td>
                             <td>{customer.total_orders}</td>

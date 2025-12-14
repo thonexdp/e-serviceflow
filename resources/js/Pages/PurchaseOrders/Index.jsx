@@ -346,7 +346,7 @@ export default function PurchaseOrdersIndex({
                                                     router.get(buildUrl("/purchase-orders/create"))
                                                 }
                                             >
-                                                <i className="ti-plus"></i>{" "}
+                                                <i className="ti-plus text-xs"></i>{" "}
                                                 Create PO
                                             </button>
                                         </div>

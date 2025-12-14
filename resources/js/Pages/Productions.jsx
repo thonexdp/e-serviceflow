@@ -47,6 +47,7 @@ export default function Productions({
 
     // Helper function to show confirmation dialog
     const showConfirmation = (type, data = null) => {
+        console.log('✅ showConfirmation called with type:', type, 'data:', data);
         setConfirmationType(type);
         setConfirmationData(data);
         setConfirmationModal(true);
@@ -62,7 +63,7 @@ export default function Productions({
         if (!auth?.user) return [];
         if (auth.user.role === 'admin') return []; // Admin sees all
         if (auth.user.role !== 'Production') return [];
-        
+
         // Get workflow steps from user object
         if (auth.user.workflow_steps && Array.isArray(auth.user.workflow_steps)) {
             return auth.user.workflow_steps.map(ws => ws.workflow_step || ws);
@@ -78,15 +79,15 @@ export default function Productions({
         if (isAdmin) return true;
         if (auth?.user?.role !== 'Production') return true;
         if (assignedWorkflowSteps.length === 0) return false;
-        
+
         // For ready_to_print, all production users can see
         if (ticket.status === 'ready_to_print') return true;
-        
+
         // For in_production/completed, check if current_workflow_step matches user's assignments
         if (ticket.current_workflow_step) {
             return assignedWorkflowSteps.includes(ticket.current_workflow_step);
         }
-        
+
         return false;
     };
 
@@ -110,14 +111,12 @@ export default function Productions({
             return;
         }
 
-        console.log('🔌 Setting up production queue real-time updates...');
 
         // Subscribe to user's private channel
         const channel = window.Echo.private(`user.${auth.user.id}`);
 
         // Listen for ticket status changes
         const handleTicketUpdate = (data) => {
-            console.log('📬 Production queue update received:', data);
 
             // Refresh the tickets data
             router.reload({
@@ -159,12 +158,12 @@ export default function Productions({
             showAlert('ticket_assigned', { message: `This ticket is currently assigned to ${assignedUserName}. Please claim it first.` });
             return;
         }
-        
+
         setSelectedTicket(ticket);
         setUpdateModalMessage(null); // Clear any previous messages
         const currentStep = ticket.current_workflow_step || getFirstWorkflowStep(ticket);
         setCurrentWorkflowStep(currentStep);
-        
+
         // Get quantity from workflow progress for current step, or use ticket's produced_quantity
         let quantityToShow = ticket.produced_quantity || 0;
         if (currentStep && ticket.workflow_progress) {
@@ -176,7 +175,7 @@ export default function Productions({
                 quantityToShow = 0;
             }
         }
-        
+
         setProducedQuantity(quantityToShow);
         setUpdateModalOpen(true);
     };
@@ -190,6 +189,9 @@ export default function Productions({
                 setLoading(false);
             },
             onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
                 setLoading(false);
             },
         });
@@ -208,6 +210,9 @@ export default function Productions({
                 setLoading(false);
             },
             onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
                 setLoading(false);
             },
         });
@@ -241,17 +246,36 @@ export default function Productions({
     };
 
     const handleCloseModals = () => {
+        console.log('✅ handleCloseModals called');
+        setLoading(false);
         setViewModalOpen(false);
         setUpdateModalOpen(false);
         setStockModalOpen(false);
-        setConfirmationModal(false);
         setSelectedTicket(null);
         setProducedQuantity(0);
         setStockConsumptions([]);
         setSelectedPreviewFile(null);
+        setUpdateModalMessage(null);
+        // NOTE: Don't clear confirmation data here - it's needed by the confirmation modal
+        // Confirmation data will be cleared when the confirmation modal closes
+    };
+
+    const handleCloseConfirmationModal = () => {
+        console.log('✅ handleCloseConfirmationModal called');
+        setConfirmationModal(false);
         setConfirmationType(null);
         setConfirmationData(null);
-        setUpdateModalMessage(null);
+    };
+
+    const handleDownload = (fileId, filename) => {
+        const url = buildUrl(`/files/${fileId}/download`);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleStartProduction = (ticketId) => {
@@ -259,6 +283,7 @@ export default function Productions({
         const ticket = tickets.data.find(t => t.id === ticketId);
         if (ticket && !ticket.assigned_to_user_id) {
             // First claim, then start
+            setLoading(true);
             router.post(buildUrl(`/queue/${ticketId}/claim`), {}, {
                 preserveScroll: true,
                 preserveState: false,
@@ -266,7 +291,23 @@ export default function Productions({
                     router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
                         preserveScroll: true,
                         preserveState: false,
+                        onSuccess: () => {
+                            setLoading(false);
+                        },
+                        onError: () => {
+                            setLoading(false);
+                        },
+                        onFinish: () => {
+                            setLoading(false);
+                        },
                     });
+                },
+                onError: (errors) => {
+                    console.error('❌ Error claiming ticket:', errors);
+                    setLoading(false);
+                },
+                onFinish: () => {
+                    setLoading(false);
                 },
             });
         } else {
@@ -278,6 +319,9 @@ export default function Productions({
                     setLoading(false);
                 },
                 onError: () => {
+                    setLoading(false);
+                },
+                onFinish: () => {
                     setLoading(false);
                 },
             });
@@ -337,6 +381,9 @@ export default function Productions({
                 setUpdateModalMessage({ type: 'error', text: errors?.message || 'Failed to update progress. Please try again.' });
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
     };
 
@@ -345,19 +392,32 @@ export default function Productions({
     };
 
     const confirmMarkCompleted = (ticketId) => {
+        console.log('✅ confirmMarkCompleted called with ticketId:', ticketId);
+
+        if (!ticketId) {
+            console.error('❌ No ticketId provided to confirmMarkCompleted');
+            return;
+        }
+
         setLoading(true);
+        console.log('🚀 Making API call to complete ticket:', ticketId);
+
         router.post(buildUrl(`/queue/${ticketId}/complete`), {}, {
             preserveScroll: true,
             preserveState: false,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                console.log('✅ Ticket marked as completed successfully');
                 setLoading(false);
                 handleCloseModals();
             },
-            onError: () => {
+            onError: (errors) => {
+                console.error('❌ Error marking ticket as completed:', errors);
+                setLoading(false);
+            },
+            onFinish: () => {
                 setLoading(false);
             },
         });
-        setLoading(false);
     };
 
     const handleOpenStockModal = (ticket) => {
@@ -437,8 +497,10 @@ export default function Productions({
             onError: () => {
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
-        setLoading(false);
     };
 
     const handleQuickAdd = (amount) => {
@@ -473,7 +535,7 @@ export default function Productions({
         const isAssignedToMe = ticket.assigned_to_user_id === auth?.user?.id;
         const isAssignedToOther = ticket.assigned_to_user_id && !isAssignedToMe;
         const canUpdate = ticket.current_workflow_step ? canUpdateWorkflowStep(ticket.current_workflow_step) : true;
-        
+
         if (ticket.status === "ready_to_print") {
             return (
                 <div className="btn-group-vertical">
@@ -526,9 +588,9 @@ export default function Productions({
             );
         } else if (ticket.status === "in_production") {
             const activeSteps = getActiveWorkflowSteps(ticket);
-            const isLastStep = activeSteps.length > 0 && 
+            const isLastStep = activeSteps.length > 0 &&
                 ticket.current_workflow_step === activeSteps[activeSteps.length - 1]?.key;
-            
+
             return (
                 <div className="btn-group-vertical">
                     <div className="btn-group">
@@ -637,14 +699,14 @@ export default function Productions({
                 let stepLabel = 'Not Started';
                 let stepQuantity = 0;
                 let totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
-                
+
                 if (isCompleted) {
                     // If ticket is completed, show completed status and 100% quantity
                     stepLabel = 'Completed';
                     stepQuantity = totalQty; // Always show 100% when completed
                 } else if (currentStep) {
                     stepLabel = WORKFLOW_STEPS.find(s => s.key === currentStep)?.label || currentStep;
-                    
+
                     // Get quantity for current workflow step from workflow progress
                     if (row.workflow_progress) {
                         const stepProgress = row.workflow_progress.find(wp => wp.workflow_step === currentStep);
@@ -659,7 +721,7 @@ export default function Productions({
                     // No current step, use produced_quantity
                     stepQuantity = row.produced_quantity || 0;
                 }
-                
+
                 return (
                     <div>
                         <span>
@@ -824,16 +886,16 @@ export default function Productions({
                                                 <tbody>
                                                     {mockupFiles.map((file) => (
                                                         <tr key={file.id}>
-                                                            <td>{file.file_name}</td>
+                                                            <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
                                                             <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                             <td>
-                                                                <a
-                                                                    href={`/mock-ups/files/${file.id}/download`}
-                                                                    target="_blank"
+                                                                <button
+                                                                    type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
+                                                                    onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
-                                                                </a>
+                                                                </button>
                                                                 <button
                                                                     type="button"
                                                                     className="btn btn-link btn-sm text-blue-500"
@@ -980,11 +1042,11 @@ export default function Productions({
                                             const isCurrent = step.key === currentWorkflowStep;
                                             const currentIndex = getActiveWorkflowSteps(selectedTicket).findIndex(s => s.key === currentWorkflowStep);
                                             const isPast = currentIndex > index;
-                                            
+
                                             // Check if step is completed based on workflow progress
                                             const stepProgress = selectedTicket?.workflow_progress?.find(wp => wp.workflow_step === step.key);
                                             const isCompleted = stepProgress?.is_completed || false;
-                                            
+
                                             const canSelect = canUpdateWorkflowStep(step.key);
                                             // Show green if completed, current color if current, green if past, gray if future
                                             const stepColor = isCompleted ? '#4CAF50' : (isCurrent ? step.color : (isPast ? '#4CAF50' : '#ccc'));
@@ -1012,7 +1074,7 @@ export default function Productions({
                                                                 const newStep = step.key;
                                                                 setCurrentWorkflowStep(newStep);
                                                                 setUpdateModalMessage(null);
-                                                                
+
                                                                 // Load quantity from workflow progress for the new step
                                                                 const stepProgress = selectedTicket?.workflow_progress?.find(wp => wp.workflow_step === newStep);
                                                                 if (stepProgress) {
@@ -1065,7 +1127,7 @@ export default function Productions({
                                             if (prevStep && canUpdateWorkflowStep(prevStep)) {
                                                 setCurrentWorkflowStep(prevStep);
                                                 setUpdateModalMessage(null);
-                                                
+
                                                 // Load quantity from workflow progress for the previous step
                                                 const stepProgress = selectedTicket?.workflow_progress?.find(wp => wp.workflow_step === prevStep);
                                                 if (stepProgress) {
@@ -1090,7 +1152,7 @@ export default function Productions({
                                             if (nextStep && canUpdateWorkflowStep(nextStep)) {
                                                 setCurrentWorkflowStep(nextStep);
                                                 setUpdateModalMessage(null);
-                                                
+
                                                 // Load quantity from workflow progress for the next step, or reset to 0
                                                 const stepProgress = selectedTicket?.workflow_progress?.find(wp => wp.workflow_step === nextStep);
                                                 if (stepProgress) {
@@ -1375,14 +1437,14 @@ export default function Productions({
                                 <div className="d-flex gap-2">
                                     <button
                                         type="button"
-                                        className="btn btn-secondary"
+                                        className="btn btn-sm btn-secondary"
                                         onClick={handleCloseModals}
                                     >
                                         Skip (Record Later)
                                     </button>
                                     <button
                                         type="submit"
-                                        className="btn btn-success"
+                                        className="btn btn-sm btn-success"
                                         disabled={loading}
                                     >
                                         {loading ? (
@@ -1402,50 +1464,62 @@ export default function Productions({
             <Modal
                 title={
                     confirmationType === 'release_ticket' ? 'Release Ticket' :
-                    confirmationType === 'mark_completed' ? 'Mark Completed' :
-                    confirmationType === 'not_assigned_workflow' ? 'Access Denied' :
-                    confirmationType === 'ticket_assigned' ? 'Ticket Assigned' :
-                    confirmationType === 'stock_required' ? 'Validation Error' :
-                    'Alert'
+                        confirmationType === 'mark_completed' ? 'Mark Completed' :
+                            confirmationType === 'not_assigned_workflow' ? 'Access Denied' :
+                                confirmationType === 'ticket_assigned' ? 'Ticket Assigned' :
+                                    confirmationType === 'stock_required' ? 'Validation Error' :
+                                        'Alert'
                 }
                 isOpen={confirmationModal}
-                onClose={() => setConfirmationModal(false)}
+                onClose={handleCloseConfirmationModal}
                 size="md"
             >
                 <Confirmation
                     description={
                         confirmationType === 'release_ticket' ? 'Release this ticket?' :
-                        confirmationType === 'mark_completed' ? 'Mark this ticket as completed?' :
-                        confirmationData?.message || 'Are you sure?'
+                            confirmationType === 'mark_completed' ? 'Mark this ticket as completed?' :
+                                confirmationData?.message || 'Are you sure?'
                     }
                     subtitle={
                         confirmationType === 'release_ticket' ? 'Other users will be able to claim it.' :
-                        confirmationType === 'mark_completed' ? 'Stock will be automatically deducted.' :
-                        null
+                            confirmationType === 'mark_completed' ? 'Stock will be automatically deducted.' :
+                                null
                     }
                     label={
                         confirmationType === 'release_ticket' ? 'Release' :
-                        confirmationType === 'mark_completed' ? 'Mark Completed' :
-                        'OK'
+                            confirmationType === 'mark_completed' ? 'Mark Completed' :
+                                'OK'
                     }
                     cancelLabel={
                         (confirmationType === 'release_ticket' || confirmationType === 'mark_completed') ? 'Cancel' : 'Close'
                     }
-                    onCancel={() => setConfirmationModal(false)}
+                    onCancel={handleCloseConfirmationModal}
                     onSubmit={() => {
+                        console.log('Confirmation onSubmit triggered. Type:', confirmationType, 'Data:', confirmationData);
+
+                        // Handle action confirmations
                         if (confirmationType === 'release_ticket') {
-                            confirmReleaseTicket(confirmationData?.ticketId);
+                            const ticketId = confirmationData?.ticketId;
+                            console.log('Releasing ticket:', ticketId);
+                            // handleCloseConfirmationModal();
+                            confirmReleaseTicket(ticketId);
                         } else if (confirmationType === 'mark_completed') {
-                            confirmMarkCompleted(confirmationData?.ticketId);
+                            const ticketId = confirmationData?.ticketId;
+                            console.log('Marking ticket completed:', ticketId);
+                            handleCloseConfirmationModal();
+                            confirmMarkCompleted(ticketId);
+                        } else {
+                            // For alert-only modals, just close
+                            console.log('Alert modal - just closing');
+                            handleCloseConfirmationModal();
                         }
-                        setConfirmationModal(false);
                     }}
                     loading={loading}
                     color={
                         confirmationType === 'release_ticket' ? 'warning' :
-                        confirmationType === 'mark_completed' ? 'success' :
-                        confirmationType === 'not_assigned_workflow' || confirmationType === 'ticket_assigned' || confirmationType === 'stock_required' ? 'danger' :
-                        'primary'
+                            confirmationType === 'mark_completed' ? 'success' :
+                                confirmationType === 'not_assigned_workflow' || confirmationType === 'ticket_assigned' || confirmationType === 'stock_required' ? 'danger' :
+                                    'primary'
                     }
                     showIcon={true}
                 />

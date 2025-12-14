@@ -34,7 +34,7 @@ class StockManagementService
             $notes
         ) {
             $stockBefore = $stockItem->current_stock;
-            
+
             // Calculate stock after
             if ($movementType === 'in') {
                 // Always add for 'in' type
@@ -185,7 +185,7 @@ class StockManagementService
         if (!$ticket->relationLoaded('jobType')) {
             $ticket->load('jobType');
         }
-        
+
         if (!$ticket->jobType) {
             Log::warning("Ticket {$ticket->id} does not have a job type assigned.");
             return [];
@@ -200,20 +200,20 @@ class StockManagementService
         // If no explicit requirements found, try to find stock items directly linked to this job type
         if ($stockRequirements->isEmpty()) {
             Log::info("No explicit stock requirements found for job type {$ticket->jobType->id} (Ticket {$ticket->id}). Checking for stock items linked to this job type...");
-            
+
             // Find stock items that are linked to this job type via job_type_id
             $linkedStockItems = \App\Models\StockItem::where('job_type_id', $ticket->jobType->id)
                 ->where('is_active', true)
                 ->get();
-            
+
             if ($linkedStockItems->isEmpty()) {
                 Log::warning("No stock items found linked to job type {$ticket->jobType->id} (Ticket {$ticket->id}). Auto-consumption skipped.");
                 return [];
             }
-            
+
             // Create temporary requirement objects from linked stock items
             Log::info("Found {$linkedStockItems->count()} stock item(s) linked to job type {$ticket->jobType->id}. Creating requirements automatically...");
-            
+
             foreach ($linkedStockItems as $stockItem) {
                 // Create requirement if it doesn't exist
                 $requirement = \App\Models\JobTypeStockRequirement::firstOrCreate(
@@ -224,24 +224,24 @@ class StockManagementService
                     [
                         'quantity_per_unit' => $stockItem->is_area_based ? 0 : 1,
                         'is_required' => true,
-                        'notes' => $stockItem->is_area_based 
-                            ? 'Area-based material - calculated from production dimensions (auto-created)' 
+                        'notes' => $stockItem->is_area_based
+                            ? 'Area-based material - calculated from production dimensions (auto-created)'
                             : 'Standard 1:1 consumption (auto-created)',
                     ]
                 );
-                
+
                 // Load the stockItem relationship
                 $requirement->load('stockItem');
                 $stockRequirements->push($requirement);
             }
-            
+
             Log::info("Created {$stockRequirements->count()} stock requirement(s) for job type {$ticket->jobType->id}.");
         }
 
         // Parse production dimensions from ticket
         $productionLength = null;
         $productionWidth = null;
-        
+
         if ($ticket->size_value) {
             // Try to parse "100x50" or "100 x 50" format
             if (preg_match('/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i', $ticket->size_value, $matches)) {
@@ -256,12 +256,12 @@ class StockManagementService
         DB::transaction(function () use ($ticket, $stockRequirements, $productionLength, $productionWidth, &$consumptions, &$errors) {
             foreach ($stockRequirements as $requirement) {
                 $stockItem = $requirement->stockItem;
-                
+
                 if (!$stockItem) {
                     $errors[] = "Stock item not found for requirement ID {$requirement->id}.";
                     continue;
                 }
-                
+
                 if (!$stockItem->is_active) {
                     $errors[] = "Stock item '{$stockItem->name}' is not active.";
                     continue;
@@ -270,22 +270,22 @@ class StockManagementService
                 // Calculate required quantity
                 $requiredQuantity = 0;
                 $areaConsumed = 0; // Track area consumed for area-based materials
-                
+
                 if ($stockItem->is_area_based) {
                     // For area-based materials (tarpaulin, etc.)
                     if ($productionLength && $productionWidth && $stockItem->length && $stockItem->width) {
                         // Calculate total area needed for production
                         $productionArea = $productionLength * $productionWidth;
                         $totalAreaNeeded = $productionArea * $ticket->quantity;
-                        
+
                         // Calculate stock area per piece/roll
                         $stockArea = $stockItem->length * $stockItem->width;
-                        
+
                         // Calculate how many pieces/rolls are needed (as decimal for partial consumption)
                         // Example: 9 sq.ft needed from 450 sq.ft roll = 9/450 = 0.02 rolls
                         $requiredQuantity = $totalAreaNeeded / $stockArea;
                         $areaConsumed = $totalAreaNeeded;
-                        
+
                         Log::info("Area-based calculation for '{$stockItem->name}': Production area = {$productionArea} sq.ft × {$ticket->quantity} = {$totalAreaNeeded} sq.ft. Stock area = {$stockArea} sq.ft. Required = {$requiredQuantity} pieces.");
                     } else {
                         // Fallback: use quantity_per_unit from requirement
@@ -309,7 +309,7 @@ class StockManagementService
 
                 // Refresh stock item to get latest stock level before checking
                 $stockItem->refresh();
-                
+
                 // For area-based materials, check if we have enough area (not just pieces)
                 if ($stockItem->is_area_based && $areaConsumed > 0) {
                     $availableArea = $stockItem->current_stock * ($stockItem->length * $stockItem->width);
@@ -341,7 +341,7 @@ class StockManagementService
                 if ($stockItem->is_area_based && $areaConsumed > 0) {
                     $consumptionNotes .= " (Area: " . number_format($areaConsumed, 2) . " sq.ft)";
                 }
-                
+
                 $consumption = \App\Models\ProductionStockConsumption::create([
                     'ticket_id' => $ticket->id,
                     'stock_item_id' => $stockItem->id,
@@ -357,7 +357,7 @@ class StockManagementService
                 if ($stockItem->is_area_based && $areaConsumed > 0) {
                     $movementNotes .= " - Area: " . number_format($areaConsumed, 2) . " sq.ft";
                 }
-                
+
                 $this->recordMovement(
                     $stockItem,
                     'out',
@@ -385,4 +385,3 @@ class StockManagementService
         return $consumptions;
     }
 }
-

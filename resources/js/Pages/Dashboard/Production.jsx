@@ -36,12 +36,12 @@ export default function Productions({
     const canUpdateTicket = (ticket) => {
         if (isAdmin) return true;
         if (!auth?.user?.is_production) return false;
-        
+
         // If no workflow steps assigned, cannot update
         if (!assignedWorkflowSteps || assignedWorkflowSteps.length === 0) {
             return false;
         }
-        
+
         // For ready_to_print, check if user is assigned to first workflow step
         if (ticket.status === 'ready_to_print') {
             // Get first workflow step from ticket's job type
@@ -63,7 +63,7 @@ export default function Productions({
             }
             return false;
         }
-        
+
         // For in_production, check if user is assigned to current workflow step
         if (ticket.current_workflow_step) {
             const canUpdate = assignedWorkflowSteps.includes(ticket.current_workflow_step);
@@ -76,7 +76,7 @@ export default function Productions({
             }
             return canUpdate;
         }
-        
+
         return false;
     };
 
@@ -149,7 +149,6 @@ export default function Productions({
 
         // Listen for ticket status changes
         const handleTicketUpdate = (data) => {
-            console.log('📬 Production update received:', data);
 
             // Refresh the page data to get updated tickets
             router.reload({
@@ -452,7 +451,7 @@ export default function Productions({
 
     const getActionButton = (ticket) => {
         const canUpdate = canUpdateTicket(ticket);
-        
+
         if (ticket.status === "ready_to_print") {
             return (
                 <div className="btn-group">
@@ -564,7 +563,7 @@ export default function Productions({
                 let stepLabel = 'Not Started';
                 let stepQuantity = 0;
                 let totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
-                
+
                 if (isCompleted) {
                     // If ticket is completed, show completed status and 100% quantity
                     stepLabel = 'Completed';
@@ -579,7 +578,7 @@ export default function Productions({
                         { key: 'dtf_press', label: 'DTF Press' },
                     ];
                     stepLabel = WORKFLOW_STEPS.find(s => s.key === currentStep)?.label || currentStep;
-                    
+
                     // Get quantity for current workflow step from workflow progress
                     if (row.workflow_progress) {
                         const stepProgress = row.workflow_progress.find(wp => wp.workflow_step === currentStep);
@@ -594,7 +593,7 @@ export default function Productions({
                     // No current step, use produced_quantity
                     stepQuantity = row.produced_quantity || 0;
                 }
-                
+
                 return (
                     <div>
                         <span>
@@ -738,7 +737,7 @@ export default function Productions({
                 </div>
             )}
 
-    {/* {isFullscreen && (
+            {/* {isFullscreen && (
                 <div className="row mb-1">
                     <div className="col-12 text-center">
                         <h3
@@ -826,7 +825,7 @@ export default function Productions({
                     />
                 </div>
             </div>
-        
+
             <section id="main-content">
                 <div
                     className="content-wrap"

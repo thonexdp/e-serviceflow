@@ -418,10 +418,10 @@ export default function PaymentsFinance({
                         <div className="card-title flex justify-between items-center">
                             <h4>Expenses</h4>
                             <button
-                                className="btn btn-outline-primary"
+                                className="btn btn-outline-primary btn-sm"
                                 onClick={() => setExpenseModalOpen(true)}
                             >
-                                <i className="ti-plus m-r-5"></i> Add Expense
+                                <i className="ti-plus text-xs m-r-5"></i> Add Expense
                             </button>
                         </div>
                         <div className="card-body">

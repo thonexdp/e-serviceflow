@@ -38,7 +38,6 @@ function calculate() {
     var total_price = 0,
         total_tax = 0;
 
-    console.log('CALCULATING - Tax Rate:' + TAX_RATE);
 
     $('.invoicelist-body tbody tr').each(function () {
         var row = $(this),
@@ -92,7 +91,6 @@ $('#config_tax_rate').on('keyup', function () {
     if (TAX_RATE < 0 || TAX_RATE > 100) {
         TAX_RATE = 0;
     }
-    console.log('Changed tax rate to: ' + TAX_RATE);
     calculate();
 });
 

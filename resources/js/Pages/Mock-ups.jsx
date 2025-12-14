@@ -72,6 +72,9 @@ export default function Mockups({
             onError: () => {
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
     };
 
@@ -92,6 +95,9 @@ export default function Mockups({
                 setLoading(false);
             },
             onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
                 setLoading(false);
             },
         });
@@ -122,11 +128,21 @@ export default function Mockups({
             onError: () => {
                 setLoading(false);
             },
+            onFinish: () => {
+                setLoading(false);
+            },
         });
     };
 
     const handleDownload = (fileId, filename) => {
-        window.open(buildUrl(`/mock-ups/files/${fileId}/download`), '_blank');
+        const url = buildUrl(`/mock-ups/files/${fileId}/download`);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handlePreview = (filepath) => {
@@ -302,7 +318,7 @@ export default function Mockups({
                                             {customerFiles.length > 0 ? (
                                                 customerFiles.map((file) => (
                                                     <tr key={file.id}>
-                                                        <td>{file.file_name}</td>
+                                                        <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
                                                         <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                         <td>
                                                             <div className="btn-group">
@@ -351,7 +367,7 @@ export default function Mockups({
                                                 <tbody>
                                                     {mockupFiles.map((file) => (
                                                         <tr key={file.id}>
-                                                            <td>{file.file_name}</td>
+                                                            <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
                                                             <td>{new Date(file.created_at).toLocaleDateString()}</td>
                                                             <td>
                                                                 <div className="btn-group">
@@ -394,31 +410,36 @@ export default function Mockups({
                                 />
                             </div>
 
-                            <div className="d-flex gap-2">
-                                <button
-                                    type="button"
-                                    className="btn btn-success"
-                                    onClick={handleApprove}
-                                    disabled={loading || selectedTicket.design_status === 'approved'}
-                                >
-                                    <i className="ti-check"></i> Approve
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn btn-warning"
-                                    onClick={handleRequestRevision}
-                                    disabled={loading}
-                                >
-                                    <i className="ti-reload"></i> Request Revision
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={handleCloseModals}
-                                >
-                                    Close
-                                </button>
-                            </div>
+                            {
+                                selectedTicket.design_status !== "approved" && (
+                                    <div className="d-flex gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn btn-success"
+                                            onClick={handleApprove}
+                                            disabled={loading || selectedTicket.design_status === 'approved'}
+                                        >
+                                            <i className="ti-check"></i> Approve
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-warning"
+                                            onClick={handleRequestRevision}
+                                            disabled={loading}
+                                        >
+                                            <i className="ti-reload"></i> Request Revision
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={handleCloseModals}
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                )
+                            }
+
                         </div>
 
                         {/* Right Side - Image Preview */}

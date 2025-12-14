@@ -80,14 +80,13 @@ export default function Header({
 
         echoInitialized.current = true;
 
-        console.log(`🔌 Connecting to WebSocket channel: user.${auth?.user.id}`);
 
         // Subscribe to user's private channel
         const channel = window.Echo.private(`user.${auth?.user.id}`);
 
         // Add subscription event listeners
         channel.subscribed(() => {
-            console.log(`✅ Subscribed to channel: user.${auth?.user.id}`);
+            console.log(`✅ SC`);
         });
 
         channel.error((error) => {
@@ -98,7 +97,6 @@ export default function Header({
         // When using broadcastAs(), we listen to the broadcast name without the dot prefix
         // Laravel Echo automatically handles the App namespace
         const eventHandler = (data) => {
-            console.log('📬 Notification received via WebSocket:', data);
 
             // Create notification object from broadcast data
             const newNotification = {
@@ -143,7 +141,6 @@ export default function Header({
 
         // Cleanup on unmount
         return () => {
-            console.log(`🔌 Disconnecting from channel: user.${auth?.user.id}`);
             if (channel) {
                 window.Echo.leave(`user.${auth?.user.id}`);
             }
@@ -179,7 +176,6 @@ export default function Header({
         e.preventDefault();
         e.stopPropagation();
 
-        console.log('MarkAsRead notificationId:', notificationId);
         try {
             await axios.patch(`/notifications/${notificationId}/read`);
 
@@ -203,7 +199,6 @@ export default function Header({
         e.preventDefault();
         e.stopPropagation();
 
-        console.log('MarkAllAsRead');
         try {
             await axios.patch('/notifications/read-all');
 
@@ -255,20 +250,18 @@ export default function Header({
 
         // Navigate to ticket if available
         if (notification.data?.ticket_id || notification.notifiable_id) {
-            const ticketId = notification.data?.ticket_id || notification.notifiable_id;
-            router.visit(`/tickets?highlight=${ticketId}`);
+            // const ticketId = notification.data?.ticket_id || notification.notifiable_id;
+            router.visit(buildUrl(`/tickets`));
         }
     };
 
     const handleToggleClick = (e) => {
         e.preventDefault();
-        console.log("Sidebar toggle clicked");
         onToggleSidebar();
     };
 
     const handleLogout = (e) => {
         e.preventDefault();
-        console.log("logout");
         router.post(route("logout"), {}, { preserveScroll: true });
     };
 
@@ -362,7 +355,6 @@ export default function Header({
         }
     };
 
-    console.log("notificationList:", notificationList)
     return (
         <div className="header">
             <div className="container-fluid">
@@ -466,7 +458,16 @@ export default function Header({
                                                                     color: 'inherit',
                                                                 }}
                                                             >
-                                                                <img
+                                                                <div style={{ display: 'flex', alignItems: 'center', marginRight: '15px' }}>
+                                                                    <i
+                                                                        className="ti-email"
+                                                                        style={{
+                                                                            fontSize: '24px',
+                                                                            color: notification.read ? '#999' : '#007bff'
+                                                                        }}
+                                                                    ></i>
+                                                                </div>
+                                                                {/* <img
                                                                     className="pull-left m-r-10"
                                                                     src={userAvatar}
                                                                     alt=""
@@ -476,7 +477,7 @@ export default function Header({
                                                                         // borderRadius: '10%',
                                                                         marginRight: '10px',
                                                                     }}
-                                                                />
+                                                                /> */}
                                                                 <div className="notification-content" style={{ flex: 1 }}>
                                                                     <small
                                                                         className="notification-timestamp pull-right"

@@ -79,7 +79,7 @@ export default function PurchaseOrdersCreate({
             {flash?.error && <FlashMessage type="error" message={flash.error} />}
 
             <div className="row">
-                <div className="col-lg-8 p-r-0 title-margin-right">
+                <div className="col-lg-6 p-r-0 title-margin-right">
                     <div className="page-header">
                         <div className="page-title">
                             <h1>
@@ -88,10 +88,10 @@ export default function PurchaseOrdersCreate({
                         </div>
                     </div>
                 </div>
-                <div className="col-lg-4 p-l-0 title-margin-left">
+                <div className="col-lg-6 p-l-0 title-margin-left">
                     <div className="page-header">
                         <div className="page-title">
-                            <ol className="breadcrumb">
+                            <ol className="breadcrumb mb-0 justify-content-end">
                                 <li className="breadcrumb-item">
                                     <a href="/dashboard">Dashboard</a>
                                 </li>

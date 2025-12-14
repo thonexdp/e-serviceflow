@@ -26,10 +26,11 @@ export default function InventoryIndex({
     const [selectedStockItem, setSelectedStockItem] = useState(null);
     const [selectedID, setSelectedID] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [adjustQuantity, setAdjustQuantity] = useState(0);
     const [adjustNotes, setAdjustNotes] = useState("");
     const [isAreaBased, setIsAreaBased] = useState(false);
-    const { flash, auth } = usePage().props;
+    const { flash, auth, errors } = usePage().props;
 
     const isAdmin = auth?.user?.role === "admin";
     const { buildUrl } = useRoleApi();
@@ -44,7 +45,6 @@ export default function InventoryIndex({
     };
 
     const handleCloseModal = () => {
-
         setStockModalOpen(false);
         setAdjustModalOpen(false);
         setDeleteModalOpen(false);
@@ -53,6 +53,8 @@ export default function InventoryIndex({
         setAdjustQuantity(0);
         setAdjustNotes("");
         setIsAreaBased(false);
+        setSubmitting(false);
+        setLoading(false);
     };
 
     const handleOpenAdjustModal = (stockItem) => {
@@ -64,6 +66,7 @@ export default function InventoryIndex({
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData);
+
 
         // Convert boolean and numeric fields
         data.is_active = data.is_active === "on" || data.is_active === true;
@@ -86,20 +89,33 @@ export default function InventoryIndex({
             data.width = null;
         }
 
+
+
         if (editingStockItem) {
+
             router.put(buildUrl(`/inventory/${editingStockItem.id}`), data, {
+                onBefore: () => setSubmitting(true),
                 onSuccess: () => {
                     handleCloseModal();
                 },
-                preserveState: false,
+                onError: (errors) => {
+                    setSubmitting(false);
+                },
+                onFinish: () => setSubmitting(false),
+                preserveState: true, // Keep state so errors remain in modal
                 preserveScroll: true,
             });
         } else {
             router.post(buildUrl("/inventory"), data, {
+                onBefore: () => setSubmitting(true),
                 onSuccess: () => {
                     handleCloseModal();
                 },
-                preserveState: false,
+                onError: (errors) => {
+                    setSubmitting(false);
+                },
+                onFinish: () => setSubmitting(false),
+                preserveState: true, // Keep state so errors remain in modal
                 preserveScroll: true,
             });
         }
@@ -116,9 +132,12 @@ export default function InventoryIndex({
                 notes: adjustNotes,
             },
             {
+                onBefore: () => setSubmitting(true),
                 onSuccess: () => {
                     handleCloseModal();
                 },
+                onError: () => setSubmitting(false),
+                onFinish: () => setSubmitting(false),
                 preserveState: false,
                 preserveScroll: true,
             }
@@ -146,9 +165,9 @@ export default function InventoryIndex({
     };
 
     const getStockStatusBadge = (stockItem) => {
-        if (stockItem.current_stock <= 0) {
+        if (parseFloat(stockItem.current_stock) <= 0) {
             return <div className="badge badge-danger">Out of Stock</div>;
-        } else if (stockItem.current_stock <= stockItem.minimum_stock_level) {
+        } else if (parseFloat(stockItem.current_stock) <= parseFloat(stockItem.minimum_stock_level)) {
             return <div className="badge badge-warning">Low Stock</div>;
         }
         return <div className="badge badge-success">In Stock</div>;
@@ -365,6 +384,7 @@ export default function InventoryIndex({
                                 defaultValue={editingStockItem?.sku}
                                 required
                                 disabled={!!editingStockItem}
+                                error={errors?.sku}
                             />
                         </div>
                         <div className="col-md-6">
@@ -374,17 +394,19 @@ export default function InventoryIndex({
                                 name="name"
                                 defaultValue={editingStockItem?.name}
                                 required
+                                error={errors?.name}
                             />
                         </div>
                     </div>
                     <div className="row">
                         <div className="col-md-10">
                             <FormInput
-                                label="Description"
+                                label="Description (Optional)"
                                 type="textarea"
                                 rows={2}
                                 name="description"
                                 defaultValue={editingStockItem?.description}
+                                error={errors?.description}
                             />
                         </div>
                         <div className="col-md-2">
@@ -406,6 +428,7 @@ export default function InventoryIndex({
                                 name="job_type_id"
                                 defaultValue={editingStockItem?.job_type_id}
                                 required
+                                error={errors?.job_type_id}
                                 options={[
                                     { value: "", label: "Select Job Type" },
                                     ...jobTypes.map((jt) => ({
@@ -422,10 +445,11 @@ export default function InventoryIndex({
                                 name="base_unit_of_measure"
                                 defaultValue={
                                     editingStockItem?.base_unit_of_measure ||
-                                    "pcs"
+                                    ""
                                 }
                                 required
                                 placeholder="pcs, kg, liter, roll, sheet, sqm"
+                                error={errors?.base_unit_of_measure}
                             />
                         </div>
                         <div className="col-md-3">
@@ -436,6 +460,7 @@ export default function InventoryIndex({
                                 defaultValue={editingStockItem?.unit_cost || 0}
                                 step="0.01"
                                 min="0"
+                                error={errors?.unit_cost}
                             />
                         </div>
                     </div>
@@ -447,21 +472,9 @@ export default function InventoryIndex({
                                         type="checkbox"
                                         name="is_area_based"
                                         id="is_area_based"
-                                        checked={
-                                            isAreaBased ||
-                                            editingStockItem?.is_area_based ||
-                                            false
-                                        }
+                                        checked={isAreaBased}
                                         onChange={(e) => {
-                                            const checked = e.target.checked;
-                                            setIsAreaBased(checked);
-                                            // Also update the editingStockItem if it exists (for immediate UI update)
-                                            if (editingStockItem) {
-                                                setEditingStockItem({
-                                                    ...editingStockItem,
-                                                    is_area_based: checked,
-                                                });
-                                            }
+                                            setIsAreaBased(e.target.checked);
                                         }}
                                         className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                                     />
@@ -478,7 +491,7 @@ export default function InventoryIndex({
                                 </small>
                             </div>
                         </div>
-                        {(isAreaBased || editingStockItem?.is_area_based) && (
+                        {isAreaBased && (
                             <>
                                 <div className="col-md-3">
                                     <FormInput
@@ -492,6 +505,7 @@ export default function InventoryIndex({
                                         min="0"
                                         required
                                         placeholder="Length in base unit"
+                                        error={errors?.length}
                                     />
                                 </div>
                                 <div className="col-md-3">
@@ -506,6 +520,7 @@ export default function InventoryIndex({
                                         min="0"
                                         required
                                         placeholder="Width in base unit"
+                                        error={errors?.width}
                                     />
                                 </div>
                             </>
@@ -523,6 +538,7 @@ export default function InventoryIndex({
                                     }
                                     step="0.01"
                                     min="0"
+                                    error={errors?.current_stock}
                                 />
                             </div>
                         )}
@@ -536,6 +552,7 @@ export default function InventoryIndex({
                                 }
                                 step="0.01"
                                 min="0"
+                                error={errors?.minimum_stock_level}
                             />
                         </div>
                         <div className="col-md-4">
@@ -548,6 +565,7 @@ export default function InventoryIndex({
                                 }
                                 step="0.01"
                                 min="0"
+                                error={errors?.maximum_stock_level}
                             />
                         </div>
                     </div>
@@ -558,6 +576,7 @@ export default function InventoryIndex({
                                 type="text"
                                 name="supplier"
                                 defaultValue={editingStockItem?.supplier}
+                                error={errors?.supplier}
                             />
                         </div>
                         <div className="col-md-6">
@@ -566,18 +585,33 @@ export default function InventoryIndex({
                                 type="text"
                                 name="location"
                                 defaultValue={editingStockItem?.location}
+                                error={errors?.location}
                             />
                         </div>
                     </div>
                     <div className="d-flex justify-content-end gap-2 mt-3">
-                        <button type="submit" className="btn btn-primary">
-                            <i className="ti-save"></i>{" "}
-                            {editingStockItem ? "Update" : "Create"}
+                        <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={submitting}
+                        >
+                            {submitting ? (
+                                <>
+                                    <i className="fa fa-spinner fa-spin"></i>{" "}
+                                    {editingStockItem ? "Updating..." : "Creating..."}
+                                </>
+                            ) : (
+                                <>
+                                    <i className="ti-save"></i>{" "}
+                                    {editingStockItem ? "Update" : "Create"}
+                                </>
+                            )}
                         </button>
                         <button
                             type="button"
                             className="btn btn-secondary"
                             onClick={handleCloseModal}
+                            disabled={submitting}
                         >
                             Cancel
                         </button>
@@ -620,13 +654,26 @@ export default function InventoryIndex({
                             onChange={(e) => setAdjustNotes(e.target.value)}
                         />
                         <div className="d-flex justify-content-end gap-2 mt-3">
-                            <button type="submit" className="btn btn-primary">
-                                <i className="ti-save"></i> Adjust Stock
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                disabled={submitting}
+                            >
+                                {submitting ? (
+                                    <>
+                                        <i className="fa fa-spinner fa-spin"></i> Adjusting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="ti-save"></i> Adjust Stock
+                                    </>
+                                )}
                             </button>
                             <button
                                 type="button"
                                 className="btn btn-secondary"
                                 onClick={handleCloseModal}
+                                disabled={submitting}
                             >
                                 Cancel
                             </button>
