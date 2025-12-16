@@ -504,11 +504,32 @@ export default function CustomerPOSOrder() {
                 setUploadStatus('complete');
                 setRetryCount(0); // Reset retry count on success
 
-                setSubmittedTicket({
+                const ticketData = {
                     ticket_number: response.data.ticket_number,
                     status: response.data.ticket?.status || 'pending',
                     payment_status: response.data.ticket?.payment_status || 'pending',
-                });
+                };
+
+                setSubmittedTicket(ticketData);
+
+                // Save ticket to history in localStorage
+                try {
+                    const ticketHistory = JSON.parse(localStorage.getItem('rc_printshop_ticket_history') || '[]');
+                    const newTicket = {
+                        ticket_number: response.data.ticket_number,
+                        customer_name: formData.customer_name,
+                        created_at: new Date().toISOString(),
+                    };
+
+                    // Add to beginning of array (most recent first)
+                    ticketHistory.unshift(newTicket);
+
+                    // Keep only last 10 tickets
+                    const limitedHistory = ticketHistory.slice(0, 10);
+                    localStorage.setItem('rc_printshop_ticket_history', JSON.stringify(limitedHistory));
+                } catch (e) {
+                    console.error('Error saving ticket to history:', e);
+                }
 
                 setTimeout(() => {
                     setCurrentStep(5);
@@ -1727,36 +1748,50 @@ export default function CustomerPOSOrder() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => {
-                                setFormData({
-                                    customer_name: '',
-                                    customer_email: '',
-                                    customer_facebook: '',
-                                    customer_phone: '',
-                                    customer_id: null,
-                                    category_id: '',
-                                    job_type_id: '',
-                                    description: '',
-                                    quantity: 1,
-                                    free_quantity: 0,
-                                    size_width: '',
-                                    size_height: '',
-                                    size_rate_id: '',
-                                    due_date: '',
-                                    file: null
-                                });
-                                setDesignFiles([]);
-                                setActiveDesignTab(0);
-                                setPaymentProofs([]);
-                                setPaymentMethod('walkin');
-                                setSubmittedTicket(null);
-                                setCurrentStep(1);
-                            }}
-                            className="w-full py-4 rounded-lg bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all"
-                        >
-                            Place Another Order
-                        </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button
+                                onClick={() => {
+                                    // Save ticket number to localStorage for auto-fill on home page
+                                    if (submittedTicket?.ticket_number) {
+                                        localStorage.setItem('rc_printshop_last_ticket', submittedTicket.ticket_number);
+                                    }
+                                    router.visit('/');
+                                }}
+                                className="w-full py-4 rounded-lg border-2 border-indigo-600 font-bold text-indigo-600 hover:bg-indigo-50 shadow-lg hover:shadow-xl transition-all"
+                            >
+                                ← Back to Home
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setFormData({
+                                        customer_name: '',
+                                        customer_email: '',
+                                        customer_facebook: '',
+                                        customer_phone: '',
+                                        customer_id: null,
+                                        category_id: '',
+                                        job_type_id: '',
+                                        description: '',
+                                        quantity: 1,
+                                        free_quantity: 0,
+                                        size_width: '',
+                                        size_height: '',
+                                        size_rate_id: '',
+                                        due_date: '',
+                                        file: null
+                                    });
+                                    setDesignFiles([]);
+                                    setActiveDesignTab(0);
+                                    setPaymentProofs([]);
+                                    setPaymentMethod('walkin');
+                                    setSubmittedTicket(null);
+                                    setCurrentStep(1);
+                                }}
+                                className="w-full py-4 rounded-lg bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all"
+                            >
+                                Place Another Order
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

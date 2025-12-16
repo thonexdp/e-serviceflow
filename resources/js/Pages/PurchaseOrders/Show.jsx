@@ -104,11 +104,11 @@ export default function PurchaseOrdersShow({
                     <div className="page-header">
                         <div className="page-title">
                             <ol className="breadcrumb">
-                                <li className="breadcrumb-item">
+                                {/* <li className="breadcrumb-item">
                                     <a href="/dashboard">Dashboard</a>
-                                </li>
+                                </li> */}
                                 <li className="breadcrumb-item">
-                                    <a href="/purchase-orders">Purchase Orders</a>
+                                    <a href={buildUrl("/purchase-orders")}>Purchase Orders</a>
                                 </li>
                                 <li className="breadcrumb-item active">{purchaseOrder.po_number}</li>
                             </ol>

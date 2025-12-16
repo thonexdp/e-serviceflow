@@ -92,11 +92,11 @@ export default function PurchaseOrdersCreate({
                     <div className="page-header">
                         <div className="page-title">
                             <ol className="breadcrumb mb-0 justify-content-end">
-                                <li className="breadcrumb-item">
+                                {/* <li className="breadcrumb-item">
                                     <a href="/dashboard">Dashboard</a>
-                                </li>
+                                </li> */}
                                 <li className="breadcrumb-item">
-                                    <a href="/purchase-orders">Purchase Orders</a>
+                                    <a href={buildUrl("/purchase-orders")}>Purchase Orders</a>
                                 </li>
                                 <li className="breadcrumb-item active">Create</li>
                             </ol>

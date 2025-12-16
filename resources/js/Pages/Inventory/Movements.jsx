@@ -105,11 +105,11 @@ export default function InventoryMovements({
                     <div className="page-header">
                         <div className="page-title">
                             <ol className="breadcrumb">
-                                <li className="breadcrumb-item">
+                                {/* <li className="breadcrumb-item">
                                     <a href="/dashboard">Dashboard</a>
-                                </li>
+                                </li> */}
                                 <li className="breadcrumb-item">
-                                    <a href="/inventory">Inventory</a>
+                                    <a href={buildUrl("/inventory")}>Inventory</a>
                                 </li>
                                 <li className="breadcrumb-item active">Movements</li>
                             </ol>
