@@ -79,16 +79,16 @@ class Ticket extends Model
      */
     protected static function generateTicketNumber(): string
     {
-        // do {
-        //     $number = 'TKT-' .(Str::uuid()->toString());
-        // } while (static::where('ticket_number', $number)->exists());
+        do {
+            $code = 'RC-' . strtoupper(Str::random(8));
+        } while (static::where('ticket_number', $code)->exists());
 
-        // return $number;
+        return $code;
 
-        $last = static::orderBy('id', 'desc')->first();
-        $num = $last ? $last->id + 1 : 1;
+        // $last = static::orderBy('id', 'desc')->first();
+        // $num = $last ? $last->id + 1 : 1;
 
-        return 'RC-' . date('Y') . str_pad($num, 6, '0', STR_PAD_LEFT);
+        // return 'RC-' . date('Y') . str_pad($num, 6, '0', STR_PAD_LEFT);
     }
 
     /**

@@ -78,11 +78,15 @@ export default function FormInput({
             disabled={disabled}
             className={`${baseClasses} p-2.5`}
           >
+            <option value="" selected>
+              Select
+            </option>
             {options.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
+
           </select>
         );
 
