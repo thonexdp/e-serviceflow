@@ -9,6 +9,27 @@ export default function PrintShoppeLanding() {
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState(null);
     const [settings, setSettings] = useState(null);
+    const [showSuggestion, setShowSuggestion] = useState(false);
+    const [ticketHistory, setTicketHistory] = useState([]);
+    const [inputFocused, setInputFocused] = useState(false);
+    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+
+    // Load last ticket number from localStorage on mount
+    useEffect(() => {
+        const lastTicket = localStorage.getItem('rc_printshop_last_ticket');
+        if (lastTicket) {
+            setTrackingNumber(lastTicket);
+            setShowSuggestion(true);
+        }
+
+        // Load ticket history
+        try {
+            const history = JSON.parse(localStorage.getItem('rc_printshop_ticket_history') || '[]');
+            setTicketHistory(history);
+        } catch (e) {
+            console.error('Error loading ticket history:', e);
+        }
+    }, []);
 
     // Fetch settings on component mount
     useEffect(() => {
@@ -34,6 +55,7 @@ export default function PrintShoppeLanding() {
         setIsSearching(true);
         setError(null);
         setOrderData(null);
+        setShowSuggestion(false); // Hide suggestion when searching
 
         try {
             const response = await axios.post('/api/public/tickets/search', {
@@ -58,6 +80,48 @@ export default function PrintShoppeLanding() {
         } finally {
             setIsSearching(false);
         }
+    };
+
+    const handleSelectTicket = (ticketNumber) => {
+        setTrackingNumber(ticketNumber);
+        setInputFocused(false);
+        setSelectedSuggestionIndex(-1);
+        setShowSuggestion(false);
+    };
+
+    const handleKeyDown = (e) => {
+        if (!inputFocused || ticketHistory.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedSuggestionIndex(prev =>
+                prev < ticketHistory.length - 1 ? prev + 1 : prev
+            );
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+        } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+            e.preventDefault();
+            handleSelectTicket(ticketHistory[selectedSuggestionIndex].ticket_number);
+        } else if (e.key === 'Escape') {
+            setInputFocused(false);
+            setSelectedSuggestionIndex(-1);
+        }
+    };
+
+    const getRelativeTime = (timestamp) => {
+        const now = new Date();
+        const then = new Date(timestamp);
+        const diffMs = now - then;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+        return then.toLocaleDateString();
     };
 
     const getStatusIcon = (status) => {
@@ -97,16 +161,83 @@ export default function PrintShoppeLanding() {
                             </div>
                             <p className="text-gray-600 mb-4 text-sm">Enter your tracking number to view order status</p>
 
+                            {ticketHistory.length > 0 && !inputFocused && (
+                                <div className="mb-3 flex items-center gap-2 text-xs text-indigo-600">
+                                    <Clock className="w-4 h-4" />
+                                    <span>Click the input to see your {ticketHistory.length} recent ticket{ticketHistory.length > 1 ? 's' : ''}</span>
+                                </div>
+                            )}
+
                             <div className="flex gap-2 sm:gap-3">
-                                <div className="flex-1">
+                                <div className="flex-1 relative">
                                     <input
                                         type="text"
                                         value={trackingNumber}
                                         onChange={(e) => setTrackingNumber(e.target.value)}
-                                        placeholder="Enter tracking number (e.g., TKT-000001)"
+                                        onFocus={() => {
+                                            setInputFocused(true);
+                                            setSelectedSuggestionIndex(-1);
+                                        }}
+                                        onBlur={() => {
+                                            // Delay to allow click on dropdown item
+                                            setTimeout(() => setInputFocused(false), 200);
+                                        }}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Enter tracking number (e.g., RC-ABC123)"
                                         className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && selectedSuggestionIndex < 0) {
+                                                handleSearch();
+                                            }
+                                        }}
                                     />
+
+                                    {/* Ticket History Dropdown */}
+                                    {inputFocused && ticketHistory.length > 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                                            <div className="p-2">
+                                                <div className="text-xs font-semibold text-gray-500 uppercase px-2 py-1 mb-1">
+                                                    Recent Tickets
+                                                </div>
+                                                {ticketHistory.map((ticket, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => handleSelectTicket(ticket.ticket_number)}
+                                                        className={`w-full text-left px-3 py-2 rounded-md hover:bg-indigo-50 transition-colors ${selectedSuggestionIndex === index ? 'bg-indigo-50' : ''
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-semibold text-sm text-gray-900 truncate">
+                                                                    {ticket.ticket_number}
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 truncate">
+                                                                    {ticket.customer_name}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 ml-2 flex-shrink-0">
+                                                                {getRelativeTime(ticket.created_at)}
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+
+                                                {/* Clear History Button */}
+                                                <div className="border-t border-gray-200 mt-2 pt-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            localStorage.removeItem('rc_printshop_ticket_history');
+                                                            setTicketHistory([]);
+                                                            setInputFocused(false);
+                                                        }}
+                                                        className="w-full text-center px-3 py-2 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium"
+                                                    >
+                                                        Clear History
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     onClick={handleSearch}
@@ -118,6 +249,33 @@ export default function PrintShoppeLanding() {
                                     <span className="xs:hidden">{isSearching ? '...' : ''}</span>
                                 </button>
                             </div>
+
+                            {/* Suggestion Message */}
+                            {showSuggestion && !orderData && !error && (
+                                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+                                    <div className="flex-shrink-0 mt-0.5">
+                                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm text-green-800">
+                                            <strong>Your recent order is ready to track!</strong> We've auto-filled your ticket number <strong>{trackingNumber}</strong>. Click "Track" to view your order status.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowSuggestion(false);
+                                            localStorage.removeItem('rc_printshop_last_ticket');
+                                        }}
+                                        className="flex-shrink-0 text-green-600 hover:text-green-800"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Error Message */}
                             {error && (

@@ -66,6 +66,7 @@ return [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET SESSION wait_timeout=28800",
             ]) : [],
+            'timezone' => '+08:00',
         ],
 
         'pgsql' => [

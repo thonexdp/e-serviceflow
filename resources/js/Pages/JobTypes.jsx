@@ -166,15 +166,29 @@ export default function JobTypes({
 
                 if (row.size_rates?.length > 0) {
                     badges.push(
-                        <div key="size" className="badge badge-primary mr-1">Size-Based</div>
+                        <div key="size" className="badge badge-primary mr-1">
+                            Size-Based
+                        </div>
                     );
                 }
 
-                if (badges.length > 0) {
-                    return <div className="d-flex flex-wrap gap-1">{badges}</div>;
-                }
+                return (
+                    <div className="d-flex flex-column gap-1">
+                        {/* Price */}
+                        {row.price > 0 && (
+                            <div className="font-weight-bold">
+                                {formatPeso(parseFloat(row.price).toFixed(2))} / {row.price_by}
+                            </div>
+                        )}
 
-                return `${formatPeso(parseFloat(row.price).toFixed(2))} / ${row.price_by}`;
+                        {/* Badges */}
+                        {badges.length > 0 && (
+                            <div className="d-flex flex-wrap gap-1">
+                                {badges}
+                            </div>
+                        )}
+                    </div>
+                );
             },
         },
         {
