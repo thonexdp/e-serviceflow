@@ -239,6 +239,8 @@ Route::prefix('designer')->middleware(['auth', 'role:admin,Designer'])->name('de
     Route::post('/mock-ups/{id}/approve', [MockupsController::class, 'approve'])->name('mockups.approve');
     Route::post('/mock-ups/{id}/revision', [MockupsController::class, 'requestRevision'])->name('mockups.revision');
     Route::get('/mock-ups/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('mockups.download');
+    Route::post('/mock-ups/{id}/claim', [MockupsController::class, 'claimTicket'])->name('mockups.claim');
+    Route::post('/mock-ups/{id}/release', [MockupsController::class, 'releaseTicket'])->name('mockups.release');
 
     // // Tickets (View-only for context)
     // Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');

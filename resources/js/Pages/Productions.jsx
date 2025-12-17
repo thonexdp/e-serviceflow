@@ -11,7 +11,7 @@ import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
 const WORKFLOW_STEPS = [
-    { key: 'design', label: 'Design', icon: 'ti-pencil-alt', color: '#9C27B0' },
+    // { key: 'design', label: 'Design', icon: 'ti-pencil-alt', color: '#9C27B0' },
     { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
     { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
     { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
