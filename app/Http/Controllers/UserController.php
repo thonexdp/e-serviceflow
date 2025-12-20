@@ -21,7 +21,7 @@ class UserController extends Controller
 
         // Define available workflow steps
         $availableWorkflowSteps = [
-            'design' => 'Design',
+            // 'design' => 'Design',
             'printing' => 'Printing',
             'lamination_heatpress' => 'Lamination/Heatpress',
             'cutting' => 'Cutting',
@@ -70,6 +70,7 @@ class UserController extends Controller
             'workflow_steps' => 'nullable|array',
             'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press',
             'is_active' => 'nullable|boolean',
+            'is_head' => 'nullable|boolean',
         ]);
 
         $user = User::create([
@@ -78,6 +79,7 @@ class UserController extends Controller
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
             'is_active' => $validated['is_active'] ?? true,
+            'is_head' => ($validated['role'] === 'Production' && isset($validated['is_head'])) ? $validated['is_head'] : false,
         ]);
 
         // Sync permissions if provided
@@ -117,6 +119,7 @@ class UserController extends Controller
             'workflow_steps' => 'nullable|array',
             'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press',
             'is_active' => 'nullable|boolean',
+            'is_head' => 'nullable|boolean',
         ]);
 
         $oldData = [
@@ -124,6 +127,7 @@ class UserController extends Controller
             'email' => $user->email,
             'role' => $user->role,
             'is_active' => $user->is_active,
+            'is_head' => $user->is_head,
         ];
 
         $user->update([
@@ -131,6 +135,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'role' => $validated['role'],
             'is_active' => $validated['is_active'] ?? $user->is_active,
+            'is_head' => ($validated['role'] === 'Production' && isset($validated['is_head'])) ? $validated['is_head'] : false,
         ]);
 
         // Update password only if update_password is true and password is provided
@@ -138,7 +143,7 @@ class UserController extends Controller
             $user->update([
                 'password' => Hash::make($validated['password']),
             ]);
-            
+
             // Log password change
             UserActivityLog::log(
                 auth()->id(),

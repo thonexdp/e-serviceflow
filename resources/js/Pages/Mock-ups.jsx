@@ -25,7 +25,7 @@ export default function Mockups({
 
     const [notes, setNotes] = useState("");
     const [loading, setLoading] = useState(false);
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
 
     const handleReview = (ticket) => {
@@ -149,6 +149,40 @@ export default function Mockups({
         setSelectedImage(filepath);
     };
 
+    const handleClaimTicket = (ticketId) => {
+        setLoading(true);
+        router.post(buildUrl(`/mock-ups/${ticketId}/claim`), {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const handleReleaseTicket = (ticketId) => {
+        setLoading(true);
+        router.post(buildUrl(`/mock-ups/${ticketId}/release`), {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
+    };
+
     const getDesignStatusBadge = (status) => {
         const classes = {
             pending: "badge-warning",
@@ -172,31 +206,98 @@ export default function Mockups({
     };
 
     const getActionButton = (ticket) => {
+        const isAssignedToMe = ticket.assigned_to_user_id === auth?.user?.id;
+        const isAssignedToOther = ticket.assigned_to_user_id && !isAssignedToMe;
+
         if (ticket.design_status === "pending" || ticket.design_status === "revision_requested") {
             return (
-                <button
-                    type="button"
-                    className="btn btn-link btn-outline btn-sm text-blue-500"
-                    onClick={() => handleUpload(ticket)}
-                >
-                    <i className="ti-upload"></i> Upload Mock-up
-                </button>
+                <div className="btn-group-vertical">
+                    <div className="btn-group">
+                        {!isAssignedToMe && !isAssignedToOther && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-primary"
+                                onClick={() => handleClaimTicket(ticket.id)}
+                                disabled={loading}
+                                title="Claim this ticket"
+                            >
+                                <i className="ti-hand-point-up"></i> Claim
+                            </button>
+                        )}
+                        {isAssignedToMe && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-blue-500"
+                                onClick={() => handleUpload(ticket)}
+                            >
+                                <i className="ti-upload"></i> Upload
+                            </button>
+                        )}
+                        {isAssignedToOther && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-muted"
+                                disabled
+                                title={`Assigned to ${ticket.assigned_to_user?.name || 'another user'}`}
+                            >
+                                <i className="ti-lock"></i> Locked
+                            </button>
+                        )}
+                    </div>
+                    {isAssignedToMe && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-secondary"
+                            onClick={() => handleReleaseTicket(ticket.id)}
+                            disabled={loading}
+                            title="Release this ticket"
+                        >
+                            <i className="ti-hand-point-down"></i> Release
+                        </button>
+                    )}
+                </div>
             );
         } else if (ticket.design_status === "mockup_uploaded") {
             return (
-                <button
-                    type="button"
-                    className="btn btn-link btn-outline btn-sm text-green-500"
-                    onClick={() => handleReview(ticket)}
-                >
-                    <i className="ti-eye"></i> Review
-                </button>
+                <div className="btn-group-vertical">
+                    <div className="btn-group">
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-green-500"
+                            onClick={() => handleReview(ticket)}
+                        >
+                            <i className="ti-eye"></i> Review
+                        </button>
+                        {!isAssignedToMe && !isAssignedToOther && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-primary"
+                                onClick={() => handleClaimTicket(ticket.id)}
+                                disabled={loading}
+                                title="Claim this ticket"
+                            >
+                                <i className="ti-hand-point-up"></i> Claim
+                            </button>
+                        )}
+                    </div>
+                    {isAssignedToMe && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-secondary"
+                            onClick={() => handleReleaseTicket(ticket.id)}
+                            disabled={loading}
+                            title="Release this ticket"
+                        >
+                            <i className="ti-hand-point-down"></i> Release
+                        </button>
+                    )}
+                </div>
             );
         } else {
             return (
                 <button
                     type="button"
-                    className="btn btn-link btn-outline btn-sm text-blue-500"
+                    className="btn btn-link btn-sm text-blue-500"
                     onClick={() => handleReview(ticket)}
                 >
                     <i className="ti-eye"></i> View
@@ -224,12 +325,29 @@ export default function Mockups({
         },
         { label: "Description", key: "description" },
         {
+            label: "Assigned To",
+            key: "assigned_to",
+            render: (row) => {
+                if (row.assigned_to_user) {
+                    const isAssignedToMe = row.assigned_to_user_id === auth?.user?.id;
+                    return (
+                        <span className={isAssignedToMe ? "text-success font-weight-bold" : "text-info"}>
+                            <i className="ti-user mr-1"></i>
+                            {row.assigned_to_user.name}
+                            {isAssignedToMe && <small className="ml-1">(You)</small>}
+                        </span>
+                    );
+                }
+                return <span className="text-muted">Unassigned</span>;
+            },
+        },
+        {
             label: "Design Status",
             key: "design_status",
             render: (row) => getDesignStatusBadge(row.design_status),
         },
         {
-            label: "Action",
+            label: "Actions",
             key: "action",
             render: (row) => getActionButton(row),
         },

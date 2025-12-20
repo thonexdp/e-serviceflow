@@ -38,6 +38,7 @@ class ReportsController extends Controller
             'inventory' => $this->getInventoryConsumptionReport($dates),
             'product_profitability' => $this->getProductProfitabilityReport($dates),
             'production' => $this->getProductionReport($dates),
+            'production_incentives' => $this->getProductionIncentivesReport($dates, $request),
             'customer_insights' => $this->getCustomerInsightsReport($dates),
             'online_orders' => $this->getOnlineOrdersReport($dates),
             'designer_approvals' => $this->getDesignerApprovalsReport($dates),
@@ -603,6 +604,82 @@ class ReportsController extends Controller
             'summary' => [
                 'total_staff' => $users->count(),
                 'by_role' => $users->groupBy('role')->map->count(),
+            ],
+        ];
+    }
+
+    /**
+     * Get production incentives report
+     */
+    private function getProductionIncentivesReport($dates, Request $request)
+    {
+        $query = \App\Models\ProductionRecord::with(['user', 'ticket', 'jobType', 'evidenceFiles'])
+            ->whereBetween('created_at', [$dates['start'], $dates['end']]);
+
+        // Apply user filter
+        if ($request->has('user_id') && $request->user_id) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        // Apply job type filter
+        if ($request->has('job_type_id') && $request->job_type_id) {
+            $query->where('job_type_id', $request->job_type_id);
+        }
+
+        $records = $query->orderBy('created_at', 'desc')->get();
+
+        // Calculate summary
+        $summary = [
+            'total_incentives' => $records->sum('incentive_amount'),
+            'total_quantity' => $records->sum('quantity_produced'),
+            'total_records' => $records->count(),
+            'unique_users' => $records->pluck('user_id')->unique()->count(),
+            'by_user' => $records->groupBy('user_id')->map(function ($userRecords) {
+                return [
+                    'user_name' => $userRecords->first()->user->name ?? 'N/A',
+                    'total_quantity' => $userRecords->sum('quantity_produced'),
+                    'total_incentives' => $userRecords->sum('incentive_amount'),
+                ];
+            })->values()->toArray(),
+            'by_job_type' => $records->groupBy('job_type_id')->map(function ($jobTypeRecords) {
+                return [
+                    'job_type_name' => $jobTypeRecords->first()->jobType->name ?? 'N/A',
+                    'total_quantity' => $jobTypeRecords->sum('quantity_produced'),
+                    'total_incentives' => $jobTypeRecords->sum('incentive_amount'),
+                ];
+            })->values()->toArray(),
+        ];
+
+        // Format records for display
+        $formattedRecords = $records->map(function ($record) {
+            return [
+                'id' => $record->id,
+                'date' => $record->created_at->format('Y-m-d'),
+                'created_at' => $record->created_at->toDateTimeString(),
+                'user_name' => $record->user->name ?? 'N/A',
+                'ticket_number' => $record->ticket->ticket_number ?? 'N/A',
+                'job_type_name' => $record->jobType->name ?? 'N/A',
+                'workflow_step' => $record->workflow_step,
+                'quantity_produced' => $record->quantity_produced,
+                'incentive_price' => $record->jobType->incentive_price ?? 0,
+                'evidence_files' => $record->evidenceFiles->map(function ($file) {
+                    return [
+                        'id' => $file->id,
+                        'file_name' => $file->file_name,
+                        'file_path' => $file->file_path,
+                    ];
+                })->toArray(),
+            ];
+        })->toArray();
+
+        return [
+            'records' => $formattedRecords,
+            'summary' => $summary,
+            'filters' => [
+                'user_id' => $request->user_id ?? null,
+                'user_name' => $request->user_id ? \App\Models\User::find($request->user_id)->name ?? null : null,
+                'job_type_id' => $request->job_type_id ?? null,
+                'job_type_name' => $request->job_type_id ? \App\Models\JobType::find($request->job_type_id)->name ?? null : null,
             ],
         ];
     }

@@ -48,6 +48,7 @@ class HandleInertiaRequests extends Middleware
                         ? $request->user()->getAssignedWorkflowSteps()
                         : [],
                     'is_production' => $request->user()->isProduction(),
+                    'is_head' => $request->user()->is_head ?? false,
                 ] : null,
             ],
             'flash' => [

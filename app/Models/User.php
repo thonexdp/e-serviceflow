@@ -24,6 +24,7 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'is_head',
     ];
 
     /**
@@ -45,6 +46,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
+        'is_head' => 'boolean',
     ];
 
     /**
@@ -104,6 +106,14 @@ class User extends Authenticatable
     public function isProduction(): bool
     {
         return $this->hasRole(self::ROLE_PRODUCTION);
+    }
+
+    /**
+     * Check if user is Production Head
+     */
+    public function isProductionHead(): bool
+    {
+        return $this->isProduction() && $this->is_head === true;
     }
 
     /**
@@ -259,5 +269,23 @@ class User extends Authenticatable
         return self::whereHas('workflowSteps', function ($query) use ($workflowStep) {
             $query->where('workflow_step', $workflowStep);
         })->where('is_active', true)->get();
+    }
+
+    /**
+     * Get tickets assigned to this user for production.
+     */
+    public function assignedTickets()
+    {
+        return $this->belongsToMany(Ticket::class, 'ticket_production_assignments')
+            ->withPivot('workflow_step')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get production records for this user.
+     */
+    public function productionRecords()
+    {
+        return $this->hasMany(ProductionRecord::class);
     }
 }

@@ -24,11 +24,14 @@ class ProductionQueueController extends Controller
      */
     public function index(Request $request)
     {
+
         // Get tickets that are approved by designer (ready for production)
         $data = $this->getData($request);
+
         return Inertia::render('Productions', [
             'tickets' => $data['tickets'],
             'stockItems' => $data['stockItems'],
+            'productionUsers' => $data['productionUsers'],
             'filters' => $request->only(['search', 'status']),
             'summary' => $data['summary'],
         ]);
@@ -45,7 +48,10 @@ class ProductionQueueController extends Controller
             'mockupFiles',
             'stockConsumptions.stockItem',
             'assignedToUser',
-            'workflowProgress'
+            'assignedUsers',
+            'workflowProgress',
+            'productionRecords.user',
+            'productionRecords.evidenceFiles'
         ])
             ->whereIn('status', ['ready_to_print', 'in_production', 'completed'])
             ->where(function ($q) {
@@ -129,9 +135,16 @@ class ProductionQueueController extends Controller
                 ->count(),
         ];
 
+        // Get all production users for assignment dropdown
+        $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
         return [
             'tickets' => $tickets,
             'stockItems' => $stockItems,
+            'productionUsers' => $productionUsers,
             'filters' => $request->only(['search', 'status']),
             'summary' => $summary,
         ];
@@ -158,15 +171,18 @@ class ProductionQueueController extends Controller
             }
         }
 
-        // Auto-claim ticket if not already assigned
-        if (!$ticket->assigned_to_user_id) {
-            $ticket->assigned_to_user_id = $user->id;
+        // Don't auto-claim - users should be assigned by Production Head
+        // Keep legacy assigned_to_user_id for backward compatibility if needed
+        $updateData = [
+            'status' => 'in_production',
+        ];
+
+        // Only set assigned_to_user_id if not already set (backward compatibility)
+        if (!$ticket->assigned_to_user_id && $ticket->assignedUsers->isEmpty()) {
+            $updateData['assigned_to_user_id'] = $user->id;
         }
 
-        $ticket->update([
-            'status' => 'in_production',
-            'assigned_to_user_id' => $ticket->assigned_to_user_id,
-        ]);
+        $ticket->update($updateData);
 
         // Initialize workflow step
         $ticket->initializeWorkflow();
@@ -215,19 +231,29 @@ class ProductionQueueController extends Controller
             }
         }
 
-        // Check if ticket is assigned to another user (do this AFTER workflow step check)
-        // This allows users in the correct workflow step to take over if needed
-        if ($ticket->assigned_to_user_id && $ticket->assigned_to_user_id !== $user->id) {
-            $assignedUser = \App\Models\User::find($ticket->assigned_to_user_id);
-            return redirect()->back()->with('error', 'This ticket is currently assigned to ' . ($assignedUser->name ?? 'another user') . '. Please ask them to release it first, or have an admin reassign it.');
+        // Check if user is in assigned users list (for multi-user assignment)
+        $assignedUsers = $ticket->assignedUsers;
+        $isUserAssigned = $assignedUsers->contains('id', $user->id);
+
+        // For backward compatibility, also check single assignment
+        if (!$isUserAssigned && $ticket->assigned_to_user_id) {
+            $isUserAssigned = $ticket->assigned_to_user_id === $user->id;
+        }
+
+        // Allow if user is assigned, is admin, or is production head
+        if (!$isUserAssigned && !$user->isAdmin() && !$user->isProductionHead()) {
+            return redirect()->back()->with('error', 'You are not assigned to this ticket. Please ask Production Head to assign you.');
         }
 
         $maxQuantity = $ticket->total_quantity ?? $ticket->quantity;
 
+        // Validate request - support both single quantity and multi-user quantities
         $validated = $request->validate([
-            'produced_quantity' => 'required|integer|min:0|max:' . $maxQuantity,
+            'produced_quantity' => 'nullable|integer|min:0|max:' . $maxQuantity,
+            'user_quantities' => 'nullable|string', // JSON string
             'status' => 'nullable|string|in:in_production,completed',
             'current_workflow_step' => 'nullable|string',
+            'evidence_files.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
         $oldStatus = $ticket->status;
@@ -236,13 +262,29 @@ class ProductionQueueController extends Controller
         $newWorkflowStep = $validated['current_workflow_step'] ?? $ticket->current_workflow_step;
         $workflowStepChanged = $newWorkflowStep && $newWorkflowStep !== $oldWorkflowStep;
 
+        // Parse user quantities if provided
+        $userQuantities = [];
+        if (!empty($validated['user_quantities'])) {
+            $userQuantities = json_decode($validated['user_quantities'], true) ?? [];
+        }
+
+        // Calculate total quantity from user quantities or use single quantity
+        $totalQuantity = 0;
+        if (!empty($userQuantities)) {
+            foreach ($userQuantities as $userQty) {
+                $totalQuantity += (int)($userQty['quantity_produced'] ?? 0);
+            }
+        } else {
+            $totalQuantity = (int)($validated['produced_quantity'] ?? 0);
+        }
+
         $maxQuantity = $ticket->total_quantity ?? $ticket->quantity;
-        $newStatus = $validated['status'] ?? ($validated['produced_quantity'] >= $maxQuantity ? 'completed' : 'in_production');
+        $newStatus = $validated['status'] ?? ($totalQuantity >= $maxQuantity ? 'completed' : 'in_production');
         $wasCompleted = $ticket->status === 'completed';
         $isNowCompleted = $newStatus === 'completed';
 
         try {
-            DB::transaction(function () use ($ticket, $validated, $newStatus, $isNowCompleted, $wasCompleted, $oldStatus, $user, $newWorkflowStep, $workflowStepChanged) {
+            DB::transaction(function () use ($ticket, $validated, $totalQuantity, $newStatus, $isNowCompleted, $wasCompleted, $oldStatus, $user, $newWorkflowStep, $workflowStepChanged, $userQuantities, $request) {
                 // If workflow step changed, check if there's existing progress for the new step
                 if ($workflowStepChanged && $newWorkflowStep) {
                     $existingProgress = \App\Models\TicketWorkflowProgress::where('ticket_id', $ticket->id)
@@ -251,15 +293,15 @@ class ProductionQueueController extends Controller
 
                     // If no record exists for the new step, reset quantity to 0
                     if (!$existingProgress) {
-                        $validated['produced_quantity'] = 0;
+                        $totalQuantity = 0;
                     } else {
                         // Use the existing progress quantity for this step
-                        $validated['produced_quantity'] = $existingProgress->completed_quantity;
+                        $totalQuantity = $existingProgress->completed_quantity;
                     }
                 }
 
                 $updateData = [
-                    'produced_quantity' => $validated['produced_quantity'],
+                    'produced_quantity' => $totalQuantity,
                     'status' => $newStatus,
                 ];
 
@@ -270,15 +312,74 @@ class ProductionQueueController extends Controller
 
                 $ticket->update($updateData);
 
+                // Create production records for each user quantity
+                $currentWorkflowStep = $ticket->current_workflow_step ?? $newWorkflowStep;
+                $incentivePrice = $ticket->jobType->incentive_price ?? 0;
+                $createdRecords = [];
+
+                if (!empty($userQuantities) && $currentWorkflowStep) {
+                    foreach ($userQuantities as $userQty) {
+                        $userId = (int)($userQty['user_id'] ?? 0);
+                        $qty = (int)($userQty['quantity_produced'] ?? 0);
+
+                        if ($userId > 0 && $qty > 0) {
+                            $productionRecord = \App\Models\ProductionRecord::create([
+                                'ticket_id' => $ticket->id,
+                                'user_id' => $userId,
+                                'job_type_id' => $ticket->job_type_id,
+                                'workflow_step' => $currentWorkflowStep,
+                                'quantity_produced' => $qty,
+                                'incentive_amount' => $qty * $incentivePrice,
+                            ]);
+
+                            $createdRecords[] = $productionRecord;
+                        }
+                    }
+                } else if ($totalQuantity > 0 && $currentWorkflowStep) {
+                    // Single user mode (backward compatible) - create record for current user
+                    $productionRecord = \App\Models\ProductionRecord::create([
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $user->id,
+                        'job_type_id' => $ticket->job_type_id,
+                        'workflow_step' => $currentWorkflowStep,
+                        'quantity_produced' => $totalQuantity,
+                        'incentive_amount' => $totalQuantity * $incentivePrice,
+                    ]);
+
+                    $createdRecords[] = $productionRecord;
+                }
+
+                // Handle evidence files - attach to all records created in this update
+                if ($request->hasFile('evidence_files') && !empty($createdRecords)) {
+                    foreach ($request->file('evidence_files') as $file) {
+                        $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                        $filePath = $file->storeAs('production_evidence', $fileName, 'public');
+
+                        // Get the public URL for the file
+                        $fileUrl = asset('storage/' . $filePath);
+
+                        // Attach evidence to all production records created in this update
+                        foreach ($createdRecords as $record) {
+                            \App\Models\ProductionEvidenceFile::create([
+                                'production_record_id' => $record->id,
+                                'file_name' => $file->getClientOriginalName(),
+                                'file_path' => $fileUrl,
+                                'file_type' => $file->getMimeType(),
+                                'file_size' => $file->getSize(),
+                            ]);
+                        }
+                    }
+                }
+
                 // Record workflow progress for the current step (always save progress)
                 $stepCompleted = false;
-                if ($ticket->current_workflow_step) {
-                    $progress = $this->recordWorkflowProgress($ticket, $ticket->current_workflow_step, $validated['produced_quantity'], $user);
+                if ($currentWorkflowStep) {
+                    $progress = $this->recordWorkflowProgress($ticket, $currentWorkflowStep, $totalQuantity, $user);
                     $stepCompleted = $progress->is_completed;
                 }
 
                 // If step is completed, advance to next workflow step
-                if ($stepCompleted && $ticket->current_workflow_step) {
+                if ($stepCompleted && $currentWorkflowStep) {
                     $nextStep = $ticket->getNextWorkflowStep();
                     if ($nextStep) {
                         // Advance to next step and reset quantity for the new step
@@ -318,7 +419,7 @@ class ProductionQueueController extends Controller
             } else {
                 // Notify for workflow step or quantity changes (even if status didn't change)
                 $workflowStepChanged = $ticket->current_workflow_step !== $oldWorkflowStep;
-                $quantityChanged = $validated['produced_quantity'] !== $oldQuantity;
+                $quantityChanged = $totalQuantity !== $oldQuantity;
 
                 if ($workflowStepChanged || $quantityChanged) {
                     $this->notifyProductionUpdate($ticket, $oldWorkflowStep, $oldQuantity);
@@ -654,59 +755,580 @@ class ProductionQueueController extends Controller
     }
 
     /**
-     * Claim a ticket for the current user
+     * Assign production users to a ticket (Production Head only)
      */
-    public function claimTicket($id)
+    public function assignUsers(Request $request, $id)
     {
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        // Check if ticket is already assigned to another user
-        if ($ticket->assigned_to_user_id && $ticket->assigned_to_user_id !== $user->id) {
-            $assignedUser = \App\Models\User::find($ticket->assigned_to_user_id);
-            return redirect()->back()->with('error', 'This ticket is already assigned to ' . ($assignedUser->name ?? 'another user') . '.');
+        // Only Production Head or Admin can assign users
+        if (!$user->isProductionHead() && !$user->isAdmin()) {
+            return redirect()->back()->with('error', 'Only Production Head or Admin can assign users to tickets.');
         }
 
-        // Check if user can claim this ticket based on current workflow step
-        if ($user && $user->isProduction() && !$user->isAdmin()) {
-            if ($ticket->status === 'ready_to_print') {
-                // For ready_to_print, check if user is assigned to first workflow step
-                $firstStep = $ticket->getFirstWorkflowStep();
-                if ($firstStep && !$user->isAssignedToWorkflowStep($firstStep)) {
-                    return redirect()->back()->with('error', 'You cannot claim this ticket. It\'s not in your assigned workflow step yet.');
-                }
-            } else if ($ticket->status === 'in_production' && $ticket->current_workflow_step) {
-                // For in_production, check if current workflow step matches user's assignment
-                if (!$user->isAssignedToWorkflowStep($ticket->current_workflow_step)) {
-                    return redirect()->back()->with('error', 'You cannot claim this ticket. It\'s currently in the "' . ucfirst(str_replace('_', ' ', $ticket->current_workflow_step)) . '" step, which is not assigned to you.');
-                }
-            }
-        }
-
-        $ticket->update([
-            'assigned_to_user_id' => $user->id,
+        $validated = $request->validate([
+            'user_ids' => 'array', // Allow empty array for unassigning
+            'user_ids.*' => 'exists:users,id',
+            'workflow_step' => 'nullable|string',
         ]);
 
-        return redirect()->back()->with('success', 'Ticket claimed successfully.');
+        $userIds = $validated['user_ids'] ?? [];
+
+        // Ensure all users are production users
+        $productionUserIds = [];
+        if (!empty($userIds)) {
+            $productionUserIds = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                ->whereIn('id', $userIds)
+                ->pluck('id')
+                ->toArray();
+
+            // if (count($productionUserIds) !== count($userIds)) {
+            //     dd($productionUserIds, $userIds);
+            //     return redirect()->back()->with('error', 'All assigned users must be production users.');
+            // }
+        }
+
+        // Sync assignments with workflow step
+        $syncData = [];
+        foreach ($productionUserIds as $userId) {
+            $syncData[$userId] = ['workflow_step' => $validated['workflow_step'] ?? $ticket->current_workflow_step];
+        }
+
+        $ticket->assignedUsers()->sync($syncData);
+
+        // Also update legacy assigned_to_user_id for backward compatibility
+        if (!empty($productionUserIds)) {
+            $ticket->update(['assigned_to_user_id' => $productionUserIds[0]]);
+        } else {
+            // Clear assignment if no users selected
+            $ticket->update(['assigned_to_user_id' => null]);
+        }
+
+        return redirect()->back()->with('success', 'Users assigned successfully.');
     }
 
     /**
-     * Release a ticket (unclaim it)
+     * Show all tickets regardless of workflow (Production Head view)
      */
-    public function releaseTicket($id)
+    public function allTickets(Request $request)
     {
         $user = Auth::user();
-        $ticket = Ticket::findOrFail($id);
 
-        // Only the assigned user or admin can release
-        if ($ticket->assigned_to_user_id !== $user->id && !$user->isAdmin()) {
-            return redirect()->back()->with('error', 'You can only release tickets assigned to you.');
+        $query = Ticket::with([
+            'customer',
+            'jobType',
+            'mockupFiles',
+            'workflowProgress',
+            'productionRecords.user',
+            'assignedUsers',
+            'assignedToUser',
+        ])
+            ->whereIn('status', ['ready_to_print', 'in_production', 'completed']);
+
+        // Apply filters
+        if ($request->filled('search')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('ticket_number', 'like', "%{$request->search}%")
+                    ->orWhere('description', 'like', "%{$request->search}%");
+            });
         }
 
-        $ticket->update([
-            'assigned_to_user_id' => null,
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('workflow_step')) {
+            $query->where('current_workflow_step', $request->workflow_step);
+        }
+
+        $tickets = $query->orderBy('due_date', 'asc')
+            ->paginate(20)
+            ->withQueryString();
+
+        // Get production users for assignment
+        $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+            ->where('is_active', true)
+            ->get();
+
+
+        return Inertia::render('Production/AllTickets', [
+            'tickets' => $tickets,
+            'productionUsers' => $productionUsers,
+            'filters' => $request->only(['search', 'status', 'workflow_step']),
+        ]);
+    }
+
+    /**
+     * Show tickets for specific workflow step
+     */
+    public function workflowView(Request $request, string $workflowStep)
+    {
+        try {
+            //code...
+
+            $user = Auth::user();
+
+            // Verify user has access to this workflow step
+            if ($user->role === 'Production' && !$user->is_head && !$user->isAdmin()) {
+                $hasAccess = $user->workflowSteps()->where('workflow_step', $workflowStep)->exists();
+                if (!$hasAccess) {
+                    abort(403, 'You are not assigned to this workflow step.');
+                }
+            }
+
+            $query = Ticket::with([
+                'customer',
+                'jobType',
+                'mockupFiles',
+                'workflowProgress',
+                'productionRecords.user',
+                'assignedUsers',
+                'assignedToUser',
+                'evidenceFiles.user',
+            ]);
+
+            // For printing workflow, include ready_to_print tickets
+            if ($workflowStep === 'printing') {
+                $query->where(function ($q) use ($workflowStep) {
+                    $q->where(function ($sq) use ($workflowStep) {
+                        $sq->where('current_workflow_step', $workflowStep)
+                            ->where('status', 'in_production');
+                    })
+                        ->orWhere('status', 'ready_to_print');
+                });
+            } else {
+                // For other workflow steps, only show in_production tickets with matching step
+                $query->where('current_workflow_step', $workflowStep)
+                    ->where('status', 'in_production');
+            }
+
+            // Filter to only tickets assigned to this user (unless Production Head/Admin)
+            if (!$user->is_head && $user->role !== 'admin') {
+                $query->where(function ($q) use ($user) {
+                    $q->whereHas('assignedUsers', function ($sq) use ($user) {
+                        $sq->where('users.id', $user->id);
+                    })->orWhere('assigned_to_user_id', $user->id);
+                });
+            }
+
+            if ($request->filled('search')) {
+                $query->where(function ($q) use ($request) {
+                    $q->where('ticket_number', 'like', "%{$request->search}%")
+                        ->orWhere('description', 'like', "%{$request->search}%");
+                });
+            }
+
+            $tickets = $query->orderBy('due_date', 'asc')
+                ->paginate(20)
+                ->withQueryString();
+
+            return Inertia::render('Production/WorkflowView', [
+                'tickets' => $tickets,
+                'workflowStep' => $workflowStep,
+                'filters' => $request->only(['search']),
+            ]);
+        } catch (\Throwable $th) {
+            dd($th);
+        }
+    }
+
+    /**
+     * Start work on a specific workflow step
+     */
+    public function startWorkflow(Request $request, string $workflowStep, Ticket $ticket)
+    {
+        $user = Auth::user();
+        $oldStatus = $ticket->status;
+
+        // Check if design is approved (if applicable)
+        if ($ticket->design_status && $ticket->design_status !== 'approved') {
+            return redirect()->back()->with('error', 'Ticket design must be approved before starting production.');
+        }
+
+        // Check if user is authorized to start production (for Production users)
+        if ($user && $user->isProduction() && !$user->isAdmin()) {
+            $firstStep = $ticket->getFirstWorkflowStep();
+            if ($firstStep && !$user->isAssignedToWorkflowStep($firstStep)) {
+                return redirect()->back()->with('error', 'You cannot start production on this ticket. The first workflow step "' . ucfirst(str_replace('_', ' ', $firstStep)) . '" is not assigned to you.');
+            }
+        }
+
+        // Update ticket status to in_production
+        $updateData = [
+            'status' => 'in_production',
+        ];
+
+        // Update workflow_started_at if first workflow
+        if (empty($ticket->workflow_started_at)) {
+            $updateData['workflow_started_at'] = now();
+        }
+
+        $ticket->update($updateData);
+
+        // Initialize workflow step
+        $ticket->initializeWorkflow();
+
+        // Record initial workflow progress
+        if ($ticket->current_workflow_step) {
+            $this->recordWorkflowProgress($ticket, $ticket->current_workflow_step, 0, $user);
+        }
+
+        // Create workflow log entry
+        \App\Models\WorkflowLog::create([
+            'ticket_id' => $ticket->id,
+            'workflow_step' => $workflowStep,
+            'user_id' => $user->id,
+            'status' => 'in_progress',
+            'started_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', 'Ticket released successfully.');
+        // Notify FrontDesk and Production users
+        $this->notifyStatusChange($ticket, $oldStatus, 'in_production');
+
+        return redirect()->back()->with('success', 'Production started successfully.');
+    }
+
+    /**
+     * Update progress for a workflow step
+     */
+    public function updateWorkflow(Request $request, string $workflowStep, Ticket $ticket)
+    {
+        $request->validate([
+            'produced_quantity' => 'required|integer|min:0',
+            'evidence_files.*' => 'nullable|file|image|max:10240', // 10MB max
+            'selected_user_id' => 'nullable|exists:users,id',
+        ]);
+
+        $user = Auth::user();
+        $producedQuantity = $request->input('produced_quantity');
+        $selectedUserId = $request->input('selected_user_id', $user->id);
+
+        DB::beginTransaction();
+        try {
+            // Create or update production record for the selected user (or current user if not specified)
+            $productionRecord = \App\Models\ProductionRecord::updateOrCreate(
+                [
+                    'ticket_id' => $ticket->id,
+                    'user_id' => $selectedUserId,
+                    'workflow_step' => $workflowStep,
+                ],
+                [
+                    'quantity_produced' => $producedQuantity,
+                    'job_type_id' => $ticket->job_type_id,
+                    'incentive_amount' => $producedQuantity * ($ticket->jobType->incentive_price ?? 0),
+                    'recorded_at' => now(),
+                ]
+            );
+
+            // Calculate total completed quantity by summing all production records for this workflow step
+            $totalCompletedQuantity = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
+                ->where('workflow_step', $workflowStep)
+                ->sum('quantity_produced');
+
+            // Update or create workflow progress with the total from all users
+            $workflowProgress = \App\Models\TicketWorkflowProgress::updateOrCreate(
+                [
+                    'ticket_id' => $ticket->id,
+                    'workflow_step' => $workflowStep,
+                ],
+                [
+                    'completed_quantity' => $totalCompletedQuantity,
+                    'total_quantity' => $ticket->total_quantity ?? $ticket->quantity,
+                    'is_completed' => $totalCompletedQuantity >= ($ticket->total_quantity ?? $ticket->quantity),
+                    'completed_at' => $totalCompletedQuantity >= ($ticket->total_quantity ?? $ticket->quantity) ? now() : null,
+                ]
+            );
+
+            // Update workflow log
+            $workflowLog = \App\Models\WorkflowLog::where('ticket_id', $ticket->id)
+                ->where('workflow_step', $workflowStep)
+                ->where('user_id', $selectedUserId)
+                ->latest()
+                ->first();
+
+            if ($workflowLog) {
+                $workflowLog->update([
+                    'quantity_produced' => $producedQuantity,
+                    'status' => $producedQuantity >= ($ticket->total_quantity ?? $ticket->quantity) ? 'completed' : 'in_progress',
+                ]);
+            }
+
+            // Handle evidence file uploads
+            if ($request->hasFile('evidence_files')) {
+                foreach ($request->file('evidence_files') as $file) {
+                    $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, 'public');
+
+                    \App\Models\WorkflowEvidence::create([
+                        'ticket_id' => $ticket->id,
+                        'workflow_step' => $workflowStep,
+                        'user_id' => $user->id,
+                        'workflow_log_id' => $workflowLog?->id,
+                        'file_name' => $filename,
+                        'file_path' => asset('storage/' . $path),
+                        'file_size' => $file->getSize(),
+                        'mime_type' => $file->getMimeType(),
+                        'uploaded_at' => now(),
+                    ]);
+                }
+            }
+
+            // Update ticket produced_quantity with total from all workflow steps
+            $totalProduced = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
+                ->sum('quantity_produced');
+            $ticket->update(['produced_quantity' => $totalProduced]);
+
+            DB::commit();
+
+            return redirect()->back()->with('success', 'Progress updated successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Workflow update failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to update progress. Please try again.');
+        }
+    }
+
+    /**
+     * Mark a workflow step as completed and move to next step
+     */
+    public function completeWorkflow(Request $request, string $workflowStep, Ticket $ticket)
+    {
+        $request->validate([
+            'produced_quantity' => 'nullable|integer|min:0',
+            'evidence_files.*' => 'nullable|file|image|max:10240',
+            'selected_user_id' => 'nullable|exists:users,id',
+        ]);
+
+        $user = Auth::user();
+        $producedQuantity = $request->input('produced_quantity');
+        $selectedUserId = $request->input('selected_user_id', $user->id);
+
+        DB::beginTransaction();
+        try {
+            // If quantity provided, update production record first
+            if ($producedQuantity !== null) {
+                // Create or update production record
+                $productionRecord = \App\Models\ProductionRecord::updateOrCreate(
+                    [
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $selectedUserId,
+                        'workflow_step' => $workflowStep,
+                    ],
+                    [
+                        'quantity_produced' => $producedQuantity,
+                        'job_type_id' => $ticket->job_type_id,
+                        'incentive_amount' => $producedQuantity * ($ticket->jobType->incentive_price ?? 0),
+                        'recorded_at' => now(),
+                    ]
+                );
+
+                // Calculate total completed quantity by summing all production records for this workflow step
+                $totalCompletedQuantity = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
+                    ->where('workflow_step', $workflowStep)
+                    ->sum('quantity_produced');
+
+                // Update workflow progress with the total from all users
+                $workflowProgress = \App\Models\TicketWorkflowProgress::updateOrCreate(
+                    [
+                        'ticket_id' => $ticket->id,
+                        'workflow_step' => $workflowStep,
+                    ],
+                    [
+                        'completed_quantity' => $totalCompletedQuantity,
+                        'total_quantity' => $ticket->total_quantity ?? $ticket->quantity,
+                        'is_completed' => true,
+                        'completed_at' => now(),
+                        'completed_by' => $user->id,
+                    ]
+                );
+
+                // Handle evidence file uploads
+                if ($request->hasFile('evidence_files')) {
+                    foreach ($request->file('evidence_files') as $file) {
+                        $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, 'public');
+
+                        \App\Models\WorkflowEvidence::create([
+                            'ticket_id' => $ticket->id,
+                            'workflow_step' => $workflowStep,
+                            'user_id' => $selectedUserId,
+                            'workflow_log_id' => null,
+                            'file_name' => $filename,
+                            'file_path' => asset('storage/' . $path),
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'uploaded_at' => now(),
+                        ]);
+                    }
+                }
+
+                // Update ticket produced_quantity with total from all workflow steps
+                $totalProduced = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
+                    ->sum('quantity_produced');
+                $ticket->update(['produced_quantity' => $totalProduced]);
+            } else {
+                // Mark workflow progress as completed (legacy behavior)
+                $workflowProgress = \App\Models\TicketWorkflowProgress::where('ticket_id', $ticket->id)
+                    ->where('workflow_step', $workflowStep)
+                    ->first();
+
+                if ($workflowProgress) {
+                    $workflowProgress->update([
+                        'is_completed' => true,
+                        'completed_at' => now(),
+                        'completed_by' => $user->id,
+                    ]);
+                }
+            }
+
+            // Update workflow log
+            $workflowLog = \App\Models\WorkflowLog::where('ticket_id', $ticket->id)
+                ->where('workflow_step', $workflowStep)
+                ->where('user_id', $selectedUserId)
+                ->latest()
+                ->first();
+
+            if ($workflowLog) {
+                $workflowLog->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'quantity_produced' => $producedQuantity ?? $workflowLog->quantity_produced,
+                ]);
+            }
+
+            // Get next workflow step
+            $nextStep = $ticket->getNextWorkflowStep();
+
+            if ($nextStep) {
+                // Move to next workflow step
+                $ticket->update(['current_workflow_step' => $nextStep]);
+
+                // Notify users assigned to next step
+                $this->notifyNextWorkflowStepUsers($ticket, $nextStep);
+            } else {
+                // All workflows completed
+                $ticket->update([
+                    'status' => 'completed',
+                    'is_workflow_completed' => true,
+                    'workflow_completed_at' => now(),
+                    'current_workflow_step' => null,
+                ]);
+
+                // Auto-consume stock
+                $this->stockService->autoConsumeStockForProduction($ticket);
+            }
+
+            DB::commit();
+
+            return redirect()->back()->with('success', 'Workflow step completed successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Workflow completion failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to complete workflow. Please try again.');
+        }
+    }
+
+    /**
+     * Show completed tickets
+     */
+    public function completedTickets(Request $request)
+    {
+        $query = Ticket::with([
+            'customer',
+            'jobType',
+            'mockupFiles',
+            'workflowProgress',
+            'productionRecords.user',
+        ])
+            ->where('status', 'completed')
+            ->where(function ($q) {
+                $q->where('is_workflow_completed', true)
+                    ->orWhereNull('is_workflow_completed');
+            });
+
+        // Apply filters
+        if ($request->filled('search')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('ticket_number', 'like', "%{$request->search}%")
+                    ->orWhere('description', 'like', "%{$request->search}%");
+            });
+        }
+
+        if ($request->filled('date_range')) {
+            switch ($request->date_range) {
+                case 'today':
+                    $query->whereDate('workflow_completed_at', today());
+                    break;
+                case 'this_week':
+                    $query->whereBetween('workflow_completed_at', [now()->startOfWeek(), now()->endOfWeek()]);
+                    break;
+                case 'this_month':
+                    $query->whereMonth('workflow_completed_at', now()->month)
+                        ->whereYear('workflow_completed_at', now()->year);
+                    break;
+                case 'last_month':
+                    $query->whereMonth('workflow_completed_at', now()->subMonth()->month)
+                        ->whereYear('workflow_completed_at', now()->subMonth()->year);
+                    break;
+            }
+        }
+
+        $tickets = $query->orderBy('workflow_completed_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        return Inertia::render('Production/CompletedTickets', [
+            'tickets' => $tickets,
+            'filters' => $request->only(['search', 'date_range']),
+        ]);
+    }
+
+    /**
+     * Assign users to a specific workflow step for a ticket (Production Head)
+     */
+    public function assignWorkflow(Request $request, Ticket $ticket)
+    {
+        $request->validate([
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'exists:users,id',
+            'workflow_step' => 'required|string',
+        ]);
+
+        $assignedBy = auth()->id();
+
+        DB::beginTransaction();
+        try {
+            // Deactivate existing assignments for this workflow step
+            \App\Models\WorkflowAssignment::where('ticket_id', $ticket->id)
+                ->where('workflow_step', $request->workflow_step)
+                ->update(['is_active' => false]);
+
+            // Create new assignments
+            foreach ($request->user_ids as $userId) {
+                \App\Models\WorkflowAssignment::create([
+                    'ticket_id' => $ticket->id,
+                    'workflow_step' => $request->workflow_step,
+                    'user_id' => $userId,
+                    'assigned_by' => $assignedBy,
+                    'is_active' => true,
+                ]);
+            }
+
+            // Also sync with assigned_users relationship for compatibility
+            $syncData = [];
+            foreach ($request->user_ids as $userId) {
+                $syncData[$userId] = ['workflow_step' => $request->workflow_step];
+            }
+            $ticket->assignedUsers()->syncWithoutDetaching($syncData);
+
+            DB::commit();
+
+            return redirect()->back()->with('success', 'Users assigned successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Workflow assignment failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to assign users. Please try again.');
+        }
     }
 }

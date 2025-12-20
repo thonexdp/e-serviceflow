@@ -21,6 +21,7 @@ class JobTypeRequest extends FormRequest
             'price' => 'required|numeric|min:0',
             'price_by' => 'required|in:pcs,sqm,length',
             'discount' => 'nullable|numeric|min:0|max:100',
+            'incentive_price' => 'nullable|numeric|min:0',
             'promo_text' => 'nullable|string|max:255',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer|min:0',

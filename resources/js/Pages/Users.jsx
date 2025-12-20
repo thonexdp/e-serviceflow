@@ -34,6 +34,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             password_type: "auto", // 'auto' or 'custom'
             update_password: false, // Toggle for updating password
             is_active: true,
+            is_head: false,
         });
 
     const [activeTab, setActiveTab] = useState("basic"); // 'basic', 'permissions', 'workflow', 'history'
@@ -71,6 +72,11 @@ export default function Users({ users, availableRoles, availablePermissions, ava
         {
             label: "Role",
             key: "role",
+            render: (user) => (
+                <span>
+                    {user.role} {user.is_head ? "(Head)" : ""}
+                </span>
+            ),
         },
         {
             label: "Status",
@@ -112,6 +118,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 password_type: "auto",
                 update_password: false,
                 is_active: user.is_active !== undefined ? user.is_active : true,
+                is_head: user.is_head !== undefined ? user.is_head : false,
             });
         } else {
             setEditingUser(null);
@@ -126,6 +133,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 password_type: "auto",
                 update_password: false,
                 is_active: true,
+                is_head: false,
             });
             setActiveTab("basic");
         }
@@ -738,6 +746,28 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                     message={errors.workflow_steps}
                                     className="mt-2"
                                 />
+
+                                {/* Is Head Checkbox */}
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <Checkbox
+                                            checked={data.is_head}
+                                            onChange={(e) =>
+                                                setData("is_head", e.target.checked)
+                                            }
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">
+                                            Production Head/Supervisor
+                                        </span>
+                                    </label>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Mark this user as a production head or supervisor with additional responsibilities
+                                    </p>
+                                    <InputError
+                                        message={errors.is_head}
+                                        className="mt-2"
+                                    />
+                                </div>
                             </div>
                         )}
 

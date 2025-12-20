@@ -181,6 +181,13 @@ export default function JobTypes({
                             </div>
                         )}
 
+                        {/* Incentive Price */}
+                        {row.incentive_price > 0 && (
+                            <div className="text-success small">
+                                <i className="ti-money"></i> Incentive: {formatPeso(parseFloat(row.incentive_price).toFixed(2))}/pcs
+                            </div>
+                        )}
+
                         {/* Badges */}
                         {badges.length > 0 && (
                             <div className="d-flex flex-wrap gap-1">
