@@ -56,6 +56,7 @@ class User extends Authenticatable
     const ROLE_FRONTDESK = 'FrontDesk';
     const ROLE_DESIGNER = 'Designer';
     const ROLE_PRODUCTION = 'Production';
+    const ROLE_CASHIER = 'Cashier';
 
     /**
      * Send the password reset notification.
@@ -106,6 +107,14 @@ class User extends Authenticatable
     public function isProduction(): bool
     {
         return $this->hasRole(self::ROLE_PRODUCTION);
+    }
+
+    /**
+     * Check if user is Cashier
+     */
+    public function isCashier(): bool
+    {
+        return $this->hasRole(self::ROLE_CASHIER);
     }
 
     /**

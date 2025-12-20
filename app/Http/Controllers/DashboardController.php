@@ -444,6 +444,80 @@ class DashboardController extends Controller
                 'filters' => $request->only(['search', 'status']),
                 'summary' => $data['summary'],
             ]),
+            'Cashier' => Inertia::render('Dashboard/Cashier', [
+                'user' => $user,
+                'filters' => [
+                    'date_range' => $request->input('date_range', 'today'),
+                ],
+                'statistics' => function () use ($request) {
+                    $today = now()->startOfDay();
+                    $tomorrow = now()->endOfDay();
+
+                    $thisMonthStart = now()->startOfMonth();
+                    $thisMonthEnd = now()->endOfMonth();
+
+                    return [
+                        'todayCollections' => (float) Payment::whereBetween('payment_date', [$today, $tomorrow])
+                            ->where('payment_type', 'collection')
+                            ->sum('amount'),
+                        'monthCollections' => (float) Payment::whereBetween('payment_date', [$thisMonthStart, $thisMonthEnd])
+                            ->where('payment_type', 'collection')
+                            ->sum('amount'),
+                        'totalReceivables' => (float) Ticket::whereIn('payment_status', ['pending', 'partial'])
+                            ->where('status', '!=', 'cancelled')
+                            ->selectRaw('SUM(total_amount - COALESCE(amount_paid, 0)) as outstanding')
+                            ->value('outstanding') ?? 0,
+                        'readyForPickupUnpaid' => Ticket::where('status', 'completed')
+                            ->whereIn('payment_status', ['pending', 'partial'])
+                            ->count(),
+                        'todayTransactionsCount' => Payment::whereBetween('payment_date', [$today, $tomorrow])
+                            ->count(),
+                    ];
+                },
+                'urgentReceivables' => function () {
+                    return Ticket::with('customer')
+                        ->where('status', 'completed')
+                        ->whereIn('payment_status', ['pending', 'partial'])
+                        ->orderBy('updated_at', 'desc')
+                        ->take(10)
+                        ->get()
+                        ->map(fn($t) => [
+                            'id' => $t->id,
+                            'ticket_number' => $t->ticket_number,
+                            'customer_name' => $t->customer->full_name ?? 'Walk-in',
+                            'total_amount' => $t->total_amount,
+                            'balance' => $t->outstanding_balance,
+                            'updated_at' => $t->updated_at,
+                        ]);
+                },
+                'latestCollections' => function () {
+                    return Payment::with(['ticket.customer', 'recordedBy'])
+                        ->where('payment_type', 'collection')
+                        ->orderBy('created_at', 'desc')
+                        ->take(10)
+                        ->get()
+                        ->map(fn($p) => [
+                            'id' => $p->id,
+                            'amount' => $p->amount,
+                            'method' => $p->payment_method,
+                            'date' => $p->payment_date,
+                            'ticket_number' => $p->ticket->ticket_number ?? 'N/A',
+                            'customer_name' => $p->ticket->customer->full_name ?? $p->payer_name ?? 'Walk-in',
+                            'recorded_by' => $p->recordedBy->name ?? 'System',
+                        ]);
+                },
+                'collectionSummary' => function () {
+                    $today = now()->startOfDay();
+                    $tomorrow = now()->endOfDay();
+
+                    return Payment::whereBetween('payment_date', [$today, $tomorrow])
+                        ->where('payment_type', 'collection')
+                        ->selectRaw('payment_method, SUM(amount) as total')
+                        ->groupBy('payment_method')
+                        ->get()
+                        ->pluck('total', 'payment_method');
+                }
+            ]),
             default => Inertia::render('Dashboard/FrontDesk', [
                 'user' => $user,
             ]),
@@ -701,7 +775,7 @@ class DashboardController extends Controller
                 $query->whereBetween('created_at', [$startDate, $endDate])
                     ->where('status', '!=', 'cancelled');
             })
-            ->sum('total_cost');
+                ->sum('total_cost');
 
             return $cogs ?? 0;
         } catch (\Exception $e) {
@@ -723,11 +797,11 @@ class DashboardController extends Controller
                 $query->whereBetween('created_at', [$startDate, $endDate])
                     ->where('status', '!=', 'cancelled');
             })
-            ->join('tickets', 'production_stock_consumptions.ticket_id', '=', 'tickets.id')
-            ->selectRaw('DATE(tickets.created_at) as date, SUM(production_stock_consumptions.total_cost) as total')
-            ->groupBy('date')
-            ->pluck('total', 'date')
-            ->toArray();
+                ->join('tickets', 'production_stock_consumptions.ticket_id', '=', 'tickets.id')
+                ->selectRaw('DATE(tickets.created_at) as date, SUM(production_stock_consumptions.total_cost) as total')
+                ->groupBy('date')
+                ->pluck('total', 'date')
+                ->toArray();
 
             return $dailyCogs;
         } catch (\Exception $e) {

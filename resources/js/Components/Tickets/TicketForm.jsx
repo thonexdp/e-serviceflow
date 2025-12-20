@@ -39,7 +39,14 @@ export default function TicketForm({
     hasPermission,
     isPublic = false,
 }) {
-    const { jobCategories = [] } = usePage().props;
+    const { jobCategories = [], auth } = usePage().props;
+    const userRole = auth?.user?.role;
+
+    // Determine if payment processing should be shown
+    // Front Desk: Only create tickets, no payment processing
+    // Admin/Cashier: Can process payments during ticket creation
+    const canProcessPayment = userRole === 'admin' || userRole === 'Cashier';
+    const isFrontDesk = userRole === 'FrontDesk';
 
     const [formData, setFormData] = useState({
         customer_id: customerId || "",
@@ -649,15 +656,38 @@ export default function TicketForm({
             subtotal: parseFloat(formData.subtotal) || 0,
             discount: enableDiscount ? parseFloat(formData.discount) || 0 : 0,
             total_amount: parseFloat(formData.total_amount) || 0,
-            downpayment: parseFloat(formData.downpayment) || 0,
             size_rate_id: selectedSizeRateId,
             size_width: sizeDimensions.width,
             size_height: sizeDimensions.height,
             ticketAttachments: ticketAttachments
                 .filter((attachment) => !attachment.existing && attachment.file)
                 .map((attachment) => attachment.file),
-            paymentProofs: paymentProofs.map((proof) => proof.file),
         };
+
+        // For Front Desk: Set payment_status to 'pending' and exclude payment fields
+        if (isFrontDesk && !ticket) {
+            submitData.payment_status = 'pending';
+            submitData.payment_method = 'cash'; // Default, but won't be used until payment is processed
+            submitData.downpayment = 0;
+            // Remove payment-related fields
+            delete submitData.initial_payment_reference;
+            delete submitData.initial_payment_notes;
+            delete submitData.initial_payment_or;
+        } else if (canProcessPayment) {
+            // For Admin/Cashier: Include payment fields if provided
+            submitData.downpayment = parseFloat(formData.downpayment) || 0;
+            submitData.paymentProofs = paymentProofs
+                .filter((proof) => proof.file)
+                .map((proof) => proof.file);
+        } else {
+            // For other roles or editing: Keep existing payment data
+            submitData.downpayment = parseFloat(formData.downpayment) || 0;
+            if (paymentProofs.length > 0) {
+                submitData.paymentProofs = paymentProofs
+                    .filter((proof) => proof.file)
+                    .map((proof) => proof.file);
+            }
+        }
 
         onSubmit(submitData);
 
@@ -670,6 +700,7 @@ export default function TicketForm({
         { value: "pending", label: "Pending" },
         { value: "partial", label: "Partial" },
         { value: "paid", label: "Paid" },
+        { value: "awaiting_verification", label: "Awaiting Verification" },
     ];
 
     const statusOptions = [
@@ -769,78 +800,6 @@ export default function TicketForm({
                                                 )}
                                             </span>
                                         </div>
-
-                                        <div className="d-flex justify-content-between align-items-center py-2 border-top">
-                                            <span className="text-muted small text-uppercase font-weight-bold">
-                                                Downpayment
-                                            </span>
-                                            <span className="text-success font-weight-bold">
-                                                ₱
-                                                {downpaymentValue.toLocaleString(
-                                                    "en-US",
-                                                    {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2,
-                                                    }
-                                                )}
-                                            </span>
-                                        </div>
-                                        {downpaymentValue > 0 && (
-                                            <div className="d-flex justify-content-between align-items-center py-2 border-top">
-                                                <span className="text-muted small text-uppercase font-weight-bold">
-                                                    Due After Downpayment
-                                                </span>
-                                                <span className="text-warning font-weight-bold">
-                                                    ₱
-                                                    {remainingAfterDownpayment.toLocaleString(
-                                                        "en-US",
-                                                        {
-                                                            minimumFractionDigits: 2,
-                                                            maximumFractionDigits: 2,
-                                                        }
-                                                    )}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* Balance */}
-                                        {/* {parseFloat(formData.balance || 0) > 0 && ( */}
-                                        <div className="d-flex justify-content-between align-items-center py-2 border-top">
-                                            <span className="text-muted small text-uppercase font-weight-bold">
-                                                Balance
-                                            </span>
-                                            <span className="text-warning font-weight-bold">
-                                                ₱
-                                                {parseFloat(
-                                                    formData.balance || 0
-                                                ).toLocaleString("en-US", {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
-                                                })}
-                                            </span>
-                                        </div>
-                                        {/* )} */}
-
-                                        {/* Change (Sukli) */}
-                                        {/* {parseFloat(formData.change || 0) > 0 && ( */}
-                                        <div className="d-flex justify-content-between align-items-center py-2 border-top rounded">
-                                            <span className="text-success small text-uppercase font-weight-bold">
-                                                Change
-                                            </span>
-                                            <span
-                                                className="text-success font-weight-bold"
-                                                style={{ fontSize: "1.1rem" }}
-                                            >
-                                                ₱
-                                                {parseFloat(
-                                                    formData.change || 0
-                                                ).toLocaleString("en-US", {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2,
-                                                })}
-                                            </span>
-                                        </div>
-                                        {/* )} */}
                                     </div>
                                 </Section>
                             </div>
@@ -1138,11 +1097,11 @@ export default function TicketForm({
                     )}
 
 
-                    {/* SCHEDULE & PAYMENT */}
+                    {/* SCHEDULE */}
                     <hr className="my-2" />
-                    <Section title="Schedule & Payment">
+                    <Section title="Schedule">
                         <div className="row">
-                            <div className="col-md-4">
+                            <div className="col-md-12">
                                 <FormInput
                                     label="Due Date"
                                     type="date"
@@ -1154,225 +1113,240 @@ export default function TicketForm({
                                     min={new Date().toISOString().split("T")[0]}
                                 />
                             </div>
-
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Payment Method"
-                                    type="select"
-                                    name="payment_method"
-                                    value={formData.payment_method}
-                                    onChange={handleChange}
-                                    error={errors.payment_method}
-                                    options={paymentMethodOptions}
-                                    required
-                                />
-                            </div>
-                            <div className="col-md-4">
-                                <FormInput
-                                    label={`Payment Status ${formData.payment_status}`}
-                                    type="select"
-                                    name="payment_status"
-                                    value={formData.payment_status}
-                                    onChange={handleChange}
-                                    error={errors.payment_status}
-                                    options={paymentStatusOptions}
-                                    required
-                                />
-                            </div>
                         </div>
-                    </Section>
-                    <Section title="Billing">
-                        <div className="row">
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Downpayment"
-                                    type="number"
-                                    name="downpayment"
-                                    value={formData.downpayment}
-                                    onChange={handleChange}
-                                    error={errors.downpayment}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                />
+                        {isFrontDesk && (
+                            <div className="alert alert-info mt-3">
+                                <i className="ti-info-alt mr-2"></i>
+                                <strong>Note:</strong> Payment will be processed separately by the Cashier.
+                                Ticket will be created with "Pending" payment status.
                             </div>
-                            {hasPermission("tickets", "price_edit") ? (
-                                <>
-                                    <div className="col-md-3">
-                                        <div className="custom-control custom-checkbox float-end">
-                                            <input
-                                                type="checkbox"
-                                                className="custom-control-input"
-                                                id="enableDiscount"
-                                                checked={enableDiscount}
-                                                onChange={(e) => {
-                                                    setEnableDiscount(e.target.checked);
-                                                    // if (!e.target.checked) {
-                                                    //     setFormData((prev) => ({
-                                                    //         ...prev,
-                                                    //         discount: "",
-                                                    //         discount_amount: "0.00",
-                                                    //     }));
-                                                    // }
-                                                }}
-                                            />
-                                            <label
-                                                className="custom-control-label"
-                                                htmlFor="enableDiscount"
-                                            >
-                                                <i className="ti-cut mr-1"></i>{" "}
-                                                <small>Add Discount</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div className="col-md-2">
+                        )}
+                    </Section>
+
+                    {/* PAYMENT SECTION - Only for Admin/Cashier */}
+                    {canProcessPayment && (
+                        <>
+                            <Section title="Payment Information">
+                                <div className="row">
+                                    <div className="col-md-6">
                                         <FormInput
-                                            label="Discount (%)"
-                                            type="number"
-                                            name="discount"
-                                            value={formData.discount}
+                                            label="Payment Method"
+                                            type="select"
+                                            name="payment_method"
+                                            value={formData.payment_method}
                                             onChange={handleChange}
-                                            error={errors.discount}
-                                            placeholder="0"
+                                            error={errors.payment_method}
+                                            options={paymentMethodOptions}
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <FormInput
+                                            label="Payment Status"
+                                            type="select"
+                                            name="payment_status"
+                                            value={formData.payment_status}
+                                            onChange={handleChange}
+                                            error={errors.payment_status}
+                                            options={paymentStatusOptions}
+                                        />
+                                    </div>
+                                </div>
+                            </Section>
+                            <Section title="Billing">
+                                <div className="row">
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label="Downpayment"
+                                            type="number"
+                                            name="downpayment"
+                                            value={formData.downpayment}
+                                            onChange={handleChange}
+                                            error={errors.downpayment}
+                                            placeholder="0.00"
                                             step="0.01"
                                             min="0"
-                                            max="100"
-                                            disabled={!enableDiscount}
                                         />
                                     </div>
-                                    <div className="col-md-3">
-                                        <FormInput
-                                            label="Discount Amount"
-                                            type="number"
-                                            name="discount_amount"
-                                            value={formData.discount_amount}
-                                            readOnly
-                                            className="bg-light"
-                                            disabled={!enableDiscount}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="col-md-8"></div>)
-                            }
-                        </div>
-                        <div className="row mt-3">
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Official Receipt #"
-                                    type="text"
-                                    name="initial_payment_or"
-                                    value={formData.initial_payment_or}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Payment Reference"
-                                    type="text"
-                                    name="initial_payment_reference"
-                                    value={formData.initial_payment_reference}
-                                    onChange={handleChange}
-                                    placeholder="GCash, bank trace, etc."
-                                />
-                            </div>
-                            <div className="col-md-4">
-                                <FormInput
-                                    label="Payment Notes"
-                                    type="text"
-                                    name="initial_payment_notes"
-                                    value={formData.initial_payment_notes}
-                                    onChange={handleChange}
-                                    placeholder="Optional note"
-                                />
-                            </div>
-                        </div>
-                        <div className="row">
-                            <div className="col-md-6">
-                                <div className="mt-10">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Payment Proofs (GCash / bank receipts)
-                                    </label>
-                                    <input
-                                        type="file"
-                                        className="form-control"
-                                        accept="image/*"
-                                        onChange={handlePaymentProofUpload}
-                                    />
-                                </div>
-
-                            </div>
-                            <div className="col-md-6">
-                                {paymentProofs.length > 0 ? (
-                                    <div className="mt-3">
-                                        {paymentProofs.length > 1 && (
-                                            <div className="nav nav-pills nav-fill gap-2 mb-3" role="tablist">
-                                                {paymentProofs.map((_, index) => (
-                                                    <button
-                                                        key={index}
-                                                        type="button"
-                                                        className={`nav-link btn-sm py-1 px-2 ${activeProofTab === index ? "active" : ""
-                                                            }`}
-                                                        onClick={() => setActiveProofTab(index)}
-                                                        style={{ fontSize: "0.75rem" }}
+                                    {hasPermission("tickets", "price_edit") ? (
+                                        <>
+                                            <div className="col-md-3">
+                                                <div className="custom-control custom-checkbox float-end">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="custom-control-input"
+                                                        id="enableDiscount"
+                                                        checked={enableDiscount}
+                                                        onChange={(e) => {
+                                                            setEnableDiscount(e.target.checked);
+                                                            // if (!e.target.checked) {
+                                                            //     setFormData((prev) => ({
+                                                            //         ...prev,
+                                                            //         discount: "",
+                                                            //         discount_amount: "0.00",
+                                                            //     }));
+                                                            // }
+                                                        }}
+                                                    />
+                                                    <label
+                                                        className="custom-control-label"
+                                                        htmlFor="enableDiscount"
                                                     >
-                                                        <i className="ti-receipt mr-1"></i>
-                                                        Proof {index + 1}
-                                                        {paymentProofs[index].existing && (
-                                                            <span className="badge badge-success ml-1">
-                                                                Existing
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                ))}
+                                                        <i className="ti-cut mr-1"></i>{" "}
+                                                        <small>Add Discount</small>
+                                                    </label>
+                                                </div>
                                             </div>
-                                        )}
-                                        <div
-                                            className="border rounded overflow-hidden bg-light d-flex align-items-center justify-content-center"
-                                            style={{ minHeight: "300px", maxHeight: "300px" }}
-                                        >
-                                            <img
-                                                src={paymentProofs[activeProofTab].preview}
-                                                alt={`Payment proof ${activeProofTab + 1}`}
-                                                className="img-fluid"
-                                                style={{
-                                                    maxHeight: "300px",
-                                                    maxWidth: "100%",
-                                                    objectFit: "contain",
-                                                }}
+                                            <div className="col-md-2">
+                                                <FormInput
+                                                    label="Discount (%)"
+                                                    type="number"
+                                                    name="discount"
+                                                    value={formData.discount}
+                                                    onChange={handleChange}
+                                                    error={errors.discount}
+                                                    placeholder="0"
+                                                    step="0.01"
+                                                    min="0"
+                                                    max="100"
+                                                    disabled={!enableDiscount}
+                                                />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <FormInput
+                                                    label="Discount Amount"
+                                                    type="number"
+                                                    name="discount_amount"
+                                                    value={formData.discount_amount}
+                                                    readOnly
+                                                    className="bg-light"
+                                                    disabled={!enableDiscount}
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="col-md-8"></div>)
+                                    }
+                                </div>
+                                <div className="row mt-3">
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label="Official Receipt #"
+                                            type="text"
+                                            name="initial_payment_or"
+                                            value={formData.initial_payment_or}
+                                            onChange={handleChange}
+                                        />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label="Payment Reference"
+                                            type="text"
+                                            name="initial_payment_reference"
+                                            value={formData.initial_payment_reference}
+                                            onChange={handleChange}
+                                            placeholder="GCash, bank trace, etc."
+                                        />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label="Payment Notes"
+                                            type="text"
+                                            name="initial_payment_notes"
+                                            value={formData.initial_payment_notes}
+                                            onChange={handleChange}
+                                            placeholder="Optional note"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="row">
+                                    <div className="col-md-6">
+                                        <div className="mt-10">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Payment Proofs (GCash / bank receipts)
+                                            </label>
+                                            <input
+                                                type="file"
+                                                className="form-control"
+                                                accept="image/*"
+                                                onChange={handlePaymentProofUpload}
                                             />
                                         </div>
-                                        <div className="text-muted small mt-2 text-center">
-                                            {activeProofTab + 1} of {paymentProofs.length}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-danger w-100 mt-2"
-                                            onClick={() => removePaymentProof(activeProofTab)}
-                                            disabled={paymentProofs[activeProofTab]?.existing}
-                                            title={
-                                                paymentProofs[activeProofTab]?.existing
-                                                    ? "Existing payment proofs cannot be removed here."
-                                                    : "Remove proof"
-                                            }
-                                        >
-                                            <i className="ti-trash mr-1"></i>
-                                            {paymentProofs[activeProofTab]?.existing
-                                                ? "Existing Proof"
-                                                : "Remove Proof"}
-                                        </button>
+
                                     </div>
-                                ) : (
-                                    <div className="border rounded p-4 text-center text-muted bg-light mt-3">
-                                        <i className="ti-receipt" style={{ fontSize: "32px" }}></i>
-                                        <p className="mt-2 small mb-0">
-                                            Upload screenshots of payment confirmations
-                                        </p>
+                                    <div className="col-md-6">
+                                        {paymentProofs.length > 0 ? (
+                                            <div className="mt-3">
+                                                {paymentProofs.length > 1 && (
+                                                    <div className="nav nav-pills nav-fill gap-2 mb-3" role="tablist">
+                                                        {paymentProofs.map((_, index) => (
+                                                            <button
+                                                                key={index}
+                                                                type="button"
+                                                                className={`nav-link btn-sm py-1 px-2 ${activeProofTab === index ? "active" : ""
+                                                                    }`}
+                                                                onClick={() => setActiveProofTab(index)}
+                                                                style={{ fontSize: "0.75rem" }}
+                                                            >
+                                                                <i className="ti-receipt mr-1"></i>
+                                                                Proof {index + 1}
+                                                                {paymentProofs[index].existing && (
+                                                                    <span className="badge badge-success ml-1">
+                                                                        Existing
+                                                                    </span>
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className="border rounded overflow-hidden bg-light d-flex align-items-center justify-content-center"
+                                                    style={{ minHeight: "300px", maxHeight: "300px" }}
+                                                >
+                                                    <img
+                                                        src={paymentProofs[activeProofTab].preview}
+                                                        alt={`Payment proof ${activeProofTab + 1}`}
+                                                        className="img-fluid"
+                                                        style={{
+                                                            maxHeight: "300px",
+                                                            maxWidth: "100%",
+                                                            objectFit: "contain",
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="text-muted small mt-2 text-center">
+                                                    {activeProofTab + 1} of {paymentProofs.length}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-danger w-100 mt-2"
+                                                    onClick={() => removePaymentProof(activeProofTab)}
+                                                    disabled={paymentProofs[activeProofTab]?.existing}
+                                                    title={
+                                                        paymentProofs[activeProofTab]?.existing
+                                                            ? "Existing payment proofs cannot be removed here."
+                                                            : "Remove proof"
+                                                    }
+                                                >
+                                                    <i className="ti-trash mr-1"></i>
+                                                    {paymentProofs[activeProofTab]?.existing
+                                                        ? "Existing Proof"
+                                                        : "Remove Proof"}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="border rounded p-4 text-center text-muted bg-light mt-3">
+                                                <i className="ti-receipt" style={{ fontSize: "32px" }}></i>
+                                                <p className="mt-2 small mb-0">
+                                                    Upload screenshots of payment confirmations
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    </Section>
+                                </div>
+                            </Section>
+                        </>
+                    )}
+                    {/* END PAYMENT SECTION - Only for Admin/Cashier */}
 
                     <Section title="Attachments">
                         <div className="card shadow-sm border-0">

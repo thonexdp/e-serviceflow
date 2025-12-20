@@ -54,6 +54,7 @@ class ProductionQueueController extends Controller
             'productionRecords.evidenceFiles'
         ])
             ->whereIn('status', ['ready_to_print', 'in_production', 'completed'])
+            ->where('payment_status', '!=', 'awaiting_verification')
             ->where(function ($q) {
                 $q->where('design_status', 'approved')
                     ->orWhereNull('design_status');
@@ -111,6 +112,7 @@ class ProductionQueueController extends Controller
         // Calculate summary statistics for today
         $today = now()->startOfDay();
         $baseQuery = Ticket::whereIn('status', ['ready_to_print', 'in_production', 'completed'])
+            ->where('payment_status', '!=', 'awaiting_verification')
             ->where(function ($q) {
                 $q->where('design_status', 'approved')
                     ->orWhereNull('design_status');

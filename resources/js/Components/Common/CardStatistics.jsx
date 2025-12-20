@@ -11,7 +11,7 @@ export default function CardStatistics({
 }) {
     const isPositive = changePercent >= 0;
     const formattedPercent = Math.abs(changePercent).toFixed(1);
-    
+
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
@@ -59,10 +59,10 @@ export default function CardStatistics({
                             </div>
                         )
                     }
-                   
+
                 </div>
                 <div className={`${color} p-3 rounded-lg`}>
-                    <i className={`${icon} text-white`}></i>
+                    {icon === "ti-money" ? "₱" : <i className={`${icon} text-white`}></i>}
                 </div>
             </div>
         </div >

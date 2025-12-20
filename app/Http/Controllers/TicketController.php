@@ -156,7 +156,7 @@ class TicketController extends BaseCrudController
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
             'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
-            'payment_status' => 'nullable|string|in:pending,partial,paid',
+            'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -270,7 +270,7 @@ class TicketController extends BaseCrudController
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
             'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
-            'payment_status' => 'nullable|string|in:pending,partial,paid',
+            'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -490,6 +490,41 @@ class TicketController extends BaseCrudController
         ]);
     }
 
+    /**
+     * Verify a payment that was previously 'awaiting_verification'.
+     */
+    public function verifyPayment(Request $request, $id)
+    {
+        $ticket = Ticket::findOrFail($id);
+
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        // Update the "unverified" payment record notes if it exists
+        $unverifiedPayment = $ticket->payments()->where('amount', 0)->first();
+        if ($unverifiedPayment) {
+            $unverifiedPayment->update([
+                'notes' => $validated['notes'] ?? $unverifiedPayment->notes,
+                'recorded_by' => auth()->id(),
+            ]);
+        }
+
+        // Move status from 'awaiting_verification' to 'pending'
+        // This will make it visible in Receivables for the Cashier to process the actual payment
+        $ticket->payment_status = 'pending';
+        $ticket->save();
+
+        // Refresh the summary (it will remain 'pending' or 'partial' because no new amount was recorded)
+        $ticket->refreshPaymentSummary();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment verified successfully',
+            'ticket' => $ticket->fresh(['payments.documents', 'customer'])
+        ]);
+    }
+
     protected function getValidationRules(string $action, $model = null): array
     {
         return [
@@ -511,7 +546,7 @@ class TicketController extends BaseCrudController
             'downpayment' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
             'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
-            'payment_status' => 'nullable|string|in:pending,partial,paid',
+            'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
         ];
     }
 

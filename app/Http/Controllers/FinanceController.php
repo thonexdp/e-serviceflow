@@ -22,15 +22,27 @@ class FinanceController extends Controller
         $perPage = (int)$request->input('per_page', 15);
 
         $ledgerQuery = Payment::with(['ticket.customer', 'customer', 'documents'])
-            ->when($request->filled('method'), fn ($query) => $query->where('payment_method', $request->string('method')))
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->when($request->filled('method'), fn($query) => $query->where('payment_method', $request->string('method')))
+            ->when($request->filled('status'), fn($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('search'), function ($query) use ($request) {
                 $term = '%' . $request->search . '%';
                 $query->where(function ($q) use ($term) {
                     $q->where('official_receipt_number', 'like', $term)
                         ->orWhere('invoice_number', 'like', $term)
                         ->orWhere('payment_reference', 'like', $term)
-                        ->orWhere('payer_name', 'like', $term);
+                        ->orWhere('payer_name', 'like', $term)
+                        ->orWhere('payment_method', 'like', $term)
+                        ->orWhere('notes', 'like', $term)
+                        ->orWhere('amount', 'like', $term)
+                        ->orWhereHas('ticket', function ($t) use ($term) {
+                            $t->where('ticket_number', 'like', $term)
+                                ->orWhere('description', 'like', $term);
+                        })
+                        ->orWhereHas('customer', function ($c) use ($term) {
+                            $c->where('firstname', 'like', $term)
+                                ->orWhere('lastname', 'like', $term)
+                                ->orWhereRaw("CONCAT(firstname, ' ', lastname) LIKE ?", [$term]);
+                        });
                 });
             })
             ->orderByDesc('payment_date')
@@ -41,6 +53,20 @@ class FinanceController extends Controller
         $receivables = $this->buildReceivables();
 
         $expenses = Expense::with('ticket')
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $term = '%' . $request->search . '%';
+                $query->where(function ($q) use ($term) {
+                    $q->where('description', 'like', $term)
+                        ->orWhere('vendor', 'like', $term)
+                        ->orWhere('category', 'like', $term)
+                        ->orWhere('amount', 'like', $term)
+                        ->orWhere('notes', 'like', $term)
+                        ->orWhere('payment_method', 'like', $term)
+                        ->orWhereHas('ticket', function ($t) use ($term) {
+                            $t->where('ticket_number', 'like', $term);
+                        });
+                });
+            })
             ->orderByDesc('expense_date')
             ->paginate(15)
             ->withQueryString();
@@ -53,7 +79,7 @@ class FinanceController extends Controller
             ->where('payment_status', '!=', 'paid')
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'amount_paid']);
+            ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'amount_paid', 'discount', 'quantity', 'description', 'size_value', 'size_unit', 'job_type']); // Added explicit fields needed for receipt
 
         $recentCustomers = Customer::orderBy('lastname')
             ->limit(50)
@@ -74,47 +100,43 @@ class FinanceController extends Controller
     }
 
     /**
-     * Aggregate receivables per customer.
+     * Get individual tickets with outstanding balances (ticket-level receivables).
      *
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
     protected function buildReceivables(): Collection
     {
-        return Customer::query()
-            ->withSum(['tickets as total_invoiced' => function ($query) {
-                $query->whereNull('tickets.deleted_at')
-                    ->where('status', '!=', 'cancelled');
-            }], 'total_amount')
-            ->withSum(['payments as total_paid' => function ($query) {
-                $query->whereNull('payments.deleted_at')
-                    ->where('status', 'posted');
-            }], 'amount')
-            ->withMax(['payments as last_payment_at' => function ($query) {
-                $query->whereNull('payments.deleted_at')
-                    ->where('status', 'posted');
-            }], 'payment_date')
-            ->withCount(['tickets as open_tickets_count' => function ($query) {
-                $query->whereNull('tickets.deleted_at')
-                    ->where('payment_status', '!=', 'paid');
-            }])
-            ->orderBy('lastname')
+        return Ticket::with('customer')
+            ->whereNull('deleted_at')
+            ->where('status', '!=', 'cancelled')
+            ->where('payment_status', '!=', 'paid')
+            ->whereNotIn('payment_status', ['awaiting_verification']) // Exclude orders awaiting payment verification
+            ->orderByDesc('created_at')
             ->get()
-            ->map(function (Customer $customer) {
-                $invoiced = (float)($customer->total_invoiced ?? 0);
-                $paid = (float)($customer->total_paid ?? 0);
-                $balance = max($invoiced - $paid, 0);
+            ->map(function (Ticket $ticket) {
+                $totalAmount = (float)($ticket->total_amount ?? 0);
+                $amountPaid = (float)($ticket->amount_paid ?? 0);
+                $balance = max($totalAmount - $amountPaid, 0);
 
                 return [
-                    'id' => $customer->id,
-                    'name' => $customer->full_name,
-                    'total_invoiced' => round($invoiced, 2),
-                    'total_paid' => round($paid, 2),
+                    'id' => $ticket->id,
+                    'ticket_id' => $ticket->id,
+                    'ticket_number' => $ticket->ticket_number,
+                    'customer_id' => $ticket->customer_id,
+                    'name' => $ticket->customer
+                        ? "{$ticket->customer->firstname} {$ticket->customer->lastname}"
+                        : 'Walk-in Customer',
+                    'description' => $ticket->description,
+                    'total_invoiced' => round($totalAmount, 2),
+                    'total_paid' => round($amountPaid, 2),
                     'balance' => round($balance, 2),
-                    'open_tickets' => $customer->open_tickets_count ?? 0,
-                    'last_payment_at' => $customer->last_payment_at,
+                    'open_tickets' => 1, // Each row is one ticket
+                    'last_payment_at' => $ticket->payments()->latest('payment_date')->value('payment_date'),
+                    'due_date' => $ticket->due_date,
+                    'created_at' => $ticket->created_at,
                 ];
             })
-            ->filter(fn ($row) => $row['balance'] > 0)
+            ->filter(fn($row) => $row['balance'] > 0)
             ->values();
     }
 
@@ -156,7 +178,7 @@ class FinanceController extends Controller
             });
 
         $entries = $paymentFlows->merge($expenseFlows)
-            ->sortBy(fn ($row) => $row['entry_date'])
+            ->sortBy(fn($row) => $row['entry_date'])
             ->values();
 
         $running = 0;

@@ -180,6 +180,19 @@ export default function Sidebar({ isCollapsed }) {
                                 </Link>
                             </li>
                         </ul>
+                    ) : role === "Cashier" ? (
+                        <ul>
+                            <li className={isActive("/cashier/") ? "active" : ""}>
+                                <Link href="/cashier/">
+                                    <i className="ti-calendar"></i> Dashboard
+                                </Link>
+                            </li>
+                            <li className={isActive("/cashier/finance") ? "active" : ""}>
+                                <Link href="/cashier/finance">
+                                    <i className="ti-credit-card"></i> Payments & Finance
+                                </Link>
+                            </li>
+                        </ul>
                     ) : (
                         role === "admin" && (
                             <ul>

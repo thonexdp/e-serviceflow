@@ -29,6 +29,7 @@ export default function Tickets({
     const [openTicketModal, setTicketModalOpen] = useState(false);
     const [openStatusModal, setStatusModalOpen] = useState(false);
     const [openPaymentModal, setPaymentModalOpen] = useState(false);
+    const [openVerifyModal, setVerifyModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [editingTicket, setEditingTicket] = useState(null);
     const [selectedTicket, setSelectedTicket] = useState(null);
@@ -40,6 +41,9 @@ export default function Tickets({
     const { api, buildUrl } = useRoleApi();
     const { flash, auth } = usePage().props;
     const [error, setError] = useState(null);
+    const [verifyFormData, setVerifyFormData] = useState({
+        notes: "",
+    });
 
 
     useEffect(() => {
@@ -370,6 +374,34 @@ export default function Tickets({
         });
     };
 
+    const handleOpenVerifyModal = (ticket) => {
+        setSelectedTicket(ticket);
+        setVerifyFormData({
+            notes: "",
+        });
+        setVerifyModalOpen(true);
+    };
+
+    const closeVerifyModal = () => {
+        setVerifyModalOpen(false);
+        setSelectedTicket(null);
+    };
+
+    const handleVerifyPayment = async () => {
+        setIsUpdating(true);
+        try {
+            await api.patch(`/tickets/${selectedTicket.id}/verify-payment`, verifyFormData);
+
+            closeVerifyModal();
+            router.reload({ preserveScroll: true });
+        } catch (error) {
+            console.error("Verification failed", error);
+            alert(error.response?.data?.message || "Failed to verify payment. Please check your data.");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
     const getStatusBadge = (status) => {
         const classes = {
             pending: "badge-primary",
@@ -385,12 +417,24 @@ export default function Tickets({
         );
     };
 
-    const getPaymentStatusBadge = (status) => {
+    const getPaymentStatusBadge = (row) => {
+        const { payment_status: status, payment_method } = row;
         const classes = {
             pending: "badge-warning",
             partial: "badge-info",
             paid: "badge-success",
+            awaiting_verification: "badge-secondary",
         };
+
+        if (status === 'awaiting_verification') {
+            const isWalkin = payment_method === 'cash' || payment_method === 'walkin';
+            return (
+                <div className={`badge ${isWalkin ? "badge-dark" : "badge-secondary"}`}>
+                    {isWalkin ? 'WALK-IN ORDER' : 'AWAITING VERIFICATION'}
+                </div>
+            );
+        }
+
         return (
             <div className={`badge ${classes[status] || "badge-secondary"}`}>
                 {status?.toUpperCase() || "PENDING"}
@@ -455,18 +499,26 @@ export default function Tickets({
             label: "Payment Status",
             key: "payment_status",
             render: (row) => (
-                <div>
-                    {getPaymentStatusBadge(row.payment_status)}
-                    {/* {row.payment_status !== "paid" && ( */}
+                <div className="d-flex align-items-center">
+                    {getPaymentStatusBadge(row)}
+                    {row.payment_status === 'awaiting_verification' && (
+                        <button
+                            onClick={() => handleOpenVerifyModal(row)}
+                            className="btn btn-sm btn-success ml-1"
+                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                            title="Verify Payment"
+                        >
+                            <i className="ti-check-box"></i> Verify
+                        </button>
+                    )}
                     <button
                         onClick={() => handleOpenPaymentModal(row)}
                         className="btn btn-sm btn-outline-primary ml-1"
                         style={{ padding: "2px 8px", fontSize: "11px" }}
-                        title="Update Payment"
+                        title="View Payment History"
                     >
-                        <i className={`ti-${row.payment_status === "paid" ? "eye" : "pencil"}`}></i>
+                        <i className="ti-eye"></i>
                     </button>
-                    {/* )} */}
                 </div>
             ),
         },
@@ -702,9 +754,9 @@ export default function Tickets({
                     </div>
                 </Modal>
 
-                {/* Payment Update Modal */}
+                {/* Payment Update Modal - READ ONLY */}
                 <Modal
-                    title="Record Payment"
+                    title="Payment History"
                     isOpen={openPaymentModal}
                     onClose={closePaymentModal}
                     size="4xl"
@@ -728,7 +780,7 @@ export default function Tickets({
                                         <p className="m-b-0">
                                             <strong>Status:</strong>{" "}
                                             {getPaymentStatusBadge(
-                                                selectedTicket.payment_status
+                                                selectedTicket
                                             )}
                                         </p>
                                     </div>
@@ -763,148 +815,12 @@ export default function Tickets({
                         )}
 
                         <div className="row">
-                            <div className="col-md-6">
-                                <div className="form-group">
-                                    <label>Payment Date</label>
-                                    <input
-                                        type="date"
-                                        className="form-control"
-                                        value={paymentFormData.payment_date}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                payment_date: e.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Payment Method</label>
-                                    <select
-                                        className="form-control"
-                                        value={paymentFormData.payment_method}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                payment_method: e.target.value,
-                                            })
-                                        }
-                                    >
-                                        <option value="cash">Cash</option>
-                                        <option value="gcash">GCash</option>
-                                        <option value="bank_transfer">
-                                            Bank Transfer
-                                        </option>
-                                        <option value="credit_card">
-                                            Credit Card
-                                        </option>
-                                        <option value="check">Check</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>
-                                        Amount <span className="text-danger">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        className={`form-control ${error ? "border-danger" : ""}`}
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="Enter amount"
-                                        value={paymentFormData.amount}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                amount: e.target.value,
-                                            })
-                                        }
-                                    />
-                                    <span className="text-danger">{error}</span>
-                                </div>
-                                <div className="form-group">
-                                    <label>Allocation</label>
-                                    <select
-                                        className="form-control"
-                                        value={paymentFormData.allocation}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                allocation: e.target.value,
-                                            })
-                                        }
-                                    >
-                                        <option value="downpayment">
-                                            Downpayment
-                                        </option>
-                                        <option value="balance">Balance</option>
-                                        <option value="full">Full Payment</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Official Receipt #</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="OR number"
-                                        value={paymentFormData.official_receipt_number}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                official_receipt_number:
-                                                    e.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Reference # / GCash Trace</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="GCash, bank reference, etc."
-                                        value={paymentFormData.payment_reference}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                payment_reference: e.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Notes</label>
-                                    <textarea
-                                        className="form-control"
-                                        rows="3"
-                                        placeholder="Add any details about this payment..."
-                                        value={paymentFormData.notes}
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                notes: e.target.value,
-                                            })
-                                        }
-                                    ></textarea>
-                                </div>
-                                <div className="form-group">
-                                    <label>Attachments (GCash / Bank proof)</label>
-                                    <input
-                                        type="file"
-                                        className="form-control"
-                                        multiple
-                                        onChange={(e) =>
-                                            setPaymentFormData({
-                                                ...paymentFormData,
-                                                attachments: Array.from(
-                                                    e.target.files || []
-                                                ),
-                                            })
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <div className="col-md-6">
+                            <div className="col-md-12">
                                 <h5 className="m-b-3">Payment History</h5>
+                                <div className="alert alert-info mb-3">
+                                    <i className="ti-info-alt mr-2"></i>
+                                    <strong>Note:</strong> This is a read-only view. To record new payments, please use the <strong>Payments & Finance</strong> module.
+                                </div>
                                 <div className="border rounded p-3 payment-history">
                                     {selectedTicket?.payments &&
                                         selectedTicket.payments.length ? (
@@ -978,6 +894,56 @@ export default function Tickets({
                                 type="button"
                                 className="btn btn-secondary btn-sm"
                                 onClick={closePaymentModal}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+
+                {/* Verify Payment Modal */}
+                <Modal
+                    title="Verify Order & Payment"
+                    isOpen={openVerifyModal}
+                    onClose={closeVerifyModal}
+                    size="lg"
+                    submitButtonText={null}
+                >
+                    <div className="modal-body">
+                        {selectedTicket && (
+                            <div className={`alert ${selectedTicket.payment_method === 'cash' ? 'alert-info' : 'alert-warning'} mb-4`}>
+                                <h6 className="alert-heading f-s-14">
+                                    <i className="ti-info-alt mr-2"></i>
+                                    {selectedTicket.payment_method === 'cash'
+                                        ? 'Walk-in order confirmation'
+                                        : 'Verification required for online payment'}
+                                </h6>
+                                <p className="mb-0 small">
+                                    Ticket: <strong>{selectedTicket.ticket_number}</strong><br />
+                                    Total Amount: <strong>{formatPeso(selectedTicket.total_amount)}</strong>
+                                    {selectedTicket.payment_method === 'cash' && (
+                                        <><br />Confirm this order once the customer arrives at the branch.</>
+                                    )}
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="form-group mb-4">
+                            <label className="form-label f-s-13">Verification Notes (Optional)</label>
+                            <textarea
+                                className="form-control"
+                                rows="2"
+                                value={verifyFormData.notes}
+                                onChange={(e) => setVerifyFormData({ ...verifyFormData, notes: e.target.value })}
+                                placeholder="Add any notes for the cashier or designers..."
+                            ></textarea>
+                        </div>
+
+                        <div className="modal-footer border-top pt-3 px-0">
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={closeVerifyModal}
                                 disabled={isUpdating}
                             >
                                 Cancel
@@ -985,18 +951,16 @@ export default function Tickets({
                             <button
                                 type="button"
                                 className="btn btn-success btn-sm"
-                                onClick={handlePaymentUpdate}
+                                onClick={handleVerifyPayment}
                                 disabled={isUpdating}
                             >
                                 {isUpdating ? (
                                     <>
-                                        <i className="fa fa-spinner fa-spin mr-2"></i>
-                                        Updating...
+                                        <i className="fa fa-spinner fa-spin mr-1"></i> Verifying...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="ti-check mr-2"></i>
-                                        Save Payment
+                                        <i className="ti-check mr-1"></i> Confirm & Release to Cashier
                                     </>
                                 )}
                             </button>
@@ -1207,6 +1171,7 @@ export default function Tickets({
                                                 <option value="pending">Pending</option>
                                                 <option value="partial">Partial</option>
                                                 <option value="paid">Paid</option>
+                                                <option value="awaiting_verification">Awaiting Verification</option>
                                             </select>
                                         </div>
                                         <DateRangeFilter
@@ -1276,9 +1241,9 @@ export default function Tickets({
                             </div>
                         </div>
                     </div>
-                </section>
+                </section >
 
-            </AdminLayout>
+            </AdminLayout >
         </>
     );
 }
