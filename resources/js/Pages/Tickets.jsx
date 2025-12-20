@@ -449,6 +449,67 @@ export default function Tickets({
             render: (row, index) =>
                 (tickets.current_page - 1) * tickets.per_page + index + 1,
         },
+        {
+            label: "Design",
+            key: "mockup_files",
+            render: (row) => {
+                const mockupFiles = row.mockup_files || [];
+                const customerFiles = row.customer_files || [];
+
+                const latestMockup = mockupFiles.length > 0 ? mockupFiles[mockupFiles.length - 1] : null;
+                const latestCustomerFile = customerFiles.length > 0 ? customerFiles[customerFiles.length - 1] : null;
+
+                const displayFile = latestMockup || latestCustomerFile;
+                const isApproved = row.design_status === 'approved';
+                const isMockup = !!latestMockup;
+
+                if (!displayFile) {
+                    return (
+                        <div className="text-center">
+                            <span className="badge badge-pill badge-light text-muted" style={{ fontSize: '9px' }}>
+                                NO DESIGN
+                            </span>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="text-center">
+                        <div
+                            className="position-relative d-inline-block p-1 border rounded bg-white shadow-sm"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                                setFilepath(displayFile.file_path);
+                                setShow(true);
+                            }}
+                        >
+                            <img
+                                src={displayFile.file_path}
+                                alt="Design"
+                                style={{ width: '45px', height: '45px', objectFit: 'cover', borderRadius: '4px' }}
+                            />
+                            <div className="position-absolute" style={{ top: '-6px', right: '-6px' }}>
+                                {isMockup ? (
+                                    isApproved ? (
+                                        <span className="badge badge-success border border-white shadow-sm" style={{ borderRadius: '50%', padding: '2px 4px' }} title="Approved Mockup">
+                                            <i className="ti-check" style={{ fontSize: '8px' }}></i>
+                                        </span>
+                                    ) : (
+                                        <span className="badge badge-warning border border-white shadow-sm" style={{ borderRadius: '50%', padding: '2px 4px' }} title="Pending Mockup">
+                                            <i className="ti-timer" style={{ fontSize: '8px' }}></i>
+                                        </span>
+                                    )
+                                ) : (
+                                    <span className="badge badge-info border border-white shadow-sm" style={{ borderRadius: '50%', padding: '2px 4px' }} title="Customer Attachment">
+                                        <i className="ti-clip" style={{ fontSize: '8px' }}></i>
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+        },
         { label: "Ticket ID", key: "ticket_number" },
         {
             label: "Customer",

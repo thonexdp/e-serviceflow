@@ -38,7 +38,7 @@ class TicketController extends BaseCrudController
      */
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'customerFiles', 'payments.documents']);
+        $query = Ticket::with(['customer', 'customerFiles', 'payments.documents', 'mockupFiles', 'assignedToUser']);
 
         // Apply search
         if ($request->has('search') && $request->search) {
