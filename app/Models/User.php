@@ -109,6 +109,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is Production Head
+     */
+    public function isProductionHead(): bool
+    {
+        return $this->isProduction() && $this->is_head === true;
+    }
+
+    /**
      * Get all notifications for the user.
      */
     public function notifications()
@@ -261,5 +269,23 @@ class User extends Authenticatable
         return self::whereHas('workflowSteps', function ($query) use ($workflowStep) {
             $query->where('workflow_step', $workflowStep);
         })->where('is_active', true)->get();
+    }
+
+    /**
+     * Get tickets assigned to this user for production.
+     */
+    public function assignedTickets()
+    {
+        return $this->belongsToMany(Ticket::class, 'ticket_production_assignments')
+            ->withPivot('workflow_step')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get production records for this user.
+     */
+    public function productionRecords()
+    {
+        return $this->hasMany(ProductionRecord::class);
     }
 }

@@ -105,16 +105,69 @@ export default function Sidebar({ isCollapsed }) {
                                     <i className="ti-calendar"></i> Dashboard
                                 </Link>
                             </li>
-                            {/* <li>
-                                    <Link href="/tickets">
-                                        <i className="ti-email"></i> Tickets
+
+                            {/* Production Workflow Submenu */}
+                            <li className="label">Production Workflow</li>
+
+                            {auth?.user?.is_head && (
+                                <li className={isActive("/production/tickets/all") ? "active" : ""}>
+                                    <Link href="/production/tickets/all">
+                                        <i className="ti-layout-grid2"></i> All Tickets
                                     </Link>
-                                </li> */}
-                            <li className={isActive("/production/queue") ? "active" : ""}>
-                                <Link href="/production/queue">
-                                    <i className="ti-user"></i> Production Queue
+                                </li>
+                            )}
+
+                            <li className={isActive("/production/workflow/printing") ? "active" : ""}>
+                                <Link href="/production/workflow/printing">
+                                    <i className="ti-printer"></i> Printing
                                 </Link>
                             </li>
+
+                            <li className={isActive("/production/workflow/lamination_heatpress") ? "active" : ""}>
+                                <Link href="/production/workflow/lamination_heatpress">
+                                    <i className="ti-layers"></i> Heatpress / Lamination
+                                </Link>
+                            </li>
+
+                            <li className={isActive("/production/workflow/cutting") ? "active" : ""}>
+                                <Link href="/production/workflow/cutting">
+                                    <i className="ti-cut"></i> Cutting
+                                </Link>
+                            </li>
+
+                            <li className={isActive("/production/workflow/sewing") ? "active" : ""}>
+                                <Link href="/production/workflow/sewing">
+                                    <i className="ti-pin-alt"></i> Sewing
+                                </Link>
+                            </li>
+
+                            <li className={isActive("/production/workflow/dtf_press") ? "active" : ""}>
+                                <Link href="/production/workflow/dtf_press">
+                                    <i className="ti-stamp"></i> DTF Press
+                                </Link>
+                            </li>
+
+                            <li className={isActive("/production/workflow/qa") ? "active" : ""}>
+                                <Link href="/production/workflow/qa">
+                                    <i className="ti-check-box"></i> Quality Assurance
+                                </Link>
+                            </li>
+
+                            <li className={isActive("/production/completed") ? "active" : ""}>
+                                <Link href="/production/completed">
+                                    <i className="ti-check"></i> Completed
+                                </Link>
+                            </li>
+
+                            <li className={isActive("/production/reports") ? "active" : ""}>
+                                <Link href="/production/reports">
+                                    <i className="ti-stats-up"></i> Reports
+                                </Link>
+                            </li>
+
+                            {/* Other Production Menu Items */}
+                            <li className="label">Resources</li>
+
                             <li className={isActive("/production/inventory") ? "active" : ""}>
                                 <Link href="/production/inventory">
                                     <i className="ti-package"></i> Inventory

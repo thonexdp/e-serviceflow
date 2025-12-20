@@ -9,6 +9,7 @@ import FormInput from "@/Components/Common/FormInput";
 import Confirmation from "@/Components/Common/Confirmation";
 import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import TicketAssigner from "@/Components/Production/TicketAssigner";
 
 const WORKFLOW_STEPS = [
     // { key: 'design', label: 'Design', icon: 'ti-pencil-alt', color: '#9C27B0' },
@@ -28,6 +29,7 @@ export default function Productions({
     tickets = { data: [] },
     stockItems = [],
     filters = {},
+    productionUsers = [],
 }) {
     const [openViewModal, setViewModalOpen] = useState(false);
     const [openUpdateModal, setUpdateModalOpen] = useState(false);
@@ -42,8 +44,13 @@ export default function Productions({
     const [confirmationType, setConfirmationType] = useState(null);
     const [confirmationData, setConfirmationData] = useState(null);
     const [updateModalMessage, setUpdateModalMessage] = useState(null);
+    const [userQuantities, setUserQuantities] = useState({});
+    const [evidenceFiles, setEvidenceFiles] = useState([]);
     const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
+    const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
+
+    console.log("isProductionHead", auth, isProductionHead);
 
     // Helper function to show confirmation dialog
     const showConfirmation = (type, data = null) => {
@@ -152,10 +159,14 @@ export default function Productions({
             return;
         }
 
-        // Check if ticket is assigned to another user
-        if (ticket.assigned_to_user_id && ticket.assigned_to_user_id !== auth?.user?.id && !isAdmin) {
-            const assignedUserName = ticket.assigned_to_user?.name || 'another user';
-            showAlert('ticket_assigned', { message: `This ticket is currently assigned to ${assignedUserName}. Please claim it first.` });
+        // Check if ticket is assigned to another user (for single assignment)
+        // For multi-user assignment, allow if user is in assigned_users list
+        const assignedUsers = ticket.assigned_users || (ticket.assigned_to_user ? [ticket.assigned_to_user] : []);
+        const isUserAssigned = assignedUsers.some(u => u.id === auth?.user?.id);
+
+        if (!isUserAssigned && !isAdmin && !isProductionHead && assignedUsers.length > 0) {
+            const assignedUserNames = assignedUsers.map(u => u.name).join(', ');
+            showAlert('ticket_assigned', { message: `This ticket is currently assigned to ${assignedUserNames}. Please ask Production Head to assign you.` });
             return;
         }
 
@@ -163,6 +174,17 @@ export default function Productions({
         setUpdateModalMessage(null); // Clear any previous messages
         const currentStep = ticket.current_workflow_step || getFirstWorkflowStep(ticket);
         setCurrentWorkflowStep(currentStep);
+
+        // Initialize user quantities from production records if available
+        const initialUserQuantities = {};
+        if (ticket.production_records && ticket.production_records.length > 0) {
+            ticket.production_records.forEach(record => {
+                if (record.workflow_step === currentStep && record.user_id) {
+                    initialUserQuantities[record.user_id] = (initialUserQuantities[record.user_id] || 0) + (record.quantity_produced || 0);
+                }
+            });
+        }
+        setUserQuantities(initialUserQuantities);
 
         // Get quantity from workflow progress for current step, or use ticket's produced_quantity
         let quantityToShow = ticket.produced_quantity || 0;
@@ -177,43 +199,34 @@ export default function Productions({
         }
 
         setProducedQuantity(quantityToShow);
+        setEvidenceFiles([]);
         setUpdateModalOpen(true);
     };
 
-    const handleClaimTicket = (ticketId) => {
-        setLoading(true);
-        router.post(buildUrl(`/queue/${ticketId}/claim`), {}, {
+    const handleAssignUsers = (ticket, userIds) => {
+        console.log('✅ handleAssignUsers called with ticket:', ticket, 'userIds:', userIds);
+        if (!isProductionHead && !isAdmin) {
+            showAlert('not_authorized', { message: 'Only Production Head or Admin can assign users.' });
+            return;
+        }
+
+        // Don't trigger global loading to prevent re-renders that would close the dropdown
+        router.post(buildUrl(`/queue/${ticket.id}/assign-users`), {
+            user_ids: userIds,
+            workflow_step: ticket.current_workflow_step || null,
+        }, {
             preserveScroll: true,
-            preserveState: false,
+            preserveState: true,
             onSuccess: () => {
-                setLoading(false);
+                // No setLoading(false) here, as we didn't set it to true
             },
-            onError: () => {
-                setLoading(false);
+            onError: (errors) => {
+                console.error('Assignment error:', errors);
+                showAlert('error', { message: 'Failed to assign users. Please try again.' });
             },
             onFinish: () => {
-                setLoading(false);
-            },
-        });
-    };
-
-    const handleReleaseTicket = (ticketId) => {
-        showConfirmation('release_ticket', { ticketId });
-    };
-
-    const confirmReleaseTicket = (ticketId) => {
-        setLoading(true);
-        router.post(buildUrl(`/queue/${ticketId}/release`), {}, {
-            preserveScroll: true,
-            preserveState: false,
-            onSuccess: () => {
-                setLoading(false);
-            },
-            onError: () => {
-                setLoading(false);
-            },
-            onFinish: () => {
-                setLoading(false);
+                console.log('✅ handleAssignUsers onFinish called');
+                // No setLoading(false) here, as we didn't set it to true
             },
         });
     };
@@ -256,6 +269,8 @@ export default function Productions({
         setStockConsumptions([]);
         setSelectedPreviewFile(null);
         setUpdateModalMessage(null);
+        setUserQuantities({});
+        setEvidenceFiles([]);
         // NOTE: Don't clear confirmation data here - it's needed by the confirmation modal
         // Confirmation data will be cleared when the confirmation modal closes
     };
@@ -279,53 +294,20 @@ export default function Productions({
     };
 
     const handleStartProduction = (ticketId) => {
-        // Auto-claim ticket when starting production if not already claimed
-        const ticket = tickets.data.find(t => t.id === ticketId);
-        if (ticket && !ticket.assigned_to_user_id) {
-            // First claim, then start
-            setLoading(true);
-            router.post(buildUrl(`/queue/${ticketId}/claim`), {}, {
-                preserveScroll: true,
-                preserveState: false,
-                onSuccess: () => {
-                    router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
-                        preserveScroll: true,
-                        preserveState: false,
-                        onSuccess: () => {
-                            setLoading(false);
-                        },
-                        onError: () => {
-                            setLoading(false);
-                        },
-                        onFinish: () => {
-                            setLoading(false);
-                        },
-                    });
-                },
-                onError: (errors) => {
-                    console.error('❌ Error claiming ticket:', errors);
-                    setLoading(false);
-                },
-                onFinish: () => {
-                    setLoading(false);
-                },
-            });
-        } else {
-            setLoading(true);
-            router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
-                preserveScroll: true,
-                preserveState: false,
-                onSuccess: () => {
-                    setLoading(false);
-                },
-                onError: () => {
-                    setLoading(false);
-                },
-                onFinish: () => {
-                    setLoading(false);
-                },
-            });
-        }
+        setLoading(true);
+        router.post(buildUrl(`/queue/${ticketId}/start`), {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                setLoading(false);
+            },
+            onError: () => {
+                setLoading(false);
+            },
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
     };
 
     const handleUpdateProgress = () => {
@@ -334,24 +316,52 @@ export default function Productions({
         // Clear previous messages
         setUpdateModalMessage(null);
 
-        // Check if ticket is assigned to another user
-        if (selectedTicket.assigned_to_user_id && selectedTicket.assigned_to_user_id !== auth?.user?.id && !isAdmin) {
-            const assignedUserName = selectedTicket.assigned_to_user?.name || 'another user';
-            setUpdateModalMessage({ type: 'error', text: `This ticket is currently assigned to ${assignedUserName}. Please claim it first.` });
-            return;
-        }
-
-        // Check if user can update this workflow step
-        if (!canUpdateWorkflowStep(currentWorkflowStep)) {
+        // Check if user can update this workflow step (allow Production Head and Admin)
+        if (!canUpdateWorkflowStep(currentWorkflowStep) && !isProductionHead && !isAdmin) {
             setUpdateModalMessage({ type: 'error', text: 'You are not assigned to this workflow step.' });
             return;
         }
 
-        const quantity = parseInt(producedQuantity) || 0;
         const maxQuantity = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
-        if (quantity < 0 || quantity > maxQuantity) {
-            setUpdateModalMessage({ type: 'error', text: `Quantity must be between 0 and ${maxQuantity}` });
-            return;
+
+        // For multi-user tracking, validate user quantities
+        const assignedUsersList = selectedTicket.assigned_users || (selectedTicket.assigned_to_user ? [selectedTicket.assigned_to_user] : []);
+        const hasMultiUserTracking = assignedUsersList.length > 0;
+
+        let totalUserQuantity = 0;
+        const userQuantityData = [];
+
+        if (hasMultiUserTracking) {
+            // Validate each user's quantity
+            for (const userId in userQuantities) {
+                const qty = parseInt(userQuantities[userId]) || 0;
+                if (qty < 0 || qty > maxQuantity) {
+                    setUpdateModalMessage({ type: 'error', text: `Quantity for user must be between 0 and ${maxQuantity}` });
+                    return;
+                }
+                totalUserQuantity += qty;
+                if (qty > 0) {
+                    userQuantityData.push({
+                        user_id: parseInt(userId),
+                        quantity_produced: qty,
+                    });
+                }
+            }
+
+            // Use total from user quantities or fallback to producedQuantity
+            const quantity = totalUserQuantity > 0 ? totalUserQuantity : (parseInt(producedQuantity) || 0);
+
+            if (quantity < 0 || quantity > maxQuantity) {
+                setUpdateModalMessage({ type: 'error', text: `Total quantity must be between 0 and ${maxQuantity}` });
+                return;
+            }
+        } else {
+            // Single user mode (backward compatible)
+            const quantity = parseInt(producedQuantity) || 0;
+            if (quantity < 0 || quantity > maxQuantity) {
+                setUpdateModalMessage({ type: 'error', text: `Quantity must be between 0 and ${maxQuantity}` });
+                return;
+            }
         }
 
         setLoading(true);
@@ -360,15 +370,35 @@ export default function Productions({
         const activeSteps = getActiveWorkflowSteps(selectedTicket);
         const currentStepIndex = activeSteps.findIndex(step => step.key === currentWorkflowStep);
         const isLastStep = currentStepIndex === activeSteps.length - 1;
-        const status = (quantity >= maxQuantity && isLastStep) ? 'completed' : 'in_production';
+        const finalQuantity = hasMultiUserTracking ? totalUserQuantity : parseInt(producedQuantity) || 0;
+        const status = (finalQuantity >= maxQuantity && isLastStep) ? 'completed' : 'in_production';
 
-        router.post(buildUrl(`/queue/${selectedTicket.id}/update`), {
-            produced_quantity: quantity,
-            current_workflow_step: currentWorkflowStep,
-            status: status,
-        }, {
+        // Prepare form data for file upload
+        const formData = new FormData();
+        formData.append('produced_quantity', finalQuantity);
+        formData.append('current_workflow_step', currentWorkflowStep);
+        formData.append('status', status);
+
+        if (hasMultiUserTracking && userQuantityData.length > 0) {
+            formData.append('user_quantities', JSON.stringify(userQuantityData));
+        }
+
+        // Add evidence files
+        // Add evidence files
+        evidenceFiles.forEach((item, index) => {
+            const file = item.file || item;
+            if (file instanceof File) {
+                formData.append(`evidence_files[${index}]`, file);
+                if (item.user_id) {
+                    formData.append(`evidence_file_users[${index}]`, item.user_id);
+                }
+            }
+        });
+
+        router.post(buildUrl(`/queue/${selectedTicket.id}/update`), formData, {
             preserveScroll: true,
             preserveState: false,
+            forceFormData: true,
             onSuccess: (page) => {
                 setUpdateModalMessage({ type: 'success', text: 'Progress updated successfully!' });
                 setLoading(false);
@@ -538,50 +568,22 @@ export default function Productions({
 
         if (ticket.status === "ready_to_print") {
             return (
-                <div className="btn-group-vertical">
-                    <div className="btn-group">
+                <div className="btn-group">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleView(ticket)}
+                    >
+                        <i className="ti-eye"></i> View
+                    </button>
+                    {canAccess && (isAssignedToMe || isAssignedToOther || isProductionHead || isAdmin) && (
                         <button
                             type="button"
-                            className="btn btn-link btn-sm text-blue-500"
-                            onClick={() => handleView(ticket)}
-                        >
-                            <i className="ti-eye"></i> View
-                        </button>
-                        {canAccess && !isAssignedToOther && (
-                            <>
-                                {!isAssignedToMe && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-link btn-sm text-primary"
-                                        onClick={() => handleClaimTicket(ticket.id)}
-                                        disabled={loading}
-                                        title="Claim this ticket"
-                                    >
-                                        <i className="ti-hand-point-up"></i> Claim
-                                    </button>
-                                )}
-                                {isAssignedToMe && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-link btn-sm text-green-500"
-                                        onClick={() => handleStartProduction(ticket.id)}
-                                        disabled={loading}
-                                    >
-                                        <i className="ti-play"></i> Start
-                                    </button>
-                                )}
-                            </>
-                        )}
-                    </div>
-                    {isAssignedToMe && (
-                        <button
-                            type="button"
-                            className="btn btn-link btn-sm text-secondary"
-                            onClick={() => handleReleaseTicket(ticket.id)}
+                            className="btn btn-link btn-sm text-green-500"
+                            onClick={() => handleStartProduction(ticket.id)}
                             disabled={loading}
-                            title="Release this ticket"
                         >
-                            <i className="ti-hand-point-down"></i> Release
+                            <i className="ti-play"></i> Start
                         </button>
                     )}
                 </div>
@@ -591,67 +593,38 @@ export default function Productions({
             const isLastStep = activeSteps.length > 0 &&
                 ticket.current_workflow_step === activeSteps[activeSteps.length - 1]?.key;
 
+            // Check if current user is in assigned users list
+            const assignedUsersList = ticket.assigned_users || (ticket.assigned_to_user ? [ticket.assigned_to_user] : []);
+            const isUserInAssignedList = assignedUsersList.some(u => u.id === auth?.user?.id);
+
             return (
-                <div className="btn-group-vertical">
-                    <div className="btn-group">
-                        {canUpdate && (isAssignedToMe || !ticket.assigned_to_user_id) ? (
-                            <button
-                                type="button"
-                                className="btn btn-link btn-sm text-blue-500"
-                                onClick={() => handleUpdate(ticket)}
-                            >
-                                <i className="ti-pencil"></i> Update
-                            </button>
-                        ) : isAssignedToOther ? (
-                            <button
-                                type="button"
-                                className="btn btn-link btn-sm text-muted"
-                                disabled
-                                title={`Assigned to ${ticket.assigned_to_user?.name || 'another user'}`}
-                            >
-                                <i className="ti-lock"></i> Locked
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                className="btn btn-link btn-sm text-muted"
-                                disabled
-                                title="Not assigned to this workflow step"
-                            >
-                                <i className="ti-lock"></i> Locked
-                            </button>
-                        )}
-                        {!isAssignedToMe && !isAssignedToOther && canUpdate && (
-                            <button
-                                type="button"
-                                className="btn btn-link btn-sm text-primary"
-                                onClick={() => handleClaimTicket(ticket.id)}
-                                disabled={loading}
-                                title="Claim this ticket"
-                            >
-                                <i className="ti-hand-point-up"></i> Claim
-                            </button>
-                        )}
-                        {canUpdate && isAssignedToMe && ticket.produced_quantity >= (ticket.total_quantity || ticket.quantity) && isLastStep && (
-                            <button
-                                type="button"
-                                className="btn btn-link btn-sm text-success"
-                                onClick={() => handleMarkCompleted(ticket.id)}
-                                disabled={loading}
-                            >
-                                <i className="ti-check"></i> Complete
-                            </button>
-                        )}
-                    </div>
-                    {isAssignedToMe && (
+                <div className="btn-group">
+                    {canUpdate && (isUserInAssignedList || isProductionHead || isAdmin) ? (
                         <button
                             type="button"
-                            className="btn btn-link btn-sm text-secondary"
-                            onClick={() => handleReleaseTicket(ticket.id)}
-                            disabled={loading}
-                            title="Release this ticket"
+                            className="btn btn-link btn-sm text-blue-500"
+                            onClick={() => handleUpdate(ticket)}
                         >
-                            <i className="ti-hand-point-down"></i> Release
+                            <i className="ti-pencil"></i> Update
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-muted"
+                            disabled
+                            title={!isUserInAssignedList ? "You are not assigned to this ticket" : "Not assigned to this workflow step"}
+                        >
+                            <i className="ti-lock"></i> Locked
+                        </button>
+                    )}
+                    {canUpdate && isUserInAssignedList && ticket.produced_quantity >= (ticket.total_quantity || ticket.quantity) && isLastStep && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-success"
+                            onClick={() => handleMarkCompleted(ticket.id)}
+                            disabled={loading}
+                        >
+                            <i className="ti-check"></i> Complete
                         </button>
                     )}
                 </div>
@@ -744,19 +717,16 @@ export default function Productions({
         {
             label: "Assigned To",
             key: "assigned_to",
-            render: (row) => {
-                if (row.assigned_to_user) {
-                    const isAssignedToMe = row.assigned_to_user_id === auth?.user?.id;
-                    return (
-                        <span className={isAssignedToMe ? "text-success font-weight-bold" : "text-info"}>
-                            <i className="ti-user mr-1"></i>
-                            {row.assigned_to_user.name}
-                            {isAssignedToMe && <small className="ml-1">(You)</small>}
-                        </span>
-                    );
-                }
-                return <span className="text-muted">Unassigned</span>;
-            },
+            render: (row) => (
+                <TicketAssigner
+                    ticket={row}
+                    productionUsers={productionUsers}
+                    isProductionHead={isProductionHead}
+                    isAdmin={isAdmin}
+                    auth={auth}
+                    onAssign={handleAssignUsers}
+                />
+            ),
         },
         {
             label: "Status",
@@ -1180,89 +1150,247 @@ export default function Productions({
                             <h5 className="mb-3 font-weight-bold">
                                 <i className="ti-package mr-2"></i>Production Quantity
                             </h5>
-                            <div className="row align-items-center">
-                                <div className="col-md-4">
-                                    <FormInput
-                                        label="Produced Quantity"
-                                        type="number"
-                                        name="produced_quantity"
-                                        value={producedQuantity}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 0;
-                                            setProducedQuantity(Math.min(val, selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)));
-                                        }}
-                                        placeholder="0"
-                                        min="0"
-                                        max={selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)}
-                                        required
-                                    />
-                                </div>
 
-                                <div className="col-md-8">
-                                    <label className="block text-sm font-medium mb-2">Quick Add:</label>
-                                    <div className="d-flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-primary btn-sm"
-                                            onClick={() => handleQuickAdd(1)}
-                                        >
-                                            +1
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-primary btn-sm"
-                                            onClick={() => handleQuickAdd(5)}
-                                        >
-                                            +5
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-primary btn-sm"
-                                            onClick={() => handleQuickAdd(10)}
-                                        >
-                                            +10
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-primary btn-sm"
-                                            onClick={() => handleQuickAdd(50)}
-                                        >
-                                            +50
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-secondary btn-sm"
-                                            onClick={() => setProducedQuantity(selectedTicket.total_quantity || selectedTicket.quantity)}
-                                        >
-                                            <i className="ti-check"></i> Set to Max
-                                        </button>
+                            {/* Multi-user quantity tracking */}
+                            {selectedTicket.assigned_users && selectedTicket.assigned_users.length > 0 ? (
+                                <div className="mb-3">
+                                    <label className="font-weight-bold mb-2">Quantity by User:</label>
+                                    {selectedTicket.assigned_users.map((assignedUser) => {
+                                        const userId = assignedUser.id;
+                                        const userQty = userQuantities[userId] || 0;
+                                        return (
+                                            <div key={userId} className="row mb-2 align-items-center">
+                                                <div className="col-md-4">
+                                                    <label className="mb-0">
+                                                        {assignedUser.name}
+                                                        {assignedUser.id === auth?.user?.id && <span className="text-success ml-1">(You)</span>}
+                                                    </label>
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <FormInput
+                                                        type="number"
+                                                        name={`user_quantity_${userId}`}
+                                                        value={userQty}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            const maxQty = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
+                                                            setUserQuantities({
+                                                                ...userQuantities,
+                                                                [userId]: Math.min(val, maxQty),
+                                                            });
+                                                        }}
+                                                        placeholder="0"
+                                                        min="0"
+                                                        max={selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div className="mt-2">
+                                        <strong>Total: {Object.values(userQuantities).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)}</strong>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="row align-items-center">
+                                    <div className="col-md-4">
+                                        <FormInput
+                                            label="Produced Quantity"
+                                            type="number"
+                                            name="produced_quantity"
+                                            value={producedQuantity}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                setProducedQuantity(Math.min(val, selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)));
+                                            }}
+                                            placeholder="0"
+                                            min="0"
+                                            max={selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="col-md-8">
+                                        <label className="block text-sm font-medium mb-2">Quick Add:</label>
+                                        <div className="d-flex flex-wrap gap-2">
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-primary btn-sm"
+                                                onClick={() => handleQuickAdd(1)}
+                                            >
+                                                +1
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-primary btn-sm"
+                                                onClick={() => handleQuickAdd(5)}
+                                            >
+                                                +5
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-primary btn-sm"
+                                                onClick={() => handleQuickAdd(10)}
+                                            >
+                                                +10
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-primary btn-sm"
+                                                onClick={() => handleQuickAdd(50)}
+                                            >
+                                                +50
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-secondary btn-sm"
+                                                onClick={() => setProducedQuantity(selectedTicket.total_quantity || selectedTicket.quantity)}
+                                            >
+                                                <i className="ti-check"></i> Set to Max
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Progress Bar */}
                             <div className="mt-3">
                                 <div className="d-flex justify-content-between mb-1">
                                     <span className="text-muted small">Production Progress</span>
                                     <span className="font-weight-bold">
-                                        {Math.round((producedQuantity / (selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0))) * 100)}%
+                                        {(() => {
+                                            const totalQty = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
+                                            const currentQty = selectedTicket.assigned_users && selectedTicket.assigned_users.length > 0
+                                                ? Object.values(userQuantities).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
+                                                : producedQuantity;
+                                            return Math.round((currentQty / totalQty) * 100);
+                                        })()}%
                                     </span>
                                 </div>
                                 <div className="progress" style={{ height: "20px" }}>
                                     <div
-                                        className={`progress-bar ${producedQuantity >= (selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0))
-                                            ? "bg-success"
-                                            : "bg-warning"
-                                            }`}
+                                        className={`progress-bar ${(() => {
+                                            const totalQty = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
+                                            const currentQty = selectedTicket.assigned_users && selectedTicket.assigned_users.length > 0
+                                                ? Object.values(userQuantities).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
+                                                : producedQuantity;
+                                            return currentQty >= totalQty ? "bg-success" : "bg-warning";
+                                        })()}`}
                                         role="progressbar"
                                         style={{
-                                            width: `${(producedQuantity / (selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0))) * 100}%`,
+                                            width: `${(() => {
+                                                const totalQty = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
+                                                const currentQty = selectedTicket.assigned_users && selectedTicket.assigned_users.length > 0
+                                                    ? Object.values(userQuantities).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
+                                                    : producedQuantity;
+                                                return (currentQty / totalQty) * 100;
+                                            })()}%`,
                                         }}
                                     >
-                                        {Math.round((producedQuantity / (selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0))) * 100)}%
+                                        {(() => {
+                                            const totalQty = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
+                                            const currentQty = selectedTicket.assigned_users && selectedTicket.assigned_users.length > 0
+                                                ? Object.values(userQuantities).reduce((sum, qty) => sum + (parseInt(qty) || 0), 0)
+                                                : producedQuantity;
+                                            return Math.round((currentQty / totalQty) * 100);
+                                        })()}%
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Evidence Upload */}
+                        <hr className="my-4" />
+                        <div className="mb-4">
+                            <h5 className="mb-3 font-weight-bold">
+                                <i className="ti-image mr-2"></i>Production Evidence
+                            </h5>
+                            <div className="mb-2">
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    className="form-control"
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files);
+                                        const newFiles = files.map(file => ({
+                                            file,
+                                            user_id: auth?.user?.id || ''
+                                        }));
+                                        setEvidenceFiles([...evidenceFiles, ...newFiles]);
+                                    }}
+                                />
+                                <small className="text-muted">Upload images as evidence of production work</small>
+                            </div>
+                            {evidenceFiles.length > 0 && (
+                                <div className="mt-3">
+                                    <label className="font-weight-bold mb-2">Uploaded Files:</label>
+                                    <div className="row">
+                                        {evidenceFiles.map((item, index) => {
+                                            const file = item.file || item;
+                                            const assignedUsers = selectedTicket.assigned_users || (selectedTicket.assigned_to_user ? [selectedTicket.assigned_to_user] : []);
+
+                                            return (
+                                                <div key={index} className="col-md-3 mb-2">
+                                                    <div className="card h-100">
+                                                        <div className="card-body p-2">
+                                                            {file instanceof File ? (
+                                                                <>
+                                                                    <img
+                                                                        src={URL.createObjectURL(file)}
+                                                                        alt={`Evidence ${index + 1}`}
+                                                                        className="img-fluid mb-2 rounded"
+                                                                        style={{ height: '100px', width: '100%', objectFit: 'cover' }}
+                                                                    />
+                                                                    <p className="small mb-2 text-truncate font-weight-bold" title={file.name}>{file.name}</p>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <img
+                                                                        src={file.file_path || file.url}
+                                                                        alt={`Evidence ${index + 1}`}
+                                                                        className="img-fluid mb-2 rounded"
+                                                                        style={{ height: '100px', width: '100%', objectFit: 'cover' }}
+                                                                    />
+                                                                    <p className="small mb-2 text-truncate font-weight-bold">{file.file_name || file.name}</p>
+                                                                </>
+                                                            )}
+
+                                                            {assignedUsers.length > 0 && (
+                                                                <select
+                                                                    className="form-control form-control-sm mb-2"
+                                                                    value={item.user_id || ''}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...evidenceFiles];
+                                                                        updated[index] = { ...item, user_id: parseInt(e.target.value) };
+                                                                        setEvidenceFiles(updated);
+                                                                    }}
+                                                                    title="Select user who produced this evidence"
+                                                                >
+                                                                    <option value="">-- Uploaded By --</option>
+                                                                    {assignedUsers.map(u => (
+                                                                        <option key={u.id} value={u.id}>{u.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            )}
+
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-danger btn-block"
+                                                                onClick={() => {
+                                                                    setEvidenceFiles(evidenceFiles.filter((_, i) => i !== index));
+                                                                }}
+                                                            >
+                                                                <i className="ti-trash"></i> Remove
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <hr className="my-4" />
@@ -1463,12 +1591,11 @@ export default function Productions({
             {/* Confirmation Modal */}
             <Modal
                 title={
-                    confirmationType === 'release_ticket' ? 'Release Ticket' :
-                        confirmationType === 'mark_completed' ? 'Mark Completed' :
-                            confirmationType === 'not_assigned_workflow' ? 'Access Denied' :
-                                confirmationType === 'ticket_assigned' ? 'Ticket Assigned' :
-                                    confirmationType === 'stock_required' ? 'Validation Error' :
-                                        'Alert'
+                    confirmationType === 'mark_completed' ? 'Mark Completed' :
+                        confirmationType === 'not_assigned_workflow' ? 'Access Denied' :
+                            confirmationType === 'ticket_assigned' ? 'Ticket Assigned' :
+                                confirmationType === 'stock_required' ? 'Validation Error' :
+                                    'Alert'
                 }
                 isOpen={confirmationModal}
                 onClose={handleCloseConfirmationModal}
@@ -1476,34 +1603,26 @@ export default function Productions({
             >
                 <Confirmation
                     description={
-                        confirmationType === 'release_ticket' ? 'Release this ticket?' :
-                            confirmationType === 'mark_completed' ? 'Mark this ticket as completed?' :
-                                confirmationData?.message || 'Are you sure?'
+                        confirmationType === 'mark_completed' ? 'Mark this ticket as completed?' :
+                            confirmationData?.message || 'Are you sure?'
                     }
                     subtitle={
-                        confirmationType === 'release_ticket' ? 'Other users will be able to claim it.' :
-                            confirmationType === 'mark_completed' ? 'Stock will be automatically deducted.' :
-                                null
+                        confirmationType === 'mark_completed' ? 'Stock will be automatically deducted.' :
+                            null
                     }
                     label={
-                        confirmationType === 'release_ticket' ? 'Release' :
-                            confirmationType === 'mark_completed' ? 'Mark Completed' :
-                                'OK'
+                        confirmationType === 'mark_completed' ? 'Mark Completed' :
+                            'OK'
                     }
                     cancelLabel={
-                        (confirmationType === 'release_ticket' || confirmationType === 'mark_completed') ? 'Cancel' : 'Close'
+                        confirmationType === 'mark_completed' ? 'Cancel' : 'Close'
                     }
                     onCancel={handleCloseConfirmationModal}
                     onSubmit={() => {
                         console.log('Confirmation onSubmit triggered. Type:', confirmationType, 'Data:', confirmationData);
 
                         // Handle action confirmations
-                        if (confirmationType === 'release_ticket') {
-                            const ticketId = confirmationData?.ticketId;
-                            console.log('Releasing ticket:', ticketId);
-                            // handleCloseConfirmationModal();
-                            confirmReleaseTicket(ticketId);
-                        } else if (confirmationType === 'mark_completed') {
+                        if (confirmationType === 'mark_completed') {
                             const ticketId = confirmationData?.ticketId;
                             console.log('Marking ticket completed:', ticketId);
                             handleCloseConfirmationModal();
@@ -1516,10 +1635,9 @@ export default function Productions({
                     }}
                     loading={loading}
                     color={
-                        confirmationType === 'release_ticket' ? 'warning' :
-                            confirmationType === 'mark_completed' ? 'success' :
-                                confirmationType === 'not_assigned_workflow' || confirmationType === 'ticket_assigned' || confirmationType === 'stock_required' ? 'danger' :
-                                    'primary'
+                        confirmationType === 'mark_completed' ? 'success' :
+                            confirmationType === 'not_assigned_workflow' || confirmationType === 'ticket_assigned' || confirmationType === 'stock_required' ? 'danger' :
+                                'primary'
                     }
                     showIcon={true}
                 />

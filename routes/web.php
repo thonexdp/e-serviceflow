@@ -144,12 +144,21 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/mock-ups/{id}/revision', [MockupsController::class, 'requestRevision'])->name('mockups.revision');
     Route::get('/mock-ups/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('mockups.download');
 
-    // Production Queue (Admin can access)
+    // Production Queue (Admin can access - Legacy routes)
     Route::get('/production', [ProductionQueueController::class, 'index'])->name('production.index');
     Route::post('/production/{id}/start', [ProductionQueueController::class, 'startProduction'])->name('production.start');
     Route::post('/production/{id}/update', [ProductionQueueController::class, 'updateProgress'])->name('production.update');
     Route::post('/production/{id}/complete', [ProductionQueueController::class, 'markCompleted'])->name('production.complete');
     Route::post('/production/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->name('production.record-stock');
+    Route::post('/production/{id}/assign-users', [ProductionQueueController::class, 'assignUsers'])->name('production.assign-users');
+
+    // New Workflow Routes (Admin can access all)
+    Route::get('/production/tickets/all', [ProductionQueueController::class, 'allTickets'])->name('production.tickets.all');
+    Route::post('/production/tickets/{ticket}/assign-workflow', [ProductionQueueController::class, 'assignWorkflow'])->name('production.tickets.assign-workflow');
+    Route::get('/production/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('production.workflow.view');
+    Route::get('/production/completed', [ProductionQueueController::class, 'completedTickets'])->name('production.completed');
 
     // Reports & Analytics
     Route::get('/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('reports');
@@ -263,14 +272,44 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     // Production Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Production Queue Management
+    // Production Queue Management (Legacy - kept for backward compatibility)
     Route::get('/queue', [ProductionQueueController::class, 'index'])->name('queue.index');
     Route::post('/queue/{id}/start', [ProductionQueueController::class, 'startProduction'])->name('queue.start');
     Route::post('/queue/{id}/update', [ProductionQueueController::class, 'updateProgress'])->name('queue.update');
     Route::post('/queue/{id}/complete', [ProductionQueueController::class, 'markCompleted'])->name('queue.complete');
     Route::post('/queue/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->name('queue.record-stock');
-    Route::post('/queue/{id}/claim', [ProductionQueueController::class, 'claimTicket'])->name('queue.claim');
-    Route::post('/queue/{id}/release', [ProductionQueueController::class, 'releaseTicket'])->name('queue.release');
+    Route::post('/queue/{id}/assign-users', [ProductionQueueController::class, 'assignUsers'])->name('queue.assign-users');
+
+    // New Workflow-Based Routes
+    // All Tickets View (Production Head only)
+    Route::get('/tickets/all', [ProductionQueueController::class, 'allTickets'])
+        ->middleware('production_head')
+        ->name('tickets.all');
+
+    // Assign users to workflow steps (Production Head only)
+    Route::post('/tickets/{ticket}/assign-workflow', [ProductionQueueController::class, 'assignWorkflow'])
+        ->middleware('production_head')
+        ->name('tickets.assign-workflow');
+
+    // Workflow-specific views
+    Route::get('/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.view');
+
+    Route::post('/workflow/{workflowStep}/start/{ticket}', [ProductionQueueController::class, 'startWorkflow'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.start');
+
+    Route::post('/workflow/{workflowStep}/update/{ticket}', [ProductionQueueController::class, 'updateWorkflow'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.update');
+
+    Route::post('/workflow/{workflowStep}/complete/{ticket}', [ProductionQueueController::class, 'completeWorkflow'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.complete');
+
+    // Completed tickets
+    Route::get('/completed', [ProductionQueueController::class, 'completedTickets'])->name('completed');
 
     // Inventory (View for stock consumption)
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
@@ -291,6 +330,9 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
     Route::get('/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('files.download');
+
+    // Reports
+    Route::get('/reports', [App\Http\Controllers\ProductionReportController::class, 'index'])->name('reports');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');

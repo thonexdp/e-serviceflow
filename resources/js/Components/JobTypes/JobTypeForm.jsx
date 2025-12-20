@@ -10,6 +10,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         price: "",
         price_by: "pcs",
         discount: "",
+        incentive_price: "",
         is_active: true,
         sort_order: 0,
     });
@@ -41,6 +42,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 price: jobType.price || "",
                 price_by: jobType.price_by || "pcs",
                 discount: jobType.discount || "",
+                incentive_price: jobType.incentive_price || "",
                 is_active: jobType.is_active !== undefined ? jobType.is_active : true,
                 sort_order: jobType.sort_order || 0,
             });
@@ -308,6 +310,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             category_id: parseInt(formData.category_id),
             price: parseFloat(formData.price),
             discount: formData.discount ? parseFloat(formData.discount) : null,
+            incentive_price: formData.incentive_price ? parseFloat(formData.incentive_price) : null,
             sort_order: parseInt(formData.sort_order) || 0,
             price_tiers: formattedPriceTiers,
             size_rates: formattedSizeRates,
@@ -431,6 +434,23 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         step="0.01"
                         min="0"
                         max="100"
+                    />
+                </div>
+            </div>
+
+            <div className="row">
+                <div className="col-md-6">
+                    <FormInput
+                        label="Incentive Price (per piece)"
+                        type="number"
+                        name="incentive_price"
+                        value={formData.incentive_price}
+                        onChange={handleChange}
+                        error={errors.incentive_price}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        helpText="Used to calculate production incentives based on quantity produced"
                     />
                 </div>
             </div>

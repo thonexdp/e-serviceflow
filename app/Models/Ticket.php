@@ -37,6 +37,9 @@ class Ticket extends Model
         'design_notes',
         'payment_status',
         'file_path',
+        'is_workflow_completed',
+        'workflow_started_at',
+        'workflow_completed_at',
     ];
 
     protected $casts = [
@@ -205,11 +208,37 @@ class Ticket extends Model
     }
 
     /**
-     * Get the user assigned to this ticket.
+     * Get the user assigned to this ticket (legacy single assignment).
      */
     public function assignedToUser()
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    /**
+     * Get all users assigned to this ticket for production (many-to-many).
+     */
+    public function assignedUsers()
+    {
+        return $this->belongsToMany(User::class, 'ticket_production_assignments')
+            ->withPivot('workflow_step')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get production records for this ticket.
+     */
+    public function productionRecords()
+    {
+        return $this->hasMany(ProductionRecord::class);
+    }
+
+    /**
+     * Get workflow evidence files for this ticket.
+     */
+    public function evidenceFiles()
+    {
+        return $this->hasMany(WorkflowEvidence::class, 'ticket_id');
     }
 
     /**

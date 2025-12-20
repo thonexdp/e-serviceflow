@@ -1,0 +1,471 @@
+import React, { useState } from "react";
+import AdminLayout from "@/Components/Layouts/AdminLayout";
+import { Head, router, usePage } from "@inertiajs/react";
+import Modal from "@/Components/Main/Modal";
+import DataTable from "@/Components/Common/DataTable";
+import SearchBox from "@/Components/Common/SearchBox";
+import FlashMessage from "@/Components/Common/FlashMessage";
+import FormInput from "@/Components/Common/FormInput";
+import { formatDate } from "@/Utils/formatDate";
+import { useRoleApi } from "@/Hooks/useRoleApi";
+import WorkflowTimeline from "@/Components/Production/WorkflowTimeline";
+
+export default function CompletedTickets({
+    user = {},
+    notifications = [],
+    messages = [],
+    tickets = { data: [] },
+    filters = {},
+}) {
+    const [openViewModal, setViewModalOpen] = useState(false);
+    const [openTimelineModal, setTimelineModalOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+    const { flash, auth } = usePage().props;
+    const { buildUrl } = useRoleApi();
+
+    const handleView = (ticket) => {
+        setSelectedTicket(ticket);
+        setViewModalOpen(true);
+    };
+
+    const handleViewTimeline = (ticket) => {
+        setSelectedTicket(ticket);
+        setTimelineModalOpen(true);
+    };
+
+    const handleCloseModals = () => {
+        setViewModalOpen(false);
+        setTimelineModalOpen(false);
+        setSelectedTicket(null);
+        setSelectedPreviewFile(null);
+    };
+
+    const handleDownload = (fileId, filename) => {
+        const url = buildUrl(`/files/${fileId}/download`);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const calculateCompletionTime = (startDate, endDate) => {
+        if (!startDate || !endDate) return 'N/A';
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const diffMs = end - start;
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffDays > 0) {
+            return `${diffDays}d ${diffHours % 24}h`;
+        } else {
+            return `${diffHours}h`;
+        }
+    };
+
+    // Define table columns
+    const ticketColumns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) =>
+                (tickets.current_page - 1) * tickets.per_page + index + 1,
+        },
+        {
+            label: "Ticket / Preview",
+            key: "ticket_number",
+            render: (row) => (
+                <div className="d-flex align-items-center">
+                    {row.mockup_files && row.mockup_files.length > 0 && (
+                        <img 
+                            src={row.mockup_files[0].file_path} 
+                            alt="Preview"
+                            className="img-thumbnail mr-2"
+                            style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => handleView(row)}
+                        />
+                    )}
+                    <div>
+                        <strong>{row.ticket_number}</strong>
+                        <div className="text-muted small">{row.description}</div>
+                        <div className="text-success small">
+                            <i className="ti-check"></i> Completed
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            label: "Customer",
+            key: "customer",
+            render: (row) => (
+                <div>
+                    <strong>{row.customer?.firstname} {row.customer?.lastname}</strong>
+                    <div className="text-muted small">{row.customer?.email}</div>
+                </div>
+            )
+        },
+        {
+            label: "Quantity",
+            key: "quantity",
+            render: (row) => {
+                const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
+                return (
+                    <div>
+                        <span className="badge badge-success" style={{ fontSize: '1rem' }}>
+                            {totalQty} pcs
+                        </span>
+                        <div className="progress mt-1" style={{ height: '5px' }}>
+                            <div className="progress-bar bg-success" style={{ width: '100%' }}></div>
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            label: "Completion Time",
+            key: "completion_time",
+            render: (row) => {
+                const duration = calculateCompletionTime(row.workflow_started_at, row.workflow_completed_at);
+                return (
+                    <div>
+                        <div className="mb-1">
+                            <small className="text-muted">Started:</small>
+                            <div>{row.workflow_started_at ? formatDate(row.workflow_started_at) : 'N/A'}</div>
+                        </div>
+                        <div>
+                            <small className="text-muted">Completed:</small>
+                            <div>{row.workflow_completed_at ? formatDate(row.workflow_completed_at) : 'N/A'}</div>
+                        </div>
+                        <div className="mt-1">
+                            <span className="badge badge-info">
+                                <i className="ti-time mr-1"></i>{duration}
+                            </span>
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            label: "Team Members",
+            key: "team_members",
+            render: (row) => {
+                // Get unique users from production records
+                const users = {};
+                if (row.production_records) {
+                    row.production_records.forEach(record => {
+                        if (record.user) {
+                            if (!users[record.user.id]) {
+                                users[record.user.id] = {
+                                    name: record.user.name,
+                                    total_quantity: 0
+                                };
+                            }
+                            users[record.user.id].total_quantity += record.quantity_produced || 0;
+                        }
+                    });
+                }
+                
+                const userList = Object.values(users);
+                
+                if (userList.length === 0) {
+                    return <span className="text-muted">No records</span>;
+                }
+                
+                return (
+                    <div>
+                        {userList.map((user, idx) => (
+                            <div key={idx} className="mb-1">
+                                <small>
+                                    <i className="ti-user mr-1"></i>
+                                    {user.name}
+                                    <span className="badge badge-secondary ml-1" style={{ fontSize: '0.7rem' }}>
+                                        {user.total_quantity} pcs
+                                    </span>
+                                </small>
+                            </div>
+                        ))}
+                    </div>
+                );
+            },
+        },
+        {
+            label: "Actions",
+            key: "actions",
+            render: (row) => (
+                <div className="btn-group-vertical btn-group-sm">
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-purple-500"
+                        onClick={() => handleViewTimeline(row)}
+                    >
+                        <i className="ti-time"></i> Timeline
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-link btn-sm text-blue-500"
+                        onClick={() => handleView(row)}
+                    >
+                        <i className="ti-eye"></i> View
+                    </button>
+                </div>
+            ),
+        },
+    ];
+
+    const mockupFiles = selectedTicket?.mockup_files || [];
+
+    return (
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
+            <Head title="Completed Tickets - Production" />
+
+            {/* Flash Messages */}
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
+
+            <div className="row">
+                <div className="col-lg-8 p-r-0 title-margin-right">
+                    <div className="page-header">
+                        <div className="page-title">
+                            <h1 className="text-success">
+                                <i className="ti-check mr-2"></i>
+                                Completed Tickets <span>Archive</span>
+                            </h1>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-lg-4 p-l-0 title-margin-left">
+                    <div className="page-header">
+                        <div className="page-title">
+                            <ol className="breadcrumb">
+                                <li className="breadcrumb-item">
+                                    <a href="/production/">Dashboard</a>
+                                </li>
+                                <li className="breadcrumb-item active">Completed</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* View Modal */}
+            <Modal
+                title={`Ticket Details - #${selectedTicket?.ticket_number}`}
+                isOpen={openViewModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <div>
+                        <div className="alert alert-success mb-4">
+                            <i className="ti-check mr-2"></i>
+                            This ticket has been completed and all workflows are finished.
+                        </div>
+
+                        <div className="row mb-4">
+                            <div className="col-md-6">
+                                <h5>
+                                    Customer: <b>{selectedTicket.customer?.firstname} {selectedTicket.customer?.lastname}</b>
+                                </h5>
+                                <h5>
+                                    Description: <b>{selectedTicket.description}</b>
+                                </h5>
+                                <p>
+                                    <strong>Total Quantity:</strong> {selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)} pcs
+                                </p>
+                            </div>
+                            <div className="col-md-6">
+                                <p>
+                                    <strong>Started:</strong> {selectedTicket.workflow_started_at ? formatDate(selectedTicket.workflow_started_at) : 'N/A'}
+                                </p>
+                                <p>
+                                    <strong>Completed:</strong> {selectedTicket.workflow_completed_at ? formatDate(selectedTicket.workflow_completed_at) : 'N/A'}
+                                </p>
+                                <p>
+                                    <strong>Total Time:</strong> {calculateCompletionTime(selectedTicket.workflow_started_at, selectedTicket.workflow_completed_at)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <hr className="my-3" />
+
+                        <div className="mb-4">
+                            <h6>Design Files:</h6>
+                            {mockupFiles.length > 0 ? (
+                                <div className="row">
+                                    {mockupFiles.map((file) => (
+                                        <div key={file.id} className="col-md-12 col-lg-12 mb-2">
+                                            <div className="card">
+                                                <img
+                                                    src={file.file_path}
+                                                    alt={file.file_name}
+                                                    className="card-img-top"
+                                                    style={{ height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                                                    onClick={() => setSelectedPreviewFile(file)}
+                                                />
+                                                <div className="card-body p-2">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-block btn-primary"
+                                                        onClick={() => handleDownload(file.id, file.file_name)}
+                                                    >
+                                                        <i className="ti-download"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-muted">No design files available</p>
+                            )}
+                        </div>
+
+                        <div className="d-flex justify-content-between">
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleCloseModals}
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    handleCloseModals();
+                                    handleViewTimeline(selectedTicket);
+                                }}
+                            >
+                                <i className="ti-time mr-2"></i>View Full Timeline
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Timeline Modal */}
+            <Modal
+                title={`Workflow Timeline - Ticket #${selectedTicket?.ticket_number}`}
+                isOpen={openTimelineModal}
+                onClose={handleCloseModals}
+                size="5xl"
+            >
+                {selectedTicket && (
+                    <WorkflowTimeline ticket={selectedTicket} />
+                )}
+            </Modal>
+
+            {/* Image Preview Modal */}
+            {selectedPreviewFile && (
+                <div
+                    className="modal fade show d-block"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+                    onClick={() => setSelectedPreviewFile(null)}
+                >
+                    <div className="modal-dialog modal-lg modal-dialog-centered">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Preview</h5>
+                                <button
+                                    type="button"
+                                    className="close"
+                                    onClick={() => setSelectedPreviewFile(null)}
+                                >
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+                            <div className="modal-body text-center">
+                                <img
+                                    src={selectedPreviewFile.file_path}
+                                    alt={selectedPreviewFile.file_name}
+                                    className="img-fluid"
+                                    style={{ maxHeight: '70vh' }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <section id="main-content">
+                <div className="content-wrap">
+                    <div className="main">
+                        <div className="container-fluid">
+                            <div className="row">
+                                <div className="col-lg-12">
+                                    <div className="card">
+                                        <div className="card-title mt-3">
+                                            <h4 className="text-success">
+                                                <i className="ti-check mr-2"></i>
+                                                Completed Production Tickets
+                                            </h4>
+                                            <p className="text-muted">All tickets that have completed all workflow steps</p>
+                                        </div>
+                                        <div className="card-body">
+                                            <div className="row mt-4 align-items-center">
+                                                <div className="col-md-6">
+                                                    <SearchBox
+                                                        placeholder="Search completed tickets..."
+                                                        initialValue={filters.search || ""}
+                                                        route={buildUrl("/completed")}
+                                                    />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <FormInput
+                                                        label=""
+                                                        type="select"
+                                                        name="date_range"
+                                                        value={filters.date_range || "all"}
+                                                        onChange={(e) => {
+                                                            router.get(buildUrl("/completed"), {
+                                                                ...filters,
+                                                                date_range: e.target.value === "all" ? null : e.target.value
+                                                            }, {
+                                                                preserveState: false,
+                                                                preserveScroll: true,
+                                                            });
+                                                        }}
+                                                        options={[
+                                                            { value: "all", label: "All Time" },
+                                                            { value: "today", label: "Today" },
+                                                            { value: "this_week", label: "This Week" },
+                                                            { value: "this_month", label: "This Month" },
+                                                            { value: "last_month", label: "Last Month" },
+                                                        ]}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4">
+                                                <DataTable
+                                                    columns={ticketColumns}
+                                                    data={tickets.data}
+                                                    pagination={tickets}
+                                                    emptyMessage="No completed tickets found."
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </AdminLayout>
+    );
+}
+
