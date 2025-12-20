@@ -17,7 +17,9 @@ class MockupsController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser'])->whereNotNull('design_status');
+        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser'])
+            ->where('payment_status', '!=', 'awaiting_verification')
+            ->whereNotNull('design_status');
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -311,7 +313,7 @@ class MockupsController extends Controller
         $ticket = Ticket::findOrFail($id);
 
         // Only the assigned user or admin can release
-        if ($ticket->assigned_to_user_id !== $user->id && !$user->isAdmin()) {
+        if ($ticket->assigned_to_user_id !== $user->id && $user->role !== \App\Models\User::ROLE_ADMIN) {
             return redirect()->back()->with('error', 'You can only release tickets assigned to you.');
         }
 

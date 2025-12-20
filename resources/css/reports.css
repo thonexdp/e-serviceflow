@@ -78,54 +78,91 @@
     .btn {
         display: none !important;
     }
-    
+
     .print-header {
         display: block !important;
         border-bottom: 2px solid #000;
         padding-bottom: 20px;
         margin-bottom: 30px;
     }
-    
+
     body {
         margin: 0;
         padding: 20px;
         font-size: 12pt;
     }
-    
+
     .card {
         border: none !important;
         box-shadow: none !important;
         page-break-inside: avoid;
     }
-    
+
     table {
         page-break-inside: auto;
     }
-    
+
     tr {
         page-break-inside: avoid;
         page-break-after: auto;
     }
-    
+
     thead {
         display: table-header-group;
     }
-    
+
     tfoot {
         display: table-footer-group;
     }
-    
-    h1, h2, h3, h4, h5, h6 {
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
         page-break-after: avoid;
     }
-    
+
     .stat-card {
         border: 1px solid #ddd !important;
         page-break-inside: avoid;
     }
-    
+
     @page {
+        size: A4 landscape;
         margin: 1cm;
+    }
+}
+
+/* Official Receipt Print Overlay */
+@media print {
+    body.printing-receipt * {
+        visibility: hidden;
+    }
+    body.printing-receipt .official-receipt-print-wrapper,
+    body.printing-receipt .official-receipt-print-wrapper * {
+        visibility: visible;
+    }
+    body.printing-receipt .official-receipt-print-wrapper {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: white;
+        z-index: 99999;
+        display: flex !important;
+        justify-content: center;
+        align-items: center;
+    }
+    /* Ensure the receipt itself takes up good space but fits */
+    body.printing-receipt .official-receipt-container {
+        width: 100%;
+        max-width: 800px;
+        transform: scale(1.1); /* Slight zoom for A4 */
     }
 }
 
@@ -236,9 +273,3 @@
 .alert-danger {
     border-left-color: #dc3545;
 }
-
-
-
-
-
-

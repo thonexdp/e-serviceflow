@@ -162,6 +162,17 @@ class Ticket extends Model
             return;
         }
 
+        // If payment status is 'awaiting_verification', don't auto-update it
+        // This status must be manually changed by Front Desk after verification
+        if ($this->payment_status === 'awaiting_verification') {
+            // Still update amount_paid for reference, but don't change status
+            $paid = (float)$this->payments()->where('status', 'posted')->sum('amount');
+            $this->forceFill([
+                'amount_paid' => round($paid, 2),
+            ])->saveQuietly();
+            return;
+        }
+
         $paid = (float)$this->payments()->where('status', 'posted')->sum('amount');
         $total = (float)($this->total_amount ?? 0);
 

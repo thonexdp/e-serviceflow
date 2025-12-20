@@ -97,7 +97,12 @@ class PublicOrderController extends Controller
         ]);
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
-        $paymentStatus = ($paymentMethod === 'walkin') ? 'pending' : 'pending';
+
+        // Set payment status based on payment method and whether payment proofs will be uploaded
+        // - 'awaiting_verification': Online payment (gcash/bank) with proofs - needs Front Desk verification
+        // - 'pending': Walk-in payment - will be processed at counter
+        // All public orders are set to 'awaiting_verification' so Front Desk can verify them when the customer visits/confirms.
+        $paymentStatus = 'awaiting_verification';
 
         $ticketData = [
             'customer_id' => $validated['customer_id'],

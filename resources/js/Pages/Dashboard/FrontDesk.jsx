@@ -53,6 +53,10 @@ export default function FrontDesk({
 
     // Preview Modal
     const [previewModal, setPreviewModal] = useState({ isOpen: false, fileUrl: null });
+    const [openVerifyModal, setOpenVerifyModal] = useState(false);
+    const [verifyFormData, setVerifyFormData] = useState({
+        notes: "",
+    });
 
     const refreshDashboard = () => {
         setRefreshing(true);
@@ -163,6 +167,41 @@ export default function FrontDesk({
         }));
     };
 
+    const handleOpenVerifyModal = (ticket) => {
+        setSelectedTicket(ticket);
+        setVerifyFormData({
+            notes: "",
+        });
+        setOpenVerifyModal(true);
+    };
+
+    const closeVerifyModal = () => {
+        setOpenVerifyModal(false);
+        setSelectedTicket(null);
+    };
+
+    const handleVerifyPayment = async () => {
+        setIsUpdating(true);
+        try {
+            // Using the api instance if available or just router
+            router.patch(`/tickets/${selectedTicket.id}/verify-payment`, verifyFormData, {
+                onSuccess: () => {
+                    closeVerifyModal();
+                    refreshDashboard();
+                },
+                onError: (errors) => {
+                    alert(errors.message || "Failed to verify order.");
+                }
+            });
+        } catch (error) {
+            console.error("Verification failed", error);
+            alert("Failed to verify order. Please try again.");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+
     const handleRecordPayment = async () => {
         if (!selectedTicket || !paymentFormData.amount) {
             alert("Please enter the payment amount.");
@@ -172,7 +211,7 @@ export default function FrontDesk({
         setIsUpdating(true);
         const formData = new FormData();
         formData.append("ticket_id", selectedTicket.id);
-        formData.append("payment_method", paymentFormData.payment_method);
+        formData.append("payment_method", paymentFormData.payment_status === "paid" ? "cash" : paymentFormData.payment_method);
         formData.append("payment_date", paymentFormData.payment_date);
         formData.append("amount", paymentFormData.amount);
         formData.append("allocation", paymentFormData.allocation);
@@ -222,12 +261,24 @@ export default function FrontDesk({
         return `badge ${statusMap[status] || "badge-secondary"}`;
     };
 
-    const getPaymentStatusBadge = (status) => {
+    const getPaymentStatusBadge = (ticket) => {
+        const { payment_status: status, payment_method } = ticket;
         const classes = {
             pending: "badge-warning",
             partial: "badge-info",
             paid: "badge-success",
+            awaiting_verification: "badge-secondary",
         };
+
+        if (status === 'awaiting_verification') {
+            const isWalkin = payment_method === 'cash' || payment_method === 'walkin';
+            return (
+                <div className={`badge ${isWalkin ? "badge-dark" : "badge-secondary"}`}>
+                    {isWalkin ? 'WALK-IN ORDER' : 'AWAITING VERIFICATION'}
+                </div>
+            );
+        }
+
         return (
             <div className={`badge ${classes[status] || "badge-secondary"}`}>
                 {status?.toUpperCase() || "PENDING"}
@@ -272,7 +323,7 @@ export default function FrontDesk({
 
             {/* Payment Modal */}
             <Modal
-                title="Record Payment"
+                title="Payment History"
                 isOpen={openPaymentModal}
                 onClose={() => {
                     setOpenPaymentModal(false);
@@ -297,7 +348,7 @@ export default function FrontDesk({
                                     </p>
                                     <p className="m-b-0">
                                         <strong>Status:</strong>{" "}
-                                        {getPaymentStatusBadge(selectedTicket.payment_status)}
+                                        {getPaymentStatusBadge(selectedTicket)}
                                     </p>
                                 </div>
                                 <div className="col-md-6">
@@ -318,113 +369,13 @@ export default function FrontDesk({
                         </div>
 
                         <div className="row">
-                            <div className="col-md-6">
-                                <div className="form-group">
-                                    <label>Payment Date</label>
-                                    <input
-                                        type="date"
-                                        className="form-control"
-                                        value={paymentFormData.payment_date}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("payment_date", e.target.value)
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Payment Method</label>
-                                    <select
-                                        className="form-control"
-                                        value={paymentFormData.payment_method}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("payment_method", e.target.value)
-                                        }
-                                    >
-                                        <option value="cash">Cash</option>
-                                        <option value="gcash">GCash</option>
-                                        <option value="bank_transfer">Bank Transfer</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>
-                                        Amount <span className="text-danger">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        className="form-control"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="Enter amount"
-                                        value={paymentFormData.amount}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("amount", e.target.value)
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Allocation</label>
-                                    <select
-                                        className="form-control"
-                                        value={paymentFormData.allocation}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("allocation", e.target.value)
-                                        }
-                                    >
-                                        <option value="downpayment">Downpayment</option>
-                                        <option value="balance">Balance</option>
-                                        <option value="full">Full Payment</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Official Receipt #</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="OR number"
-                                        value={paymentFormData.official_receipt_number}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("official_receipt_number", e.target.value)
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Reference # / GCash Trace</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="GCash, bank reference, etc."
-                                        value={paymentFormData.payment_reference}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("payment_reference", e.target.value)
-                                        }
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Notes</label>
-                                    <textarea
-                                        className="form-control"
-                                        rows="3"
-                                        placeholder="Add any details about this payment..."
-                                        value={paymentFormData.notes}
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("notes", e.target.value)
-                                        }
-                                    ></textarea>
-                                </div>
-                                <div className="form-group">
-                                    <label>Attachments (GCash / Bank proof)</label>
-                                    <input
-                                        type="file"
-                                        className="form-control"
-                                        multiple
-                                        onChange={(e) =>
-                                            handlePaymentFormChange("attachments", Array.from(e.target.files || []))
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <div className="col-md-6">
+                            <div className="col-md-12">
                                 <h5 className="m-b-3">Payment History</h5>
-                                <div className="border rounded p-3 payment-history" style={{ maxHeight: "500px", overflowY: "auto" }}>
+                                <div className="alert alert-info mb-3">
+                                    <i className="ti-info-alt mr-2"></i>
+                                    <strong>Note:</strong> This is a read-only view. To record new payments, please use the <strong>Payments & Finance</strong> module.
+                                </div>
+                                <div className="border rounded p-3 payment-history">
                                     {selectedTicket.payments && selectedTicket.payments.length ? (
                                         selectedTicket.payments.map((payment) => (
                                             <div key={payment.id} className="border-bottom pb-2 mb-2">
@@ -449,7 +400,7 @@ export default function FrontDesk({
                                                     <p className="text-xs mt-1">{payment.notes}</p>
                                                 )}
                                                 {payment.documents?.length ? (
-                                                    <>
+                                                    <div className="mt-2">
                                                         <span className="badge badge-success">
                                                             {payment.documents.length} attachment{payment.documents.length > 1 ? "s" : ""}
                                                         </span>
@@ -457,10 +408,11 @@ export default function FrontDesk({
                                                             onClick={() => handlePreviewFile(payment.documents[0])}
                                                             className="btn btn-sm btn-outline-primary ml-1"
                                                             style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                            title="Preview Proof"
                                                         >
                                                             <i className="ti-eye"></i>
                                                         </button>
-                                                    </>
+                                                    </div>
                                                 ) : null}
                                             </div>
                                         ))
@@ -479,27 +431,8 @@ export default function FrontDesk({
                                     setOpenPaymentModal(false);
                                     setSelectedTicket(null);
                                 }}
-                                disabled={isUpdating}
                             >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-success"
-                                onClick={handleRecordPayment}
-                                disabled={isUpdating}
-                            >
-                                {isUpdating ? (
-                                    <>
-                                        <i className="fa fa-spinner fa-spin mr-2"></i>
-                                        Updating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="ti-check mr-2"></i>
-                                        Record Payment
-                                    </>
-                                )}
+                                Close
                             </button>
                         </div>
                     </div>
@@ -513,6 +446,73 @@ export default function FrontDesk({
                 fileUrl={previewModal.fileUrl}
                 title="File Preview"
             />
+
+            {/* Verify Payment Modal */}
+            <Modal
+                title="Verify Order & Payment"
+                isOpen={openVerifyModal}
+                onClose={closeVerifyModal}
+                size="lg"
+                submitButtonText={null}
+            >
+                <div className="modal-body">
+                    {selectedTicket && (
+                        <div className={`alert ${selectedTicket.payment_method === 'cash' ? 'alert-info' : 'alert-warning'} mb-4`}>
+                            <h6 className="alert-heading f-s-14">
+                                <i className="ti-info-alt mr-2"></i>
+                                {selectedTicket.payment_method === 'cash'
+                                    ? 'Walk-in order confirmation'
+                                    : 'Verification required for online payment'}
+                            </h6>
+                            <p className="mb-0 small">
+                                Ticket: <strong>{selectedTicket.ticket_number}</strong><br />
+                                Total Amount: <strong>{formatPeso(selectedTicket.total_amount)}</strong>
+                                {selectedTicket.payment_method === 'cash' && (
+                                    <><br />Confirm this order once the customer arrives at the branch.</>
+                                )}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="form-group mb-4">
+                        <label className="form-label f-s-13">Verification Notes (Optional)</label>
+                        <textarea
+                            className="form-control"
+                            rows="2"
+                            value={verifyFormData.notes}
+                            onChange={(e) => setVerifyFormData({ ...verifyFormData, notes: e.target.value })}
+                            placeholder="Add any notes for the cashier or designers..."
+                        ></textarea>
+                    </div>
+
+                    <div className="modal-footer border-top pt-3 px-0">
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={closeVerifyModal}
+                            disabled={isUpdating}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-success btn-sm"
+                            onClick={handleVerifyPayment}
+                            disabled={isUpdating}
+                        >
+                            {isUpdating ? (
+                                <>
+                                    <i className="fa fa-spinner fa-spin mr-1"></i> Verifying...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="ti-check mr-1"></i> Confirm & Release to Cashier
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <section id="main-content">
                 {/* Date Filter Section */}
@@ -622,7 +622,7 @@ export default function FrontDesk({
                                                 <th>Amount</th>
                                                 <th>Payment Status</th>
                                                 <th>Files</th>
-                                                {/* <th>Action</th> */}
+                                                <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -640,7 +640,7 @@ export default function FrontDesk({
                                                         </td>
                                                         <td>{ticket.description}</td>
                                                         <td>{formatPeso(ticket.total_amount)}</td>
-                                                        <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
+                                                        <td>{getPaymentStatusBadge(ticket)}</td>
                                                         <td>
                                                             {ticket.customer_files && ticket.customer_files.length > 0 ? (
                                                                 <>
@@ -661,14 +661,14 @@ export default function FrontDesk({
                                                                 <span className="text-gray-400">No files</span>
                                                             )}
                                                         </td>
-                                                        {/* <td>
+                                                        <td>
                                                             <button
-                                                                className="btn btn-sm btn-link btn-flat m-b-10 m-l-5"
-                                                                onClick={() => handleOpenPaymentModal(ticket)}
+                                                                className="btn btn-sm btn-success btn-flat"
+                                                                onClick={() => handleOpenVerifyModal(ticket)}
                                                             >
-                                                                <i className="ti ti-eye"></i> Review
+                                                                <i className="ti-check-box"></i> Verify
                                                             </button>
-                                                        </td> */}
+                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
@@ -814,16 +814,16 @@ export default function FrontDesk({
                                                                 {ticket.status?.replace("_", " ").toUpperCase() || "PENDING"}
                                                             </div>
                                                         </td>
-                                                        <td>{getPaymentStatusBadge(ticket.payment_status)}</td>
+                                                        <td>{getPaymentStatusBadge(ticket)}</td>
                                                         <td>
-                                                            {ticket.payment_status !== "paid" && (
-                                                                <button
-                                                                    className="btn btn-sm btn-link btn-flat m-b-10 m-l-5"
-                                                                    onClick={() => handleOpenPaymentModal(ticket)}
-                                                                >
-                                                                    <i className="ti-clipboard"></i> Payment
-                                                                </button>
-                                                            )}
+                                                            <button
+                                                                onClick={() => handleOpenPaymentModal(ticket)}
+                                                                className="btn btn-sm btn-outline-primary ml-1"
+                                                                style={{ padding: "2px 8px", fontSize: "11px" }}
+                                                                title="View Payment History"
+                                                            >
+                                                                <i className="ti-eye"></i>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ))
