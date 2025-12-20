@@ -17,7 +17,7 @@ class MockupsController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'jobType.category', 'files'])->whereNotNull('design_status');
+        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser'])->whereNotNull('design_status');
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -279,5 +279,46 @@ class MockupsController extends Controller
         } catch (\Exception $e) {
             Log::error("Failed to broadcast event for ticket {$ticket->id}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Claim a ticket for the current user
+     */
+    public function claimTicket($id)
+    {
+        $user = Auth::user();
+        $ticket = Ticket::findOrFail($id);
+
+        // Check if ticket is already assigned to another user
+        if ($ticket->assigned_to_user_id && $ticket->assigned_to_user_id !== $user->id) {
+            $assignedUser = \App\Models\User::find($ticket->assigned_to_user_id);
+            return redirect()->back()->with('error', 'This ticket is already assigned to ' . ($assignedUser->name ?? 'another user') . '.');
+        }
+
+        $ticket->update([
+            'assigned_to_user_id' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Ticket claimed successfully.');
+    }
+
+    /**
+     * Release a ticket (unclaim it)
+     */
+    public function releaseTicket($id)
+    {
+        $user = Auth::user();
+        $ticket = Ticket::findOrFail($id);
+
+        // Only the assigned user or admin can release
+        if ($ticket->assigned_to_user_id !== $user->id && !$user->isAdmin()) {
+            return redirect()->back()->with('error', 'You can only release tickets assigned to you.');
+        }
+
+        $ticket->update([
+            'assigned_to_user_id' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Ticket released successfully.');
     }
 }

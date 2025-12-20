@@ -17,6 +17,7 @@ class JobType extends Model
         'price',
         'price_by',
         'discount',
+        'incentive_price',
         'promo_text',
         'is_active',
         'sort_order',
@@ -26,6 +27,7 @@ class JobType extends Model
     protected $casts = [
         'price' => 'decimal:2',
         'discount' => 'decimal:2',
+        'incentive_price' => 'decimal:2',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
         'workflow_steps' => 'array',

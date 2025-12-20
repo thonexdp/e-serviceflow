@@ -34,6 +34,7 @@ export default function ReportsAnalytics({
         { value: 'inventory', label: 'Inventory Consumption', icon: 'ti-package' },
         { value: 'product_profitability', label: 'Product Profitability', icon: 'ti-pie-chart' },
         { value: 'production', label: 'Production Report', icon: 'ti-settings' },
+        { value: 'production_incentives', label: 'Production Incentives', icon: 'ti-gift' },
         { value: 'customer_insights', label: 'Customer Insights', icon: 'ti-user' },
         { value: 'online_orders', label: 'Online Orders', icon: 'ti-shopping-cart' },
         { value: 'designer_approvals', label: 'Designer Approvals', icon: 'ti-paint-bucket' },
@@ -204,6 +205,7 @@ export default function ReportsAnalytics({
                                 {selectedReport === 'inventory' && <InventoryReport data={reportData} />}
                                 {selectedReport === 'product_profitability' && <ProductProfitabilityReport data={reportData} />}
                                 {selectedReport === 'production' && <ProductionReport data={reportData} />}
+                                {selectedReport === 'production_incentives' && <ProductionIncentivesReport data={reportData} />}
                                 {selectedReport === 'customer_insights' && <CustomerInsightsReport data={reportData} />}
                                 {selectedReport === 'online_orders' && <OnlineOrdersReport data={reportData} />}
                                 {selectedReport === 'designer_approvals' && <DesignerApprovalsReport data={reportData} />}
@@ -900,6 +902,171 @@ function ReceiptsReport({ data }) {
                     </div>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function ProductionIncentivesReport({ data }) {
+    const { records = [], summary = {}, filters = {} } = data;
+
+    return (
+        <div>
+            <h4>Production Incentives Report</h4>
+            <div className="row mb-4">
+                <div className="col-md-3">
+                    <div className="stat-card">
+                        <h6>Total Incentives</h6>
+                        <h3>{formatPeso(summary.total_incentives || 0)}</h3>
+                    </div>
+                </div>
+                <div className="col-md-3">
+                    <div className="stat-card">
+                        <h6>Total Quantity Produced</h6>
+                        <h3>{summary.total_quantity || 0}</h3>
+                    </div>
+                </div>
+                <div className="col-md-3">
+                    <div className="stat-card">
+                        <h6>Total Records</h6>
+                        <h3>{summary.total_records || 0}</h3>
+                    </div>
+                </div>
+                <div className="col-md-3">
+                    <div className="stat-card">
+                        <h6>Unique Users</h6>
+                        <h3>{summary.unique_users || 0}</h3>
+                    </div>
+                </div>
+            </div>
+
+            {filters.user_id && (
+                <div className="alert alert-info mb-3">
+                    <i className="ti-filter"></i> Filtered by User: {filters.user_name || 'N/A'}
+                </div>
+            )}
+
+            {filters.job_type_id && (
+                <div className="alert alert-info mb-3">
+                    <i className="ti-filter"></i> Filtered by Job Type: {filters.job_type_name || 'N/A'}
+                </div>
+            )}
+
+            <h5 className="mt-4">Incentive Records</h5>
+            {records && records.length > 0 ? (
+                <div className="table-responsive">
+                    <table className="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>User Name</th>
+                                <th>Ticket #</th>
+                                <th>Job Type</th>
+                                <th>Workflow Step</th>
+                                <th className="text-right">Quantity Produced</th>
+                                <th className="text-right">Incentive Price</th>
+                                <th className="text-right">Total Incentives</th>
+                                <th>Evidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {records.map((record, index) => (
+                                <tr key={record.id || index}>
+                                    <td>{formatDate(record.created_at || record.date)}</td>
+                                    <td>{record.user_name || 'N/A'}</td>
+                                    <td>{record.ticket_number || 'N/A'}</td>
+                                    <td>{record.job_type_name || 'N/A'}</td>
+                                    <td className="text-capitalize">
+                                        {record.workflow_step ? record.workflow_step.replace(/_/g, ' ') : 'N/A'}
+                                    </td>
+                                    <td className="text-right">{record.quantity_produced || 0}</td>
+                                    <td className="text-right">{formatPeso(record.incentive_price || 0)}</td>
+                                    <td className="text-right">
+                                        <strong className="text-success">
+                                            {formatPeso((record.quantity_produced || 0) * (record.incentive_price || 0))}
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        {record.evidence_files && record.evidence_files.length > 0 ? (
+                                            <span className="badge badge-info">
+                                                <i className="ti-image"></i> {record.evidence_files.length} file(s)
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted">No evidence</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr className="table-active">
+                                <th colSpan="6" className="text-right">Total:</th>
+                                <th className="text-right">{summary.total_quantity || 0}</th>
+                                <th></th>
+                                <th className="text-right">
+                                    <strong>{formatPeso(summary.total_incentives || 0)}</strong>
+                                </th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            ) : (
+                <div className="alert alert-info">No incentive records found for the selected period.</div>
+            )}
+
+            {/* Summary by User */}
+            {summary.by_user && Object.keys(summary.by_user).length > 0 && (
+                <>
+                    <h5 className="mt-4">Summary by User</h5>
+                    <table className="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>User Name</th>
+                                <th className="text-right">Total Quantity</th>
+                                <th className="text-right">Total Incentives</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.values(summary.by_user).map((userSummary, index) => (
+                                <tr key={index}>
+                                    <td>{userSummary.user_name}</td>
+                                    <td className="text-right">{userSummary.total_quantity || 0}</td>
+                                    <td className="text-right">
+                                        <strong>{formatPeso(userSummary.total_incentives || 0)}</strong>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </>
+            )}
+
+            {/* Summary by Job Type */}
+            {summary.by_job_type && Object.keys(summary.by_job_type).length > 0 && (
+                <>
+                    <h5 className="mt-4">Summary by Job Type</h5>
+                    <table className="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Job Type</th>
+                                <th className="text-right">Total Quantity</th>
+                                <th className="text-right">Total Incentives</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.values(summary.by_job_type).map((jobTypeSummary, index) => (
+                                <tr key={index}>
+                                    <td>{jobTypeSummary.job_type_name}</td>
+                                    <td className="text-right">{jobTypeSummary.total_quantity || 0}</td>
+                                    <td className="text-right">
+                                        <strong>{formatPeso(jobTypeSummary.total_incentives || 0)}</strong>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </>
+            )}
         </div>
     );
 }

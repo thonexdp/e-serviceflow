@@ -10,6 +10,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         price: "",
         price_by: "pcs",
         discount: "",
+        incentive_price: "",
         is_active: true,
         sort_order: 0,
     });
@@ -18,7 +19,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     const [sizeRates, setSizeRates] = useState([]);
     const [promoRules, setPromoRules] = useState([]);
     const [workflowSteps, setWorkflowSteps] = useState({
-        design: false,
+        // design: false,
         printing: false,
         lamination_heatpress: false,
         cutting: false,
@@ -41,6 +42,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 price: jobType.price || "",
                 price_by: jobType.price_by || "pcs",
                 discount: jobType.discount || "",
+                incentive_price: jobType.incentive_price || "",
                 is_active: jobType.is_active !== undefined ? jobType.is_active : true,
                 sort_order: jobType.sort_order || 0,
             });
@@ -82,7 +84,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             // Load workflow steps if they exist
             if (jobType.workflow_steps) {
                 setWorkflowSteps({
-                    design: jobType.workflow_steps.design || false,
+                    // design: jobType.workflow_steps.design || false,
                     printing: jobType.workflow_steps.printing || false,
                     lamination_heatpress: jobType.workflow_steps.lamination_heatpress || false,
                     cutting: jobType.workflow_steps.cutting || false,
@@ -97,7 +99,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             setSizeRates([]);
             setPromoRules([]);
             setWorkflowSteps({
-                design: false,
+                // design: false,
                 printing: false,
                 lamination_heatpress: false,
                 cutting: false,
@@ -308,6 +310,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             category_id: parseInt(formData.category_id),
             price: parseFloat(formData.price),
             discount: formData.discount ? parseFloat(formData.discount) : null,
+            incentive_price: formData.incentive_price ? parseFloat(formData.incentive_price) : null,
             sort_order: parseInt(formData.sort_order) || 0,
             price_tiers: formattedPriceTiers,
             size_rates: formattedSizeRates,
@@ -431,6 +434,23 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         step="0.01"
                         min="0"
                         max="100"
+                    />
+                </div>
+            </div>
+
+            <div className="row">
+                <div className="col-md-6">
+                    <FormInput
+                        label="Incentive Price (per piece)"
+                        type="number"
+                        name="incentive_price"
+                        value={formData.incentive_price}
+                        onChange={handleChange}
+                        error={errors.incentive_price}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        helpText="Used to calculate production incentives based on quantity produced"
                     />
                 </div>
             </div>
@@ -828,7 +848,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     Select the production steps that apply to this job type/product. These steps will be used to track progress in the production board.
                 </p>
                 <div className="row">
-                    <div className="col-md-3 mb-3">
+                    {/* <div className="col-md-3 mb-3">
                         <div className="form-check">
                             <input
                                 type="checkbox"
@@ -841,7 +861,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                                 <i className="ti-pencil-alt mr-1"></i> Design
                             </label>
                         </div>
-                    </div>
+                    </div> */}
                     <div className="col-md-3 mb-3">
                         <div className="form-check">
                             <input
@@ -950,7 +970,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         .filter(([key, value]) => value)
                         .sort((a, b) => {
                             // const order = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press', 'assembly', 'quality_check'];
-                            const order = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
+                            const order = ['printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
                             return order.indexOf(a[0]) - order.indexOf(b[0]);
                         })
                         .map(([key, value], index, array) => (

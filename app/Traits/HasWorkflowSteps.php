@@ -19,7 +19,7 @@ trait HasWorkflowSteps
 
         // Define the order of workflow steps
         $stepOrder = [
-            'design',
+            // 'design',
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -54,7 +54,7 @@ trait HasWorkflowSteps
 
         // Define the order of workflow steps
         $stepOrder = [
-            'design',
+            // 'design',
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -98,7 +98,7 @@ trait HasWorkflowSteps
 
         // Define the order of workflow steps
         $stepOrder = [
-            'design',
+            // 'design',
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -141,7 +141,7 @@ trait HasWorkflowSteps
 
         // Define the order of workflow steps
         $stepOrder = [
-            'design',
+            // 'design',
             'printing',
             'lamination_heatpress',
             'cutting',

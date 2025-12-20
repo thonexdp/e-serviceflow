@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Package, Phone, Mail, MapPin, Plus, CheckCircle, Clock, Printer, Truck } from 'lucide-react';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
+import { formatPeso } from '@/Utils/currency';
 
 export default function PrintShoppeLanding() {
     const [trackingNumber, setTrackingNumber] = useState('');
@@ -368,15 +369,15 @@ export default function PrintShoppeLanding() {
                                         <div className="pt-4 space-y-2">
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Total Amount</span>
-                                                <span className="font-medium text-gray-900">₱{orderData.payment.totalAmount.toFixed(2)}</span>
+                                                <span className="font-medium text-gray-900">{formatPeso(orderData.payment.totalAmount.toFixed(2))}</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Amount Paid</span>
-                                                <span className="font-medium text-green-600">₱{orderData.payment.amountPaid.toFixed(2)}</span>
+                                                <span className="font-medium text-green-600">{formatPeso(orderData.payment.amountPaid.toFixed(2))}</span>
                                             </div>
                                             <div className="flex justify-between pt-2 border-t border-gray-200">
                                                 <span className="font-semibold text-gray-900">Balance Due</span>
-                                                <span className="font-bold text-red-600">₱{orderData.payment.balance.toFixed(2)}</span>
+                                                <span className="font-bold text-red-600">{formatPeso(orderData.payment.balance.toFixed(2))}</span>
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-600">Payment Status</span>

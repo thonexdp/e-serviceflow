@@ -174,16 +174,32 @@ export default function TicketForm({
 
             // Auto-fill price and promo if job type is selected
             if (jobType) {
+                let newDiscount = jobType.discount;
+
+                // If editing and job type matches ticket's job type, use ticket discount
+                if (ticket && ticket.job_type_id?.toString() === formData.job_type_id?.toString()) {
+                    newDiscount = ticket.discount;
+                }
+
                 setFormData((prev) => ({
                     ...prev,
-                    discount: jobType.discount || prev.discount,
+                    discount: newDiscount !== undefined && newDiscount !== null ? newDiscount : prev.discount,
                     subtotal: (jobType.price * (prev.quantity || 1)).toFixed(2),
                 }));
+
+                // Auto-enable discount if we have a value
+                const discountToCheck = newDiscount !== undefined && newDiscount !== null
+                    ? newDiscount
+                    : formData.discount;
+
+                if (parseFloat(discountToCheck) > 0) {
+                    setEnableDiscount(true);
+                }
             }
         } else {
             setSelectedJobType(null);
         }
-    }, [formData.job_type_id, availableJobTypes]);
+    }, [formData.job_type_id, availableJobTypes, ticket]);
 
     useEffect(() => {
         const sizeRates = selectedJobType?.size_rates || [];
