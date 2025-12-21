@@ -51,7 +51,9 @@ class ProductionQueueController extends Controller
             'assignedUsers',
             'workflowProgress',
             'productionRecords.user',
-            'productionRecords.evidenceFiles'
+            'productionRecords.evidenceFiles',
+            'payments.documents',
+            'payments.recordedBy'
         ])
             ->whereIn('status', ['ready_to_print', 'in_production', 'completed'])
             ->where('payment_status', '!=', 'awaiting_verification')

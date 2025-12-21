@@ -449,7 +449,20 @@ export default function Tickets({
             render: (row, index) =>
                 (tickets.current_page - 1) * tickets.per_page + index + 1,
         },
-        { label: "Ticket ID", key: "ticket_number" },
+        {
+            label: "Ticket ID",
+            key: "ticket_number",
+            render: (row) => (
+                <div>
+                    <div className="font-weight-bold">{row.ticket_number}</div>
+                    {row.payments?.some(p => p.status === 'rejected') && (
+                        <div className="text-danger font-bold text-[9px] uppercase">
+                            <i className="ti-alert mr-1"></i> Bounced Payment
+                        </div>
+                    )}
+                </div>
+            )
+        },
         {
             label: "Customer",
             key: "customer",
@@ -600,6 +613,7 @@ export default function Tickets({
                 onClose={handleCloseModal}
                 size="md"
                 submitButtonText={null}
+                staticBackdrop={true}
             >
                 <DeleteConfirmation
                     label=" ticket"
@@ -663,6 +677,7 @@ export default function Tickets({
                     onClose={closeStatusModal}
                     size="lg"
                     submitButtonText={null}
+                    staticBackdrop={true}
                 >
                     <div className="modal-body">
                         {selectedTicket && (
@@ -761,8 +776,20 @@ export default function Tickets({
                     onClose={closePaymentModal}
                     size="4xl"
                     submitButtonText={null}
+                    staticBackdrop={true}
                 >
                     <div className="modal-body">
+                        {selectedTicket?.payments?.some(p => p.status === 'rejected') && (
+                            <div className="alert alert-danger mb-4">
+                                <h5 className="font-bold text-danger">
+                                    <i className="ti-alert mr-2"></i>
+                                    ACTION REQUIRED: BOUNCED PAYMENT
+                                </h5>
+                                <p className="mb-0 text-sm text-black">
+                                    <strong>PAYMENT REJECTED</strong> We have received a payment rejection for this ticket. Please contact the customer immediately to secure a new payment via the Cashier.
+                                </p>
+                            </div>
+                        )}
                         {selectedTicket && (
                             <div className="mb-4 border rounded p-3 bg-light">
                                 <div className="row">
@@ -839,13 +866,13 @@ export default function Tickets({
                                                         ).toLocaleDateString()}
                                                     </span>
                                                 </div>
-                                                <div className="text-sm text-gray-600">
-                                                    {payment.payment_method?.replace(
-                                                        "_",
-                                                        " "
-                                                    ) || "N/A"}
+                                                <div className={`text-sm ${payment.status === 'rejected' ? 'text-danger font-bold' : 'text-gray-600'}`}>
+                                                    {payment.payment_method?.replace("_", " ") || "N/A"}
                                                     {payment.official_receipt_number && (
                                                         <> • OR {payment.official_receipt_number}</>
+                                                    )}
+                                                    {payment.status === 'rejected' && (
+                                                        <span className="ml-2">• REJECTED: {payment.notes || "No reason provided"}</span>
                                                     )}
                                                 </div>
                                                 {payment.payment_reference && (
