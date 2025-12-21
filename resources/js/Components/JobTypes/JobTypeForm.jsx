@@ -492,7 +492,9 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                                         alt="Preview"
                                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                         onError={(e) => {
-                                            e.target.src = 'https://via.placeholder.com/80?text=No+Image';
+                                            // Use data URI SVG as fallback
+                                            e.target.onerror = null; // Prevent infinite loop
+                                            e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E`;
                                         }}
                                     />
                                 </div>
