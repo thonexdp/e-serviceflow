@@ -8,6 +8,7 @@ import { formatPeso } from "@/Utils/currency";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import OfficialReceipt from "@/Components/Finance/OfficialReceipt";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import Confirmation from "@/Components/Common/Confirmation";
 
 export default function PaymentsFinance({
     ledger,
@@ -20,12 +21,13 @@ export default function PaymentsFinance({
     expenseCategories = [],
     openTickets = [],
     customers = [],
+    pendingPayments = [],
     // flash = {},
     user = {},
     notifications = [],
     messages = [],
 }) {
-    const [activeTab, setActiveTab] = useState("receivables");
+    const [activeTab, setActiveTab] = useState(filters.tab || "receivables");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isExpenseSubmitting, setIsExpenseSubmitting] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -46,6 +48,9 @@ export default function PaymentsFinance({
         payment_reference: "",
         notes: "",
         attachments: [],
+        bank_name: "",
+        cheque_number: "",
+        cheque_date: "",
     });
     const { api, buildUrl } = useRoleApi();
     const { flash, auth } = usePage().props;
@@ -53,8 +58,19 @@ export default function PaymentsFinance({
 
     const [show, setShow] = useState(false);
     const [filepath, setFilepath] = useState("");
-
     const [receiptToPrint, setReceiptToPrint] = useState(null);
+    const [selectedReceivable, setSelectedReceivable] = useState(null);
+
+    const [confirmConfig, setConfirmConfig] = useState({
+        isOpen: false,
+        title: "Confirm Action",
+        description: "",
+        subtitle: "",
+        color: "primary",
+        label: "Confirm",
+        onConfirm: () => { },
+        loading: false
+    });
 
     const [expenseForm, setExpenseForm] = useState({
         category: expenseCategories[0] || "supplies",
@@ -86,17 +102,16 @@ export default function PaymentsFinance({
     const handleTabChange = (key) => {
         setActiveTab(key);
         setLocalSearch("");
-        if (filters.search) {
-            router.get(
-                buildUrl("finance"),
-                {},
-                {
-                    preserveState: true,
-                    preserveScroll: true,
-                    replace: true,
-                }
-            );
-        }
+        // Clear all filters but keep the tab selection
+        router.get(
+            buildUrl("finance"),
+            { tab: key },
+            {
+                preserveState: false,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
     };
 
     // Auto-update when filters prop changes (if search is cleared from URL)
@@ -113,20 +128,30 @@ export default function PaymentsFinance({
     };
 
     const filteredReceivables = useMemo(() => {
-        if (!localSearch) return receivables;
-        const query = localSearch.toLowerCase();
-        return receivables.filter(
-            (r) =>
-                r.ticket_number?.toLowerCase().includes(query) ||
-                r.name?.toLowerCase().includes(query) ||
-                r.description?.toLowerCase().includes(query) ||
-                String(r.total_invoiced).includes(query) ||
-                String(r.balance).includes(query)
-        );
-    }, [receivables, localSearch]);
+        // Server-side search is now implemented, so we just return the data
+        if (receivables && receivables.data) {
+            return receivables.data;
+        }
+        return Array.isArray(receivables) ? receivables : [];
+    }, [receivables]);
 
     const renderTableControls = () => (
         <div className="flex items-center gap-2">
+            {activeTab === "ledger" && (
+                <select
+                    className="form-control form-control-sm"
+                    value={filters.status || ""}
+                    onChange={(e) => {
+                        router.get(buildUrl("finance"), { ...filters, status: e.target.value }, { preserveState: true });
+                    }}
+                    style={{ width: "130px", borderRadius: "5px" }}
+                >
+                    <option value="">All Statuses</option>
+                    <option value="posted">Posted</option>
+                    <option value="pending">Pending</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            )}
             <div className="relative">
                 <input
                     type="text"
@@ -157,6 +182,7 @@ export default function PaymentsFinance({
 
     const tabs = [
         { key: "receivables", label: "Receivables" },
+        { key: "pending_payments", label: `Pending Payments (${summary?.pending_cheques_count || 0})` },
         { key: "ledger", label: "Payment Ledger" },
         { key: "expenses", label: "Expenses" },
         // { key: "cashFlow", label: "Cash Flow" },
@@ -175,6 +201,9 @@ export default function PaymentsFinance({
             payment_reference: "",
             notes: "",
             attachments: [],
+            bank_name: "",
+            cheque_number: "",
+            cheque_date: "",
         }));
         setPaymentErrors({});
     };
@@ -236,16 +265,54 @@ export default function PaymentsFinance({
             return;
         }
 
+        const isCheck = paymentForm.payment_method === 'check';
+        const selectedTicket = openTickets.find(t => t.id === paymentForm.ticket_id);
+        const payerName = paymentForm.payer_name || (selectedTicket?.customer ? `${selectedTicket.customer.firstname} ${selectedTicket.customer.lastname}` : "Customer");
+
+        setConfirmConfig({
+            isOpen: true,
+            title: "Confirm Payment Recording",
+            description: `Record ${paymentForm.payment_method.toUpperCase()} payment?`,
+            subtitle: isCheck
+                ? `You are about to record a PENDING cheque payment of ${formatPeso(paymentForm.amount)} for ${payerName}. This will not update the ticket balance until cleared.`
+                : `You are about to record a payment of ${formatPeso(paymentForm.amount)} for ${payerName}.`,
+            color: "success",
+            label: "Save Payment",
+            onConfirm: () => processPaymentSubmit(),
+            loading: false
+        });
+    };
+
+    const processPaymentSubmit = async () => {
         const formData = new FormData();
+
+        // Handle metadata for cheques
+        let finalMetadata = {};
+        if (paymentForm.payment_method === 'check') {
+            finalMetadata = {
+                bank_name: paymentForm.bank_name,
+                cheque_number: paymentForm.cheque_number,
+                cheque_date: paymentForm.cheque_date
+            };
+            formData.append('status', 'pending');
+        }
+
         Object.entries(paymentForm).forEach(([key, value]) => {
             if (key === "attachments") {
                 value.forEach((file) => formData.append("attachments[]", file));
             } else if (key === "amount") {
                 // Ensure amount is clean (no commas)
                 formData.append(key, String(value).replace(/,/g, ''));
+            } else if (['bank_name', 'cheque_number', 'cheque_date'].includes(key)) {
+                // Already handled via metadata
             } else if (value !== null && value !== "") {
                 formData.append(key, value);
             }
+        });
+
+        // Append metadata properly for Laravel
+        Object.entries(finalMetadata).forEach(([k, v]) => {
+            formData.append(`metadata[${k}]`, v);
         });
 
         setIsSubmitting(true);
@@ -275,23 +342,15 @@ export default function PaymentsFinance({
 
             setPaymentModalOpen(false);
             resetPaymentForm();
-
-            // Prompt to print
-            // if (window.confirm("Payment recorded successfully! Do you want to print the Official Receipt now?")) {
-            //     handlePrintReceipt(printablePayment, () => {
-            //         router.reload({ preserveScroll: true });
-            //     });
-            // } else {
+            setConfirmConfig({ isOpen: false });
             router.reload({ preserveScroll: true });
-            //  }
 
         } catch (error) {
             console.error("Payment submission failed", error);
+            setConfirmConfig(prev => ({ ...prev, loading: false }));
             setPaymentErrors({
                 submit: error.response?.data?.message || "Failed to record payment."
             });
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
@@ -377,6 +436,7 @@ export default function PaymentsFinance({
     };
 
     const handleProcessPayment = (row) => {
+        setSelectedReceivable(row);
         setPaymentForm((prev) => ({
             ...prev,
             ticket_id: row.ticket_id,
@@ -384,6 +444,47 @@ export default function PaymentsFinance({
             payer_name: row.name,
         }));
         setPaymentModalOpen(true);
+    };
+
+    const handlePaymentAction = (paymentId, action) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: "Confirm Action",
+            description: `Are you sure you want to ${action} this payment?`,
+            subtitle: action === 'reject'
+                ? "Please provide a reason for rejecting this payment. This will be visible to the frontdesk."
+                : "This action will update the payment status and may affect ticket balances.",
+            color: action === 'reject' ? 'danger' : 'success',
+            label: action.toUpperCase(),
+            showNotesField: action === 'reject',
+            notesLabel: "Rejection Reason",
+            notesPlaceholder: "e.g., NSF (Non-Sufficient Funds), Signature mismatch, Account closed...",
+            notesRequired: action === 'reject',
+            notesRows: 6,
+            onConfirm: async (notes) => {
+                setConfirmConfig(prev => ({ ...prev, loading: true }));
+                try {
+                    const payload = action === 'reject' && notes ? { notes } : {};
+                    await api.post(`/payments/${paymentId}/${action}`, payload);
+                    setConfirmConfig({ isOpen: false });
+                    router.reload({ preserveScroll: true });
+                } catch (error) {
+                    console.error(`Payment ${action} failed`, error);
+                    setConfirmConfig({
+                        isOpen: true,
+                        title: "Error",
+                        description: `Failed to ${action} payment`,
+                        subtitle: error.response?.data?.message || "Something went wrong.",
+                        color: "danger",
+                        label: "Close",
+                        showNotesField: false,
+                        onConfirm: () => setConfirmConfig({ isOpen: false }),
+                        loading: false
+                    });
+                }
+            },
+            loading: false
+        });
     };
 
     const ledgerColumns = [
@@ -413,13 +514,27 @@ export default function PaymentsFinance({
         },
         {
             label: "Method",
-            render: (row) =>
-                row.payment_method ? row.payment_method.replace("_", " ") : "—",
+            render: (row) => (
+                <div>
+                    <div>{row.payment_method ? row.payment_method.replace("_", " ") : "—"}</div>
+                    {row.payment_method === 'check' && row.metadata && (
+                        <div className="text-xs text-muted">
+                            {row.metadata.bank_name} | {row.metadata.cheque_number}
+                        </div>
+                    )}
+                </div>
+            ),
         },
         {
             label: "Amount",
             render: (row) => (
-                <strong className="text-green-600">{formatPeso(row.amount)}</strong>
+                <div className="flex flex-col">
+                    <strong className={row.status === 'pending' ? "text-warning" : "text-green-600"}>
+                        {formatPeso(row.amount)}
+                    </strong>
+                    {row.status === 'pending' && <span className="text-xs text-warning font-bold">PENDING</span>}
+                    {row.status === 'rejected' && <span className="text-xs text-danger font-bold">REJECTED</span>}
+                </div>
             ),
         },
         {
@@ -452,13 +567,34 @@ export default function PaymentsFinance({
         {
             label: "Action",
             render: (row) => (
-                <button
-                    className="btn btn-primary btn-sm btn-outline"
-                    onClick={() => handlePrintReceipt(row)}
-                    title="Print Official Receipt"
-                >
-                    <i className="ti-printer"></i>
-                </button>
+                <div className="flex gap-1">
+                    {row.status === 'pending' && (
+                        <>
+                            <button
+                                className="btn btn-success btn-sm btn-outline"
+                                onClick={() => handlePaymentAction(row.id, 'clear')}
+                                title="Clear Cheque"
+                            >
+                                <i className="ti-check"></i>
+                            </button>
+                            <button
+                                className="btn btn-danger btn-sm btn-outline"
+                                onClick={() => handlePaymentAction(row.id, 'reject')}
+                                title="Reject Cheque"
+                            >
+                                <i className="ti-close"></i>
+                            </button>
+                        </>
+                    )}
+                    <button
+                        className="btn btn-primary btn-sm btn-outline"
+                        onClick={() => handlePrintReceipt(row)}
+                        title="Print Official Receipt"
+                        disabled={row.status === 'rejected'}
+                    >
+                        <i className="ti-printer"></i>
+                    </button>
+                </div>
             ),
         }
     ];
@@ -467,9 +603,23 @@ export default function PaymentsFinance({
         {
             label: "Ticket #",
             render: (row) => (
-                <span className="font-semibold text-primary">
-                    {row.ticket_number || `#${row.ticket_id}`}
-                </span>
+                <div className="flex flex-col">
+                    <span className="font-semibold text-primary">
+                        {row.ticket_number || `#${row.ticket_id}`}
+                    </span>
+                    {row.has_rejected_payment && (
+                        <div className="flex flex-col mt-1">
+                            <span className="badge badge-danger text-[10px] p-1 flex items-center w-fit" title="Click process to see details or record new payment">
+                                <i className="ti-alert mr-1"></i> BOUNCED/REJECTED
+                            </span>
+                            {row.last_rejected_payment?.notes && (
+                                <span className="text-danger text-xs mt-1 italic">
+                                    Reason: {row.last_rejected_payment.notes}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
             )
         },
         { label: "Customer", render: (row) => row.name },
@@ -607,6 +757,21 @@ export default function PaymentsFinance({
                         </div>
                     </div>
                 );
+            case "pending_payments":
+                return (
+                    <div className="card">
+                        <div className="card-title">
+                            <h4>Pending Payments (Cheques)</h4>
+                        </div>
+                        <div className="card-body">
+                            <DataTable
+                                columns={ledgerColumns}
+                                data={pendingPayments}
+                                emptyMessage="No pending cheque payments."
+                            />
+                        </div>
+                    </div>
+                );
             case "receivables":
                 return (
                     <div className="card">
@@ -617,6 +782,7 @@ export default function PaymentsFinance({
                             <DataTable
                                 columns={receivablesColumns}
                                 data={filteredReceivables}
+                                pagination={receivables}
                                 emptyMessage="No outstanding balances. Great job!"
                             />
                         </div>
@@ -629,7 +795,7 @@ export default function PaymentsFinance({
                             <div className="flex items-center gap-3">
                                 <h4 className="m-b-0">Expenses</h4>
                                 <button
-                                    className="btn btn-outline-primary btn-sm btn-rounded"
+                                    className="btn btn-outline-primary btn-sm btn-rounded-md ml-auto"
                                     onClick={() => setExpenseModalOpen(true)}
                                 >
                                     <i className="ti-plus text-xs m-r-5"></i> Add Expense
@@ -646,77 +812,11 @@ export default function PaymentsFinance({
                         </div>
                     </div>
                 );
-            // case "cashFlow":
-            //     return (
-            //         <div className="card">
-            //             <div className="card-title">
-            //                 <h4>Cash Flow (Last 30 days)</h4>
-            //             </div>
-            //             <div className="card-body table-responsive">
-            //                 <table className="table table-striped">
-            //                     <thead>
-            //                         <tr>
-            //                             <th>Date</th>
-            //                             <th>Type</th>
-            //                             <th>Description</th>
-            //                             <th>Method</th>
-            //                             <th>Amount</th>
-            //                             <th>Running Balance</th>
-            //                         </tr>
-            //                     </thead>
-            //                     <tbody>
-            //                         {cashFlow.length ? (
-            //                             cashFlow.map((entry) => (
-            //                                 <tr key={entry.id}>
-            //                                     <td>
-            //                                         {new Date(
-            //                                             entry.entry_date
-            //                                         ).toLocaleDateString()}
-            //                                     </td>
-            //                                     <td>
-            //                                         <span
-            //                                             className={`badge ${entry.type === "inflow"
-            //                                                 ? "badge-success"
-            //                                                 : "badge-danger"
-            //                                                 }`}
-            //                                         >
-            //                                             {entry.type}
-            //                                         </span>
-            //                                     </td>
-            //                                     <td>{entry.description}</td>
-            //                                     <td>
-            //                                         {entry.method
-            //                                             ? entry.method.replace("_", " ")
-            //                                             : "—"}
-            //                                     </td>
-            //                                     <td
-            //                                         className={
-            //                                             entry.type === "inflow"
-            //                                                 ? "text-success"
-            //                                                 : "text-danger"
-            //                                         }
-            //                                     >
-            //                                         {formatPeso(entry.amount)}
-            //                                     </td>
-            //                                     <td>{formatPeso(entry.running_balance)}</td>
-            //                                 </tr>
-            //                             ))
-            //                         ) : (
-            //                             <tr>
-            //                                 <td colSpan="6" className="text-center">
-            //                                     No cash flow activity yet.
-            //                                 </td>
-            //                             </tr>
-            //                         )}
-            //                     </tbody>
-            //                 </table>
-            //             </div>
-            //         </div>
-            //     );
             default:
                 return null;
         }
     };
+
 
     const handleTicketChange = (ticketId) => {
         const selected = ticketOptions.find((option) => option.value === ticketId);
@@ -744,6 +844,7 @@ export default function PaymentsFinance({
                 resetPaymentForm();
             }}
             size="6xl"
+            staticBackdrop={true}
         >
             {/* Header - Customer and Ticket Info */}
             <div className="mb-4 pb-3 border-bottom">
@@ -762,9 +863,29 @@ export default function PaymentsFinance({
             <div className="row">
                 {/* LEFT COLUMN - Payment Summary  */}
                 <div className="col-md-5">
+                    {selectedReceivable?.has_rejected_payment && (
+                        <div className="alert alert-danger mb-4">
+                            <h6 className="font-bold">
+                                <i className="ti-alert mr-2"></i>
+                                PREVIOUS PAYMENT REJECTED
+                            </h6>
+                            <div className="text-xs uppercase mt-1">
+                                <strong>Date:</strong> {new Date(selectedReceivable.last_rejected_payment.payment_date).toLocaleDateString()} <br />
+                                <strong>Method:</strong> {selectedReceivable.last_rejected_payment.payment_method} <br />
+                                {selectedReceivable.last_rejected_payment.metadata && (
+                                    <>
+                                        <strong>Bank/Cheque #:</strong> {selectedReceivable.last_rejected_payment.metadata.bank_name} | {selectedReceivable.last_rejected_payment.metadata.cheque_number} <br />
+                                    </>
+                                )}
+                                <strong>Reason:</strong> {selectedReceivable.last_rejected_payment.notes || "No reason provided"}
+                            </div>
+                        </div>
+                    )}
                     {paymentForm.ticket_id && (() => {
                         const selectedTicket = openTickets.find(t => t.id === paymentForm.ticket_id);
                         if (!selectedTicket) return null;
+
+                        const isCheck = paymentForm.payment_method === 'check';
 
                         const ticketTotal = parseFloat(selectedTicket.total_amount || 0);
                         const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
@@ -832,13 +953,27 @@ export default function PaymentsFinance({
 
                                                 {/* Balance After Payment */}
                                                 <div className="d-flex justify-content-between align-items-center py-3 border-top border-bottom bg-white px-3 rounded mt-2">
-                                                    <span className="font-weight-bold">
+                                                    <span className="font-weight-bold text-dark">
                                                         Balance After Payment:
                                                     </span>
-                                                    <span className={`font-weight-bold ${balanceAfterPayment === 0 ? 'text-success' : 'text-warning'}`} style={{ fontSize: '1.2rem' }}>
-                                                        {formatPeso(balanceAfterPayment)}
-                                                    </span>
+                                                    <div className="text-right">
+                                                        <span className={`font-weight-bold ${balanceAfterPayment === 0 ? 'text-success' : 'text-warning'}`} style={{ fontSize: '1.2rem' }}>
+                                                            {formatPeso(balanceAfterPayment)}
+                                                        </span>
+                                                        {isCheck && (
+                                                            <div className="text-danger font-bold text-xs">
+                                                                (EXPECTED UPON CLEARANCE)
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
+
+                                                {isCheck && (
+                                                    <div className="alert alert-warning mt-2 small py-2">
+                                                        <i className="ti-info-alt mr-1"></i>
+                                                        Cheque payments are recorded as <strong>PENDING</strong> and do not affect the official balance until cleared by authorized personnel.
+                                                    </div>
+                                                )}
 
                                                 {/* Change */}
                                                 {change > 0 && (
@@ -909,6 +1044,45 @@ export default function PaymentsFinance({
                                 </select>
                             </div>
                         </div>
+
+                        {paymentForm.payment_method === 'check' && (
+                            <>
+                                <div className="col-md-6">
+                                    <div className="form-group">
+                                        <label className="form-label font-bold text-primary">Bank Name</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="e.g. BDO, BPI, MBTC"
+                                            value={paymentForm.bank_name}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, bank_name: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="col-md-3">
+                                    <div className="form-group">
+                                        <label className="form-label font-bold text-primary">Cheque #</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={paymentForm.cheque_number}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, cheque_number: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="col-md-3">
+                                    <div className="form-group">
+                                        <label className="form-label font-bold text-primary">Cheque Date</label>
+                                        <input
+                                            type="date"
+                                            className="form-control"
+                                            value={paymentForm.cheque_date}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, cheque_date: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        )}
                         <div className="col-md-6">
                             <div className="form-group">
                                 <label className="form-label font-bold text-primary">Amount Received (₱)</label>
@@ -1039,14 +1213,16 @@ export default function PaymentsFinance({
 
 
 
-            </div>
-            {paymentErrors.submit && (
-                <div className="alert alert-danger mt-3">
-                    <i className="ti-alert mr-2"></i>
-                    {paymentErrors.submit}
-                </div>
-            )}
-            <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+            </div >
+            {
+                paymentErrors.submit && (
+                    <div className="alert alert-danger mt-3">
+                        <i className="ti-alert mr-2"></i>
+                        {paymentErrors.submit}
+                    </div>
+                )
+            }
+            < div className="flex justify-end gap-3 mt-6 border-t pt-4" >
                 <button
                     className="btn btn-secondary"
                     onClick={() => {
@@ -1072,8 +1248,8 @@ export default function PaymentsFinance({
                         </>
                     )}
                 </button>
-            </div>
-        </Modal>
+            </div >
+        </Modal >
     );
 
     const renderExpenseModal = () => (
@@ -1338,6 +1514,20 @@ export default function PaymentsFinance({
 
                 {renderPaymentModal()}
                 {renderExpenseModal()}
+
+                <Modal
+                    isOpen={confirmConfig.isOpen}
+                    onClose={() => !confirmConfig.loading && setConfirmConfig({ ...confirmConfig, isOpen: false })}
+                    title={confirmConfig.title}
+                    size="md"
+                    staticBackdrop={true}
+                >
+                    <Confirmation
+                        {...confirmConfig}
+                        onCancel={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+                        onSubmit={confirmConfig.onConfirm}
+                    />
+                </Modal>
 
                 {show && (
                     <PreviewModal
