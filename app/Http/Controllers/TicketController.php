@@ -240,6 +240,10 @@ class TicketController extends BaseCrudController
             $this->notifyTicketCreated($ticket);
         }
 
+        if ($ticket->status === 'pending') {
+            $this->notifyCashierNewTicket($ticket);
+        }
+
         return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket created successfully.');
     }
@@ -684,5 +688,38 @@ class TicketController extends BaseCrudController
             $title,
             $message
         ));
+    }
+
+    /**
+     * Notify Cashiers when a new pending ticket is created.
+     */
+    protected function notifyCashierNewTicket(Ticket $ticket): void
+    {
+        $cashiers = User::where('role', User::ROLE_CASHIER)->get();
+
+        if ($cashiers->isEmpty()) {
+            return;
+        }
+
+        $title = 'New Pending Ticket';
+        $message = "New ticket #{$ticket->ticket_number} created and is pending payment/action.";
+
+        foreach ($cashiers as $cashier) {
+            Notification::create([
+                'user_id' => $cashier->id,
+                'type' => 'ticket_created_pending',
+                'notifiable_id' => $ticket->id,
+                'notifiable_type' => Ticket::class,
+                'title' => $title,
+                'message' => $message,
+                'data' => [
+                    'ticket_id' => $ticket->id,
+                    'ticket_number' => $ticket->ticket_number,
+                    'status' => $ticket->status,
+                ],
+            ]);
+        }
+
+        // We could also broadcast an event here if real-time updates are needed for Cashiers
     }
 }

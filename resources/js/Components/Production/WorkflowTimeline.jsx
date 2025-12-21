@@ -123,6 +123,33 @@ export default function WorkflowTimeline({ ticket }) {
                 </div>
             </div>
 
+            {/* Payment Summary/Status */}
+            {(ticket.payments?.length > 0 || ticket.total_amount > 0) && (
+                <div className="card mb-4 border-left-info shadow-sm">
+                    <div className="card-body">
+                        <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 className="text-muted text-uppercase small font-bold mb-1">Financial Status</h6>
+                                <div className="d-flex align-items-center gap-2">
+                                    <h4 className="mb-0 font-bold">
+                                        Total: <span className="text-dark">₱{Number(ticket.total_amount).toLocaleString()}</span>
+                                    </h4>
+                                    <span className={`badge ${ticket.payment_status === 'paid' ? 'badge-success' : 'badge-warning'}`}>
+                                        {ticket.payment_status?.toUpperCase() || 'UNPAID'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-muted small mb-1">Remaining Balance</div>
+                                <h4 className={`mb-0 font-bold ${Number(ticket.total_amount - ticket.amount_paid) > 0 ? 'text-danger' : 'text-success'}`}>
+                                    ₱{Number(ticket.total_amount - ticket.amount_paid).toLocaleString()}
+                                </h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Timeline */}
             <div className="timeline-wrapper">
                 {timelineData.length === 0 ? (
@@ -339,6 +366,85 @@ export default function WorkflowTimeline({ ticket }) {
                     </div>
                 )}
             </div>
+
+            {/* Payment History Timeline Section */}
+            {ticket.payments?.length > 0 && (
+                <div className="payment-history-section mt-5">
+                    <h4 className="mb-4">
+                        <i className="ti-wallet mr-2"></i>Payment History
+                    </h4>
+                    <div className="timeline-wrapper">
+                        <div className="timeline">
+                            {ticket.payments.map((payment, idx) => (
+                                <div key={payment.id} className="timeline-item mb-4">
+                                    <div className="row">
+                                        <div className="col-md-1 text-center">
+                                            <div
+                                                className="timeline-badge d-inline-flex align-items-center justify-content-center rounded-circle"
+                                                style={{
+                                                    width: '40px',
+                                                    height: '40px',
+                                                    backgroundColor: payment.status === 'pending' ? '#FFC107' : payment.status === 'rejected' ? '#F44336' : '#4CAF50',
+                                                    color: 'white'
+                                                }}
+                                            >
+                                                <i className={payment.payment_method === 'check' ? 'ti-receipt' : 'ti-money'}></i>
+                                            </div>
+                                        </div>
+                                        <div className="col-md-11">
+                                            <div className="card shadow-sm border-left-success" style={{ borderLeft: `4px solid ${payment.status === 'pending' ? '#FFC107' : payment.status === 'rejected' ? '#F44336' : '#4CAF50'}` }}>
+                                                <div className="card-body">
+                                                    <div className="d-flex justify-content-between align-items-start">
+                                                        <div>
+                                                            <h6 className="font-bold mb-1">
+                                                                {payment.payment_method?.replace('_', ' ').toUpperCase()} PAYMENT
+                                                                {payment.status === 'pending' && <span className="ml-2 badge badge-warning">PENDING CLEARANCE</span>}
+                                                                {payment.status === 'rejected' && <span className="ml-2 badge badge-danger">REJECTED / BOUNCED</span>}
+                                                            </h6>
+                                                            <div className="text-muted small">
+                                                                <i className="ti-calendar mr-1"></i>
+                                                                {formatDate(payment.payment_date)}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <h5 className="font-bold text-success mb-0">
+                                                                ₱{Number(payment.amount).toLocaleString()}
+                                                            </h5>
+                                                            {payment.official_receipt_number && (
+                                                                <div className="text-muted small">OR: {payment.official_receipt_number}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {payment.payment_method === 'check' && payment.metadata && (
+                                                        <div className="mt-2 p-2 bg-light rounded small">
+                                                            <strong>Bank:</strong> {payment.metadata.bank_name} |
+                                                            <strong> Cheque #:</strong> {payment.metadata.cheque_number} |
+                                                            <strong> Date:</strong> {payment.metadata.cheque_date}
+                                                        </div>
+                                                    )}
+
+                                                    {payment.notes && (
+                                                        <p className="mt-2 mb-0 text-muted italic small">
+                                                            <i className="ti-info-alt mr-1"></i>"{payment.notes}"
+                                                        </p>
+                                                    )}
+
+                                                    <div className="mt-2 text-right">
+                                                        <small className="text-muted">
+                                                            Recorded by: {payment.recorded_by?.name || 'System'}
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Image Preview Modal */}
             {selectedImage && (

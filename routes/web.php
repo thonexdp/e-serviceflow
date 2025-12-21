@@ -113,6 +113,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     // Finance Hub
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
 
@@ -201,6 +203,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Tickets Management
+    Route::patch('/tickets/{ticket}/verify-payment', [TicketController::class, 'verifyPayment'])->name('tickets.verify-payment');
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
@@ -217,6 +220,8 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     // Finance Hub
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
 
@@ -353,14 +358,23 @@ Route::prefix('cashier')->middleware(['auth', 'role:admin,Cashier'])->name('cash
     // Cashier Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Tickets (View-only for payment processing context)
+    // Finance Hub
+    Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
+    Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
+    Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+
+    // Tickets (Read-only view for payment lookup)
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
 
-    // Finance Hub (Payment Processing)
-    Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
-    Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
-    Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
+    // Customer Management
+    Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
+    Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
