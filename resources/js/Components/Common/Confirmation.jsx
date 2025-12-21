@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 export default function Confirmation({
     label,
@@ -11,7 +11,23 @@ export default function Confirmation({
     icon,
     cancelLabel = "Cancel",
     showIcon = true,
+    showNotesField = false,
+    notesLabel = "Reason / Notes",
+    notesPlaceholder = "Enter reason or notes...",
+    notesRequired = false,
+    notesRows = 4,
 }) {
+    const [notes, setNotes] = useState("");
+    const [notesError, setNotesError] = useState("");
+
+    const handleSubmit = () => {
+        if (showNotesField && notesRequired && !notes.trim()) {
+            setNotesError("This field is required");
+            return;
+        }
+        onSubmit(notes);
+    };
+
     // Default icons based on color if not provided
     const getDefaultIcon = () => {
         if (icon) return icon;
@@ -77,6 +93,33 @@ export default function Confirmation({
                 </p>
             )}
 
+            {/* Notes Field */}
+            {showNotesField && (
+                <div className="mb-4 text-left">
+                    <label className="form-label font-weight-bold">
+                        {notesLabel}
+                        {notesRequired && <span className="text-danger ml-1">*</span>}
+                    </label>
+                    <textarea
+                        className={`form-control ${notesError ? 'is-invalid' : ''}`}
+                        rows={notesRows}
+                        style={{ height: 'auto' }}
+                        placeholder={notesPlaceholder}
+                        value={notes}
+                        onChange={(e) => {
+                            setNotes(e.target.value);
+                            setNotesError("");
+                        }}
+                        disabled={loading}
+                    />
+                    {notesError && (
+                        <div className="invalid-feedback d-block">
+                            {notesError}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Buttons */}
             <div className="mt-4 d-flex justify-content-center gap-2">
                 <button
@@ -90,7 +133,7 @@ export default function Confirmation({
                 </button>
                 <button
                     type="button"
-                    onClick={onSubmit}
+                    onClick={handleSubmit}
                     disabled={loading}
                     className={`btn btn-${color} px-4`}
                 >
