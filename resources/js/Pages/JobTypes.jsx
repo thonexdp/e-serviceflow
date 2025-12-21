@@ -150,7 +150,7 @@ export default function JobTypes({
             render: (row) => (
                 <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden border">
                     <img
-                        src={row.image_path ? `/storage/${row.image_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(row.name)}&background=random&color=fff&size=48`}
+                        src={row.image_path || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.name)}&background=random&color=fff&size=48`}
                         alt={row.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {

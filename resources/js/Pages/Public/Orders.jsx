@@ -1098,7 +1098,7 @@ export default function CustomerPOSOrder() {
                                                     <div className="flex gap-4 items-center">
                                                         <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
                                                             <img
-                                                                src={jobType.image_path ? `/storage/${jobType.image_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(jobType.name)}&background=random&color=fff&size=64`}
+                                                                src={jobType.image_path || `https://ui-avatars.com/api/?name=${encodeURIComponent(jobType.name)}&background=random&color=fff&size=64`}
                                                                 alt={jobType.name}
                                                                 className="w-full h-full object-cover"
                                                                 loading="lazy"
