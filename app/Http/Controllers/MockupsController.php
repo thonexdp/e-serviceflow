@@ -211,9 +211,17 @@ class MockupsController extends Controller
         switch ($newStatus) {
             case 'approved':
             case 'ready_to_print':
-                // Notify FrontDesk and Production
-                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
-                $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+                // Notify FrontDesk from order branch and Production from production branch
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
+                    ->when($ticket->order_branch_id, function ($query) use ($ticket) {
+                        $query->where('branch_id', $ticket->order_branch_id);
+                    })
+                    ->get();
+                $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                    ->when($ticket->production_branch_id, function ($query) use ($ticket) {
+                        $query->where('branch_id', $ticket->production_branch_id);
+                    })
+                    ->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->merge($productionUsers->pluck('id'))->unique()->toArray();
 
                 $notificationType = 'ticket_approved';
@@ -223,8 +231,12 @@ class MockupsController extends Controller
 
             case 'rejected':
             case 'cancelled':
-                // Notify FrontDesk
-                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
+                // Notify FrontDesk from order branch
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
+                    ->when($ticket->order_branch_id, function ($query) use ($ticket) {
+                        $query->where('branch_id', $ticket->order_branch_id);
+                    })
+                    ->get();
                 $recipientIds = $frontDeskUsers->pluck('id')->toArray();
                 $notificationType = 'ticket_rejected';
                 $title = 'Ticket ' . ucfirst($newStatus);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ProductionRecord;
 use App\Models\User;
 use App\Models\JobType;
+use App\Models\WorkflowEvidence;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -20,7 +21,7 @@ class ProductionReportController extends Controller
         // Calculate date ranges
         $dates = $this->calculateDateRange($dateRange, $startDate, $endDate);
 
-        $query = ProductionRecord::with(['user', 'ticket', 'jobType', 'evidenceFiles'])
+        $query = ProductionRecord::with(['user', 'ticket', 'jobType'])
             ->whereBetween('created_at', [$dates['start'], $dates['end']]);
 
         // If not head or admin, only show own records
@@ -68,8 +69,19 @@ class ProductionReportController extends Controller
             })->values()->toArray(),
         ];
 
+        // Get all relevant evidence files for these records to avoid N+1
+        $ticketIds = $records->pluck('ticket_id')->unique();
+        $allEvidence = WorkflowEvidence::whereIn('ticket_id', $ticketIds)->get();
+
         // Format records for display - Excluding Incentives Amount
-        $formattedRecords = $records->map(function ($record) {
+        $formattedRecords = $records->map(function ($record) use ($allEvidence) {
+            // Find evidence for this specific production record
+            $evidence = $allEvidence->filter(function ($e) use ($record) {
+                return $e->ticket_id == $record->ticket_id &&
+                    $e->user_id == $record->user_id &&
+                    $e->workflow_step == $record->workflow_step;
+            });
+
             return [
                 'id' => $record->id,
                 'date' => $record->created_at->format('Y-m-d'),
@@ -79,14 +91,15 @@ class ProductionReportController extends Controller
                 'job_type_name' => $record->jobType->name ?? 'N/A',
                 'workflow_step' => $record->workflow_step,
                 'quantity_produced' => $record->quantity_produced,
+                'ticket_id' => $record->ticket_id,
                 // 'incentive_price' => $record->jobType->incentive_price ?? 0, // Excluded
-                'evidence_files' => $record->evidenceFiles->map(function ($file) {
+                'evidence_files' => $evidence->map(function ($file) {
                     return [
                         'id' => $file->id,
                         'file_name' => $file->file_name,
                         'file_path' => $file->file_path,
                     ];
-                })->toArray(),
+                })->values()->toArray(),
             ];
         })->toArray();
 

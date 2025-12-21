@@ -36,6 +36,7 @@ export default function AllTickets({
     const { buildUrl } = useRoleApi();
     const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
     const isAdmin = auth?.user?.role === 'admin';
+    const canOnlyPrint = auth?.user?.can_only_print || false;
 
     const handleView = (ticket) => {
         setSelectedTicket(ticket);
@@ -129,10 +130,10 @@ export default function AllTickets({
 
     const getWorkflowBadge = (workflowStep) => {
         if (!workflowStep) return <span className="text-muted">Not Started</span>;
-        
+
         const step = WORKFLOW_STEPS.find(s => s.key === workflowStep);
         if (!step) return <span className="text-muted">{workflowStep}</span>;
-        
+
         return (
             <span className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
                 <i className={`${step.icon} mr-1`}></i>
@@ -147,7 +148,7 @@ export default function AllTickets({
         const due = new Date(dueDate);
         const diffTime = due - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays < 0) {
             return <span className="text-danger font-weight-bold">{Math.abs(diffDays)} days overdue</span>;
         } else if (diffDays === 0) {
@@ -175,8 +176,8 @@ export default function AllTickets({
                     <strong>{row.ticket_number}</strong>
                     {row.mockup_files && row.mockup_files.length > 0 && (
                         <div className="mt-1">
-                            <img 
-                                src={row.mockup_files[0].file_path} 
+                            <img
+                                src={row.mockup_files[0].file_path}
                                 alt="Preview"
                                 className="img-thumbnail"
                                 style={{ width: '50px', height: '50px', objectFit: 'cover', cursor: 'pointer' }}
@@ -187,8 +188,8 @@ export default function AllTickets({
                 </div>
             )
         },
-        { 
-            label: "Description", 
+        {
+            label: "Description",
             key: "description",
             render: (row) => (
                 <div>
@@ -206,23 +207,25 @@ export default function AllTickets({
                 const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
                 const currentStep = row.current_workflow_step;
                 let stepQuantity = 0;
-                
-                if (currentStep && row.workflow_progress) {
+
+                if (row.status === 'completed') {
+                    stepQuantity = totalQty;
+                } else if (currentStep && row.workflow_progress) {
                     const stepProgress = row.workflow_progress.find(wp => wp.workflow_step === currentStep);
                     stepQuantity = stepProgress?.completed_quantity || 0;
                 } else {
                     stepQuantity = row.produced_quantity || 0;
                 }
-                
+
                 const percentage = totalQty > 0 ? Math.round((stepQuantity / totalQty) * 100) : 0;
-                
+
                 return (
                     <div>
                         <span className={stepQuantity >= totalQty ? "text-success font-weight-bold" : "text-warning font-weight-bold"}>
                             {stepQuantity} / {totalQty}
                         </span>
                         <div className="progress mt-1" style={{ height: '5px' }}>
-                            <div 
+                            <div
                                 className={`progress-bar ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
                                 style={{ width: `${percentage}%` }}
                             ></div>
@@ -245,6 +248,7 @@ export default function AllTickets({
                     productionUsers={productionUsers}
                     isProductionHead={isProductionHead}
                     isAdmin={isAdmin}
+                    canOnlyPrint={canOnlyPrint}
                     auth={auth}
                     onAssign={handleAssignUsers}
                 />
@@ -471,7 +475,7 @@ export default function AllTickets({
                                         </div>
                                         <div className="card-body">
                                             <div className="row mt-4 align-items-center">
-                                                <div className="col-md-5">
+                                                <div className="col-md-4">
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
@@ -497,11 +501,10 @@ export default function AllTickets({
                                                             { value: "all", label: "All Status" },
                                                             { value: "ready_to_print", label: "Ready to Print" },
                                                             { value: "in_production", label: "In Progress" },
-                                                            { value: "completed", label: "Completed" },
                                                         ]}
                                                     />
                                                 </div>
-                                                <div className="col-md-4">
+                                                <div className="col-md-3">
                                                     <FormInput
                                                         label=""
                                                         type="select"
@@ -524,6 +527,15 @@ export default function AllTickets({
                                                             }))
                                                         ]}
                                                     />
+                                                </div>
+                                                <div className="col-md-2 text-right">
+                                                    <button
+                                                        onClick={() => router.reload()}
+                                                        className="btn btn-outline-primary"
+                                                        title="Refresh Data"
+                                                    >
+                                                        <i className="ti-reload mr-2"></i> Refresh
+                                                    </button>
                                                 </div>
                                             </div>
 

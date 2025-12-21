@@ -807,16 +807,20 @@ export default function Mockups({
                                                             { value: "pending", label: "Pending Review" },
                                                             { value: "in_review", label: "In Review" },
                                                             { value: "revision_requested", label: "Revision Requested" },
-                                                            { value: "approved", label: "Approved" },
                                                             { value: "mockup_uploaded", label: "Mock-up Uploaded" },
+                                                            { value: "approved", label: "Approved" },
                                                         ]}
                                                     />
                                                 </div>
-                                                <DateRangeFilter
-                                                    filters={filters}
-                                                    route="/mock-ups"
-                                                    buildUrl={buildUrl}
-                                                />
+                                                <div className="col-md-5 text-right">
+                                                    <button
+                                                        onClick={() => router.reload()}
+                                                        className="btn btn-outline-primary"
+                                                        title="Refresh Data"
+                                                    >
+                                                        <i className="ti-reload mr-2"></i> Refresh
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="mt-4">

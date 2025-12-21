@@ -27,7 +27,14 @@ export default function Sidebar({ isCollapsed }) {
     // Production = 2
     // Admin = 1
 
+
+    console.log(auth?.user);
+
     const role = auth?.user?.role;
+    const userBranch = auth?.user?.branch;
+    const canAcceptOrders = userBranch?.can_accept_orders ?? true;
+    const canProduce = userBranch?.can_produce ?? true;
+
     if (!role) {
         return null;
     }
@@ -59,21 +66,25 @@ export default function Sidebar({ isCollapsed }) {
                                     <i className="ti-calendar"></i> Dashboard
                                 </Link>
                             </li>
-                            <li className={isActive("/frontdesk/tickets") ? "active" : ""}>
-                                <Link href="/frontdesk/tickets">
-                                    <i className="ti-email"></i> Tickets
-                                </Link>
-                            </li>
-                            <li className={isActive("/frontdesk/finance") ? "active" : ""}>
-                                <Link href="/frontdesk/finance">
-                                    <i className="ti-credit-card"></i> Payments & Finance
-                                </Link>
-                            </li>
-                            <li className={isActive("/frontdesk/customers") ? "active" : ""}>
-                                <Link href="/frontdesk/customers">
-                                    <i className="ti-user"></i> Customers
-                                </Link>
-                            </li>
+                            {canAcceptOrders && (
+                                <>
+                                    <li className={isActive("/frontdesk/tickets") ? "active" : ""}>
+                                        <Link href="/frontdesk/tickets">
+                                            <i className="ti-email"></i> Tickets
+                                        </Link>
+                                    </li>
+                                    <li className={isActive("/frontdesk/finance") ? "active" : ""}>
+                                        <Link href="/frontdesk/finance">
+                                            <i className="ti-credit-card"></i> Payments & Finance
+                                        </Link>
+                                    </li>
+                                    <li className={isActive("/frontdesk/customers") ? "active" : ""}>
+                                        <Link href="/frontdesk/customers">
+                                            <i className="ti-user"></i> Customers
+                                        </Link>
+                                    </li>
+                                </>
+                            )}
                             <li className={isActive("/frontdesk/inventory") ? "active" : ""}>
                                 <Link href="/frontdesk/inventory">
                                     <i className="ti-package"></i> Inventory
@@ -106,64 +117,81 @@ export default function Sidebar({ isCollapsed }) {
                                 </Link>
                             </li>
 
-                            {/* Production Workflow Submenu */}
-                            <li className="label">Production Workflow</li>
+                            {/* Production Workflow Submenu - Only show if branch can produce */}
+                            {canProduce && (() => {
+                                // Get user's assigned workflow steps
+                                const userWorkflowSteps = auth?.user?.workflow_steps || [];
+                                const isProductionHead = auth?.user?.is_head || false;
+                                const canOnlyPrint = auth?.user?.can_only_print || false;
+                                
 
-                            {auth?.user?.is_head && (
-                                <li className={isActive("/production/tickets/all") ? "active" : ""}>
-                                    <Link href="/production/tickets/all">
-                                        <i className="ti-layout-grid2"></i> All Tickets
-                                    </Link>
-                                </li>
-                            )}
+                                // If user can only print, show only Printing menu
+                                if (canOnlyPrint) {
+                                    return (
+                                        <>
+                                            <li className="label">Production Workflow</li>
+                                            <li className={isActive("/production/workflow/printing") ? "active" : ""}>
+                                                <Link href="/production/workflow/printing">
+                                                    <i className="ti-printer"></i> Printing
+                                                </Link>
+                                            </li>
+                                        </>
+                                    );
+                                }
 
-                            <li className={isActive("/production/workflow/printing") ? "active" : ""}>
-                                <Link href="/production/workflow/printing">
-                                    <i className="ti-printer"></i> Printing
-                                </Link>
-                            </li>
+                                // Define all workflow steps with their menu properties
+                                const workflowSteps = [
+                                    { key: 'printing', path: '/production/workflow/printing', icon: 'ti-printer', label: 'Printing' },
+                                    { key: 'lamination_heatpress', path: '/production/workflow/lamination_heatpress', icon: 'ti-layers', label: 'Heatpress / Lamination' },
+                                    { key: 'cutting', path: '/production/workflow/cutting', icon: 'ti-cut', label: 'Cutting' },
+                                    { key: 'sewing', path: '/production/workflow/sewing', icon: 'ti-pin-alt', label: 'Sewing' },
+                                    { key: 'dtf_press', path: '/production/workflow/dtf_press', icon: 'ti-stamp', label: 'DTF Press' },
+                                    { key: 'qa', path: '/production/workflow/qa', icon: 'ti-check-box', label: 'Quality Assurance' },
+                                ];
 
-                            <li className={isActive("/production/workflow/lamination_heatpress") ? "active" : ""}>
-                                <Link href="/production/workflow/lamination_heatpress">
-                                    <i className="ti-layers"></i> Heatpress / Lamination
-                                </Link>
-                            </li>
+                                // Filter workflow steps based on user's assignments
+                                const visibleWorkflowSteps = workflowSteps.filter(step => userWorkflowSteps.includes(step.key));
 
-                            <li className={isActive("/production/workflow/cutting") ? "active" : ""}>
-                                <Link href="/production/workflow/cutting">
-                                    <i className="ti-cut"></i> Cutting
-                                </Link>
-                            </li>
+                                return (
+                                    <>
+                                        {visibleWorkflowSteps.length > 0 && (
+                                            <li className="label">Production Workflow</li>
+                                        )}
 
-                            <li className={isActive("/production/workflow/sewing") ? "active" : ""}>
-                                <Link href="/production/workflow/sewing">
-                                    <i className="ti-pin-alt"></i> Sewing
-                                </Link>
-                            </li>
+                                        {isProductionHead && (
+                                            <li className={isActive("/production/tickets/all") ? "active" : ""}>
+                                                <Link href="/production/tickets/all">
+                                                    <i className="ti-layout-grid2"></i> All Tickets
+                                                </Link>
+                                            </li>
+                                        )}
 
-                            <li className={isActive("/production/workflow/dtf_press") ? "active" : ""}>
-                                <Link href="/production/workflow/dtf_press">
-                                    <i className="ti-stamp"></i> DTF Press
-                                </Link>
-                            </li>
+                                        {visibleWorkflowSteps.map(step => (
+                                            <li key={step.key} className={isActive(step.path) ? "active" : ""}>
+                                                <Link href={step.path}>
+                                                    <i className={step.icon}></i> {step.label}
+                                                </Link>
+                                            </li>
+                                        ))}
 
-                            <li className={isActive("/production/workflow/qa") ? "active" : ""}>
-                                <Link href="/production/workflow/qa">
-                                    <i className="ti-check-box"></i> Quality Assurance
-                                </Link>
-                            </li>
+                                        {visibleWorkflowSteps.length > 0 && (
+                                            <>
+                                                <li className={isActive("/production/completed") ? "active" : ""}>
+                                                    <Link href="/production/completed">
+                                                        <i className="ti-check"></i> Completed
+                                                    </Link>
+                                                </li>
 
-                            <li className={isActive("/production/completed") ? "active" : ""}>
-                                <Link href="/production/completed">
-                                    <i className="ti-check"></i> Completed
-                                </Link>
-                            </li>
-
-                            <li className={isActive("/production/reports") ? "active" : ""}>
-                                <Link href="/production/reports">
-                                    <i className="ti-stats-up"></i> Reports
-                                </Link>
-                            </li>
+                                                <li className={isActive("/production/reports") ? "active" : ""}>
+                                                    <Link href="/production/reports">
+                                                        <i className="ti-stats-up"></i> Reports
+                                                    </Link>
+                                                </li>
+                                            </>
+                                        )}
+                                    </>
+                                );
+                            })()}
 
                             {/* Other Production Menu Items */}
                             <li className="label">Resources</li>
@@ -253,6 +281,12 @@ export default function Sidebar({ isCollapsed }) {
                                     <Link href="/admin/settings">
                                         <i className="ti-settings"></i> System
                                         Settings
+                                    </Link>
+                                </li>
+                                <li className={isActive("/admin/branches") ? "active" : ""}>
+                                    <Link href="/admin/branches">
+                                        <i className="ti-location-pin"></i> Branch
+                                        Management
                                     </Link>
                                 </li>
                             </ul>

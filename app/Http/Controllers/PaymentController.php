@@ -126,13 +126,19 @@ class PaymentController extends Controller
      */
     protected function notifyFrontDeskPayment(Payment $payment, string $statusType): void
     {
-        $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
+        $ticket = $payment->ticket;
+
+        // Only notify frontdesk users from the ticket's order branch
+        $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
+            ->when($ticket && $ticket->order_branch_id, function ($query) use ($ticket) {
+                $query->where('branch_id', $ticket->order_branch_id);
+            })
+            ->get();
 
         if ($frontDeskUsers->isEmpty()) {
             return;
         }
 
-        $ticket = $payment->ticket;
         $customerName = $payment->payer_name
             ?? ($payment->customer ? $payment->customer->firstname . ' ' . $payment->customer->lastname : 'Unknown');
         $amount = number_format($payment->amount, 2);
@@ -159,6 +165,7 @@ class PaymentController extends Controller
                     'ticket_id' => $ticket ? $ticket->id : null,
                     'amount' => $payment->amount,
                     'status' => $statusType,
+                    'order_branch_id' => $ticket ? $ticket->order_branch_id : null,
                 ],
             ]);
         }

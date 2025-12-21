@@ -19,6 +19,8 @@ export default function ProductionReports({
     const [customEndDate, setCustomEndDate] = useState(endDate);
     const [selectedUser, setSelectedUser] = useState(filters.user_id || '');
     const [selectedJobType, setSelectedJobType] = useState(filters.job_type_id || '');
+    const [viewingEvidence, setViewingEvidence] = useState(null); // { record, files }
+    const [selectedImage, setSelectedImage] = useState(null);
 
     const dateRanges = [
         { value: 'today', label: 'Today' },
@@ -264,9 +266,36 @@ export default function ProductionReports({
                                                 </td>
                                                 <td className="text-center">
                                                     {record.evidence_files && record.evidence_files.length > 0 ? (
-                                                        <span className="badge badge-info">
-                                                            <i className="ti-image"></i> {record.evidence_files.length} file(s)
-                                                        </span>
+                                                        <div className="d-flex justify-content-center gap-1 flex-wrap" style={{ maxWidth: '150px', margin: '0 auto' }}>
+                                                            {record.evidence_files.slice(0, 3).map((file) => (
+                                                                <img
+                                                                    key={file.id}
+                                                                    src={file.file_path}
+                                                                    alt="evidence"
+                                                                    className="img-thumbnail"
+                                                                    style={{ width: '35px', height: '35px', objectFit: 'cover', cursor: 'pointer' }}
+                                                                    onClick={() => setSelectedImage(file)}
+                                                                />
+                                                            ))}
+                                                            {record.evidence_files.length > 3 && (
+                                                                <button
+                                                                    className="btn btn-xs btn-info"
+                                                                    style={{ padding: '2px 5px', fontSize: '10px' }}
+                                                                    onClick={() => setViewingEvidence({ record, files: record.evidence_files })}
+                                                                >
+                                                                    +{record.evidence_files.length - 3}
+                                                                </button>
+                                                            )}
+                                                            {record.evidence_files.length <= 3 && record.evidence_files.length > 0 && (
+                                                                <button
+                                                                    className="btn btn-xs btn-link p-0 ml-1"
+                                                                    onClick={() => setViewingEvidence({ record, files: record.evidence_files })}
+                                                                    title="View all evidence"
+                                                                >
+                                                                    <i className="ti-zoom-in"></i>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <span className="text-muted small">No evidence</span>
                                                     )}
@@ -343,6 +372,88 @@ export default function ProductionReports({
 
                     </div>
                 </div>
+                {/* Evidence Gallery Modal */}
+                {viewingEvidence && (
+                    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+                        <div className="modal-dialog modal-lg modal-dialog-centered">
+                            <div className="modal-content">
+                                <div className="modal-header">
+                                    <h5 className="modal-title">Production Evidence - Ticket #{viewingEvidence.record.ticket_number}</h5>
+                                    <button type="button" className="close" onClick={() => setViewingEvidence(null)}>
+                                        <span>&times;</span>
+                                    </button>
+                                </div>
+                                <div className="modal-body">
+                                    <div className="row">
+                                        {viewingEvidence.files.map((file) => (
+                                            <div key={file.id} className="col-md-3 col-sm-4 mb-3">
+                                                <div className="card h-100 shadow-sm border">
+                                                    <img
+                                                        src={file.file_path}
+                                                        className="card-img-top"
+                                                        style={{ height: '120px', objectFit: 'cover', cursor: 'pointer' }}
+                                                        onClick={() => setSelectedImage(file)}
+                                                        alt={file.file_name}
+                                                    />
+                                                    <div className="card-body p-2 text-center bg-light">
+                                                        <small className="text-muted text-truncate d-block" style={{ fontSize: '10px' }} title={file.file_name}>
+                                                            {file.file_name}
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setViewingEvidence(null)}>Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Image Preview Modal */}
+                {selectedImage && (
+                    <div
+                        className="modal fade show d-block"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1100 }}
+                        onClick={() => setSelectedImage(null)}
+                    >
+                        <div className="modal-dialog modal-xl modal-dialog-centered" onClick={e => e.stopPropagation()}>
+                            <div className="modal-content border-0 bg-transparent shadow-none">
+                                <div className="modal-header border-0 pb-0 pr-3">
+                                    <button
+                                        type="button"
+                                        className="close text-white"
+                                        style={{ fontSize: '2.5rem', opacity: 1, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}
+                                        onClick={() => setSelectedImage(null)}
+                                    >
+                                        <span>&times;</span>
+                                    </button>
+                                </div>
+                                <div className="modal-body p-0 text-center">
+                                    <img
+                                        src={selectedImage.file_path}
+                                        className="img-fluid rounded shadow-lg"
+                                        style={{ maxHeight: '80vh', border: '5px solid white' }}
+                                        alt={selectedImage.file_name}
+                                    />
+                                    <div className="mt-3 text-white">
+                                        <h5 className="mb-0">{selectedImage.file_name}</h5>
+                                        <a
+                                            href={selectedImage.file_path}
+                                            download={selectedImage.file_name}
+                                            className="btn btn-primary mt-3 px-4"
+                                        >
+                                            <i className="ti-download mr-1"></i> Download Image
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <style>{`

@@ -31,6 +31,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
     const [sizeBase, setSizeBase] = useState(false);
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
 
     // Populate form if editing
     useEffect(() => {
@@ -94,20 +96,25 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     // quality_check: jobType.workflow_steps.quality_check || false,
                 });
             }
+            if (jobType && jobType.image_path) {
+                setImagePreview(`/storage/${jobType.image_path}`);
+            } else {
+                setImagePreview(null);
+            }
+            setImageFile(null);
         } else {
             setPriceTiers([]);
             setSizeRates([]);
             setPromoRules([]);
             setWorkflowSteps({
-                // design: false,
                 printing: false,
                 lamination_heatpress: false,
                 cutting: false,
                 sewing: false,
                 dtf_press: false,
-                // assembly: false,
-                // quality_check: false,
             });
+            setImagePreview(null);
+            setImageFile(null);
         }
     }, [jobType]);
 
@@ -125,6 +132,18 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 delete newErrors[name];
                 return newErrors;
             });
+        }
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -316,6 +335,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             size_rates: formattedSizeRates,
             promo_rules: formattedPromoRules,
             workflow_steps: workflowSteps,
+            image: imageFile,
         };
 
         onSubmit(submitData);
@@ -452,6 +472,34 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         min="0"
                         helpText="Used to calculate production incentives based on quantity produced"
                     />
+                </div>
+                <div className="col-md-6">
+                    <div className="form-group">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Item Image (Optional)
+                        </label>
+                        <div className="d-flex align-items-center gap-3">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageChange}
+                                className="form-control form-control-sm"
+                            />
+                            {imagePreview && (
+                                <div className="image-preview" style={{ width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ddd' }}>
+                                    <img
+                                        src={imagePreview}
+                                        alt="Preview"
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        onError={(e) => {
+                                            e.target.src = 'https://via.placeholder.com/80?text=No+Image';
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        {errors.image && <p className="text-danger text-xs mt-1">{errors.image}</p>}
+                    </div>
                 </div>
             </div>
 

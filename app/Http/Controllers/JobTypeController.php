@@ -7,6 +7,7 @@ use App\Models\JobCategory;
 use App\Http\Requests\JobTypeRequest;
 use App\Services\JobTypePricingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class JobTypeController extends Controller
@@ -50,17 +51,37 @@ class JobTypeController extends Controller
 
     public function store(JobTypeRequest $request)
     {
-        $validated = $request->validated();
-        $jobType = JobType::create($validated);
-        $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
-        $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
+        try {
+            //code...
 
-        return back()->with('success', 'Job type created successfully!');
+            $validated = $request->validated();
+
+
+            if ($request->hasFile('image')) {
+                $validated['image_path'] = $request->file('image')->store('job-types', 'public');
+            }
+
+            $jobType = JobType::create($validated);
+            $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
+            $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
+
+            return back()->with('success', 'Job type created successfully!');
+        } catch (\Throwable $th) {
+            dd($th);
+        }
     }
 
     public function update(JobTypeRequest $request, JobType $jobType)
     {
         $validated = $request->validated();
+
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($jobType->image_path) {
+                Storage::disk('public')->delete($jobType->image_path);
+            }
+            $validated['image_path'] = $request->file('image')->store('job-types', 'public');
+        }
 
         $jobType->update($validated);
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);

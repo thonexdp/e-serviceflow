@@ -78,6 +78,7 @@ class PublicOrderController extends Controller
 
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
+            'branch_id' => 'required|exists:branches,id',
             'description' => 'required|string',
             'job_type_id' => 'required|exists:job_types,id',
             'quantity' => 'required|integer|min:1',
@@ -98,6 +99,23 @@ class PublicOrderController extends Controller
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
 
+        // Get the selected branch
+        $selectedBranch = \App\Models\Branch::find($validated['branch_id']);
+
+        // Validate that the branch can accept orders
+        if (!$selectedBranch || !$selectedBranch->can_accept_orders || !$selectedBranch->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected branch cannot accept orders at this time.',
+            ], 422);
+        }
+
+        // Determine production branch
+        // If the order branch can produce, use it; otherwise, use default production branch
+        $productionBranchId = $selectedBranch->can_produce
+            ? $selectedBranch->id
+            : \App\Models\Branch::where('is_default_production', true)->value('id');
+
         // Set payment status based on payment method and whether payment proofs will be uploaded
         // - 'awaiting_verification': Online payment (gcash/bank) with proofs - needs Front Desk verification
         // - 'pending': Walk-in payment - will be processed at counter
@@ -106,6 +124,8 @@ class PublicOrderController extends Controller
 
         $ticketData = [
             'customer_id' => $validated['customer_id'],
+            'order_branch_id' => $validated['branch_id'],
+            'production_branch_id' => $productionBranchId,
             'description' => $validated['description'],
             'job_type_id' => $validated['job_type_id'],
             'quantity' => $validated['quantity'],
@@ -183,22 +203,24 @@ class PublicOrderController extends Controller
             );
         }
 
-        // Notify all FrontDesk users about the new order
+        // Notify FrontDesk users from the specific branch about the new order
         try {
-            // Get all active frontdesk users
+            // Get active frontdesk users from the same branch as the order
             $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
                 ->where('is_active', true)
+                ->where('branch_id', $validated['branch_id']) // Only notify users from the order's branch
                 ->get();
 
             if ($frontDeskUsers->isNotEmpty()) {
                 $customerName = $ticket->customer->full_name ?? 'Unknown Customer';
                 $ticketNumber = $ticket->ticket_number;
+                $branchName = $selectedBranch->name ?? 'Branch';
 
                 // Create notification title and message
                 $notificationTitle = 'New Order from Customer';
-                $notificationMessage = "{$customerName} has created a new order ({$ticketNumber})";
+                $notificationMessage = "{$customerName} has created a new order ({$ticketNumber}) for {$branchName}";
 
-                // Store notification in database for each frontdesk user
+                // Store notification in database for each frontdesk user from this branch
                 foreach ($frontDeskUsers as $user) {
                     Notification::create([
                         'user_id' => $user->id,
@@ -213,6 +235,8 @@ class PublicOrderController extends Controller
                             'ticket_number' => $ticketNumber,
                             'customer_name' => $customerName,
                             'total_amount' => $ticket->total_amount,
+                            'branch_id' => $validated['branch_id'],
+                            'branch_name' => $branchName,
                         ],
                     ]);
                 }

@@ -44,11 +44,20 @@ class HandleInertiaRequests extends Middleware
                         ->get()
                         ->map(fn($p) => $p->module . '.' . $p->feature)
                         ->toArray(),
-                    'workflow_steps' => $request->user()->isProduction()
+                    'workflow_steps' => ($request->user()->isProduction() || $request->user()->is_head)
                         ? $request->user()->getAssignedWorkflowSteps()
                         : [],
                     'is_production' => $request->user()->isProduction(),
                     'is_head' => $request->user()->is_head ?? false,
+                    'can_only_print' => $request->user()->can_only_print ?? false,
+                    'branch_id' => $request->user()->branch_id,
+                    'branch' => $request->user()->branch ? [
+                        'id' => $request->user()->branch->id,
+                        'name' => $request->user()->branch->name,
+                        'code' => $request->user()->branch->code,
+                        'can_accept_orders' => $request->user()->branch->can_accept_orders,
+                        'can_produce' => $request->user()->branch->can_produce,
+                    ] : null,
                 ] : null,
             ],
             'flash' => [
