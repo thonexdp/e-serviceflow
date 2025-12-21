@@ -24,6 +24,7 @@ export default function Tickets({
     tickets = { data: [] },
     selectedCustomer = null,
     filters = {},
+    branches = [],
 }) {
     const [openCustomerModal, setCustomerModalOpen] = useState(false);
     const [openTicketModal, setTicketModalOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function Tickets({
             status: filters.status,
             payment_status: filters.payment_status,
             customer_id: _selectedCustomer?.id,
+            branch_id: filters.branch_id,
             [key]: value,
         };
 
@@ -532,6 +534,11 @@ export default function Tickets({
                     ? `${row.customer.firstname} ${row.customer.lastname}`
                     : "N/A",
         },
+        ...(auth.user.role === 'admin' ? [{
+            label: "Branch",
+            key: "order_branch",
+            render: (row) => row.order_branch?.name || "N/A",
+        }] : []),
         { label: "Description", key: "description" },
         {
             label: "Qty",
@@ -556,19 +563,19 @@ export default function Tickets({
                     ? new Date(row.due_date).toLocaleDateString()
                     : "N/A",
         },
-        {
-            label: "Amount",
-            key: "total_amount",
-            render: (row) => (
-                <b>
-                    ₱{" "}
-                    {parseFloat(row.total_amount || 0).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    })}
-                </b>
-            ),
-        },
+        // {
+        //     label: "Amount",
+        //     key: "total_amount",
+        //     render: (row) => (
+        //         <b>
+        //             ₱{" "}
+        //             {parseFloat(row.total_amount || 0).toLocaleString("en-US", {
+        //                 minimumFractionDigits: 2,
+        //                 maximumFractionDigits: 2,
+        //             })}
+        //         </b>
+        //     ),
+        // },
         {
             label: "Payment Status",
             key: "payment_status",
@@ -666,6 +673,7 @@ export default function Tickets({
                     customerId={_selectedCustomer?.id}
                     onSubmit={handleTicketSubmit}
                     onCancel={closeTicketModal}
+                    branches={branches}
                 />
             </Modal>
             <Modal
@@ -1262,6 +1270,22 @@ export default function Tickets({
                                                 <option value="awaiting_verification">Awaiting Verification</option>
                                             </select>
                                         </div>
+                                        {auth.user.role === 'admin' && (
+                                            <div className="col-md-2">
+                                                <select
+                                                    className="form-control"
+                                                    value={filters.branch_id || ''}
+                                                    onChange={(e) => handleFilterChange('branch_id', e.target.value)}
+                                                >
+                                                    <option value="">All Branches</option>
+                                                    {branches.map(branch => (
+                                                        <option key={branch.id} value={branch.id}>
+                                                            {branch.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
                                         <DateRangeFilter
                                             filters={filters}
                                             route="tickets"
@@ -1304,6 +1328,11 @@ export default function Tickets({
                                                                     ? 'Last 30 Days'
                                                                     : `Year: ${filters.date_range}`
                                                             }
+                                                        </span>
+                                                    )}
+                                                    {filters.branch_id && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Branch: {branches.find(b => b.id == filters.branch_id)?.name}
                                                         </span>
                                                     )}
                                                 </div>

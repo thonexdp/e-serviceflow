@@ -71,6 +71,10 @@ export default function PaymentsFinance({
         onConfirm: () => { },
         loading: false
     });
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
 
     const [expenseForm, setExpenseForm] = useState({
         category: expenseCategories[0] || "supplies",
@@ -101,17 +105,10 @@ export default function PaymentsFinance({
 
     const handleTabChange = (key) => {
         setActiveTab(key);
-        setLocalSearch("");
-        // Clear all filters but keep the tab selection
-        router.get(
-            buildUrl("finance"),
-            { tab: key },
-            {
-                preserveState: false,
-                preserveScroll: true,
-                replace: true,
-            }
-        );
+        // Update URL without reloading to keep it in sync for refreshes/searches
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', key);
+        window.history.replaceState({}, '', url);
     };
 
     // Auto-update when filters prop changes (if search is cleared from URL)
@@ -128,7 +125,6 @@ export default function PaymentsFinance({
     };
 
     const filteredReceivables = useMemo(() => {
-        // Server-side search is now implemented, so we just return the data
         if (receivables && receivables.data) {
             return receivables.data;
         }
@@ -649,13 +645,15 @@ export default function PaymentsFinance({
         {
             label: "Action",
             render: (row) => (
-                <button
-                    className="btn btn-primary btn-sm btn-rounded-md"
-                    onClick={() => handleProcessPayment(row)}
-                >
-                    <i className="ti-wallet m-r-5"></i>
-                    Process Payment
-                </button>
+                hasPermission('finance', 'create') && (
+                    <button
+                        className="btn btn-primary btn-sm btn-rounded-md"
+                        onClick={() => handleProcessPayment(row)}
+                    >
+                        <i className="ti-wallet m-r-5"></i>
+                        Process Payment
+                    </button>
+                )
             ),
         },
     ];

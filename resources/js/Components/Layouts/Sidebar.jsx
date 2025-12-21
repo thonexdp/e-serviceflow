@@ -13,6 +13,11 @@ export default function Sidebar({ isCollapsed }) {
         return currentPath.startsWith(path);
     };
 
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
+
     const sidebarClasses = [
         "sidebar",
         "sidebar-hide-to-small",
@@ -73,11 +78,13 @@ export default function Sidebar({ isCollapsed }) {
                                             <i className="ti-email"></i> Tickets
                                         </Link>
                                     </li>
-                                    <li className={isActive("/frontdesk/finance") ? "active" : ""}>
-                                        <Link href="/frontdesk/finance">
-                                            <i className="ti-credit-card"></i> Payments & Finance
-                                        </Link>
-                                    </li>
+                                    {hasPermission('finance', 'read') && (
+                                        <li className={isActive("/frontdesk/finance") ? "active" : ""}>
+                                            <Link href="/frontdesk/finance">
+                                                <i className="ti-credit-card"></i> Payments & Finance
+                                            </Link>
+                                        </li>
+                                    )}
                                     <li className={isActive("/frontdesk/customers") ? "active" : ""}>
                                         <Link href="/frontdesk/customers">
                                             <i className="ti-user"></i> Customers
@@ -123,7 +130,7 @@ export default function Sidebar({ isCollapsed }) {
                                 const userWorkflowSteps = auth?.user?.workflow_steps || [];
                                 const isProductionHead = auth?.user?.is_head || false;
                                 const canOnlyPrint = auth?.user?.can_only_print || false;
-                                
+
 
                                 // If user can only print, show only Printing menu
                                 if (canOnlyPrint) {

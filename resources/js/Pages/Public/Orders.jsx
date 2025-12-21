@@ -16,7 +16,7 @@ export default function CustomerPOSOrder() {
         category_id: '',
         job_type_id: '',
         description: '',
-        quantity: 1,
+        quantity: '',
         free_quantity: 0,
         size_width: '',
         size_height: '',
@@ -817,7 +817,7 @@ export default function CustomerPOSOrder() {
     // };
 
     const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone && formData.branch_id;
-    const canProceedStep2 = formData.category_id && formData.job_type_id && formData.quantity > 0;
+    const canProceedStep2 = formData.category_id && formData.job_type_id && parseInt(formData.quantity) > 0;
     const hasInvalidDesignFiles = designFiles.some(f => f.invalid);
     const canProceedStep3 = formData.description && formData.due_date && !hasInvalidDesignFiles;
 
@@ -1245,7 +1245,7 @@ export default function CustomerPOSOrder() {
                                 <input
                                     type="number"
                                     value={formData.quantity}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                     min="1"
                                 />
@@ -1825,7 +1825,7 @@ export default function CustomerPOSOrder() {
                                         category_id: '',
                                         job_type_id: '',
                                         description: '',
-                                        quantity: 1,
+                                        quantity: '',
                                         free_quantity: 0,
                                         size_width: '',
                                         size_height: '',
