@@ -1098,12 +1098,14 @@ export default function CustomerPOSOrder() {
                                                     <div className="flex gap-4 items-center">
                                                         <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
                                                             <img
-                                                                src={jobType.image_path || `https://ui-avatars.com/api/?name=${encodeURIComponent(jobType.name)}&background=random&color=fff&size=64`}
+                                                                src={jobType.image_path || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(jobType.name.substring(0, 2).toUpperCase())}%3C/text%3E%3C/svg%3E`}
                                                                 alt={jobType.name}
                                                                 className="w-full h-full object-cover"
                                                                 loading="lazy"
                                                                 onError={(e) => {
-                                                                    e.target.src = 'https://via.placeholder.com/64?text=Service';
+                                                                    // Use data URI SVG as final fallback
+                                                                    e.target.onerror = null; // Prevent infinite loop
+                                                                    e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
                                                                 }}
                                                             />
                                                         </div>
