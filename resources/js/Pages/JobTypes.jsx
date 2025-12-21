@@ -68,14 +68,24 @@ export default function JobTypes({
         const url = editingJobType
             ? buildUrl(`/job-types/${editingJobType.id}`)
             : buildUrl("/job-types");
-        const method = editingJobType ? "put" : "post";
 
-        router[method](url, data, {
-            onSuccess: handleCloseModals,
-            preserveState: false,
-            preserveScroll: true,
 
-        });
+        // If editing and has image, use POST with _method: 'put' for Laravel file upload support
+        if (editingJobType && data.image) {
+            router.post(url, { ...data, _method: "put" }, {
+                onSuccess: handleCloseModals,
+                preserveState: false,
+                preserveScroll: true,
+            });
+        } else {
+            const method = editingJobType ? "put" : "post";
+
+            router[method](url, data, {
+                // onSuccess: handleCloseModals,
+                preserveState: false,
+                preserveScroll: true,
+            });
+        }
     };
 
     const handleCategorySubmit = (data) => {
@@ -135,6 +145,22 @@ export default function JobTypes({
             },
         },
         {
+            label: "Image",
+            key: "image",
+            render: (row) => (
+                <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden border">
+                    <img
+                        src={row.image_path ? `/storage/${row.image_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(row.name)}&background=random&color=fff&size=48`}
+                        alt={row.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                            e.target.src = 'https://via.placeholder.com/48?text=N/A';
+                        }}
+                    />
+                </div>
+            )
+        },
+        {
             label: "Category",
             key: "category",
             render: (row) => row.category?.name || "N/A",
@@ -184,7 +210,7 @@ export default function JobTypes({
                         {/* Incentive Price */}
                         {row.incentive_price > 0 && (
                             <div className="text-success small">
-                                <i className="ti-money"></i> Incentive: {formatPeso(parseFloat(row.incentive_price).toFixed(2))}/pcs
+                                Incentive: {formatPeso(parseFloat(row.incentive_price).toFixed(2))}/pcs
                             </div>
                         )}
 

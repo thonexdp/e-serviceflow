@@ -22,6 +22,7 @@ class FinanceController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
         $perPage = (int)$request->input('per_page', 15);
         $tab = $request->input('tab', 'receivables');
         $search = $request->input('search');
@@ -30,6 +31,12 @@ class FinanceController extends Controller
         $ledger = null;
         if ($tab === 'ledger') {
             $ledger = Payment::with(['ticket.customer', 'customer', 'documents'])
+                // Apply branch filtering for non-admin users
+                ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                    $query->whereHas('ticket', function ($q) use ($user) {
+                        $q->where('order_branch_id', $user->branch_id);
+                    });
+                })
                 ->when($request->filled('method'), fn($query) => $query->where('payment_method', $request->string('method')))
                 ->when(
                     $request->filled('status'),
@@ -109,6 +116,12 @@ class FinanceController extends Controller
         $pendingPayments = [];
         if ($tab === 'pending_payments') {
             $pendingPayments = Payment::with(['ticket.customer', 'customer', 'documents'])
+                // Apply branch filtering for non-admin users
+                ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                    $query->whereHas('ticket', function ($q) use ($user) {
+                        $q->where('order_branch_id', $user->branch_id);
+                    });
+                })
                 ->where('status', 'pending')
                 ->orderByDesc('payment_date')
                 ->get();
@@ -120,6 +133,10 @@ class FinanceController extends Controller
         // Dropdown Data
         $openTickets = Ticket::with('customer')
             ->where('payment_status', '!=', 'paid')
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->where('order_branch_id', $user->branch_id);
+            })
             ->orderByDesc('created_at')
             ->limit(50)
             ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'amount_paid', 'discount', 'quantity', 'description', 'size_value', 'size_unit', 'job_type']);
@@ -129,7 +146,14 @@ class FinanceController extends Controller
             ->get(['id', 'firstname', 'lastname']);
 
         // Quick fetch for pending count if not loaded
-        $pendingCount = Payment::where('status', 'pending')->count();
+        $pendingCount = Payment::where('status', 'pending')
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->whereHas('ticket', function ($q) use ($user) {
+                    $q->where('order_branch_id', $user->branch_id);
+                });
+            })
+            ->count();
         if (empty($pendingPayments)) {
             // pass
         } else {
@@ -157,6 +181,7 @@ class FinanceController extends Controller
 
     protected function buildReceivables(Request $request)
     {
+        $user = auth()->user();
         $perPage = (int)$request->input('per_page', 15);
         $search = $request->input('search');
 
@@ -166,6 +191,10 @@ class FinanceController extends Controller
             ->where('payment_status', '!=', 'paid')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
+            })
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->where('order_branch_id', $user->branch_id);
             });
 
         if ($search) {
@@ -212,12 +241,19 @@ class FinanceController extends Controller
 
     protected function buildSummary(?Collection $receivables = null): array
     {
+        $user = auth()->user();
         $now = Carbon::now();
         $monthRange = [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()];
 
         $collections = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', $monthRange)
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->whereHas('ticket', function ($q) use ($user) {
+                    $q->where('order_branch_id', $user->branch_id);
+                });
+            })
             ->sum('amount');
 
         $expenses = Expense::whereBetween('expense_date', $monthRange)->sum('amount');
@@ -226,6 +262,10 @@ class FinanceController extends Controller
         $receivablesTotal = Ticket::where('payment_status', '!=', 'paid')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
+            })
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->where('order_branch_id', $user->branch_id);
             })
             ->get()
             ->sum(function ($ticket) {
@@ -238,7 +278,12 @@ class FinanceController extends Controller
             'net_cash_flow_month' => round($collections - $expenses, 2),
             'receivables_total' => round($receivablesTotal, 2),
             'pending_cheques_count' => 0, // set in index
-            'open_tickets' => Ticket::where('payment_status', '!=', 'paid')->count(),
+            'open_tickets' => Ticket::where('payment_status', '!=', 'paid')
+                // Apply branch filtering for non-admin users
+                ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                    $query->where('order_branch_id', $user->branch_id);
+                })
+                ->count(),
         ];
     }
 }

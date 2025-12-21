@@ -14,6 +14,7 @@ class JobType extends Model
         'category_id',
         'name',
         'description',
+        'image_path',
         'price',
         'price_by',
         'discount',

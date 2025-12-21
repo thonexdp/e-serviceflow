@@ -27,6 +27,7 @@ class PublicTicketController extends Controller
             ->with([
                 'customer:id,firstname,lastname,email,phone',
                 'jobType:id,name',
+                'mockupFiles',
                 'payments' => function ($query) {
                     $query->where('status', 'posted')
                         ->orderBy('payment_date', 'desc');
@@ -113,6 +114,15 @@ class PublicTicketController extends Controller
                 'status' => $paymentStatusLabel,
             ],
             'status' => $this->getStatusLabel($ticket->status),
+            'design_status' => $ticket->design_status,
+            'designer' => $ticket->assignedToUser ? $ticket->assignedToUser->name : null,
+            'approved_mockups' => ($ticket->design_status === 'approved' && $ticket->mockupFiles->count() > 0)
+                ? $ticket->mockupFiles->map(fn($f) => [
+                    'id' => $f->id,
+                    'url' => $f->file_path,
+                    'name' => $f->file_name
+                ])
+                : [],
             'current_workflow_step' => $ticket->status === 'in_production' ? $ticket->current_workflow_step : null,
             'timeline' => $timeline,
         ];

@@ -870,6 +870,6 @@ export default function FrontDesk({
                     </div>
                 </div>
             </section>
-        </AdminLayout>
+        </AdminLayout >
     );
 }

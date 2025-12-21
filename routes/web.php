@@ -73,8 +73,16 @@ Route::get('/orders', function () {
             ->orderBy('name');
     }])->orderBy('name')->get();
 
+    // Get branches that can accept orders
+    $branches = \App\Models\Branch::where('is_active', true)
+        ->where('can_accept_orders', true)
+        ->orderBy('sort_order')
+        ->orderBy('name')
+        ->get(['id', 'name', 'code', 'address', 'can_produce']);
+
     return Inertia::render('Public/Orders', [
-        'jobCategories' => $jobCategories
+        'jobCategories' => $jobCategories,
+        'branches' => $branches
     ]);
 })->name('orders');
 
@@ -98,6 +106,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::delete('/tickets/{ticket}', [TicketController::class, 'destroy'])->name('tickets.destroy');
     Route::patch('/tickets/{ticket}/update-status', [TicketController::class, 'updateStatus'])->name('tickets.update-status');
     Route::patch('/tickets/{ticket}/update-payment', [TicketController::class, 'updatePayment'])->name('tickets.update-payment');
+    Route::patch('/tickets/{ticket}/verify-payment', [TicketController::class, 'verifyPayment'])->name('tickets.verify-payment');
 
     // Customer Management
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
@@ -184,6 +193,17 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     Route::get('/permissions', [UserController::class, 'getPermissions'])->name('permissions.index');
     Route::get('/users/{user}/permissions', [UserController::class, 'getUserPermissions'])->name('users.permissions');
+
+    // Branch Management
+    Route::get('/branches', [App\Http\Controllers\BranchController::class, 'index'])->name('branches.index');
+    Route::post('/branches', [App\Http\Controllers\BranchController::class, 'store'])->name('branches.store');
+    Route::put('/branches/{branch}', [App\Http\Controllers\BranchController::class, 'update'])->name('branches.update');
+    Route::delete('/branches/{branch}', [App\Http\Controllers\BranchController::class, 'destroy'])->name('branches.destroy');
+    
+    // Branch API endpoints
+    Route::get('/api/branches/active', [App\Http\Controllers\BranchController::class, 'getActiveBranches'])->name('api.branches.active');
+    Route::get('/api/branches/order', [App\Http\Controllers\BranchController::class, 'getOrderBranches'])->name('api.branches.order');
+    Route::get('/api/branches/production', [App\Http\Controllers\BranchController::class, 'getProductionBranches'])->name('api.branches.production');
     Route::get('/users/{user}/activity-logs', [UserController::class, 'getActivityLogs'])->name('users.activity-logs');
 
     // Profile
@@ -210,6 +230,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::delete('/tickets/{ticket}', [TicketController::class, 'destroy'])->name('tickets.destroy');
     Route::patch('/tickets/{ticket}/update-status', [TicketController::class, 'updateStatus'])->name('tickets.update-status');
     Route::patch('/tickets/{ticket}/update-payment', [TicketController::class, 'updatePayment'])->name('tickets.update-payment');
+    Route::patch('/tickets/{ticket}/verify-payment', [TicketController::class, 'verifyPayment'])->name('tickets.verify-payment');
 
     // Customer Management
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
@@ -386,7 +407,6 @@ Route::prefix('cashier')->middleware(['auth', 'role:admin,Cashier'])->name('cash
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
-
 
 /*
 |--------------------------------------------------------------------------

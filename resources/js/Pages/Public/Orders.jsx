@@ -3,7 +3,7 @@ import { router, usePage } from '@inertiajs/react';
 import { formatPeso } from '@/Utils/currency';
 
 export default function CustomerPOSOrder() {
-    const { jobCategories = [] } = usePage().props;
+    const { jobCategories = [], branches = [] } = usePage().props;
 
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -12,6 +12,7 @@ export default function CustomerPOSOrder() {
         customer_facebook: '',
         customer_phone: '',
         customer_id: null,
+        branch_id: '',
         category_id: '',
         job_type_id: '',
         description: '',
@@ -265,6 +266,7 @@ export default function CustomerPOSOrder() {
                 customer_name: savedCustomer.name || prev.customer_name,
                 customer_phone: savedCustomer.phone || prev.customer_phone,
                 customer_facebook: savedCustomer.facebook || prev.customer_facebook,
+                branch_id: savedCustomer.branch_id || prev.branch_id,
             }));
         }
     };
@@ -294,6 +296,7 @@ export default function CustomerPOSOrder() {
                     name: formData.customer_name,
                     phone: formData.customer_phone,
                     facebook: formData.customer_facebook,
+                    branch_id: formData.branch_id // Save selected branch
                 });
 
                 setFormData(prev => ({ ...prev, customer_id: data.customer.id }));
@@ -367,6 +370,7 @@ export default function CustomerPOSOrder() {
             setUploadStatus('preparing');
             const orderData = new FormData();
             orderData.append('customer_id', customerId);
+            orderData.append('branch_id', formData.branch_id);
             orderData.append('description', formData.description);
             orderData.append('job_type_id', formData.job_type_id);
             orderData.append('quantity', formData.quantity);
@@ -812,7 +816,7 @@ export default function CustomerPOSOrder() {
     //     }
     // };
 
-    const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone;
+    const canProceedStep1 = formData.customer_name && formData.customer_email && formData.customer_phone && formData.branch_id;
     const canProceedStep2 = formData.category_id && formData.job_type_id && formData.quantity > 0;
     const hasInvalidDesignFiles = designFiles.some(f => f.invalid);
     const canProceedStep3 = formData.description && formData.due_date && !hasInvalidDesignFiles;
@@ -1005,6 +1009,26 @@ export default function CustomerPOSOrder() {
                                 />
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Select Branch *</label>
+                                <select
+                                    value={formData.branch_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, branch_id: e.target.value }))}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    required
+                                >
+                                    <option value="">-- Choose a branch --</option>
+                                    {branches.map(branch => (
+                                        <option key={branch.id} value={branch.id}>
+                                            {branch.name} {branch.address ? `- ${branch.address}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Select which branch you want to place your order with
+                                </p>
+                            </div>
+
                             <button
                                 onClick={() => setCurrentStep(2)}
                                 disabled={!canProceedStep1}
@@ -1066,27 +1090,53 @@ export default function CustomerPOSOrder() {
                                                 <button
                                                     key={jobType.id}
                                                     onClick={() => setFormData(prev => ({ ...prev, job_type_id: jobType.id.toString() }))}
-                                                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${formData.job_type_id === jobType.id.toString()
-                                                        ? 'border-indigo-600 bg-indigo-50'
-                                                        : 'border-gray-200 hover:border-indigo-300'
+                                                    className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.job_type_id === jobType.id.toString()
+                                                        ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                                                        : 'border-gray-100 hover:border-indigo-300 hover:bg-gray-50'
                                                         }`}
                                                 >
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex-1">
-                                                            <p className="font-semibold text-gray-900">{jobType.name}</p>
-                                                            {jobType.promo_text && (
-                                                                <p className="text-xs text-green-600 mt-1">🎁 {jobType.promo_text}</p>
-                                                            )}
-                                                            {hasPriceTiers && (
-                                                                <p className="text-xs text-blue-600 mt-1">📊 Bulk Pricing Available</p>
-                                                            )}
-                                                            {hasSizeRates && (
-                                                                <p className="text-xs text-purple-600 mt-1">📐 Size-Based Pricing</p>
-                                                            )}
+                                                    <div className="flex gap-4 items-center">
+                                                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
+                                                            <img
+                                                                src={jobType.image_path ? `/storage/${jobType.image_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(jobType.name)}&background=random&color=fff&size=64`}
+                                                                alt={jobType.name}
+                                                                className="w-full h-full object-cover"
+                                                                loading="lazy"
+                                                                onError={(e) => {
+                                                                    e.target.src = 'https://via.placeholder.com/64?text=Service';
+                                                                }}
+                                                            />
                                                         </div>
-                                                        {!hasSizeRates && !hasPriceTiers && (
-                                                            <span className="text-indigo-600 font-bold">{formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
-                                                        )}
+                                                        <div className="flex-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <p className="font-bold text-gray-900">{jobType.name}</p>
+                                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                                        {jobType.promo_text && (
+                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                                                                                🎁 Promo
+                                                                            </span>
+                                                                        )}
+                                                                        {hasPriceTiers && (
+                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">
+                                                                                📊 Bulk
+                                                                            </span>
+                                                                        )}
+                                                                        {hasSizeRates && (
+                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
+                                                                                📐 Size
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {!hasSizeRates && !hasPriceTiers && (
+                                                                    <span className="text-indigo-600 font-bold text-lg">{formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
+                                                                )}
+                                                                {(hasSizeRates || hasPriceTiers) && (
+                                                                    <span className="text-gray-400 text-xs mt-1 italic">Starts at {formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </button>
                                             );
@@ -1769,6 +1819,7 @@ export default function CustomerPOSOrder() {
                                         customer_facebook: '',
                                         customer_phone: '',
                                         customer_id: null,
+                                        branch_id: '',
                                         category_id: '',
                                         job_type_id: '',
                                         description: '',

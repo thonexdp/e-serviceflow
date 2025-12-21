@@ -50,7 +50,7 @@ class DashboardController extends Controller
                 'filters' => [
                     'date_range' => $request->input('date_range', 'this_month'),
                 ],
-                'statistics' => function () use ($request) {
+                'statistics' => function () use ($request, $user) {
                     $dateRange = $request->input('date_range', 'this_month');
                     $startDate = now()->startOfMonth();
                     $endDate = now()->endOfMonth();
@@ -89,30 +89,45 @@ class DashboardController extends Controller
                             break;
                     }
 
+                    // Apply branch filtering - FrontDesk sees only their branch's orders
+                    $branchFilter = function ($query) use ($user) {
+                        if ($user && !$user->isAdmin() && $user->branch_id) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        }
+                    };
+
                     // New orders from online (customer orders) - pending status tickets
                     $newOnlineOrders = Ticket::where('status', 'pending')
                         ->whereBetween('created_at', [$startDate, $endDate])
+                        ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                         ->count();
 
                     return [
                         'newTickets' => Ticket::where('status', 'pending')
                             ->whereBetween('created_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                         'newOnlineOrders' => $newOnlineOrders,
                         'paymentPending' => Ticket::whereIn('payment_status', ['pending', 'partial'])
                             ->whereBetween('created_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                         'completed' => Ticket::where('status', 'completed')
                             ->whereBetween('updated_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                         'inProgress' => Ticket::whereIn('status', ['in_production', 'ready_to_print'])
                             ->whereBetween('created_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                     ];
                 },
                 'ticketsByStatus' => [
                     'pendingPayment' => Ticket::with('customer')
                         ->whereIn('payment_status', ['pending', 'partial'])
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->latest()
                         ->take(5)
                         ->get()
@@ -123,6 +138,9 @@ class DashboardController extends Controller
                         ]),
                     'inProgress' => Ticket::with('customer')
                         ->whereIn('status', ['in_production', 'ready_to_print'])
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->latest()
                         ->take(5)
                         ->get()
@@ -133,6 +151,9 @@ class DashboardController extends Controller
                         ]),
                     'readyForPickup' => Ticket::with('customer')
                         ->where('status', 'completed')
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->latest()
                         ->take(5)
                         ->get()
@@ -144,6 +165,9 @@ class DashboardController extends Controller
                     'completed' => Ticket::with('customer')
                         ->where('status', 'completed')
                         ->whereDate('updated_at', today())
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->latest()
                         ->take(5)
                         ->get()
@@ -154,9 +178,13 @@ class DashboardController extends Controller
                         ]),
                 ],
                 // New/Online Orders to Confirm - pending tickets with pagination
-                'newOnlineOrders' => function () use ($request) {
+                'newOnlineOrders' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'customerFiles', 'payments.documents'])
                         ->where('status', 'pending')
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->orderBy('created_at', 'desc');
 
                     // Search
@@ -209,9 +237,13 @@ class DashboardController extends Controller
                     });
                 },
                 // Recent Tickets (Today)
-                'recentTicketsToday' => function () use ($request) {
+                'recentTicketsToday' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'payments.documents'])
-                        ->whereDate('created_at', today());
+                        ->whereDate('created_at', today())
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        });
 
                     // Search functionality
                     if ($request->has('recent_search') && $request->recent_search) {
@@ -273,6 +305,10 @@ class DashboardController extends Controller
                 },
                 'payments' => Ticket::whereIn('payment_status', ['pending', 'partial'])
                     ->with('customer')
+                    // Apply branch filtering
+                    ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                        $query->where('order_branch_id', $user->branch_id);
+                    })
                     ->latest()
                     ->take(10)
                     ->get()
@@ -292,7 +328,7 @@ class DashboardController extends Controller
                 'filters' => [
                     'date_range' => $request->input('date_range', 'this_month'),
                 ],
-                'statistics' => function () use ($request) {
+                'statistics' => function () use ($request, $user) {
                     $dateRange = $request->input('date_range', 'this_month');
                     $startDate = now()->startOfMonth();
                     $endDate = now()->endOfMonth();
@@ -331,29 +367,44 @@ class DashboardController extends Controller
                             break;
                     }
 
+                    // Apply branch filtering for designers
+                    $branchFilter = function ($query) use ($user) {
+                        if ($user && !$user->isAdmin() && $user->branch_id) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        }
+                    };
+
                     return [
                         'ticketsPendingReview' => Ticket::where(function ($q) {
                             $q->whereNull('design_status')
                                 ->orWhere('design_status', 'pending');
                         })
                             ->whereBetween('created_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                         'revisionRequested' => Ticket::where('design_status', 'revision_requested')
                             ->whereBetween('updated_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                         'mockupsUploadedToday' => Ticket::where('design_status', 'mockup_uploaded')
                             ->whereDate('updated_at', today())
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                         'approvedDesign' => Ticket::where('design_status', 'approved')
                             ->whereBetween('updated_at', [$startDate, $endDate])
+                            ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
                     ];
                 },
-                'ticketsPendingReview' => function () use ($request) {
+                'ticketsPendingReview' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'customerFiles', 'jobType'])
                         ->where(function ($q) {
                             $q->whereNull('design_status')
                                 ->orWhere('design_status', 'pending');
+                        })
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
                         })
                         ->orderBy('created_at', 'desc')
                         ->limit(10);
@@ -380,9 +431,13 @@ class DashboardController extends Controller
                         ];
                     });
                 },
-                'revisionRequested' => function () use ($request) {
+                'revisionRequested' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
                         ->where('design_status', 'revision_requested')
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->orderBy('updated_at', 'desc')
                         ->limit(10);
 
@@ -409,10 +464,14 @@ class DashboardController extends Controller
                         ];
                     });
                 },
-                'mockupsUploadedToday' => function () use ($request) {
+                'mockupsUploadedToday' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
                         ->where('design_status', 'mockup_uploaded')
                         ->whereDate('updated_at', today())
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->orderBy('updated_at', 'desc')
                         ->limit(10);
 
@@ -449,7 +508,7 @@ class DashboardController extends Controller
                 'filters' => [
                     'date_range' => $request->input('date_range', 'today'),
                 ],
-                'statistics' => function () use ($request) {
+                'statistics' => function () use ($request, $user) {
                     $today = now()->startOfDay();
                     $tomorrow = now()->endOfDay();
 
@@ -459,25 +518,55 @@ class DashboardController extends Controller
                     return [
                         'todayCollections' => (float) Payment::whereBetween('payment_date', [$today, $tomorrow])
                             ->where('payment_type', 'collection')
+                            // Apply branch filtering
+                            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                                $query->whereHas('ticket', function ($q) use ($user) {
+                                    $q->where('order_branch_id', $user->branch_id);
+                                });
+                            })
                             ->sum('amount'),
                         'monthCollections' => (float) Payment::whereBetween('payment_date', [$thisMonthStart, $thisMonthEnd])
                             ->where('payment_type', 'collection')
+                            // Apply branch filtering
+                            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                                $query->whereHas('ticket', function ($q) use ($user) {
+                                    $q->where('order_branch_id', $user->branch_id);
+                                });
+                            })
                             ->sum('amount'),
                         'totalReceivables' => (float) Ticket::whereIn('payment_status', ['pending', 'partial'])
                             ->where('status', '!=', 'cancelled')
+                            // Apply branch filtering
+                            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                                $query->where('order_branch_id', $user->branch_id);
+                            })
                             ->selectRaw('SUM(total_amount - COALESCE(amount_paid, 0)) as outstanding')
                             ->value('outstanding') ?? 0,
                         'readyForPickupUnpaid' => Ticket::where('status', 'completed')
                             ->whereIn('payment_status', ['pending', 'partial'])
+                            // Apply branch filtering
+                            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                                $query->where('order_branch_id', $user->branch_id);
+                            })
                             ->count(),
                         'todayTransactionsCount' => Payment::whereBetween('payment_date', [$today, $tomorrow])
+                            // Apply branch filtering
+                            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                                $query->whereHas('ticket', function ($q) use ($user) {
+                                    $q->where('order_branch_id', $user->branch_id);
+                                });
+                            })
                             ->count(),
                     ];
                 },
-                'urgentReceivables' => function () {
+                'urgentReceivables' => function () use ($user) {
                     return Ticket::with('customer')
                         ->where('status', 'completed')
                         ->whereIn('payment_status', ['pending', 'partial'])
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->where('order_branch_id', $user->branch_id);
+                        })
                         ->orderBy('updated_at', 'desc')
                         ->take(10)
                         ->get()
@@ -490,9 +579,15 @@ class DashboardController extends Controller
                             'updated_at' => $t->updated_at,
                         ]);
                 },
-                'latestCollections' => function () {
+                'latestCollections' => function () use ($user) {
                     return Payment::with(['ticket.customer', 'recordedBy'])
                         ->where('payment_type', 'collection')
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->whereHas('ticket', function ($q) use ($user) {
+                                $q->where('order_branch_id', $user->branch_id);
+                            });
+                        })
                         ->orderBy('created_at', 'desc')
                         ->take(10)
                         ->get()
@@ -506,12 +601,18 @@ class DashboardController extends Controller
                             'recorded_by' => $p->recordedBy->name ?? 'System',
                         ]);
                 },
-                'collectionSummary' => function () {
+                'collectionSummary' => function () use ($user) {
                     $today = now()->startOfDay();
                     $tomorrow = now()->endOfDay();
 
                     return Payment::whereBetween('payment_date', [$today, $tomorrow])
                         ->where('payment_type', 'collection')
+                        // Apply branch filtering
+                        ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                            $query->whereHas('ticket', function ($q) use ($user) {
+                                $q->where('order_branch_id', $user->branch_id);
+                            });
+                        })
                         ->selectRaw('payment_method, SUM(amount) as total')
                         ->groupBy('payment_method')
                         ->get()

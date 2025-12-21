@@ -323,6 +323,65 @@ export default function PrintShoppeLanding() {
                                     </div>
                                 </div>
 
+                                {/* Approved Designs */}
+                                {orderData.approved_mockups && orderData.approved_mockups.length > 0 && (
+                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                                <div className="p-2 bg-green-100 rounded-lg">
+                                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                                </div>
+                                                Approved Design
+                                            </h3>
+                                            <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                                                Ready for Production
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {orderData.approved_mockups.map((mockup) => (
+                                                <div key={mockup.id} className="group relative bg-gray-50 rounded-xl border border-gray-100 p-2 transition-all hover:shadow-md hover:border-indigo-200">
+                                                    <div className="aspect-square w-full overflow-hidden rounded-lg bg-white relative">
+                                                        <img
+                                                            src={mockup.url}
+                                                            alt={mockup.name}
+                                                            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 cursor-zoom-in"
+                                                            onClick={() => window.open(mockup.url, '_blank')}
+                                                        />
+                                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="bg-white/90 backdrop-blur p-1.5 rounded-lg shadow-sm">
+                                                                <Search className="w-4 h-4 text-indigo-600" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 px-1 pb-1">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-xs font-medium text-gray-700 truncate" title={mockup.name}>
+                                                                {mockup.name}
+                                                            </p>
+                                                            <div className="flex-shrink-0 flex items-center gap-1 text-[10px] font-bold text-green-600">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></div>
+                                                                VERIFIED
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {/* <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-between gap-4">
+                                            <p className="text-xs text-indigo-700 flex items-start gap-2">
+                                                <Printer className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                                <span>This design has been approved and is scheduled for production. Any further changes may affect your expected completion date.</span>
+                                            </p>
+                                            {orderData.designer && (
+                                                <div className="flex-shrink-0 text-right">
+                                                    <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Designer</p>
+                                                    <p className="text-xs font-semibold text-indigo-900">{orderData.designer}</p>
+                                                </div>
+                                            )}
+                                        </div> */}
+                                    </div>
+                                )}
+
                                 {/* Order Details */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Details</h3>

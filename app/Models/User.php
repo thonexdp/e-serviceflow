@@ -25,6 +25,8 @@ class User extends Authenticatable
         'role',
         'is_active',
         'is_head',
+        'can_only_print',
+        'branch_id',
     ];
 
     /**
@@ -47,6 +49,7 @@ class User extends Authenticatable
         'password' => 'hashed',
         'is_active' => 'boolean',
         'is_head' => 'boolean',
+        'can_only_print' => 'boolean',
     ];
 
     /**
@@ -231,11 +234,17 @@ class User extends Authenticatable
      */
     public function isAssignedToWorkflowStep(string $workflowStep): bool
     {
-        // Admin and non-production users can see all tickets
-        if (!$this->isProduction() || $this->isAdmin()) {
+        // Admin can see all tickets
+        if ($this->isAdmin()) {
             return true;
         }
 
+        // Non-production users without is_head flag can see all tickets
+        if (!$this->isProduction() && !$this->is_head) {
+            return true;
+        }
+
+        // Production users and production heads/supervisors must be assigned to the workflow step
         return $this->workflowSteps()->where('workflow_step', $workflowStep)->exists();
     }
 
@@ -246,8 +255,8 @@ class User extends Authenticatable
      */
     public function syncWorkflowSteps(array $workflowSteps)
     {
-        // Only sync for production users
-        if (!$this->isProduction()) {
+        // Only sync for production users or production heads/supervisors
+        if (!$this->isProduction() && !$this->is_head) {
             return;
         }
 
@@ -296,5 +305,13 @@ class User extends Authenticatable
     public function productionRecords()
     {
         return $this->hasMany(ProductionRecord::class);
+    }
+
+    /**
+     * Get the branch that this user belongs to.
+     */
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 }
