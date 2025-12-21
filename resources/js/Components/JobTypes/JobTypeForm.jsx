@@ -97,7 +97,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 });
             }
             if (jobType && jobType.image_path) {
-                setImagePreview(`/storage/${jobType.image_path}`);
+                setImagePreview(jobType.image_path);
             } else {
                 setImagePreview(null);
             }
