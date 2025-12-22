@@ -68,7 +68,7 @@ export default function DataTable({
                                                                 {row.status !== 'completed' ? ' Edit' : ' View'}</small>
                                                         </button>
                                                     )}
-                                                    {onDelete && row.status !== 'completed' && (
+                                                    {onDelete && row.status !== 'completed' && row?.role !== 'admin' && (
                                                         <button
                                                             type="button"
                                                             className="btn btn-link btn-sm text-danger"

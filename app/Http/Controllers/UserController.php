@@ -33,7 +33,7 @@ class UserController extends Controller
         return Inertia::render('Users', [
             'users' => $users,
             'availableRoles' => [
-                User::ROLE_ADMIN,
+                // User::ROLE_ADMIN,
                 User::ROLE_FRONTDESK,
                 User::ROLE_DESIGNER,
                 User::ROLE_PRODUCTION,
@@ -272,8 +272,20 @@ class UserController extends Controller
     private function syncUserPermissions(User $user, array $permissions)
     {
         $sync = [];
+        $role = $user->role;
+
+        // Get all allowed permissions for this role
+        // This ensures the user cannot be granted permissions not intended for their role
+        $allowedPermissionIds = Permission::all()->filter(function ($p) use ($role) {
+            if (empty($p->role)) {
+                return true;
+            }
+            $allowedRoles = array_map('trim', explode(',', $p->role));
+            return in_array($role, $allowedRoles);
+        })->pluck('id')->toArray();
+
         foreach ($permissions as $permissionId => $granted) {
-            if ($granted) {
+            if ($granted && in_array($permissionId, $allowedPermissionIds)) {
                 $sync[$permissionId] = ['granted' => true];
             }
         }

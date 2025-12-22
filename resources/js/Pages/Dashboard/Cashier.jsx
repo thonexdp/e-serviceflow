@@ -196,7 +196,12 @@ export default function Cashier({
                                                         <td className="text-muted small">
                                                             {new Date(p.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </td>
-                                                        <td className="font-weight-bold">{p.ticket_number}</td>
+                                                        <td className="font-weight-bold">
+                                                            {p.ticket_number}
+                                                            {p.has_promo && (
+                                                                <span className="badge badge-success ml-1" style={{ fontSize: '10px' }}>PROMO</span>
+                                                            )}
+                                                        </td>
                                                         <td>{p.customer_name}</td>
                                                         <td>
                                                             <span className={`badge badge-pill badge-light ${getCollectionColor(p.method)} text-capitalize`}>
@@ -249,7 +254,12 @@ export default function Cashier({
                                             {urgentReceivables.length > 0 ? (
                                                 urgentReceivables.map((t) => (
                                                     <tr key={t.id}>
-                                                        <td><span className="font-weight-bold">{t.ticket_number}</span></td>
+                                                        <td>
+                                                            <span className="font-weight-bold">{t.ticket_number}</span>
+                                                            {t.has_promo && (
+                                                                <span className="badge badge-success ml-1" style={{ fontSize: '10px' }}>PROMO</span>
+                                                            )}
+                                                        </td>
                                                         <td>{t.customer_name}</td>
                                                         <td>{formatDate(t.updated_at)}</td>
                                                         <td>{formatPeso(t.total_amount)}</td>

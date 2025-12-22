@@ -20,7 +20,7 @@ export default function Productions({
     summary = {},
 }) {
     const [activeView, setActiveView] = useState("table"); // "table" or "board"
-    const [autoPageInterval, setAutoPageInterval] = useState(15); // Default 15 seconds
+    const [autoPageInterval, setAutoPageInterval] = useState(10); // Default 15 seconds
     const [autoPageEnabled, setAutoPageEnabled] = useState(false);
     const [openViewModal, setViewModalOpen] = useState(false);
     const [openUpdateModal, setUpdateModalOpen] = useState(false);
@@ -31,6 +31,7 @@ export default function Productions({
     const [loading, setLoading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [showFullscreenControls, setShowFullscreenControls] = useState(false);
     const { flash, auth } = usePage().props;
     const isAdmin = auth?.user?.role === 'admin';
     const assignedWorkflowSteps = auth?.user?.workflow_steps || [];
@@ -113,24 +114,27 @@ export default function Productions({
 
     const stats = calculateSummary();
 
-    // Handle auto-paging
+    // Handle auto-paging cycle
     useEffect(() => {
         let timer;
-        if (autoPageEnabled && tickets?.links?.length > 3) {
+        const interval = isFullscreen ? 10000 : (autoPageInterval * 1000);
+        const shouldPage = isFullscreen || (autoPageEnabled && tickets?.links?.length > 3);
+
+        if (shouldPage) {
             timer = setInterval(() => {
                 const nextPage = tickets.current_page < tickets.last_page
                     ? tickets.current_page + 1
                     : 1;
 
-                router.visit(`${window.location.pathname}?page=${nextPage}`, {
+                router.visit(`${window.location.pathname}?per_page=${isFullscreen ? 6 : (filters.per_page || 10)}&page=${nextPage}`, {
                     preserveScroll: true,
                     preserveState: true,
                     only: ['tickets'],
                 });
-            }, autoPageInterval * 1000);
+            }, interval);
         }
         return () => clearInterval(timer);
-    }, [autoPageEnabled, autoPageInterval, tickets.current_page, tickets.last_page]);
+    }, [autoPageEnabled, autoPageInterval, isFullscreen, tickets.current_page, tickets.last_page, filters.per_page]);
 
     // Real-time clock update
     useEffect(() => {
@@ -138,16 +142,80 @@ export default function Productions({
         return () => clearInterval(timer);
     }, []);
 
-    // Handle fullscreen mode
+    // Update per_page when entering/exiting fullscreen
     useEffect(() => {
         if (isFullscreen) {
+            router.visit(`${window.location.pathname}?per_page=6&page=1`, {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['tickets'],
+            });
+        } else if (!isFullscreen && filters.per_page === 6) {
+            // Revert to 10 if we were just in fullscreen
+            router.visit(`${window.location.pathname}?per_page=10&page=1`, {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['tickets'],
+            });
+        }
+    }, [isFullscreen]);
+
+    // Handle fullscreen mode with Fullscreen API
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const isCurrentlyFullscreen = !!(
+                document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement ||
+                document.msFullscreenElement
+            );
+            
+            if (!isCurrentlyFullscreen && isFullscreen) {
+                // User exited fullscreen via ESC key
+                setIsFullscreen(false);
+            }
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        if (isFullscreen) {
+            const element = document.documentElement;
+            
+            // Try to enter fullscreen
+            const requestFullscreen = 
+                element.requestFullscreen ||
+                element.webkitRequestFullscreen ||
+                element.mozRequestFullScreen ||
+                element.msRequestFullscreen;
+
+            if (requestFullscreen) {
+                requestFullscreen.call(element).catch(err => {
+                    console.error('Error attempting to enable fullscreen:', err);
+                });
+            }
+
             document.body.classList.add("production-fullscreen");
             document.querySelector(".header")?.classList.add("d-none");
             document.querySelector(".sidebar")?.classList.add("d-none");
-            // Also hide the page wrapper padding/margin if possible
             const content = document.querySelector(".content-wrap");
             if (content) content.style.padding = "0";
         } else {
+            // Exit fullscreen
+            const exitFullscreen =
+                document.exitFullscreen ||
+                document.webkitExitFullscreen ||
+                document.mozCancelFullScreen ||
+                document.msExitFullscreen;
+
+            if (exitFullscreen) {
+                exitFullscreen.call(document).catch(err => {
+                    console.error('Error attempting to exit fullscreen:', err);
+                });
+            }
+
             document.body.classList.remove("production-fullscreen");
             document.querySelector(".header")?.classList.remove("d-none");
             document.querySelector(".sidebar")?.classList.remove("d-none");
@@ -156,12 +224,30 @@ export default function Productions({
         }
 
         return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+            
             document.body.classList.remove("production-fullscreen");
             document.querySelector(".header")?.classList.remove("d-none");
             document.querySelector(".sidebar")?.classList.remove("d-none");
             const content = document.querySelector(".content-wrap");
             if (content) content.style.padding = "";
         };
+    }, [isFullscreen]);
+
+    // Handle mouse hover at top of screen to show controls
+    useEffect(() => {
+        if (!isFullscreen) return;
+
+        const handleMouseMove = (e) => {
+            const topThreshold = 100; // Show controls when mouse is within 100px from top
+            setShowFullscreenControls(e.clientY <= topThreshold);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        return () => document.removeEventListener('mousemove', handleMouseMove);
     }, [isFullscreen]);
 
     // WebSocket real-time updates
@@ -265,10 +351,17 @@ export default function Productions({
     }, [isFullscreen]); // Re-run when fullscreen changes
 
     const toggleFullscreen = () => {
-        if (!isFullscreen) {
-            setActiveView("board");
+        const nextFullscreen = !isFullscreen;
+        setIsFullscreen(nextFullscreen);
+
+        if (nextFullscreen) {
+            setActiveView("table");
+            setAutoPageEnabled(false); // Disable auto-paging in favor of auto-scroll
+        } else {
+            setAutoPageEnabled(false);
+            // Reset scroll position when exiting
+            window.scrollTo({ top: 0, behavior: 'instant' });
         }
-        setIsFullscreen(!isFullscreen);
     };
 
     const handleView = (ticket) => {
@@ -466,10 +559,10 @@ export default function Productions({
 
     const getStatusBadge = (status) => {
         const classes = {
-            ready_to_print: "badge-info",
-            in_production: "badge-warning",
-            completed: "badge-success",
-            pending: "badge-secondary",
+            ready_to_print: "text-info",
+            in_production: "text-warning",
+            completed: "text-success",
+            pending: "text-secondary",
         };
         const labels = {
             ready_to_print: "Ready to Print",
@@ -478,9 +571,9 @@ export default function Productions({
             pending: "Pending",
         };
         return (
-            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+            <b className={`${classes[status] || "text-black"}`}>
                 {labels[status] || status?.toUpperCase() || "PENDING"}
-            </div>
+            </b>
         );
     };
 
@@ -609,8 +702,12 @@ export default function Productions({
         {
             label: "#",
             key: "index",
-            render: (row, index) =>
-                (tickets.current_page - 1) * tickets.per_page + index + 1,
+            render: (row, index) => {
+                if (isFullscreen) {
+                    return index + 1;
+                }
+                return (tickets.current_page - 1) * tickets.per_page + index + 1;
+            },
         },
         {
             label: "Ticket ID",
@@ -764,7 +861,12 @@ export default function Productions({
             label: "Status",
             key: "status",
             render: (row) => (
-                <div style={{ transform: isFullscreen ? 'scale(1.3)' : 'none', transformOrigin: 'left' }}>
+                <div style={{ 
+                    transform: isFullscreen ? 'scale(1.3)' : 'none', 
+                    transformOrigin: 'left',
+                    minWidth: isFullscreen ? '150px' : '120px',
+                    whiteSpace: 'nowrap'
+                }}>
                     {getStatusBadge(row.status)}
                 </div>
             ),
@@ -779,18 +881,21 @@ export default function Productions({
         >
             <Head title="Production Monitor" />
 
-            {/* Fullscreen Toolbar */}
             <div
-                className="position-fixed d-flex align-items-center gap-3"
+                className={`position-fixed d-flex align-items-center gap-3 fullscreen-controls`}
                 style={{
-                    top: isFullscreen ? "10px" : "20px",
-                    right: isFullscreen ? "20px" : "20px",
+                    top: isFullscreen ? "10px" : "15px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
                     zIndex: 9999,
-                    backgroundColor: isFullscreen ? "rgba(255,255,255,0.95)" : "transparent",
-                    padding: isFullscreen ? "12px 24px" : "0",
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    padding: "8px 24px",
                     borderRadius: "50px",
-                    boxShadow: isFullscreen ? "0 8px 30px rgba(0,0,0,0.12)" : "none",
-                    backdropFilter: isFullscreen ? "blur(10px)" : "none",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                    backdropFilter: "blur(10px)",
+                    opacity: isFullscreen ? (showFullscreenControls ? 1 : 0) : 1,
+                    pointerEvents: isFullscreen ? (showFullscreenControls ? 'auto' : 'none') : 'auto',
+                    transition: "opacity 0.3s ease-in-out",
                 }}
             >
                 {/* Auto Page Controls */}
@@ -895,8 +1000,8 @@ export default function Productions({
                             </p>
                         </div>
                     </div>
-                    <div className="text-right" style={{ marginRight: isFullscreen ? '350px' : '0' }}>
-                        <h2 className="mb-0 font-weight-bold" style={{ fontSize: '2.5rem', color: '#667eea' }}>
+                    <div className="text-right">
+                        <h2 className="mb-0 font-weight-bold" style={{ fontSize: '3.5rem', color: '#667eea', lineHeight: '1' }}>
                             {currentTime.toLocaleTimeString("en-US", {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -943,42 +1048,44 @@ export default function Productions({
             )}
 
             {/* Summary Cards (Only when not in fullscreen) */}
-            {!isFullscreen && (
-                <div className="row mb-4">
-                    <div className="col-lg-3 col-md-6 mb-3">
-                        <CardStatistics
-                            label="Total Items Produced Today"
-                            statistics={stats.total}
-                            icon="ti-package"
-                            color="bg-info"
-                        />
+            {
+                !isFullscreen && (
+                    <div className="row mb-4">
+                        <div className="col-lg-3 col-md-6 mb-3">
+                            <CardStatistics
+                                label="Total Items Produced Today"
+                                statistics={stats.total}
+                                icon="ti-package"
+                                color="bg-info"
+                            />
+                        </div>
+                        <div className="col-lg-3 col-md-6 mb-3">
+                            <CardStatistics
+                                label="In Progress"
+                                statistics={stats.inProgress}
+                                icon="ti-settings"
+                                color="bg-warning"
+                            />
+                        </div>
+                        <div className="col-lg-3 col-md-6 mb-3">
+                            <CardStatistics
+                                label="Finished Today"
+                                statistics={stats.finished}
+                                icon="ti-check"
+                                color="bg-success"
+                            />
+                        </div>
+                        <div className="col-lg-3 col-md-6 mb-3">
+                            <CardStatistics
+                                label="Delayed Tickets"
+                                statistics={stats.delays}
+                                icon="ti-alert"
+                                color="bg-danger"
+                            />
+                        </div>
                     </div>
-                    <div className="col-lg-3 col-md-6 mb-3">
-                        <CardStatistics
-                            label="In Progress"
-                            statistics={stats.inProgress}
-                            icon="ti-settings"
-                            color="bg-warning"
-                        />
-                    </div>
-                    <div className="col-lg-3 col-md-6 mb-3">
-                        <CardStatistics
-                            label="Finished Today"
-                            statistics={stats.finished}
-                            icon="ti-check"
-                            color="bg-success"
-                        />
-                    </div>
-                    <div className="col-lg-3 col-md-6 mb-3">
-                        <CardStatistics
-                            label="Delayed Tickets"
-                            statistics={stats.delays}
-                            icon="ti-alert"
-                            color="bg-danger"
-                        />
-                    </div>
-                </div>
-            )}
+                )
+            }
 
             <section id="main-content">
                 <div
@@ -995,7 +1102,7 @@ export default function Productions({
                             className="container-fluid"
                             style={
                                 isFullscreen
-                                    ? { maxWidth: "100%", padding: "0 30px" }
+                                    ? { maxWidth: "100%", padding: "0" }
                                     : {}
                             }
                         >
@@ -1033,7 +1140,7 @@ export default function Productions({
                                                         <DataTable
                                                             columns={ticketColumns}
                                                             data={tickets.data}
-                                                            pagination={tickets}
+                                                            pagination={isFullscreen ? null : tickets}
                                                             emptyMessage="No tickets found in the production queue."
                                                         />
                                                     </div>
@@ -1067,19 +1174,57 @@ export default function Productions({
                 }
                 body.production-fullscreen .table-fullscreen-container {
                     background: white;
-                    border-radius: 12px;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-                    padding: 20px;
+                    border-radius: 0;
+                    box-shadow: none;
+                    padding: 0;
+                    max-height: calc(100vh - 200px);
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    scroll-behavior: auto;
+                }
+                body.production-fullscreen .table-fullscreen-container .table-responsive {
+                    max-height: 100%;
+                    overflow-y: auto;
+                    overflow-x: auto;
                 }
                 body.production-fullscreen .table th {
                     font-size: 1.1rem;
                     padding: 20px 15px;
                     background-color: #f8f9fa;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
                 }
                 body.production-fullscreen .table td {
                     padding: 20px 15px;
                     vertical-align: middle;
                 }
+                body.production-fullscreen .table th:nth-last-child(1),
+                body.production-fullscreen .table td:nth-last-child(1) {
+                    min-width: 150px;
+                    white-space: nowrap;
+                }
+                .fullscreen-controls {
+                    transition: opacity 0.3s ease-in-out;
+                }
+                
+                /* Hide scrollbars in fullscreen mode */
+                body.production-fullscreen .table-fullscreen-container::-webkit-scrollbar,
+                body.production-fullscreen .table-fullscreen-container .table-responsive::-webkit-scrollbar,
+                body.production-fullscreen .production-board::-webkit-scrollbar,
+                body.production-fullscreen .workflow-column .card-body::-webkit-scrollbar {
+                    display: none;
+                    width: 0;
+                    height: 0;
+                }
+                body.production-fullscreen .table-fullscreen-container,
+                body.production-fullscreen .table-fullscreen-container .table-responsive,
+                body.production-fullscreen .production-board,
+                body.production-fullscreen .workflow-column .card-body {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+                
                 @keyframes slideInRight {
                     from { transform: translateX(400px); opacity: 0; }
                     to { transform: translateX(0); opacity: 1; }

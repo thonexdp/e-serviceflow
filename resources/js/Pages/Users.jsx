@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, useForm, usePage, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -28,7 +28,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             email: "",
             password: "",
             password_confirmation: "",
-            role: "FrontDesk",
+            role: "",
             branch_id: "",
             permissions: {},
             workflow_steps: [],
@@ -62,6 +62,60 @@ export default function Users({ users, availableRoles, availablePermissions, ava
         }
         return password;
     };
+
+    // Filter permissions based on current selected role
+    const filteredPermissionsByRole = useMemo(() => {
+        if (!availablePermissions) return {};
+
+        const filtered = {};
+        Object.entries(availablePermissions).forEach(([module, permissions]) => {
+            const moduleFiltered = permissions.filter(p => {
+                if (!p.role) return true;
+                const allowedRoles = p.role.split(',').map(r => r.trim());
+                return allowedRoles.includes(data.role);
+            });
+            if (moduleFiltered.length > 0) {
+                filtered[module] = moduleFiltered;
+            }
+        });
+        return filtered;
+    }, [availablePermissions, data.role]);
+
+    // Strip permissions that are not allowed for the selected role
+    // and auto-check all if adding a new user
+    useEffect(() => {
+        if (!availablePermissions || !data.permissions) return;
+
+        const allowedPermissionIds = new Set();
+        Object.values(filteredPermissionsByRole).forEach(permissions => {
+            permissions.forEach(p => allowedPermissionIds.add(p.id));
+        });
+
+        let changed = false;
+        const newPermissions = { ...data.permissions };
+
+        // 1. Remove permissions that are no longer allowed for this role
+        Object.keys(newPermissions).forEach(id => {
+            if (newPermissions[id] === true && !allowedPermissionIds.has(parseInt(id))) {
+                delete newPermissions[id];
+                changed = true;
+            }
+        });
+
+        // 2. If adding a new user, default to checking all allowed permissions
+        if (!editingUser) {
+            allowedPermissionIds.forEach(id => {
+                if (newPermissions[id] !== true) {
+                    newPermissions[id] = true;
+                    changed = true;
+                }
+            });
+        }
+
+        if (changed) {
+            setData("permissions", newPermissions);
+        }
+    }, [data.role, filteredPermissionsByRole, editingUser]);
 
     const userColumns = [
         {
@@ -142,7 +196,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 email: "",
                 password: "",
                 password_confirmation: "",
-                role: "FrontDesk",
+                role: "",
                 branch_id: "",
                 permissions: {},
                 workflow_steps: [],
@@ -461,6 +515,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                             setData("role", e.target.value)
                                         }
                                     >
+                                        <option value="">-- Select Role --</option>
                                         {availableRoles.map((role) => (
                                             <option key={role} value={role}>
                                                 {role}
@@ -711,51 +766,57 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                         {/* Permissions Tab */}
                         {activeTab === "permissions" && (
                             <div className="space-y-4 max-h-96 overflow-y-auto">
-                                {Object.entries(availablePermissions).map(
-                                    ([module, permissions]) => (
-                                        <div
-                                            key={module}
-                                            className="border rounded-md bg-gray-50"
-                                        >
-                                            <div className="flex items-center justify-between px-4 py-2 border-b bg-white rounded-t-md">
-                                                <h4 className="font-semibold capitalize text-sm text-gray-800">
-                                                    {module}
-                                                </h4>
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                                                    {permissions.length} option{permissions.length !== 1 ? "s" : ""}
-                                                </span>
-                                            </div>
-                                            <div className="px-4 py-3">
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                                    {permissions.map((permission) => (
-                                                        <label
-                                                            key={permission.id}
-                                                            htmlFor={`permission-${permission.id}`}
-                                                            className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
-                                                        >
-                                                            <Checkbox
-                                                                id={`permission-${permission.id}`}
-                                                                checked={
-                                                                    data.permissions[
-                                                                    permission.id
-                                                                    ] || false
-                                                                }
-                                                                onChange={(e) =>
-                                                                    handlePermissionChange(
-                                                                        permission.id,
-                                                                        e.target.checked
-                                                                    )
-                                                                }
-                                                            />
-                                                            <span>
-                                                                {permission.label ||
-                                                                    permission.feature}
-                                                            </span>
-                                                        </label>
-                                                    ))}
+                                {Object.keys(filteredPermissionsByRole).length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        No specific permissions available for this role.
+                                    </div>
+                                ) : (
+                                    Object.entries(filteredPermissionsByRole).map(
+                                        ([module, permissions]) => (
+                                            <div
+                                                key={module}
+                                                className="border rounded-md bg-gray-50"
+                                            >
+                                                <div className="flex items-center justify-between px-4 py-2 border-b bg-white rounded-t-md">
+                                                    <h4 className="font-semibold capitalize text-sm text-gray-800">
+                                                        {module.replace('_', ' ')}
+                                                    </h4>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                                        {permissions.length} option{permissions.length !== 1 ? "s" : ""}
+                                                    </span>
+                                                </div>
+                                                <div className="px-4 py-3">
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                        {permissions.map((permission) => (
+                                                            <label
+                                                                key={permission.id}
+                                                                htmlFor={`permission-${permission.id}`}
+                                                                className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
+                                                            >
+                                                                <Checkbox
+                                                                    id={`permission-${permission.id}`}
+                                                                    checked={
+                                                                        data.permissions[
+                                                                        permission.id
+                                                                        ] || false
+                                                                    }
+                                                                    onChange={(e) =>
+                                                                        handlePermissionChange(
+                                                                            permission.id,
+                                                                            e.target.checked
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <span>
+                                                                    {permission.label ||
+                                                                        permission.feature}
+                                                                </span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )
                                     )
                                 )}
                             </div>

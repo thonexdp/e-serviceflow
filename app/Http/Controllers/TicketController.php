@@ -38,6 +38,7 @@ class TicketController extends BaseCrudController
      */
     public function index(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $query = Ticket::with(['customer', 'customerFiles', 'payments.documents', 'mockupFiles', 'assignedToUser', 'orderBranch', 'productionBranch']);
 
@@ -83,6 +84,11 @@ class TicketController extends BaseCrudController
         // Filter by customer
         if ($request->has('customer_id') && $request->customer_id) {
             $query->where('customer_id', $request->customer_id);
+        }
+
+        // Filter by branch (for admin)
+        if ($user->isAdmin() && $request->has('branch_id') && $request->branch_id) {
+            $query->where('order_branch_id', $request->branch_id);
         }
 
         // Default to Last 30 Days if no date range is specified
@@ -143,10 +149,12 @@ class TicketController extends BaseCrudController
                 'search' => $request->get('search'),
                 'status' => $request->get('status'),
                 'payment_status' => $request->get('payment_status'),
+                'branch_id' => $request->get('branch_id'),
                 'date_range' => $dateRange,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ],
+            'branches' => $user->isAdmin() ? \App\Models\Branch::active()->get() : [],
         ]);
     }
 
@@ -181,6 +189,8 @@ class TicketController extends BaseCrudController
             'initial_payment_reference' => 'nullable|string|max:150',
             'initial_payment_notes' => 'nullable|string|max:500',
             'initial_payment_or' => 'nullable|string|max:100',
+            'order_branch_id' => 'nullable|exists:branches,id',
+            'production_branch_id' => 'nullable|exists:branches,id',
         ]);
 
         $ticketData = $validated;
@@ -271,6 +281,7 @@ class TicketController extends BaseCrudController
      */
     public function update(Request $request, $id)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
@@ -321,6 +332,8 @@ class TicketController extends BaseCrudController
             'initial_payment_reference' => 'nullable|string|max:150',
             'initial_payment_notes' => 'nullable|string|max:500',
             'initial_payment_or' => 'nullable|string|max:100',
+            'order_branch_id' => 'nullable|exists:branches,id',
+            'production_branch_id' => 'nullable|exists:branches,id',
         ]);
 
         $ticketData = $validated;
@@ -611,6 +624,8 @@ class TicketController extends BaseCrudController
             'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
             'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
+            'order_branch_id' => 'nullable|exists:branches,id',
+            'production_branch_id' => 'nullable|exists:branches,id',
         ];
     }
 

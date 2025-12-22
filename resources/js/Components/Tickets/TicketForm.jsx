@@ -38,6 +38,7 @@ export default function TicketForm({
     onCancel,
     hasPermission,
     isPublic = false,
+    branches = [],
 }) {
     const { jobCategories = [], auth } = usePage().props;
     const userRole = auth?.user?.role;
@@ -78,6 +79,8 @@ export default function TicketForm({
         initial_payment_or: "",
         status: "pending",
         file: null,
+        order_branch_id: "",
+        production_branch_id: "",
     });
 
     const [errors, setErrors] = useState({});
@@ -159,6 +162,8 @@ export default function TicketForm({
                 initial_payment_reference: "",
                 initial_payment_notes: "",
                 initial_payment_or: "",
+                order_branch_id: ticket.order_branch_id || "",
+                production_branch_id: ticket.production_branch_id || "",
             });
             setSizeDimensions(parsedSize);
             setEnableDiscount(parseFloat(ticket.discount) > 0);
@@ -723,7 +728,9 @@ export default function TicketForm({
 
     const jobTypeOptions = availableJobTypes.map((jt) => {
         let label = jt.name;
-        if (jt.price_tiers && jt.price_tiers.length > 0) {
+        if (jt.discount > 0) {
+            label += ` (PROMO - ${parseFloat(jt.discount)}% OFF)`;
+        } else if (jt.price_tiers && jt.price_tiers.length > 0) {
             label += " (Tiered Pricing)";
         } else if (jt.size_rates && jt.size_rates.length > 0) {
             label += " (Size-Based)";
@@ -955,6 +962,37 @@ export default function TicketForm({
                             </div>
                         )}
                     </Section>
+
+                    {userRole === 'admin' && (
+                        <Section title="Branch Assignment">
+                            <div className="row">
+                                <div className="col-md-6">
+                                    <FormInput
+                                        label="Order Branch"
+                                        type="select"
+                                        name="order_branch_id"
+                                        value={formData.order_branch_id}
+                                        onChange={handleChange}
+                                        options={branches.map(b => ({ value: b.id.toString(), label: b.name }))}
+                                        placeholder="Select Order Branch"
+                                        required
+                                    />
+                                </div>
+                                <div className="col-md-6">
+                                    <FormInput
+                                        label="Production Branch"
+                                        type="select"
+                                        name="production_branch_id"
+                                        value={formData.production_branch_id}
+                                        onChange={handleChange}
+                                        options={branches.map(b => ({ value: b.id.toString(), label: b.name }))}
+                                        placeholder="Select Production Branch"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </Section>
+                    )}
 
                     {hasPriceTiers && (
                         <div className="alert alert-light border mt-3">

@@ -99,19 +99,33 @@ class ProductionQueueController extends Controller
         // Permission to edit will be checked in the update methods
 
         // Paginate manually
-        $perPage = $request->get('per_page', 15);
+        $perPage = $request->get('per_page', 10);
         $currentPage = $request->get('page', 1);
         $total = $tickets->count();
-        $tickets = $tickets->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        
+        // If per_page is very large (like 1000), return all tickets without pagination
+        if ($perPage >= 1000) {
+            $tickets = $tickets->values();
+            // Create a simple paginator structure for compatibility
+            $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
+                $tickets,
+                $total,
+                $total, // Set per_page to total so it shows all
+                1, // Always page 1
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        } else {
+            $tickets = $tickets->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
-        // Create paginator manually
-        $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
-            $tickets,
-            $total,
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
+            // Create paginator manually
+            $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
+                $tickets,
+                $total,
+                $perPage,
+                $currentPage,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        }
 
         // Get all active stock items for consumption form
         $stockItems = \App\Models\StockItem::where('is_active', true)
