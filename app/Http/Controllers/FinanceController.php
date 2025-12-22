@@ -119,7 +119,7 @@ class FinanceController extends Controller
             })
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'amount_paid', 'discount', 'quantity', 'description', 'size_value', 'size_unit', 'job_type']);
+            ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'subtotal', 'amount_paid', 'discount', 'quantity', 'description', 'size_value', 'size_unit', 'job_type']);
 
         $recentCustomers = Customer::orderBy('lastname')
             ->limit(50)
@@ -188,6 +188,7 @@ class FinanceController extends Controller
                     'total_invoiced' => $ticket->total_amount,
                     'total_paid' => $ticket->amount_paid,
                     'balance' => $ticket->total_amount - $ticket->amount_paid,
+                    'discount' => $ticket->discount,
                     'due_date' => $ticket->due_date,
                     'created_at' => $ticket->created_at, // useful for debug/display
                     'has_rejected_payment' => $ticket->payments->isNotEmpty(),

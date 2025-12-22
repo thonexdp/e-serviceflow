@@ -1112,7 +1112,7 @@ export default function CustomerPOSOrder() {
                                                         <div className="flex-1">
                                                             <div className="flex justify-between items-start">
                                                                 <div>
-                                                                    <p className="font-bold text-gray-900">{jobType.name}</p>
+                                                                    <p className="font-normal text-gray-900">{jobType.name}</p>
                                                                     <div className="flex flex-wrap gap-1 mt-1">
                                                                         {jobType.promo_text && (
                                                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">

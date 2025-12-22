@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\UserActivityLog;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -73,7 +74,14 @@ class BranchController extends Controller
             Branch::where('is_default_production', true)->update(['is_default_production' => false]);
         }
 
-        Branch::create($validated);
+        $branch = Branch::create($validated);
+
+        UserActivityLog::log(
+            auth()->id(),
+            'created_branch',
+            "Created new branch: {$branch->name} ({$branch->code})",
+            $branch
+        );
 
         return redirect()->route('admin.branches.index')
             ->with('success', 'Branch created successfully.');
@@ -112,6 +120,14 @@ class BranchController extends Controller
 
         $branch->update($validated);
 
+        UserActivityLog::log(
+            auth()->id(),
+            'updated_branch',
+            "Updated branch: {$branch->name}",
+            $branch,
+            $validated
+        );
+
         return redirect()->route('admin.branches.index')
             ->with('success', 'Branch updated successfully.');
     }
@@ -138,7 +154,16 @@ class BranchController extends Controller
                 ->with('error', 'Cannot delete branch with existing tickets.');
         }
 
+        $branchName = $branch->name;
+        $branchCode = $branch->code;
         $branch->delete();
+
+        UserActivityLog::log(
+            auth()->id(),
+            'deleted_branch',
+            "Deleted branch: {$branchName} ({$branchCode})",
+            null
+        );
 
         return redirect()->route('admin.branches.index')
             ->with('success', 'Branch deleted successfully.');

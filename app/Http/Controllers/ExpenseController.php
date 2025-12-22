@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Expense;
 use App\Models\Payment;
+use App\Models\UserActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -30,6 +31,14 @@ class ExpenseController extends Controller
             ...$validated,
             'recorded_by' => Auth::id(),
         ]);
+
+        UserActivityLog::log(
+            Auth::id(),
+            'expense_recorded',
+            "Recorded expense of ₱" . number_format($expense->amount, 2) . " for {$expense->category}: {$expense->description}",
+            $expense,
+            $validated
+        );
 
         $message = 'Expense recorded successfully.';
 
