@@ -8,6 +8,7 @@ use App\Services\PaymentRecorder;
 use Illuminate\Http\Request;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\UserActivityLog;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -33,6 +34,7 @@ class PaymentController extends Controller
             'official_receipt_number' => 'nullable|string|max:100',
             'payment_reference' => 'nullable|string|max:150',
             'notes' => 'nullable|string|max:1000',
+            'discount' => 'nullable|numeric|min:0',
             'status' => 'nullable|string',
             'metadata' => 'nullable|array',
             'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:8192',
@@ -79,6 +81,13 @@ class PaymentController extends Controller
 
         $payment->update(['status' => 'posted']);
 
+        UserActivityLog::log(
+            auth()->id(),
+            'payment_cleared',
+            "Cleared cheque payment of ₱" . number_format($payment->amount, 2) . " for " . ($payment->ticket ? "Ticket #{$payment->ticket->ticket_number}" : "Customer {$payment->payer_name}"),
+            $payment
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Cheque cleared successfully.',
@@ -104,6 +113,14 @@ class PaymentController extends Controller
             'notes' => $validated['notes'] ?? $payment->notes,
         ]);
 
+        UserActivityLog::log(
+            auth()->id(),
+            'payment_rejected',
+            "Rejected cheque payment of ₱" . number_format($payment->amount, 2) . " for " . ($payment->ticket ? "Ticket #{$payment->ticket->ticket_number}" : "Customer {$payment->payer_name}") . ". Reason: " . ($validated['notes'] ?? 'None'),
+            $payment,
+            ['reason' => $validated['notes'] ?? null]
+        );
+
         $this->notifyFrontDeskPayment($payment, 'rejected');
 
         return response()->json([
@@ -126,13 +143,19 @@ class PaymentController extends Controller
      */
     protected function notifyFrontDeskPayment(Payment $payment, string $statusType): void
     {
-        $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)->get();
+        $ticket = $payment->ticket;
+
+        // Only notify frontdesk users from the ticket's order branch
+        $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
+            ->when($ticket && $ticket->order_branch_id, function ($query) use ($ticket) {
+                $query->where('branch_id', $ticket->order_branch_id);
+            })
+            ->get();
 
         if ($frontDeskUsers->isEmpty()) {
             return;
         }
 
-        $ticket = $payment->ticket;
         $customerName = $payment->payer_name
             ?? ($payment->customer ? $payment->customer->firstname . ' ' . $payment->customer->lastname : 'Unknown');
         $amount = number_format($payment->amount, 2);
@@ -159,6 +182,7 @@ class PaymentController extends Controller
                     'ticket_id' => $ticket ? $ticket->id : null,
                     'amount' => $payment->amount,
                     'status' => $statusType,
+                    'order_branch_id' => $ticket ? $ticket->order_branch_id : null,
                 ],
             ]);
         }

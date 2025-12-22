@@ -68,14 +68,24 @@ export default function JobTypes({
         const url = editingJobType
             ? buildUrl(`/job-types/${editingJobType.id}`)
             : buildUrl("/job-types");
-        const method = editingJobType ? "put" : "post";
 
-        router[method](url, data, {
-            onSuccess: handleCloseModals,
-            preserveState: false,
-            preserveScroll: true,
 
-        });
+        // If editing and has image, use POST with _method: 'put' for Laravel file upload support
+        if (editingJobType && data.image) {
+            router.post(url, { ...data, _method: "put" }, {
+                onSuccess: handleCloseModals,
+                preserveState: false,
+                preserveScroll: true,
+            });
+        } else {
+            const method = editingJobType ? "put" : "post";
+
+            router[method](url, data, {
+                // onSuccess: handleCloseModals,
+                preserveState: false,
+                preserveScroll: true,
+            });
+        }
     };
 
     const handleCategorySubmit = (data) => {
@@ -135,6 +145,29 @@ export default function JobTypes({
             },
         },
         {
+            label: "Image",
+            key: "image",
+            render: (row) => {
+                // Fallback SVG as data URI to avoid network errors
+                const fallbackSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='%239ca3af'%3E${encodeURIComponent(row.name.substring(0, 2).toUpperCase())}%3C/text%3E%3C/svg%3E`;
+
+                return (
+                    <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden border">
+                        <img
+                            src={row.image_path || fallbackSvg}
+                            alt={row.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                // Use data URI SVG as final fallback
+                                e.target.onerror = null; // Prevent infinite loop
+                                e.target.src = fallbackSvg;
+                            }}
+                        />
+                    </div>
+                );
+            }
+        },
+        {
             label: "Category",
             key: "category",
             render: (row) => row.category?.name || "N/A",
@@ -184,7 +217,7 @@ export default function JobTypes({
                         {/* Incentive Price */}
                         {row.incentive_price > 0 && (
                             <div className="text-success small">
-                                <i className="ti-money"></i> Incentive: {formatPeso(parseFloat(row.incentive_price).toFixed(2))}/pcs
+                                Incentive: {formatPeso(parseFloat(row.incentive_price).toFixed(2))}/pcs
                             </div>
                         )}
 

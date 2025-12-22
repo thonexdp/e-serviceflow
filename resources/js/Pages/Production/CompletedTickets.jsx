@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -9,6 +9,126 @@ import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 import WorkflowTimeline from "@/Components/Production/WorkflowTimeline";
+
+const TeamMemberCell = ({ productionRecords }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const buttonRef = useRef(null);
+
+    // Get unique users and their workflow steps from production records
+    const userWorkflows = {};
+    if (productionRecords) {
+        productionRecords.forEach(record => {
+            if (record.user) {
+                const userId = record.user.id;
+                const workflowStep = record.workflow_step || 'Unknown';
+
+                if (!userWorkflows[userId]) {
+                    userWorkflows[userId] = {
+                        name: record.user.name,
+                        steps: {}
+                    };
+                }
+
+                if (!userWorkflows[userId].steps[workflowStep]) {
+                    userWorkflows[userId].steps[workflowStep] = 0;
+                }
+                userWorkflows[userId].steps[workflowStep] += record.quantity_produced || 0;
+            }
+        });
+    }
+
+    const userList = Object.values(userWorkflows);
+
+    if (userList.length === 0) {
+        return <span className="text-muted small">No records</span>;
+    }
+
+    const totalMembers = userList.length;
+
+    const toggleDropdown = () => {
+        if (!isExpanded && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setCoords({
+                top: rect.bottom + window.scrollY,
+                left: rect.left + window.scrollX - 220 + rect.width // Align right side
+            });
+        }
+        setIsExpanded(!isExpanded);
+    };
+
+    return (
+        <div className="position-relative">
+            <button
+                ref={buttonRef}
+                type="button"
+                className={`btn btn-sm ${isExpanded ? 'btn-primary' : 'btn-outline-primary'} py-0 px-2 d-flex align-items-center mb-1`}
+                style={{ fontSize: '0.7rem', borderRadius: '12px', whiteSpace: 'nowrap' }}
+                onClick={toggleDropdown}
+            >
+                <i className={`ti-user mr-1`}></i>
+                {totalMembers} Member{totalMembers > 1 ? 's' : ''}
+                <i className={`ti-angle-${isExpanded ? 'up' : 'down'} ml-1`} style={{ fontSize: '0.6rem' }}></i>
+            </button>
+
+            {isExpanded && (
+                <>
+                    {/* Backdrop to close on click outside */}
+                    <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1040 }}
+                        onClick={() => setIsExpanded(false)}
+                    />
+                    <div
+                        className="card shadow-lg border p-3"
+                        style={{
+                            position: "fixed", // Changed to fixed to avoid table clipping
+                            zIndex: 1050,
+                            minWidth: "240px",
+                            left: `${coords.left}px`,
+                            top: `${coords.top + 5}px`,
+                            backgroundColor: "#fff",
+                            maxHeight: "350px",
+                            overflowY: "auto",
+                            boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+                            borderRadius: "8px",
+                            border: '1px solid #dee2e6'
+                        }}
+                    >
+                        <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                            <span className="font-weight-bold text-primary" style={{ fontSize: "0.85rem" }}>
+                                <i className="ti-user mr-1"></i> Team Production
+                            </span>
+                            <i
+                                className="ti-close text-muted cursor-pointer"
+                                style={{ fontSize: "0.8rem" }}
+                                onClick={() => setIsExpanded(false)}
+                            ></i>
+                        </div>
+                        {userList.map((u, idx) => (
+                            <div key={idx} className="mb-3 pb-2 border-bottom last:border-0">
+                                <div className="small font-weight-bold text-dark d-flex align-items-center mb-1" style={{ fontSize: "0.80rem" }}>
+                                    {u.name}
+                                </div>
+                                <div className="mt-1">
+                                    {Object.entries(u.steps).map(([step, qty], sIdx) => (
+                                        <div key={sIdx} className="d-flex justify-content-between align-items-center ml-2 mb-1" style={{ fontSize: "0.7rem" }}>
+                                            <span className="text-capitalize text-muted small mr-2">
+                                                {step.replace(/_/g, " ")}:
+                                            </span>
+                                            <span className="badge badge-light border text-dark">
+                                                <b>{qty}</b> pcs
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
 
 export default function CompletedTickets({
     user = {},
@@ -58,7 +178,7 @@ export default function CompletedTickets({
         const diffMs = end - start;
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffHours / 24);
-        
+
         if (diffDays > 0) {
             return `${diffDays}d ${diffHours % 24}h`;
         } else {
@@ -75,13 +195,13 @@ export default function CompletedTickets({
                 (tickets.current_page - 1) * tickets.per_page + index + 1,
         },
         {
-            label: "Ticket / Preview",
+            label: "Ticket",
             key: "ticket_number",
             render: (row) => (
                 <div className="d-flex align-items-center">
                     {row.mockup_files && row.mockup_files.length > 0 && (
-                        <img 
-                            src={row.mockup_files[0].file_path} 
+                        <img
+                            src={row.mockup_files[0].file_path}
                             alt="Preview"
                             className="img-thumbnail mr-2"
                             style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
@@ -109,7 +229,7 @@ export default function CompletedTickets({
             )
         },
         {
-            label: "Quantity",
+            label: "Qty",
             key: "quantity",
             render: (row) => {
                 const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
@@ -126,71 +246,30 @@ export default function CompletedTickets({
             },
         },
         {
-            label: "Completion Time",
+            label: "Time",
             key: "completion_time",
             render: (row) => {
                 const duration = calculateCompletionTime(row.workflow_started_at, row.workflow_completed_at);
                 return (
                     <div>
-                        <div className="mb-1">
-                            <small className="text-muted">Started:</small>
-                            <div>{row.workflow_started_at ? formatDate(row.workflow_started_at) : 'N/A'}</div>
-                        </div>
-                        <div>
-                            <small className="text-muted">Completed:</small>
-                            <div>{row.workflow_completed_at ? formatDate(row.workflow_completed_at) : 'N/A'}</div>
-                        </div>
-                        <div className="mt-1">
+                        <small className="text-muted">Started:</small>
+                        <small> {row.workflow_started_at ? formatDate(row.workflow_started_at) : 'N/A'}</small>
+                        <br />
+                        <small className="text-muted">Completed:</small>
+                        <small> {row.workflow_completed_at ? formatDate(row.workflow_completed_at) : 'N/A'}</small>
+                        {/* <div className="mt-1">
                             <span className="badge badge-info">
                                 <i className="ti-time mr-1"></i>{duration}
                             </span>
-                        </div>
+                        </div> */}
                     </div>
                 );
             },
         },
         {
-            label: "Team Members",
+            label: "Team",
             key: "team_members",
-            render: (row) => {
-                // Get unique users from production records
-                const users = {};
-                if (row.production_records) {
-                    row.production_records.forEach(record => {
-                        if (record.user) {
-                            if (!users[record.user.id]) {
-                                users[record.user.id] = {
-                                    name: record.user.name,
-                                    total_quantity: 0
-                                };
-                            }
-                            users[record.user.id].total_quantity += record.quantity_produced || 0;
-                        }
-                    });
-                }
-                
-                const userList = Object.values(users);
-                
-                if (userList.length === 0) {
-                    return <span className="text-muted">No records</span>;
-                }
-                
-                return (
-                    <div>
-                        {userList.map((user, idx) => (
-                            <div key={idx} className="mb-1">
-                                <small>
-                                    <i className="ti-user mr-1"></i>
-                                    {user.name}
-                                    <span className="badge badge-secondary ml-1" style={{ fontSize: '0.7rem' }}>
-                                        {user.total_quantity} pcs
-                                    </span>
-                                </small>
-                            </div>
-                        ))}
-                    </div>
-                );
-            },
+            render: (row) => <TeamMemberCell productionRecords={row.production_records} />,
         },
         {
             label: "Actions",
@@ -445,6 +524,15 @@ export default function CompletedTickets({
                                                             { value: "last_month", label: "Last Month" },
                                                         ]}
                                                     />
+                                                </div>
+                                                <div className="col-md-3 text-right">
+                                                    <button
+                                                        onClick={() => router.reload()}
+                                                        className="btn btn-outline-success"
+                                                        title="Refresh Data"
+                                                    >
+                                                        <i className="ti-reload mr-2"></i> Refresh
+                                                    </button>
                                                 </div>
                                             </div>
 

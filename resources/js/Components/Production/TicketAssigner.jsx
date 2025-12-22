@@ -1,8 +1,8 @@
 import React from 'react';
 
-const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, auth, onAssign }) => {
+const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, canOnlyPrint = false, auth, onAssign }) => {
     const [isOpen, setIsOpen] = React.useState(false);
-    const [dropdownPosition, setDropdownPosition] = React.useState('bottom');
+    const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, left: 0, placement: 'bottom-left' });
     const [localAssignedIds, setLocalAssignedIds] = React.useState([]);
 
     // Support both single assigned_to_user and multiple assigned_users
@@ -44,21 +44,121 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, au
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Calculate dropdown position when opening
+    // Close dropdown on scroll and recalculate position on resize
+    React.useEffect(() => {
+        if (!isOpen) return;
+
+        const handleScroll = () => {
+            setIsOpen(false);
+        };
+
+        const handleResize = () => {
+            if (buttonRef.current) {
+                const buttonRect = buttonRef.current.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const viewportWidth = window.innerWidth;
+                const dropdownWidth = 220;
+                const dropdownHeight = 300;
+                
+                const spaceBelow = viewportHeight - buttonRect.bottom;
+                const spaceAbove = buttonRect.top;
+                const spaceRight = viewportWidth - buttonRect.right;
+                
+                let top = 0;
+                let left = 0;
+                
+                if (spaceBelow >= dropdownHeight) {
+                    top = buttonRect.bottom + 4;
+                } else if (spaceAbove >= dropdownHeight) {
+                    top = buttonRect.top - dropdownHeight - 4;
+                } else {
+                    top = spaceBelow > spaceAbove ? buttonRect.bottom + 4 : Math.max(10, buttonRect.top - Math.min(dropdownHeight, spaceAbove) - 4);
+                }
+                
+                if (spaceRight >= dropdownWidth) {
+                    left = buttonRect.right + 4;
+                } else {
+                    left = buttonRect.left - dropdownWidth - 4;
+                }
+                
+                left = Math.max(10, Math.min(left, viewportWidth - dropdownWidth - 10));
+                top = Math.max(10, Math.min(top, viewportHeight - 10));
+                
+                setDropdownPosition({ top, left, placement: 'bottom-right' });
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', handleResize);
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isOpen]);
+
+    // Calculate dropdown position when opening - use fixed positioning for better visibility
     React.useEffect(() => {
         if (isOpen && buttonRef.current) {
             const buttonRect = buttonRef.current.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+            const dropdownWidth = 220;
+            const dropdownHeight = 300; // max-height of dropdown
+            
             const spaceBelow = viewportHeight - buttonRect.bottom;
             const spaceAbove = buttonRect.top;
-            const dropdownHeight = 300; // max-height of dropdown
-
-            // Show above if not enough space below and more space above
-            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-                setDropdownPosition('top');
+            const spaceRight = viewportWidth - buttonRect.right;
+            const spaceLeft = buttonRect.left;
+            
+            let top = 0;
+            let left = 0;
+            let placement = 'bottom-right';
+            
+            // Determine vertical placement
+            if (spaceBelow >= dropdownHeight) {
+                // Enough space below - show below
+                top = buttonRect.bottom + 4; // 4px gap
+                placement = spaceRight >= dropdownWidth ? 'bottom-right' : 'bottom-left';
+            } else if (spaceAbove >= dropdownHeight) {
+                // Not enough space below, but enough above - show above
+                top = buttonRect.top - dropdownHeight - 4; // 4px gap
+                placement = spaceRight >= dropdownWidth ? 'top-right' : 'top-left';
             } else {
-                setDropdownPosition('bottom');
+                // Not enough space either way - use available space and make scrollable
+                if (spaceBelow > spaceAbove) {
+                    top = buttonRect.bottom + 4;
+                    placement = spaceRight >= dropdownWidth ? 'bottom-right' : 'bottom-left';
+                } else {
+                    top = Math.max(10, buttonRect.top - Math.min(dropdownHeight, spaceAbove) - 4);
+                    placement = spaceRight >= dropdownWidth ? 'top-right' : 'top-left';
+                }
             }
+            
+            // Determine horizontal placement
+            if (placement.includes('right')) {
+                // Position to the right of button
+                if (spaceRight >= dropdownWidth) {
+                    left = buttonRect.right + 4; // 4px gap to the right
+                } else {
+                    // Not enough space on right, position to the left
+                    left = buttonRect.left - dropdownWidth - 4; // 4px gap to the left
+                }
+            } else {
+                // Position to the left of button
+                if (spaceLeft >= dropdownWidth) {
+                    left = buttonRect.left - dropdownWidth - 4; // 4px gap to the left
+                } else {
+                    // Not enough space on left, position to the right
+                    left = buttonRect.right + 4; // 4px gap to the right
+                }
+            }
+            
+            // Ensure dropdown doesn't go off-screen
+            left = Math.max(10, Math.min(left, viewportWidth - dropdownWidth - 10));
+            top = Math.max(10, Math.min(top, viewportHeight - 10));
+            
+            setDropdownPosition({ top, left, placement });
         }
     }, [isOpen]);
 
@@ -71,7 +171,10 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, au
             .reduce((sum, r) => sum + (r.quantity_produced || 0), 0);
     };
 
-    const canEdit = (isProductionHead || isAdmin) && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
+    // Allow can_only_print users to assign only for printing workflow step
+    const isPrintingWorkflow = ticket.current_workflow_step === 'printing' || ticket.status === 'ready_to_print';
+    const canEditByCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
+    const canEdit = (isProductionHead || isAdmin || canEditByCanOnlyPrint) && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
 
     // Handle checkbox change using local state to avoid race conditions
     const handleCheckboxChange = (user, checked) => {
@@ -101,14 +204,18 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, au
 
                     {isOpen && (
                         <div
-                            className="card shadow-lg p-2 position-absolute"
+                            className="card shadow-lg p-2"
                             style={{
-                                zIndex: 1000,
+                                position: 'fixed',
+                                zIndex: 9999,
                                 width: '220px',
-                                left: 0,
-                                [dropdownPosition === 'top' ? 'bottom' : 'top']: '100%',
+                                top: `${dropdownPosition.top}px`,
+                                left: `${dropdownPosition.left}px`,
                                 maxHeight: '300px',
-                                overflowY: 'auto'
+                                overflowY: 'auto',
+                                backgroundColor: 'white',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '0.25rem'
                             }}
                         >
                             <div className="text-muted small mb-2 p-1 border-bottom">Select users to assign</div>

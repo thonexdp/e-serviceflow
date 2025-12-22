@@ -40,6 +40,7 @@ class ProductionQueueController extends Controller
 
     public function getData(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         $query = Ticket::with([
@@ -53,18 +54,22 @@ class ProductionQueueController extends Controller
             'productionRecords.user',
             'productionRecords.evidenceFiles',
             'payments.documents',
-            'payments.recordedBy'
+            'payments.recordedBy',
+            'orderBranch',
+            'productionBranch'
         ])
-            ->whereIn('status', ['ready_to_print', 'in_production', 'completed'])
+            ->whereIn('status', ['ready_to_print', 'in_production'])
             ->where('payment_status', '!=', 'awaiting_verification')
             ->where(function ($q) {
                 $q->where('design_status', 'approved')
                     ->orWhereNull('design_status');
             });
 
-        // Production users can see ALL tickets for progress tracking
-        // They will be restricted from editing tickets that aren't in their workflow step
-        // No filtering by workflow step assignment for visibility
+        // Branch-based filtering for production users
+        // Production users can only see tickets assigned to their production branch
+        if ($user && $user->isProduction() && !$user->isAdmin() && $user->branch_id) {
+            $query->where('production_branch_id', $user->branch_id);
+        }
 
         // Apply search
         if ($request->has('search') && $request->search) {
@@ -81,58 +86,70 @@ class ProductionQueueController extends Controller
 
         $tickets = $query->orderByRaw("
             CASE 
-                WHEN status = 'ready_to_print' THEN 1
-                WHEN status = 'in_production' THEN 2
+                WHEN status = 'in_production' THEN 1
+                WHEN status = 'ready_to_print' THEN 2
                 WHEN status = 'completed' THEN 3
                 ELSE 4
             END
-        ")->latest()->get();
+        ")
+            ->orderBy('due_date', 'asc')
+            ->get();
 
         // Production users can see all tickets for progress tracking
         // Permission to edit will be checked in the update methods
 
         // Paginate manually
-        $perPage = $request->get('per_page', 15);
+        $perPage = $request->get('per_page', 10);
         $currentPage = $request->get('page', 1);
         $total = $tickets->count();
-        $tickets = $tickets->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        
+        // If per_page is very large (like 1000), return all tickets without pagination
+        if ($perPage >= 1000) {
+            $tickets = $tickets->values();
+            // Create a simple paginator structure for compatibility
+            $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
+                $tickets,
+                $total,
+                $total, // Set per_page to total so it shows all
+                1, // Always page 1
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        } else {
+            $tickets = $tickets->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
-        // Create paginator manually
-        $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
-            $tickets,
-            $total,
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
+            // Create paginator manually
+            $tickets = new \Illuminate\Pagination\LengthAwarePaginator(
+                $tickets,
+                $total,
+                $perPage,
+                $currentPage,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        }
 
         // Get all active stock items for consumption form
         $stockItems = \App\Models\StockItem::where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        // Calculate summary statistics for today
-        $today = now()->startOfDay();
-        $baseQuery = Ticket::whereIn('status', ['ready_to_print', 'in_production', 'completed'])
-            ->where('payment_status', '!=', 'awaiting_verification')
+        // Calculate summary statistics
+        $summaryBase = Ticket::where('payment_status', '!=', 'awaiting_verification')
             ->where(function ($q) {
                 $q->where('design_status', 'approved')
                     ->orWhereNull('design_status');
             });
 
-        // Apply same filters for summary (except status filter to get all counts)
-        if ($request->has('search') && $request->search) {
-            $baseQuery->where(function ($q) use ($request) {
-                $q->where('ticket_number', 'like', '%' . $request->search . '%')
-                    ->orWhere('description', 'like', '%' . $request->search . '%');
-            });
+        if ($user && $user->isProduction() && !$user->isAdmin() && $user->branch_id) {
+            $summaryBase->where('production_branch_id', $user->branch_id);
         }
 
+        $today = now()->startOfDay();
+
         $summary = [
-            'total' => (clone $baseQuery)->count(),
-            'inProgress' => (clone $baseQuery)->where('status', 'in_production')->count(),
-            'finished' => (clone $baseQuery)->where('status', 'completed')->count(),
-            'delays' => (clone $baseQuery)
+            'total' => (clone $summaryBase)->whereIn('status', ['ready_to_print', 'in_production'])->count(),
+            'inProgress' => (clone $summaryBase)->where('status', 'in_production')->count(),
+            'finished' => (clone $summaryBase)->where('status', 'completed')->count(),
+            'delays' => (clone $summaryBase)
                 ->where('status', '!=', 'completed')
                 ->whereNotNull('due_date')
                 ->whereDate('due_date', '<', $today)
@@ -159,6 +176,7 @@ class ProductionQueueController extends Controller
      */
     public function startProduction($id)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $ticket = Ticket::with('jobType')->findOrFail($id);
         $oldStatus = $ticket->status;
@@ -207,6 +225,7 @@ class ProductionQueueController extends Controller
      */
     public function updateProgress(Request $request, $id)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $ticket = Ticket::with([
             'jobType',
@@ -546,9 +565,17 @@ class ProductionQueueController extends Controller
             // Determine recipients and notification content based on status change
             switch ($newStatus) {
                 case 'in_production':
-                    // Notify FrontDesk AND Production users
-                    $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
-                    $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+                    // Notify FrontDesk from order branch AND Production from production branch
+                    $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
+                        ->when($ticket->order_branch_id, function ($query) use ($ticket) {
+                            $query->where('branch_id', $ticket->order_branch_id);
+                        })
+                        ->get();
+                    $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                        ->when($ticket->production_branch_id, function ($query) use ($ticket) {
+                            $query->where('branch_id', $ticket->production_branch_id);
+                        })
+                        ->get();
 
                     // Merge both user collections and get unique IDs
                     $allUsers = $frontDeskUsers->merge($productionUsers);
@@ -560,9 +587,17 @@ class ProductionQueueController extends Controller
                     break;
 
                 case 'completed':
-                    // Notify FrontDesk AND Production users
-                    $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
-                    $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+                    // Notify FrontDesk from order branch AND Production from production branch
+                    $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
+                        ->when($ticket->order_branch_id, function ($query) use ($ticket) {
+                            $query->where('branch_id', $ticket->order_branch_id);
+                        })
+                        ->get();
+                    $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                        ->when($ticket->production_branch_id, function ($query) use ($ticket) {
+                            $query->where('branch_id', $ticket->production_branch_id);
+                        })
+                        ->get();
 
                     // Merge both user collections and get unique IDs
                     $allUsers = $frontDeskUsers->merge($productionUsers);
@@ -622,9 +657,17 @@ class ProductionQueueController extends Controller
         try {
             $triggeredBy = Auth::user();
 
-            // Notify ALL production users AND frontdesk
-            $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)->get();
-            $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)->get();
+            // Notify production users from production branch AND frontdesk from order branch
+            $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
+                ->when($ticket->order_branch_id, function ($query) use ($ticket) {
+                    $query->where('branch_id', $ticket->order_branch_id);
+                })
+                ->get();
+            $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                ->when($ticket->production_branch_id, function ($query) use ($ticket) {
+                    $query->where('branch_id', $ticket->production_branch_id);
+                })
+                ->get();
 
             $allUsers = $frontDeskUsers->merge($productionUsers);
             $recipientIds = $allUsers->pluck('id')->unique()->toArray();
@@ -715,7 +758,11 @@ class ProductionQueueController extends Controller
     protected function notifyNextWorkflowStepUsers(Ticket $ticket, string $nextWorkflowStep): void
     {
         try {
-            $users = \App\Models\User::getUsersAssignedToWorkflowStep($nextWorkflowStep);
+            // Get users assigned to workflow step and filter by production branch
+            $users = \App\Models\User::getUsersAssignedToWorkflowStep($nextWorkflowStep)
+                ->when($ticket->production_branch_id, function ($query) use ($ticket) {
+                    $query->where('branch_id', $ticket->production_branch_id);
+                });
 
             if ($users->isEmpty()) {
                 return;
@@ -738,6 +785,7 @@ class ProductionQueueController extends Controller
                         'ticket_number' => $ticket->ticket_number,
                         'workflow_step' => $nextWorkflowStep,
                         'workflow_step_label' => $stepLabel,
+                        'production_branch_id' => $ticket->production_branch_id,
                     ],
                 ]);
             }
@@ -759,16 +807,25 @@ class ProductionQueueController extends Controller
     }
 
     /**
-     * Assign production users to a ticket (Production Head only)
+     * Assign production users to a ticket (Production Head, Admin, or can_only_print users for printing workflow)
      */
     public function assignUsers(Request $request, $id)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        // Only Production Head or Admin can assign users
-        if (!$user->isProductionHead() && !$user->isAdmin()) {
-            return redirect()->back()->with('error', 'Only Production Head or Admin can assign users to tickets.');
+        // Check if user can assign - Production Head, Admin, or can_only_print users for printing workflow
+        $isPrintingWorkflow = $ticket->current_workflow_step === 'printing' || $ticket->status === 'ready_to_print';
+        $canAssignByCanOnlyPrint = $user->can_only_print && $isPrintingWorkflow;
+
+        if (!$user->isProductionHead() && !$user->isAdmin() && !$canAssignByCanOnlyPrint) {
+            return redirect()->back()->with('error', 'You do not have permission to assign users to tickets.');
+        }
+
+        // If can_only_print user, ensure they can only assign for printing workflow
+        if ($user->can_only_print && !$isPrintingWorkflow) {
+            return redirect()->back()->with('error', 'You can only assign users to tickets in the printing workflow step.');
         }
 
         $validated = $request->validate([
@@ -817,6 +874,7 @@ class ProductionQueueController extends Controller
      */
     public function allTickets(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         $query = Ticket::with([
@@ -828,7 +886,7 @@ class ProductionQueueController extends Controller
             'assignedUsers',
             'assignedToUser',
         ])
-            ->whereIn('status', ['ready_to_print', 'in_production', 'completed']);
+            ->whereIn('status', ['ready_to_print', 'in_production']);
 
         // Apply filters
         if ($request->filled('search')) {
@@ -846,7 +904,15 @@ class ProductionQueueController extends Controller
             $query->where('current_workflow_step', $request->workflow_step);
         }
 
-        $tickets = $query->orderBy('due_date', 'asc')
+        $tickets = $query->orderByRaw("
+                CASE 
+                    WHEN status = 'in_production' THEN 1
+                    WHEN status = 'ready_to_print' THEN 2
+                    WHEN status = 'completed' THEN 3
+                    ELSE 4
+                END
+            ")
+            ->orderBy('due_date', 'asc')
             ->paginate(20)
             ->withQueryString();
 
@@ -869,8 +935,7 @@ class ProductionQueueController extends Controller
     public function workflowView(Request $request, string $workflowStep)
     {
         try {
-            //code...
-
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             // Verify user has access to this workflow step
@@ -894,13 +959,24 @@ class ProductionQueueController extends Controller
 
             // For printing workflow, include ready_to_print tickets
             if ($workflowStep === 'printing') {
-                $query->where(function ($q) use ($workflowStep) {
-                    $q->where(function ($sq) use ($workflowStep) {
-                        $sq->where('current_workflow_step', $workflowStep)
-                            ->where('status', 'in_production');
-                    })
-                        ->orWhere('status', 'ready_to_print');
-                });
+                // If user can only print, show ready_to_print tickets and in_production tickets with printing step
+                if ($user->can_only_print) {
+                    $query->where(function ($q) use ($workflowStep) {
+                        $q->where('status', 'ready_to_print')
+                            ->orWhere(function ($sq) use ($workflowStep) {
+                                $sq->where('current_workflow_step', $workflowStep)
+                                    ->where('status', 'in_production');
+                            });
+                    });
+                } else {
+                    $query->where(function ($q) use ($workflowStep) {
+                        $q->where(function ($sq) use ($workflowStep) {
+                            $sq->where('current_workflow_step', $workflowStep)
+                                ->where('status', 'in_production');
+                        })
+                            ->orWhere('status', 'ready_to_print');
+                    });
+                }
             } else {
                 // For other workflow steps, only show in_production tickets with matching step
                 $query->where('current_workflow_step', $workflowStep)
@@ -908,7 +984,14 @@ class ProductionQueueController extends Controller
             }
 
             // Filter to only tickets assigned to this user (unless Production Head/Admin)
-            if (!$user->is_head && $user->role !== 'admin') {
+            // If the user has access to this workflow step (verified above), they should see all tickets in this step's queue
+            // but we still want to prioritize their assigned tickets if needed.
+            // For now, allow viewing all tickets in the queue if they have step access.
+            if (!$user->is_head && $user->role !== 'admin' && $user->role === 'Production') {
+                // Production users already have access to this step checked at line 916
+                // They can see all tickets in this step's pool
+            } elseif (!$user->is_head && $user->role !== 'admin') {
+                // Secondary fallback for other roles
                 $query->where(function ($q) use ($user) {
                     $q->whereHas('assignedUsers', function ($sq) use ($user) {
                         $sq->where('users.id', $user->id);
@@ -923,14 +1006,29 @@ class ProductionQueueController extends Controller
                 });
             }
 
-            $tickets = $query->orderBy('due_date', 'asc')
+            $tickets = $query->orderByRaw("
+                    CASE 
+                        WHEN status = 'in_production' THEN 1
+                        WHEN status = 'ready_to_print' THEN 2
+                        WHEN status = 'completed' THEN 3
+                        ELSE 4
+                    END
+                ")
+                ->orderBy('due_date', 'asc')
                 ->paginate(20)
                 ->withQueryString();
+
+            // Get all production users for assignment dropdown
+            $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
 
             return Inertia::render('Production/WorkflowView', [
                 'tickets' => $tickets,
                 'workflowStep' => $workflowStep,
                 'filters' => $request->only(['search']),
+                'productionUsers' => $productionUsers,
             ]);
         } catch (\Throwable $th) {
             dd($th);
@@ -942,6 +1040,7 @@ class ProductionQueueController extends Controller
      */
     public function startWorkflow(Request $request, string $workflowStep, Ticket $ticket)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $oldStatus = $ticket->status;
 
@@ -952,9 +1051,14 @@ class ProductionQueueController extends Controller
 
         // Check if user is authorized to start production (for Production users)
         if ($user && $user->isProduction() && !$user->isAdmin()) {
-            $firstStep = $ticket->getFirstWorkflowStep();
-            if ($firstStep && !$user->isAssignedToWorkflowStep($firstStep)) {
-                return redirect()->back()->with('error', 'You cannot start production on this ticket. The first workflow step "' . ucfirst(str_replace('_', ' ', $firstStep)) . '" is not assigned to you.');
+            // Allow can_only_print users to start printing workflow
+            if ($user->can_only_print && $workflowStep === 'printing' && ($ticket->status === 'ready_to_print' || $ticket->current_workflow_step === 'printing')) {
+                // Allow can_only_print users to start printing workflow
+            } else {
+                $firstStep = $ticket->getFirstWorkflowStep();
+                if ($firstStep && !$user->isAssignedToWorkflowStep($firstStep)) {
+                    return redirect()->back()->with('error', 'You cannot start production on this ticket. The first workflow step "' . ucfirst(str_replace('_', ' ', $firstStep)) . '" is not assigned to you.');
+                }
             }
         }
 
@@ -998,13 +1102,30 @@ class ProductionQueueController extends Controller
      */
     public function updateWorkflow(Request $request, string $workflowStep, Ticket $ticket)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Check authorization for can_only_print users
+        if ($user->can_only_print && $workflowStep !== 'printing') {
+            return redirect()->back()->with('error', 'You can only update printing workflow tickets.');
+        }
+
+        // Check if ticket is in correct status for can_only_print users
+        if ($user->can_only_print && $workflowStep === 'printing') {
+            if ($ticket->status !== 'ready_to_print' && $ticket->status !== 'in_production') {
+                return redirect()->back()->with('error', 'You can only update tickets that are ready to print or in production.');
+            }
+            if ($ticket->status === 'in_production' && $ticket->current_workflow_step !== 'printing') {
+                return redirect()->back()->with('error', 'This ticket is not in the printing workflow step.');
+            }
+        }
+
         $request->validate([
             'produced_quantity' => 'required|integer|min:0',
             'evidence_files.*' => 'nullable|file|image|max:10240', // 10MB max
             'selected_user_id' => 'nullable|exists:users,id',
         ]);
 
-        $user = Auth::user();
         $producedQuantity = $request->input('produced_quantity');
         $selectedUserId = $request->input('selected_user_id', $user->id);
 
@@ -1078,8 +1199,9 @@ class ProductionQueueController extends Controller
                 }
             }
 
-            // Update ticket produced_quantity with total from all workflow steps
+            // Update ticket produced_quantity with total from the CURRENT workflow step ONLY
             $totalProduced = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
+                ->where('workflow_step', $workflowStep)
                 ->sum('quantity_produced');
             $ticket->update(['produced_quantity' => $totalProduced]);
 
@@ -1098,13 +1220,29 @@ class ProductionQueueController extends Controller
      */
     public function completeWorkflow(Request $request, string $workflowStep, Ticket $ticket)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Check authorization for can_only_print users
+        if ($user->can_only_print && $workflowStep !== 'printing') {
+            return redirect()->back()->with('error', 'You can only complete printing workflow tickets.');
+        }
+
+        // Check if ticket is in correct status for can_only_print users
+        if ($user->can_only_print && $workflowStep === 'printing') {
+            if ($ticket->status !== 'ready_to_print' && $ticket->status !== 'in_production') {
+                return redirect()->back()->with('error', 'You can only complete tickets that are ready to print or in production.');
+            }
+            if ($ticket->status === 'in_production' && $ticket->current_workflow_step !== 'printing') {
+                return redirect()->back()->with('error', 'This ticket is not in the printing workflow step.');
+            }
+        }
+
         $request->validate([
             'produced_quantity' => 'nullable|integer|min:0',
             'evidence_files.*' => 'nullable|file|image|max:10240',
             'selected_user_id' => 'nullable|exists:users,id',
         ]);
-
-        $user = Auth::user();
         $producedQuantity = $request->input('produced_quantity');
         $selectedUserId = $request->input('selected_user_id', $user->id);
 
@@ -1167,8 +1305,9 @@ class ProductionQueueController extends Controller
                     }
                 }
 
-                // Update ticket produced_quantity with total from all workflow steps
+                // Update ticket produced_quantity with total from the CURRENT workflow step ONLY
                 $totalProduced = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
+                    ->where('workflow_step', $workflowStep)
                     ->sum('quantity_produced');
                 $ticket->update(['produced_quantity' => $totalProduced]);
             } else {
@@ -1217,6 +1356,7 @@ class ProductionQueueController extends Controller
                     'is_workflow_completed' => true,
                     'workflow_completed_at' => now(),
                     'current_workflow_step' => null,
+                    'produced_quantity' => $ticket->total_quantity,
                 ]);
 
                 // Auto-consume stock

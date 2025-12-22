@@ -17,7 +17,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::with(['permissions', 'workflowSteps'])->orderBy('created_at', 'desc')->get();
+        $users = User::with(['permissions', 'workflowSteps', 'branch'])->orderBy('created_at', 'desc')->get();
 
         // Define available workflow steps
         $availableWorkflowSteps = [
@@ -27,12 +27,13 @@ class UserController extends Controller
             'cutting' => 'Cutting',
             'sewing' => 'Sewing',
             'dtf_press' => 'DTF Press',
+            'qa' => 'Quality Assurance',
         ];
 
         return Inertia::render('Users', [
             'users' => $users,
             'availableRoles' => [
-                User::ROLE_ADMIN,
+                // User::ROLE_ADMIN,
                 User::ROLE_FRONTDESK,
                 User::ROLE_DESIGNER,
                 User::ROLE_PRODUCTION,
@@ -40,6 +41,7 @@ class UserController extends Controller
             ],
             'availablePermissions' => Permission::all()->groupBy('module'),
             'availableWorkflowSteps' => $availableWorkflowSteps,
+            'availableBranches' => \App\Models\Branch::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -66,12 +68,14 @@ class UserController extends Controller
             'email' => 'required|string|max:255|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => 'required|in:admin,FrontDesk,Designer,Production,Cashier',
+            'branch_id' => 'nullable|exists:branches,id',
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
             'workflow_steps' => 'nullable|array',
-            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press',
+            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press,qa',
             'is_active' => 'nullable|boolean',
             'is_head' => 'nullable|boolean',
+            'can_only_print' => 'nullable|boolean',
         ]);
 
         $user = User::create([
@@ -79,8 +83,10 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
+            'branch_id' => $validated['branch_id'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
             'is_head' => ($validated['role'] === 'Production' && isset($validated['is_head'])) ? $validated['is_head'] : false,
+            'can_only_print' => ($validated['role'] === 'Production' && isset($validated['can_only_print'])) ? $validated['can_only_print'] : false,
         ]);
 
         // Sync permissions if provided
@@ -88,8 +94,12 @@ class UserController extends Controller
             $this->syncUserPermissions($user, $validated['permissions']);
         }
 
-        // Sync workflow steps if provided and user is Production
-        if ($user->isProduction() && isset($validated['workflow_steps'])) {
+        // Sync workflow steps if provided and user is Production or Production Head/Supervisor
+        if (($user->isProduction() || $user->is_head) && isset($validated['workflow_steps'])) {
+            // If user can only print, ensure workflow_steps only contains printing
+            if ($user->can_only_print) {
+                $validated['workflow_steps'] = ['printing'];
+            }
             $user->syncWorkflowSteps($validated['workflow_steps']);
         }
 
@@ -115,28 +125,34 @@ class UserController extends Controller
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'update_password' => 'nullable|boolean', // Toggle to update password
             'role' => 'required|in:admin,FrontDesk,Designer,Production,Cashier',
+            'branch_id' => 'nullable|exists:branches,id',
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
             'workflow_steps' => 'nullable|array',
-            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press',
+            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press,qa',
             'is_active' => 'nullable|boolean',
             'is_head' => 'nullable|boolean',
+            'can_only_print' => 'nullable|boolean',
         ]);
 
         $oldData = [
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,
+            'branch_id' => $user->branch_id,
             'is_active' => $user->is_active,
             'is_head' => $user->is_head,
+            'can_only_print' => $user->can_only_print,
         ];
 
         $user->update([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role' => $validated['role'],
+            'branch_id' => $validated['branch_id'] ?? null,
             'is_active' => $validated['is_active'] ?? $user->is_active,
             'is_head' => ($validated['role'] === 'Production' && isset($validated['is_head'])) ? $validated['is_head'] : false,
+            'can_only_print' => ($validated['role'] === 'Production' && isset($validated['can_only_print'])) ? $validated['can_only_print'] : false,
         ]);
 
         // Update password only if update_password is true and password is provided
@@ -177,11 +193,15 @@ class UserController extends Controller
             $this->syncUserPermissions($user, $validated['permissions']);
         }
 
-        // Sync workflow steps if provided and user is Production
-        if ($user->isProduction() && isset($validated['workflow_steps'])) {
+        // Sync workflow steps if provided and user is Production or Production Head/Supervisor
+        if (($user->isProduction() || $user->is_head) && isset($validated['workflow_steps'])) {
+            // If user can only print, ensure workflow_steps only contains printing
+            if ($user->can_only_print) {
+                $validated['workflow_steps'] = ['printing'];
+            }
             $user->syncWorkflowSteps($validated['workflow_steps']);
-        } elseif (!$user->isProduction()) {
-            // Remove workflow steps if user is no longer Production
+        } elseif (!$user->isProduction() && !$user->is_head) {
+            // Remove workflow steps if user is no longer Production or Production Head
             $user->workflowSteps()->delete();
         }
 
@@ -252,8 +272,20 @@ class UserController extends Controller
     private function syncUserPermissions(User $user, array $permissions)
     {
         $sync = [];
+        $role = $user->role;
+
+        // Get all allowed permissions for this role
+        // This ensures the user cannot be granted permissions not intended for their role
+        $allowedPermissionIds = Permission::all()->filter(function ($p) use ($role) {
+            if (empty($p->role)) {
+                return true;
+            }
+            $allowedRoles = array_map('trim', explode(',', $p->role));
+            return in_array($role, $allowedRoles);
+        })->pluck('id')->toArray();
+
         foreach ($permissions as $permissionId => $granted) {
-            if ($granted) {
+            if ($granted && in_array($permissionId, $allowedPermissionIds)) {
                 $sync[$permissionId] = ['granted' => true];
             }
         }

@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\PaymentDocument;
 use App\Models\Ticket;
+use App\Models\UserActivityLog;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,31 @@ class PaymentRecorder
             $ticket = null;
             if (!empty($payload['ticket_id'])) {
                 $ticket = Ticket::with('customer')->findOrFail($payload['ticket_id']);
+
+                // If discount is provided, update the ticket's discount and total amount
+                if (isset($payload['discount'])) {
+                    $oldDiscount = $ticket->discount;
+                    $ticket->discount = (float)$payload['discount'];
+                    $subtotal = (float)($ticket->subtotal ?? 0);
+                    if ($subtotal > 0) {
+                        $discountAmount = $subtotal * ($ticket->discount / 100);
+                        $ticket->total_amount = round($subtotal - $discountAmount, 2);
+                        $ticket->save();
+
+                        // Log discount change
+                        if ($oldDiscount != $ticket->discount) {
+                            UserActivityLog::log(
+                                Auth::id(),
+                                'ticket_discount_updated',
+                                "Updated discount for Ticket #{$ticket->ticket_number} from {$oldDiscount}% to {$ticket->discount}% during payment.",
+                                $ticket,
+                                ['old_discount' => $oldDiscount, 'new_discount' => $ticket->discount]
+                            );
+                        }
+
+                        $ticket->refresh();
+                    }
+                }
             }
 
             $customerId = $payload['customer_id'] ?? $ticket?->customer_id;
@@ -59,6 +85,15 @@ class PaymentRecorder
                 'notes' => $payload['notes'] ?? null,
                 'metadata' => $payload['metadata'] ?? null,
             ]);
+
+            // Log payment recording
+            UserActivityLog::log(
+                Auth::id(),
+                'payment_recorded',
+                "Recorded payment of ₱" . number_format($payload['amount'], 2) . " for " . ($ticket ? "Ticket #{$ticket->ticket_number}" : "Customer {$payerName}"),
+                $payment,
+                $payload
+            );
 
             foreach ($attachments as $file) {
                 if (!$file instanceof UploadedFile) {

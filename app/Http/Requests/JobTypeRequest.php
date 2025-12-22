@@ -25,6 +25,7 @@ class JobTypeRequest extends FormRequest
             'promo_text' => 'nullable|string|max:255',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer|min:0',
+            'image' => 'nullable|image|max:2048',
 
             // Price tiers
             'price_tiers' => 'nullable|array',

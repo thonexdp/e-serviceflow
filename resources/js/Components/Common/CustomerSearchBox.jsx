@@ -4,16 +4,30 @@ import { useRoleApi } from "@/Hooks/useRoleApi";
 
 
 export default function CustomerSearchBox({ onSelect, _selectedCustomer }) {
-    const [query, setQuery] = useState("");
+    const [query, setQuery] = useState(_selectedCustomer?.full_name || "");
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
     const { api } = useRoleApi();
 
+    // Sync query with selected customer if it changes externally (e.g. after ticket creation)
+    useEffect(() => {
+        if (_selectedCustomer) {
+            setQuery(_selectedCustomer.full_name);
+        } else if (query === "") {
+            setResults([]);
+        }
+    }, [_selectedCustomer]);
 
     useEffect(() => {
+        // If query matches the selected customer's name exactly, don't trigger a new search
+        if (_selectedCustomer && query === _selectedCustomer.full_name) {
+            return;
+        }
+
         if (query.length < 2) {
             setResults([]);
+            setShowDropdown(false);
             return;
         }
 
@@ -31,10 +45,11 @@ export default function CustomerSearchBox({ onSelect, _selectedCustomer }) {
         }, 300);
 
         return () => clearTimeout(delay);
-    }, [query]);
+    }, [query, _selectedCustomer]);
 
     const handleSelect = (customer) => {
         setQuery(customer.full_name);
+        setResults([]); // Clear results to prevent "No results found" from flashing
         setShowDropdown(false);
         onSelect(customer);
     };

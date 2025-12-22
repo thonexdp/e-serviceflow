@@ -22,97 +22,89 @@ class FinanceController extends Controller
      */
     public function index(Request $request): Response
     {
-        $perPage = (int)$request->input('per_page', 15);
-        $tab = $request->input('tab', 'receivables');
+        $user = auth()->user();
         $search = $request->input('search');
 
         // Ledger (Payment History)
-        $ledger = null;
-        if ($tab === 'ledger') {
-            $ledger = Payment::with(['ticket.customer', 'customer', 'documents'])
-                ->when($request->filled('method'), fn($query) => $query->where('payment_method', $request->string('method')))
-                ->when(
-                    $request->filled('status'),
-                    fn($query) => $query->where('status', $request->string('status')),
-                    fn($query) => $query->whereNotIn('status', ['pending', 'rejected'])
-                )
-                ->when($search, function ($query) use ($search) {
-                    $term = '%' . $search . '%';
-                    $query->where(function ($q) use ($term) {
-                        $q->where('official_receipt_number', 'like', $term)
-                            ->orWhere('invoice_number', 'like', $term)
-                            ->orWhere('payment_reference', 'like', $term)
-                            ->orWhere('payer_name', 'like', $term)
-                            ->orWhere('payment_method', 'like', $term)
-                            ->orWhere('notes', 'like', $term)
-                            ->orWhere('amount', 'like', $term)
-                            ->orWhereHas('ticket', function ($t) use ($term) {
-                                $t->where('ticket_number', 'like', $term)
-                                    ->orWhere('description', 'like', $term);
-                            })
-                            ->orWhereHas('customer', function ($c) use ($term) {
-                                $c->where('firstname', 'like', $term)
-                                    ->orWhere('lastname', 'like', $term)
-                                    ->orWhereRaw("CONCAT(firstname, ' ', lastname) LIKE ?", [$term]);
-                            });
-                    });
-                })
-                ->orderByDesc('payment_date')
-                ->orderByDesc('id')
-                ->paginate($perPage)
-                ->withQueryString();
-        }
+        $ledger = Payment::with(['ticket.customer', 'ticket.jobType', 'ticket.payments', 'customer', 'documents'])
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->whereHas('ticket', function ($q) use ($user) {
+                    $q->where('order_branch_id', $user->branch_id);
+                });
+            })
+            ->when($request->filled('method'), fn($query) => $query->where('payment_method', $request->string('method')))
+            ->when(
+                $request->filled('status'),
+                fn($query) => $query->where('status', $request->string('status')),
+                fn($query) => $query->whereNotIn('status', ['pending', 'rejected'])
+            )
+            ->whereHas('ticket', function ($query) {
+                $query->where('payment_status', '!=', 'awaiting_verification');
+            })
+            ->when($search, function ($query) use ($search) {
+                $term = '%' . $search . '%';
+                $query->where(function ($q) use ($term) {
+                    $q->where('official_receipt_number', 'like', $term)
+                        ->orWhere('invoice_number', 'like', $term)
+                        ->orWhere('payment_reference', 'like', $term)
+                        ->orWhere('payer_name', 'like', $term)
+                        ->orWhere('payment_method', 'like', $term)
+                        ->orWhere('notes', 'like', $term)
+                        ->orWhere('amount', 'like', $term)
+                        ->orWhereHas('ticket', function ($t) use ($term) {
+                            $t->where('ticket_number', 'like', $term)
+                                ->orWhere('description', 'like', $term);
+                        })
+                        ->orWhereHas('customer', function ($c) use ($term) {
+                            $c->where('firstname', 'like', $term)
+                                ->orWhere('lastname', 'like', $term)
+                                ->orWhereRaw("CONCAT(firstname, ' ', lastname) LIKE ?", [$term]);
+                        });
+                });
+            })
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->paginate(15, ['*'], 'ledger_page')
+            ->withQueryString();
 
-        // Receivables
-        $receivables = null;
-        if ($tab === 'receivables') {
-            $receivables = $this->buildReceivables($request);
-        }
+        // Receivables - always load
+        $receivables = $this->buildReceivables($request);
 
-        // Expenses
-        $expenses = null;
-        if ($tab === 'expenses') {
-            $expenses = Expense::with('ticket')
-                ->when($search, function ($query) use ($search) {
-                    $term = '%' . $search . '%';
-                    $query->where(function ($q) use ($term) {
-                        $q->where('description', 'like', $term)
-                            ->orWhere('vendor', 'like', $term)
-                            ->orWhere('category', 'like', $term)
-                            ->orWhere('amount', 'like', $term)
-                            ->orWhere('notes', 'like', $term)
-                            ->orWhere('payment_method', 'like', $term)
-                            ->orWhereHas('ticket', function ($t) use ($term) {
-                                $t->where('ticket_number', 'like', $term);
-                            });
-                    });
-                })
-                ->orderByDesc('expense_date')
-                ->paginate(15)
-                ->withQueryString();
-        }
+        // Expenses - always load
+        $expenses = Expense::with('ticket')
+            ->when($search, function ($query) use ($search) {
+                $term = '%' . $search . '%';
+                $query->where(function ($q) use ($term) {
+                    $q->where('description', 'like', $term)
+                        ->orWhere('vendor', 'like', $term)
+                        ->orWhere('category', 'like', $term)
+                        ->orWhere('amount', 'like', $term)
+                        ->orWhere('notes', 'like', $term)
+                        ->orWhere('payment_method', 'like', $term)
+                        ->orWhereHas('ticket', function ($t) use ($term) {
+                            $t->where('ticket_number', 'like', $term);
+                        });
+                });
+            })
+            ->orderByDesc('expense_date')
+            ->paginate(15, ['*'], 'expenses_page')
+            ->withQueryString();
 
-        // Cash Flow (Full list if tab is active, or maybe summary only)
-        // Original code loaded all posted payments. This might be heavy if not paginated.
-        // Assuming cashFlow tab just lists them or is a chart data source.
-        // Since original code had it, we keep it but only if needed or just minimal.
-        // Original: $cashFlow = $this->buildCashFlow();
-        // If tab is 'cashFlow', load it.
+        // Cash Flow - keep empty or load if needed
         $cashFlow = [];
-        // Note: The frontend uses 'cashFlow' prop but the tab rendering is commented out in original JSX: // { key: "cashFlow", label: "Cash Flow" },
-        // So we might skip it or leave it empty to save resources unless user uncomments.
-        // I will keep it empty for now as it's not active in UI.
 
-        // Pending Payments (Always load for Badge count, or optimize?)
-        // Summary needs count.
-        // Pending payments tab needs list.
-        $pendingPayments = [];
-        if ($tab === 'pending_payments') {
-            $pendingPayments = Payment::with(['ticket.customer', 'customer', 'documents'])
-                ->where('status', 'pending')
-                ->orderByDesc('payment_date')
-                ->get();
-        }
+        // Pending Payments - always load
+        $pendingPayments = Payment::with(['ticket.customer', 'customer', 'documents'])
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->whereHas('ticket', function ($q) use ($user) {
+                    $q->where('order_branch_id', $user->branch_id);
+                });
+            })
+            ->where('status', 'pending')
+            ->orderByDesc('payment_date')
+            ->get();
 
         // Summary Statistics (Always loaded for header cards)
         $summary = $this->buildSummary();
@@ -120,24 +112,21 @@ class FinanceController extends Controller
         // Dropdown Data
         $openTickets = Ticket::with('customer')
             ->where('payment_status', '!=', 'paid')
+            ->where('payment_status', '!=', 'awaiting_verification')
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->where('order_branch_id', $user->branch_id);
+            })
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'amount_paid', 'discount', 'quantity', 'description', 'size_value', 'size_unit', 'job_type']);
+            ->get(['id', 'ticket_number', 'customer_id', 'total_amount', 'subtotal', 'amount_paid', 'discount', 'quantity', 'description', 'size_value', 'size_unit', 'job_type']);
 
         $recentCustomers = Customer::orderBy('lastname')
             ->limit(50)
             ->get(['id', 'firstname', 'lastname']);
 
-        // Quick fetch for pending count if not loaded
-        $pendingCount = Payment::where('status', 'pending')->count();
-        if (empty($pendingPayments)) {
-            // pass
-        } else {
-            $pendingCount = $pendingPayments->count();
-        }
-
         // Update summary with accurate count
-        $summary['pending_cheques_count'] = $pendingCount;
+        $summary['pending_cheques_count'] = $pendingPayments->count();
 
 
         return Inertia::render('PaymentsFinance', [
@@ -157,15 +146,20 @@ class FinanceController extends Controller
 
     protected function buildReceivables(Request $request)
     {
-        $perPage = (int)$request->input('per_page', 15);
+        $user = auth()->user();
         $search = $request->input('search');
 
-        $query = Ticket::with(['customer', 'payments' => function ($q) {
+        $query = Ticket::with(['customer', 'jobType', 'payments' => function ($q) {
             $q->where('status', 'rejected')->latest();
         }])
             ->where('payment_status', '!=', 'paid')
+            ->where('payment_status', '!=', 'awaiting_verification')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
+            })
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->where('order_branch_id', $user->branch_id);
             });
 
         if ($search) {
@@ -182,7 +176,7 @@ class FinanceController extends Controller
         }
 
         return $query->orderByDesc('created_at') // Sort by ticket creation date (descending)
-            ->paginate($perPage)
+            ->paginate(15, ['*'], 'receivables_page')
             ->withQueryString()
             ->through(function ($ticket) {
                 return [
@@ -194,6 +188,7 @@ class FinanceController extends Controller
                     'total_invoiced' => $ticket->total_amount,
                     'total_paid' => $ticket->amount_paid,
                     'balance' => $ticket->total_amount - $ticket->amount_paid,
+                    'discount' => $ticket->discount,
                     'due_date' => $ticket->due_date,
                     'created_at' => $ticket->created_at, // useful for debug/display
                     'has_rejected_payment' => $ticket->payments->isNotEmpty(),
@@ -212,20 +207,32 @@ class FinanceController extends Controller
 
     protected function buildSummary(?Collection $receivables = null): array
     {
+        $user = auth()->user();
         $now = Carbon::now();
         $monthRange = [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()];
 
         $collections = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', $monthRange)
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->whereHas('ticket', function ($q) use ($user) {
+                    $q->where('order_branch_id', $user->branch_id);
+                });
+            })
             ->sum('amount');
 
         $expenses = Expense::whereBetween('expense_date', $monthRange)->sum('amount');
 
         // Calculate total receivables independently since we don't load all of them anymore
         $receivablesTotal = Ticket::where('payment_status', '!=', 'paid')
+            ->where('payment_status', '!=', 'awaiting_verification')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
+            })
+            // Apply branch filtering for non-admin users
+            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                $query->where('order_branch_id', $user->branch_id);
             })
             ->get()
             ->sum(function ($ticket) {
@@ -238,7 +245,13 @@ class FinanceController extends Controller
             'net_cash_flow_month' => round($collections - $expenses, 2),
             'receivables_total' => round($receivablesTotal, 2),
             'pending_cheques_count' => 0, // set in index
-            'open_tickets' => Ticket::where('payment_status', '!=', 'paid')->count(),
+            'open_tickets' => Ticket::where('payment_status', '!=', 'paid')
+                ->where('payment_status', '!=', 'awaiting_verification')
+                // Apply branch filtering for non-admin users
+                ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                    $query->where('order_branch_id', $user->branch_id);
+                })
+                ->count(),
         ];
     }
 }

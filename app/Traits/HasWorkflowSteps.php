@@ -25,8 +25,7 @@ trait HasWorkflowSteps
             'cutting',
             'sewing',
             'dtf_press',
-            // 'assembly',
-            // 'quality_check',
+            'qa',
         ];
 
         // Find the first enabled step
@@ -60,8 +59,7 @@ trait HasWorkflowSteps
             'cutting',
             'sewing',
             'dtf_press',
-            // 'assembly',
-            // 'quality_check',
+            'qa',
         ];
 
         // Find current step index
@@ -104,8 +102,7 @@ trait HasWorkflowSteps
             'cutting',
             'sewing',
             'dtf_press',
-            // 'assembly',
-            // 'quality_check',
+            'qa',
         ];
 
         // Find current step index
@@ -147,8 +144,7 @@ trait HasWorkflowSteps
             'cutting',
             'sewing',
             'dtf_press',
-            // 'assembly',
-            // 'quality_check',
+            'qa',
         ];
 
         $activeSteps = [];

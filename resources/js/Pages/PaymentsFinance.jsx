@@ -47,6 +47,7 @@ export default function PaymentsFinance({
         official_receipt_number: "",
         payment_reference: "",
         notes: "",
+        discount: "",
         attachments: [],
         bank_name: "",
         cheque_number: "",
@@ -71,6 +72,10 @@ export default function PaymentsFinance({
         onConfirm: () => { },
         loading: false
     });
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+    };
 
     const [expenseForm, setExpenseForm] = useState({
         category: expenseCategories[0] || "supplies",
@@ -101,17 +106,10 @@ export default function PaymentsFinance({
 
     const handleTabChange = (key) => {
         setActiveTab(key);
-        setLocalSearch("");
-        // Clear all filters but keep the tab selection
-        router.get(
-            buildUrl("finance"),
-            { tab: key },
-            {
-                preserveState: false,
-                preserveScroll: true,
-                replace: true,
-            }
-        );
+        // Update URL without reloading to keep it in sync for refreshes/searches
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', key);
+        window.history.replaceState({}, '', url);
     };
 
     // Auto-update when filters prop changes (if search is cleared from URL)
@@ -128,7 +126,6 @@ export default function PaymentsFinance({
     };
 
     const filteredReceivables = useMemo(() => {
-        // Server-side search is now implemented, so we just return the data
         if (receivables && receivables.data) {
             return receivables.data;
         }
@@ -200,6 +197,7 @@ export default function PaymentsFinance({
             official_receipt_number: "",
             payment_reference: "",
             notes: "",
+            discount: "",
             attachments: [],
             bank_name: "",
             cheque_number: "",
@@ -300,7 +298,7 @@ export default function PaymentsFinance({
         Object.entries(paymentForm).forEach(([key, value]) => {
             if (key === "attachments") {
                 value.forEach((file) => formData.append("attachments[]", file));
-            } else if (key === "amount") {
+            } else if (key === "amount" || key === "discount") {
                 // Ensure amount is clean (no commas)
                 formData.append(key, String(value).replace(/,/g, ''));
             } else if (['bank_name', 'cheque_number', 'cheque_date'].includes(key)) {
@@ -341,6 +339,7 @@ export default function PaymentsFinance({
             }
 
             setPaymentModalOpen(false);
+            setIsSubmitting(false);
             resetPaymentForm();
             setConfirmConfig({ isOpen: false });
             router.reload({ preserveScroll: true });
@@ -442,6 +441,7 @@ export default function PaymentsFinance({
             ticket_id: row.ticket_id,
             customer_id: row.customer_id,
             payer_name: row.name,
+            discount: row.discount || "",
         }));
         setPaymentModalOpen(true);
     };
@@ -619,6 +619,11 @@ export default function PaymentsFinance({
                             )}
                         </div>
                     )}
+                    {row.job_type?.discount > 0 && (
+                        <span className="badge badge-success text-[10px] p-1 mt-1 flex items-center w-fit">
+                            <i className="ti-gift mr-1"></i> PROMO
+                        </span>
+                    )}
                 </div>
             )
         },
@@ -649,13 +654,15 @@ export default function PaymentsFinance({
         {
             label: "Action",
             render: (row) => (
-                <button
-                    className="btn btn-primary btn-sm btn-rounded-md"
-                    onClick={() => handleProcessPayment(row)}
-                >
-                    <i className="ti-wallet m-r-5"></i>
-                    Process Payment
-                </button>
+                hasPermission('finance', 'create') && (
+                    <button
+                        className="btn btn-primary btn-sm btn-rounded-md"
+                        onClick={() => handleProcessPayment(row)}
+                    >
+                        <i className="ti-wallet m-r-5"></i>
+                        Process Payment
+                    </button>
+                )
             ),
         },
     ];
@@ -887,53 +894,82 @@ export default function PaymentsFinance({
 
                         const isCheck = paymentForm.payment_method === 'check';
 
-                        const ticketTotal = parseFloat(selectedTicket.total_amount || 0);
+                        // Calculate POS style pricing
+                        const subtotal = parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0);
+                        const discountPercent = parseFloat(paymentForm.discount || 0);
+                        const discountAmount = subtotal * (discountPercent / 100);
+                        const ticketTotal = subtotal - discountAmount;
+
                         const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
                         // Strip commas for calculation
                         const currentPayment = parseFloat(String(paymentForm.amount || 0).replace(/,/g, ''));
-                        const balanceBeforePayment = ticketTotal - previousPayments;
+                        const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
                         const balanceAfterPayment = Math.max(balanceBeforePayment - currentPayment, 0);
                         const change = currentPayment > balanceBeforePayment ? currentPayment - balanceBeforePayment : 0;
 
                         return (
-                            <div className="card border-2 border-primary" style={{ position: 'sticky', top: '0' }}>
-                                <div className="card-body bg-light">
-                                    <h5 className="card-title text-primary mb-3">
-                                        <i className="ti-receipt mr-2"></i>
-                                        Payment Summary
-                                    </h5>
+                            <div className="card border-2 border-primary shadow-sm" style={{ position: 'sticky', top: '0' }}>
+                                <div className="card-body bg-light p-0">
+                                    <div className="p-3 bg-primary text-white d-flex justify-content-between align-items-center">
+                                        <h5 className="card-title text-white mb-0">
+                                            <i className="ti-receipt mr-2"></i>
+                                            Payment Summary
+                                        </h5>
+                                        <span className="badge badge-light text-primary">POS MODE</span>
+                                    </div>
 
-                                    <div className="space-y-2">
+                                    <div className="p-3 space-y-2">
                                         {/* Ticket Description */}
                                         {selectedTicket.description && (
                                             <div className="pb-2 mb-2 border-bottom">
-                                                <small className="text-muted">Description:</small>
-                                                <div className="font-weight-bold">{selectedTicket.description}</div>
+                                                <small className="text-muted uppercase text-xs font-bold">Item/Description:</small>
+                                                <div className="font-weight-bold text-dark">{selectedTicket.description}</div>
                                             </div>
                                         )}
 
-                                        {/* Ticket Total */}
-                                        <div className="d-flex justify-content-between align-items-center py-2">
-                                            <span className="text-muted">Ticket Total:</span>
+                                        {/* Subtotal */}
+                                        <div className="d-flex justify-content-between align-items-center py-1">
+                                            <span className="text-muted">Subtotal:</span>
                                             <span className="font-weight-bold">
+                                                {formatPeso(subtotal)}
+                                            </span>
+                                        </div>
+
+                                        {/* Discount */}
+                                        {discountPercent > 0 && (
+                                            <div className="d-flex justify-content-between align-items-center py-1 text-success">
+                                                <span>
+                                                    <i className="ti-tag mr-1"></i>
+                                                    Discount ({discountPercent}%):
+                                                </span>
+                                                <span className="font-weight-bold">
+                                                    -{formatPeso(discountAmount)}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Ticket Total (After Discount) */}
+                                        <div className="d-flex justify-content-between align-items-center py-2 border-top mt-2">
+                                            <span className="font-bold">Net Amount:</span>
+                                            <span className="font-bold">
                                                 {formatPeso(ticketTotal)}
                                             </span>
                                         </div>
 
                                         {/* Previous Payments */}
                                         {previousPayments > 0 && (
-                                            <div className="d-flex justify-content-between align-items-center py-2">
-                                                <span className="text-muted">Less: Previous Payments:</span>
-                                                <span className="text-success">
+                                            <div className="d-flex justify-content-between align-items-center py-1">
+                                                <span className="text-muted">Less: Paid:</span>
+                                                <span className="text-info">
                                                     -{formatPeso(previousPayments)}
                                                 </span>
                                             </div>
                                         )}
 
                                         {/* Balance Before Payment */}
-                                        <div className="d-flex justify-content-between align-items-center py-2 border-top">
-                                            <span className="font-weight-bold">Balance Due:</span>
-                                            <span className="font-weight-bold text-danger">
+                                        <div className="d-flex justify-content-between align-items-center py-3 border-top border-bottom my-2 bg-white px-3 rounded-lg shadow-sm">
+                                            <span className="font-weight-bold text-uppercase text-xs tracking-wider">Balance Due:</span>
+                                            <span className="font-weight-bold text-danger" style={{ fontSize: '1.4rem' }}>
                                                 {formatPeso(balanceBeforePayment)}
                                             </span>
                                         </div>
@@ -941,59 +977,51 @@ export default function PaymentsFinance({
                                         {/* Current Payment */}
                                         {currentPayment > 0 && (
                                             <>
-                                                <div className="d-flex justify-content-between align-items-center py-2 bg-white px-3 rounded">
-                                                    <span className="text-primary font-weight-bold">
-                                                        <i className="ti-arrow-down mr-1"></i>
-                                                        Amount Paying Now:
+                                                <div className="d-flex justify-content-between align-items-center py-2 bg-primary px-3 rounded text-white shadow-sm">
+                                                    <span className="font-weight-bold">
+                                                        <i className="ti-wallet mr-1"></i>
+                                                        Paying Now:
                                                     </span>
-                                                    <span className="text-primary font-weight-bold" style={{ fontSize: '1.1rem' }}>
+                                                    <span className="font-weight-bold" style={{ fontSize: '1.2rem' }}>
                                                         {formatPeso(currentPayment)}
                                                     </span>
                                                 </div>
 
                                                 {/* Balance After Payment */}
-                                                <div className="d-flex justify-content-between align-items-center py-3 border-top border-bottom bg-white px-3 rounded mt-2">
-                                                    <span className="font-weight-bold text-dark">
-                                                        Balance After Payment:
+                                                <div className="d-flex justify-content-between align-items-center py-2 mt-2 px-3">
+                                                    <span className="text-muted small text-uppercase font-bold">
+                                                        Remaining:
                                                     </span>
                                                     <div className="text-right">
-                                                        <span className={`font-weight-bold ${balanceAfterPayment === 0 ? 'text-success' : 'text-warning'}`} style={{ fontSize: '1.2rem' }}>
+                                                        <span className={`font-weight-bold ${balanceAfterPayment === 0 ? 'text-success' : 'text-warning'}`}>
                                                             {formatPeso(balanceAfterPayment)}
                                                         </span>
                                                         {isCheck && (
-                                                            <div className="text-danger font-bold text-xs">
-                                                                (EXPECTED UPON CLEARANCE)
+                                                            <div className="text-danger font-bold text-[10px] uppercase">
+                                                                (Pending Clearance)
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                {isCheck && (
-                                                    <div className="alert alert-warning mt-2 small py-2">
-                                                        <i className="ti-info-alt mr-1"></i>
-                                                        Cheque payments are recorded as <strong>PENDING</strong> and do not affect the official balance until cleared by authorized personnel.
-                                                    </div>
-                                                )}
-
                                                 {/* Change */}
                                                 {change > 0 && (
-                                                    <div className="alert alert-success mt-3 mb-0">
+                                                    <div className="mt-3 p-3 bg-success text-white rounded-lg shadow-sm">
                                                         <div className="d-flex justify-content-between align-items-center">
-                                                            <span className="font-weight-bold">
-                                                                Change to Return:
+                                                            <span className="font-weight-bold text-uppercase text-xs">
+                                                                Change:
                                                             </span>
-                                                            <span className="font-weight-bold" style={{ fontSize: '1.3rem' }}>
+                                                            <span className="font-weight-bold" style={{ fontSize: '1.5rem' }}>
                                                                 {formatPeso(change)}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 )}
 
-                                                {/* Payment Status Badge */}
-                                                {balanceAfterPayment === 0 && (
-                                                    <div className="alert alert-success mt-3 mb-0 text-center">
+                                                {balanceAfterPayment === 0 && change === 0 && (
+                                                    <div className="mt-3 p-2 bg-success text-white rounded text-center font-bold text-uppercase text-sm shadow-sm">
                                                         <i className="ti-check-box mr-2"></i>
-                                                        <strong>PAID IN FULL</strong>
+                                                        Paid In Full
                                                     </div>
                                                 )}
                                             </>
@@ -1083,6 +1111,30 @@ export default function PaymentsFinance({
                                 </div>
                             </>
                         )}
+                        <div className="col-md-6">
+                            <div className="form-group">
+                                <label className="form-label font-bold text-success">Discount (%)</label>
+                                <div className="input-group">
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        placeholder="0"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        value={paymentForm.discount}
+                                        onChange={(e) => setPaymentForm({ ...paymentForm, discount: e.target.value })}
+                                        disabled={!hasPermission('tickets', 'price_edit')}
+                                    />
+                                    <div className="input-group-append">
+                                        <span className="input-group-text bg-success text-white">%</span>
+                                    </div>
+                                </div>
+                                {!hasPermission('tickets', 'price_edit') && (
+                                    <small className="text-muted">No permission to edit discount.</small>
+                                )}
+                            </div>
+                        </div>
                         <div className="col-md-6">
                             <div className="form-group">
                                 <label className="form-label font-bold text-primary">Amount Received (₱)</label>

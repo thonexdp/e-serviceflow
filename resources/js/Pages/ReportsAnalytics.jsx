@@ -28,19 +28,19 @@ export default function ReportsAnalytics({
 
     const reportTypes = [
         { value: 'sales', label: 'Sales Reports', icon: 'ti-stats-up' },
-        { value: 'revenue_cashflow', label: 'Revenue & Cashflow', icon: 'ti-money' },
+        // { value: 'revenue_cashflow', label: 'Revenue & Cashflow', icon: 'ti-money' },
         { value: 'receivables', label: 'Receivables', icon: 'ti-receipt' },
-        { value: 'net_income', label: 'Net Income Report', icon: 'ti-bar-chart' },
+        // { value: 'net_income', label: 'Net Income Report', icon: 'ti-bar-chart' },
         { value: 'inventory', label: 'Inventory Consumption', icon: 'ti-package' },
-        { value: 'product_profitability', label: 'Product Profitability', icon: 'ti-pie-chart' },
+        // { value: 'product_profitability', label: 'Product Profitability', icon: 'ti-pie-chart' },
         { value: 'production', label: 'Production Report', icon: 'ti-settings' },
         { value: 'production_incentives', label: 'Production Incentives', icon: 'ti-gift' },
         { value: 'customer_insights', label: 'Customer Insights', icon: 'ti-user' },
         { value: 'online_orders', label: 'Online Orders', icon: 'ti-shopping-cart' },
-        { value: 'designer_approvals', label: 'Designer Approvals', icon: 'ti-paint-bucket' },
-        { value: 'payment_confirmations', label: 'Payment Confirmations', icon: 'ti-check-box' },
+        // { value: 'designer_approvals', label: 'Designer Approvals', icon: 'ti-paint-bucket' },
+        // { value: 'payment_confirmations', label: 'Payment Confirmations', icon: 'ti-check-box' },
         { value: 'expenses', label: 'Expenses Report', icon: 'ti-wallet' },
-        { value: 'receipts', label: 'OR / Receipt Report', icon: 'ti-file' },
+        // { value: 'receipts', label: 'OR / Receipt Report', icon: 'ti-file' },
         { value: 'staff_performance', label: 'Staff Status', icon: 'ti-id-badge' },
     ];
 

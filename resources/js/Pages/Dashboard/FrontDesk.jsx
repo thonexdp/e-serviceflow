@@ -184,7 +184,7 @@ export default function FrontDesk({
         setIsUpdating(true);
         try {
             // Using the api instance if available or just router
-            router.patch(`/tickets/${selectedTicket.id}/verify-payment`, verifyFormData, {
+            router.patch(`/frontdesk/tickets/${selectedTicket.id}/verify-payment`, verifyFormData, {
                 onSuccess: () => {
                     closeVerifyModal();
                     refreshDashboard();
@@ -870,6 +870,6 @@ export default function FrontDesk({
                     </div>
                 </div>
             </section>
-        </AdminLayout>
+        </AdminLayout >
     );
 }

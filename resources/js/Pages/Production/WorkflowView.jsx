@@ -9,6 +9,8 @@ import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 import WorkflowTimeline from "@/Components/Production/WorkflowTimeline";
+import TicketAssigner from "@/Components/Production/TicketAssigner";
+import Confirmation from "@/Components/Common/Confirmation";
 
 const WORKFLOW_STEPS = {
     printing: { label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
@@ -26,11 +28,14 @@ export default function WorkflowView({
     tickets = { data: [] },
     filters = {},
     workflowStep = 'printing',
+    productionUsers = [],
 }) {
     const [openViewModal, setViewModalOpen] = useState(false);
     const [openUpdateModal, setUpdateModalOpen] = useState(false);
     const [openTimelineModal, setTimelineModalOpen] = useState(false);
+    const [openStartConfirmModal, setStartConfirmModalOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
+    const [ticketToStart, setTicketToStart] = useState(null);
     const [producedQuantity, setProducedQuantity] = useState(0);
     const [evidenceFiles, setEvidenceFiles] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -40,6 +45,9 @@ export default function WorkflowView({
     const [userEvidenceFiles, setUserEvidenceFiles] = useState({}); // { userId: [files] }
     const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
+    const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
+    const isAdmin = auth?.user?.role === 'admin';
+    const canOnlyPrint = auth?.user?.can_only_print || false;
 
     const workflowInfo = WORKFLOW_STEPS[workflowStep] || { label: workflowStep, icon: 'ti-package', color: '#2196F3' };
 
@@ -75,6 +83,23 @@ export default function WorkflowView({
         setTimelineModalOpen(true);
     };
 
+    const handleAssignUsers = (ticket, userIds) => {
+        if (!isProductionHead && !isAdmin && !canOnlyPrint) {
+            return;
+        }
+
+        router.post(buildUrl(`/queue/${ticket.id}/assign-users`), {
+            user_ids: userIds,
+            workflow_step: ticket.current_workflow_step || workflowStep,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            onError: (errors) => {
+                console.error('Assignment error:', errors);
+            },
+        });
+    };
+
     const handleUpdate = (ticket) => {
         setSelectedTicket(ticket);
         setUpdateModalMessage(null);
@@ -83,7 +108,7 @@ export default function WorkflowView({
         const assignedUsers = ticket.assigned_users || [];
         const initialQuantities = {};
         const initialEvidence = {};
-        
+
         assignedUsers.forEach(user => {
             const userRecord = ticket.production_records?.find(
                 r => r.user_id === user.id && r.workflow_step === workflowStep
@@ -91,7 +116,7 @@ export default function WorkflowView({
             initialQuantities[user.id] = userRecord?.quantity_produced || 0;
             initialEvidence[user.id] = []; // Reset evidence files for each user
         });
-        
+
         setUserQuantities(initialQuantities);
         setUserEvidenceFiles(initialEvidence);
         setEvidenceFiles([]); // Legacy, keep for backward compatibility
@@ -100,12 +125,22 @@ export default function WorkflowView({
         setUpdateModalOpen(true);
     };
 
-    const handleStartWork = (ticketId) => {
+    const handleStartWork = (ticket) => {
+        setTicketToStart(ticket);
+        setStartConfirmModalOpen(true);
+    };
+
+    const handleConfirmStart = () => {
+        if (!ticketToStart) return;
         setLoading(true);
-        router.post(buildUrl(`/workflow/${workflowStep}/start/${ticketId}`), {}, {
+        setStartConfirmModalOpen(false);
+        router.post(buildUrl(`/workflow/${workflowStep}/start/${ticketToStart.id}`), {}, {
             preserveScroll: true,
             preserveState: false,
-            onFinish: () => setLoading(false),
+            onFinish: () => {
+                setLoading(false);
+                setTicketToStart(null);
+            },
         });
     };
 
@@ -182,7 +217,7 @@ export default function WorkflowView({
         // For now, update the first user with updates (backend will need to be updated to handle batch)
         // We'll combine all quantities and send as a single update, then let backend sum them
         // OR we can update users one by one using a recursive approach
-        
+
         // Strategy: Update each user sequentially using callbacks
         let currentIndex = 0;
         const updateNextUser = () => {
@@ -194,8 +229,8 @@ export default function WorkflowView({
                         preserveScroll: true,
                         preserveState: false,
                         onSuccess: () => {
-                            setUpdateModalMessage({ 
-                                type: 'success', 
+                            setUpdateModalMessage({
+                                type: 'success',
                                 text: `${workflowInfo.label} completed and moved to next step!`
                             });
                             setTimeout(() => {
@@ -209,9 +244,9 @@ export default function WorkflowView({
                         onFinish: () => setLoading(false),
                     });
                 } else {
-                    setUpdateModalMessage({ 
-                        type: 'success', 
-                        text: 'Progress updated successfully!' 
+                    setUpdateModalMessage({
+                        type: 'success',
+                        text: 'Progress updated successfully!'
                     });
                     setTimeout(() => {
                         handleCloseModals();
@@ -238,7 +273,7 @@ export default function WorkflowView({
             });
 
             const endpoint = buildUrl(`/workflow/${workflowStep}/update/${selectedTicket.id}`);
-            
+
             router.post(endpoint, formData, {
                 preserveScroll: true,
                 preserveState: false,
@@ -277,7 +312,9 @@ export default function WorkflowView({
         setViewModalOpen(false);
         setUpdateModalOpen(false);
         setTimelineModalOpen(false);
+        setStartConfirmModalOpen(false);
         setSelectedTicket(null);
+        setTicketToStart(null);
         setProducedQuantity(0);
         setEvidenceFiles([]);
         setUpdateModalMessage(null);
@@ -419,37 +456,17 @@ export default function WorkflowView({
         {
             label: "Assigned To",
             key: "assigned_to",
-            render: (row) => {
-                const assignedUsers = row.assigned_users || (row.assigned_to_user ? [row.assigned_to_user] : []);
-                if (assignedUsers.length === 0) return <span className="text-muted">Unassigned</span>;
-
-                return (
-                    <div>
-                        {assignedUsers.map((u, i) => {
-                            // Find production record for this user and workflow step
-                            const userRecord = row.production_records?.find(
-                                r => r.user_id === u.id && r.workflow_step === workflowStep
-                            );
-                            const userQty = userRecord?.quantity_produced || 0;
-
-                            return (
-                                <div key={u.id} className="mb-1">
-                                    <div>
-                                        {u.name}
-                                        {u.id === auth?.user?.id && <span className="text-success ml-1">(You)</span>}
-                                    </div>
-                                    {userQty > 0 && (
-                                        <small className="text-muted">
-                                            <i className="ti-check-box mr-1"></i>
-                                            Produced: <strong>{userQty}</strong> pcs
-                                        </small>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                );
-            },
+            render: (row) => (
+                <TicketAssigner
+                    ticket={row}
+                    productionUsers={productionUsers}
+                    isProductionHead={isProductionHead}
+                    isAdmin={isAdmin}
+                    canOnlyPrint={canOnlyPrint}
+                    auth={auth}
+                    onAssign={handleAssignUsers}
+                />
+            ),
         },
         {
             label: "Due Date",
@@ -479,27 +496,45 @@ export default function WorkflowView({
                 const status = getWorkflowStatus(row);
                 const isProductionHead = auth?.user?.is_head || auth?.user?.role === 'admin';
 
+                // Check if user has this workflow step assigned
+                const userWorkflowSteps = auth?.user?.workflow_steps || [];
+                const hasWorkflowStepAccess = auth?.user?.role === 'admin' || userWorkflowSteps.includes(workflowStep);
+
+                // Check if user is assigned to this ticket
+                const assignedUsers = row.assigned_users || (row.assigned_to_user ? [row.assigned_to_user] : []);
+                const isUserAssigned = assignedUsers.some(u => u.id === auth?.user?.id);
+
+                // For can_only_print users, allow access to printing workflow
+                const isPrintingWorkflow = workflowStep === 'printing';
+                const canAccessForCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (row.status === 'ready_to_print' || row.status === 'in_production');
+                const canStart = (isProductionHead && hasWorkflowStepAccess) || canAccessForCanOnlyPrint;
+
+                // Can update only if: (user is assigned OR is head/admin) AND ticket is not "Not Started"
+                const canUpdate = (isUserAssigned || isProductionHead) &&
+                    (status.status === 'In Progress' || status.status === 'Pending' || status.status === 'Completed' ||
+                        (canAccessForCanOnlyPrint && row.status === 'ready_to_print'));
+
                 return (
                     <div className="btn-group-vertical btn-group-sm">
-                        {status.status === 'Not Started' && isProductionHead && (
+                        {status.status === 'Not Started' && canStart ? (
                             <button
                                 type="button"
                                 className="btn btn-link btn-sm text-green-500"
-                                onClick={() => handleStartWork(row.id)}
+                                onClick={() => handleStartWork(row)}
                                 disabled={loading}
                             >
                                 <i className="ti-control-play"></i> Start
                             </button>
-                        )}
-                        {(status.status === 'In Progress' || status.status === 'Pending' || status.status === 'Completed') && isProductionHead && (
-                            <button
-                                type="button"
-                                className="btn btn-link btn-sm text-blue-500"
-                                onClick={() => handleUpdate(row)}
-                            >
-                                <i className="ti-pencil"></i> Update
-                            </button>
-                        )}
+                        )
+                            : canUpdate && (
+                                <button
+                                    type="button"
+                                    className="btn btn-link btn-sm text-blue-500"
+                                    onClick={() => handleUpdate(row)}
+                                >
+                                    <i className="ti-pencil"></i> Update
+                                </button>
+                            )}
                         <button
                             type="button"
                             className="btn btn-link btn-sm text-purple-500"
@@ -751,25 +786,25 @@ export default function WorkflowView({
                                                                     </div>
                                                                     <div className="col-6">
                                                                         <div className="d-flex flex-wrap gap-1">
-                                                                            <button 
-                                                                                type="button" 
-                                                                                className="btn btn-outline-primary btn-sm" 
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-outline-primary btn-sm"
                                                                                 onClick={() => handleQuickAdd(user.id, 1)}
                                                                                 title="Add 1"
                                                                             >
                                                                                 +1
                                                                             </button>
-                                                                            <button 
-                                                                                type="button" 
-                                                                                className="btn btn-outline-primary btn-sm" 
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-outline-primary btn-sm"
                                                                                 onClick={() => handleQuickAdd(user.id, 5)}
                                                                                 title="Add 5"
                                                                             >
                                                                                 +5
                                                                             </button>
-                                                                            <button 
-                                                                                type="button" 
-                                                                                className="btn btn-outline-primary btn-sm" 
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-outline-primary btn-sm"
                                                                                 onClick={() => handleQuickAdd(user.id, 10)}
                                                                                 title="Add 10"
                                                                             >
@@ -893,6 +928,27 @@ export default function WorkflowView({
                 )}
             </Modal>
 
+            {/* Start Work Confirmation Modal */}
+            <Modal
+                title={`Start ${workflowInfo.label} Workflow`}
+                isOpen={openStartConfirmModal}
+                onClose={handleCloseModals}
+                size="md"
+            >
+                {ticketToStart && (
+                    <Confirmation
+                        label="Start Work"
+                        description={`Start ${workflowInfo.label} workflow for Ticket #${ticketToStart.ticket_number}?`}
+                        subtitle={`This will change the ticket status to "In Progress" and begin the ${workflowInfo.label} workflow step.`}
+                        color="success"
+                        icon="ti-control-play"
+                        loading={loading}
+                        onCancel={handleCloseModals}
+                        onSubmit={handleConfirmStart}
+                    />
+                )}
+            </Modal>
+
             <section id="main-content">
                 <div className="content-wrap">
                     <div className="main">
@@ -915,6 +971,16 @@ export default function WorkflowView({
                                                         initialValue={filters.search || ""}
                                                         route={buildUrl(`/workflow/${workflowStep}`)}
                                                     />
+                                                </div>
+                                                <div className="col-md-4 text-right">
+                                                    <button
+                                                        onClick={() => router.reload()}
+                                                        className="btn btn-outline-primary"
+                                                        title="Refresh Data"
+                                                        style={{ borderColor: workflowInfo.color, color: workflowInfo.color }}
+                                                    >
+                                                        <i className="ti-reload mr-2"></i> Refresh
+                                                    </button>
                                                 </div>
                                             </div>
 

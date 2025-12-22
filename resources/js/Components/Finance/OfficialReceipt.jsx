@@ -19,33 +19,30 @@ export default function OfficialReceipt({ payment }) {
 
     // Calculations
     const grandTotal = parseFloat(ticket.total_amount || payment.amount || 0);
-    // If ticket amount_paid is available, use it. Otherwise assume this payment is the only one.
-    const totalPaidSoFar = parseFloat(ticket.amount_paid || payment.amount || 0);
+    const subTotal = parseFloat(ticket.subtotal || grandTotal);
+    const discountAmount = Math.max(0, subTotal - grandTotal);
+    const discountPercent = parseFloat(ticket.discount || 0);
+
     const currentPaymentAmount = parseFloat(payment.amount || 0);
 
-    // For "Previous Payments", we try to derive it. 
-    // Optimization: This logic assumes 'ticket.amount_paid' is the total paid *including* this payment
-    // (which is true for the "Just Paid" scenario). 
-    // For historic receipts, this might arguably show the 'current' state of the ticket, which is acceptable for reprints.
+    // Sum only successful payments
+    const successfulPayments = (ticket.payments || []).filter(p =>
+        p.status !== 'rejected' && p.status !== 'pending'
+    );
+
+    // To be safe, if the current payment is NOT in the list yet, we should add it
+    const isCurrentPaymentInList = successfulPayments.some(p => p.id === payment.id);
+
+    const totalPaidSoFar = successfulPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0) +
+        (isCurrentPaymentInList ? 0 : currentPaymentAmount);
+
     const previousPayments = Math.max(0, totalPaidSoFar - currentPaymentAmount);
 
-    const balanceRemaining = Math.max(0, grandTotal - totalPaidSoFar);
-
-    const discountAmount = parseFloat(ticket.discount_received || 0);
-    // Recalculate subtotal if items exist, or derive from grand total + discount
-    const subTotal = itemsTotal(ticket.items) || (grandTotal + discountAmount);
-
-    function itemsTotal(items) {
-        if (!items || !items.length) return 0;
-        return items.reduce((sum, item) => {
-            const qty = parseFloat(item.quantity) || 0;
-            const price = parseFloat(item.unit_price) || 0;
-            return sum + (qty * price);
-        }, 0);
-    }
+    // Force balance to 0 if ticket is fully paid to avoid rounding issues
+    const balanceRemaining = ticket.payment_status === 'paid' ? 0 : Math.max(0, grandTotal - totalPaidSoFar);
 
     return (
-        <div className="official-receipt-container font-sans text-sm p-8 max-w-3xl mx-auto bg-white text-black bg-white">
+        <div className="official-receipt-container font-sans text-sm p-8 max-w-3xl mx-auto bg-white text-black">
 
             {/* Header */}
             <div className="flex justify-between items-start mb-6">
@@ -144,7 +141,7 @@ export default function OfficialReceipt({ payment }) {
                             <tr className="border-b border-gray-200">
                                 <td className="py-4 px-3 text-center border-r border-gray-300">1</td>
                                 <td className="py-4 px-3 border-r border-gray-300 italic text-gray-500">
-                                    {payment.notes || ticket.ticket_number ? `Payment for Ticket #${ticket.ticket_number}` : "Service Rendered"}
+                                    {ticket.job_type?.name || ticket.job_type || payment.notes || (ticket.ticket_number ? `Payment for Ticket #${ticket.ticket_number}` : "Service Rendered")}
                                 </td>
                                 <td className="py-4 px-3 text-right border-r border-gray-300">—</td>
                                 <td className="py-4 px-3 text-center border-r border-gray-300">—</td>

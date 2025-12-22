@@ -24,6 +24,7 @@ export default function Tickets({
     tickets = { data: [] },
     selectedCustomer = null,
     filters = {},
+    branches = [],
 }) {
     const [openCustomerModal, setCustomerModalOpen] = useState(false);
     const [openTicketModal, setTicketModalOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function Tickets({
             status: filters.status,
             payment_status: filters.payment_status,
             customer_id: _selectedCustomer?.id,
+            branch_id: filters.branch_id,
             [key]: value,
         };
 
@@ -450,6 +452,67 @@ export default function Tickets({
                 (tickets.current_page - 1) * tickets.per_page + index + 1,
         },
         {
+            label: "Design",
+            key: "mockup_files",
+            render: (row) => {
+                const mockupFiles = row.mockup_files || [];
+                const customerFiles = row.customer_files || [];
+
+                const latestMockup = mockupFiles.length > 0 ? mockupFiles[mockupFiles.length - 1] : null;
+                const latestCustomerFile = customerFiles.length > 0 ? customerFiles[customerFiles.length - 1] : null;
+
+                const displayFile = latestMockup || latestCustomerFile;
+                const isApproved = row.design_status === 'approved';
+                const isMockup = !!latestMockup;
+
+                if (!displayFile) {
+                    return (
+                        <div className="text-center">
+                            <span className="badge badge-pill badge-light text-muted" style={{ fontSize: '9px' }}>
+                                NO DESIGN
+                            </span>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="text-center">
+                        <div
+                            className="position-relative d-inline-block p-1 border rounded bg-white shadow-sm"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                                setFilepath(displayFile.file_path);
+                                setShow(true);
+                            }}
+                        >
+                            <img
+                                src={displayFile.file_path}
+                                alt="Design"
+                                style={{ width: '45px', height: '45px', objectFit: 'cover', borderRadius: '4px' }}
+                            />
+                            <div className="position-absolute" style={{ top: '-6px', right: '-6px' }}>
+                                {isMockup ? (
+                                    isApproved ? (
+                                        <span className="badge badge-success border border-white shadow-sm" style={{ borderRadius: '50%', padding: '2px 4px' }} title="Approved Mockup">
+                                            <i className="ti-check" style={{ fontSize: '8px' }}></i>
+                                        </span>
+                                    ) : (
+                                        <span className="badge badge-warning border border-white shadow-sm" style={{ borderRadius: '50%', padding: '2px 4px' }} title="Pending Mockup">
+                                            <i className="ti-timer" style={{ fontSize: '8px' }}></i>
+                                        </span>
+                                    )
+                                ) : (
+                                    <span className="badge badge-info border border-white shadow-sm" style={{ borderRadius: '50%', padding: '2px 4px' }} title="Customer Attachment">
+                                        <i className="ti-clip" style={{ fontSize: '8px' }}></i>
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+        },
+        {
             label: "Ticket ID",
             key: "ticket_number",
             render: (row) => (
@@ -471,6 +534,11 @@ export default function Tickets({
                     ? `${row.customer.firstname} ${row.customer.lastname}`
                     : "N/A",
         },
+        ...(auth.user.role === 'admin' ? [{
+            label: "Branch",
+            key: "order_branch",
+            render: (row) => row.order_branch?.name || "N/A",
+        }] : []),
         { label: "Description", key: "description" },
         {
             label: "Qty",
@@ -495,19 +563,19 @@ export default function Tickets({
                     ? new Date(row.due_date).toLocaleDateString()
                     : "N/A",
         },
-        {
-            label: "Amount",
-            key: "total_amount",
-            render: (row) => (
-                <b>
-                    ₱{" "}
-                    {parseFloat(row.total_amount || 0).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    })}
-                </b>
-            ),
-        },
+        // {
+        //     label: "Amount",
+        //     key: "total_amount",
+        //     render: (row) => (
+        //         <b>
+        //             ₱{" "}
+        //             {parseFloat(row.total_amount || 0).toLocaleString("en-US", {
+        //                 minimumFractionDigits: 2,
+        //                 maximumFractionDigits: 2,
+        //             })}
+        //         </b>
+        //     ),
+        // },
         {
             label: "Payment Status",
             key: "payment_status",
@@ -605,6 +673,7 @@ export default function Tickets({
                     customerId={_selectedCustomer?.id}
                     onSubmit={handleTicketSubmit}
                     onCancel={closeTicketModal}
+                    branches={branches}
                 />
             </Modal>
             <Modal
@@ -813,6 +882,18 @@ export default function Tickets({
                                     </div>
                                     <div className="col-md-6">
                                         <p className="m-b-5">
+                                            <strong>Subtotal:</strong>{" "}
+                                            {formatPeso(
+                                                selectedTicket.subtotal || selectedTicket.total_amount
+                                            )}
+                                        </p>
+                                        {parseFloat(selectedTicket.discount || 0) > 0 && (
+                                            <p className="m-b-5 text-success">
+                                                <strong>Discount:</strong>{" "}
+                                                {parseFloat(selectedTicket.discount)}% OFF
+                                            </p>
+                                        )}
+                                        <p className="m-b-5">
                                             <strong>Total Amount:</strong>{" "}
                                             {formatPeso(
                                                 selectedTicket.total_amount
@@ -824,16 +905,10 @@ export default function Tickets({
                                                 selectedTicket.amount_paid
                                             )}
                                         </p>
-                                        <p className="m-b-0 text-danger font-bold">
+                                        <p className="m-b-0 text-danger font-bold border-t pt-1">
                                             <strong>Balance:</strong>{" "}
                                             {formatPeso(
-                                                parseFloat(
-                                                    selectedTicket.total_amount || 0
-                                                ) -
-                                                parseFloat(
-                                                    selectedTicket.amount_paid ||
-                                                    0
-                                                )
+                                                Math.max(0, parseFloat(selectedTicket.total_amount || 0) - parseFloat(selectedTicket.amount_paid || 0))
                                             )}
                                         </p>
                                     </div>
@@ -1201,6 +1276,22 @@ export default function Tickets({
                                                 <option value="awaiting_verification">Awaiting Verification</option>
                                             </select>
                                         </div>
+                                        {auth.user.role === 'admin' && (
+                                            <div className="col-md-2">
+                                                <select
+                                                    className="form-control"
+                                                    value={filters.branch_id || ''}
+                                                    onChange={(e) => handleFilterChange('branch_id', e.target.value)}
+                                                >
+                                                    <option value="">All Branches</option>
+                                                    {branches.map(branch => (
+                                                        <option key={branch.id} value={branch.id}>
+                                                            {branch.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
                                         <DateRangeFilter
                                             filters={filters}
                                             route="tickets"
@@ -1243,6 +1334,11 @@ export default function Tickets({
                                                                     ? 'Last 30 Days'
                                                                     : `Year: ${filters.date_range}`
                                                             }
+                                                        </span>
+                                                    )}
+                                                    {filters.branch_id && (
+                                                        <span className="badge badge-info mr-2">
+                                                            Branch: {branches.find(b => b.id == filters.branch_id)?.name}
                                                         </span>
                                                     )}
                                                 </div>

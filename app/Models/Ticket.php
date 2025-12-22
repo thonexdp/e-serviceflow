@@ -16,6 +16,8 @@ class Ticket extends Model
     protected $fillable = [
         'ticket_number',
         'customer_id',
+        'order_branch_id',
+        'production_branch_id',
         'description',
         'job_type',
         'job_type_id',
@@ -70,6 +72,30 @@ class Ticket extends Model
                 $ticket->ticket_number = static::generateTicketNumber();
             }
             $ticket->created_by = auth()->id();
+
+            // Auto-assign branches based on user's branch and branch capabilities
+            if (auth()->user() && auth()->user()->branch_id) {
+                $userBranch = auth()->user()->branch;
+                
+                // Set order branch to user's branch
+                if (!$ticket->order_branch_id) {
+                    $ticket->order_branch_id = $userBranch->id;
+                }
+
+                // Set production branch based on order branch capabilities
+                if (!$ticket->production_branch_id) {
+                    if ($userBranch->can_produce) {
+                        // If order branch can produce, use it for production
+                        $ticket->production_branch_id = $userBranch->id;
+                    } else {
+                        // Otherwise, use default production branch
+                        $defaultProductionBranch = \App\Models\Branch::getDefaultProductionBranch();
+                        if ($defaultProductionBranch) {
+                            $ticket->production_branch_id = $defaultProductionBranch->id;
+                        }
+                    }
+                }
+            }
         });
 
         static::updating(function ($ticket) {
@@ -399,5 +425,106 @@ class Ticket extends Model
         }
 
         return ucfirst(str_replace('_', ' ', $this->current_workflow_step));
+    }
+
+    /**
+     * Get the branch that accepted the order.
+     */
+    public function orderBranch()
+    {
+        return $this->belongsTo(Branch::class, 'order_branch_id');
+    }
+
+    /**
+     * Get the branch responsible for production.
+     */
+    public function productionBranch()
+    {
+        return $this->belongsTo(Branch::class, 'production_branch_id');
+    }
+
+    /**
+     * Check if a user can view this ticket based on their branch.
+     * 
+     * @param User|null $user The user to check (defaults to current auth user)
+     * @return bool
+     */
+    public function canUserViewByBranch(?User $user = null): bool
+    {
+        // Default to current authenticated user
+        if (!$user) {
+            $user = auth()->user();
+        }
+
+        if (!$user) {
+            return false;
+        }
+
+        // Admin can view all tickets
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // If user has no branch, deny access (except admin)
+        if (!$user->branch_id) {
+            return false;
+        }
+
+        // FrontDesk and Cashier: can view tickets from their order branch
+        if ($user->isFrontDesk() || $user->isCashier()) {
+            return $this->order_branch_id === $user->branch_id;
+        }
+
+        // Production: can view tickets assigned to their production branch
+        if ($user->isProduction()) {
+            return $this->production_branch_id === $user->branch_id;
+        }
+
+        // Designer: can view all tickets (or implement branch logic if needed)
+        if ($user->isDesigner()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a user can edit this ticket based on their branch.
+     * 
+     * @param User|null $user The user to check (defaults to current auth user)
+     * @return bool
+     */
+    public function canUserEditByBranch(?User $user = null): bool
+    {
+        // Default to current authenticated user
+        if (!$user) {
+            $user = auth()->user();
+        }
+
+        if (!$user) {
+            return false;
+        }
+
+        // Admin can edit all tickets
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // If user has no branch, deny access (except admin)
+        if (!$user->branch_id) {
+            return false;
+        }
+
+        // FrontDesk and Cashier: can edit tickets from their order branch
+        if ($user->isFrontDesk() || $user->isCashier()) {
+            return $this->order_branch_id === $user->branch_id;
+        }
+
+        // Production: can edit tickets assigned to their production branch
+        if ($user->isProduction()) {
+            return $this->production_branch_id === $user->branch_id;
+        }
+
+        return false;
     }
 }

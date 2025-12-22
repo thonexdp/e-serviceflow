@@ -266,75 +266,12 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                         </div>
                     );
                 })}
-
-                {/* Completed Column */}
-                <div
-                    className="workflow-column"
-                    style={{
-                        minWidth: isFullscreen ? '350px' : '280px',
-                        maxWidth: isFullscreen ? '400px' : '320px',
-                        flex: '0 0 auto',
-                    }}
-                >
-                    <div
-                        className="card shadow-sm mb-0"
-                        style={{
-                            borderTop: '4px solid #4CAF50',
-                            height: '100%',
-                            backgroundColor: isFullscreen ? '#f4f6f9' : '#fff',
-                        }}
-                    >
-                        <div
-                            className="card-header text-white"
-                            style={{
-                                backgroundColor: '#4CAF50',
-                                padding: isFullscreen ? '1rem' : '0.75rem',
-                            }}
-                        >
-                            <div className="d-flex justify-content-between align-items-center">
-                                <h5 className="mb-0 d-flex align-items-center text-white" style={{ fontSize: isFullscreen ? '1.2rem' : '1rem' }}>
-                                    <i className="ti-check mr-2"></i>
-                                    Completed
-                                </h5>
-                                <span
-                                    className="badge badge-light"
-                                    style={{
-                                        fontSize: isFullscreen ? '1rem' : '0.85rem',
-                                        color: '#4CAF50',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {groupedTickets['completed']?.length || 0}
-                                </span>
-                            </div>
-                        </div>
-                        <div
-                            className="card-body"
-                            style={{
-                                maxHeight: isFullscreen ? 'calc(100vh - 180px)' : '70vh',
-                                overflowY: 'auto',
-                                padding: isFullscreen ? '1rem' : '0.75rem',
-                                backgroundColor: '#f8f9fa',
-                            }}
-                        >
-                            {groupedTickets['completed']?.length > 0 ? (
-                                groupedTickets['completed'].map((ticket) => (
-                                    <TicketCard key={ticket.id} ticket={ticket} />
-                                ))
-                            ) : (
-                                <div className="text-center text-muted py-4">
-                                    <i className="ti-check mb-2" style={{ fontSize: '2rem', opacity: 0.3 }}></i>
-                                    <p style={{ fontSize: '0.85rem' }}>No completed items</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <style>{`
                 .production-board::-webkit-scrollbar {
-                    height: 8px;
+                    height: ${isFullscreen ? '0' : '8px'};
+                    display: ${isFullscreen ? 'none' : 'block'};
                 }
                 .production-board::-webkit-scrollbar-track {
                     background: #f1f1f1;
@@ -348,7 +285,8 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                     background: #555;
                 }
                 .workflow-column .card-body::-webkit-scrollbar {
-                    width: 6px;
+                    width: ${isFullscreen ? '0' : '6px'};
+                    display: ${isFullscreen ? 'none' : 'block'};
                 }
                 .workflow-column .card-body::-webkit-scrollbar-track {
                     background: #f1f1f1;
@@ -358,6 +296,16 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                     background: #ccc;
                     border-radius: 10px;
                 }
+                ${isFullscreen ? `
+                    .production-board {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+                    .workflow-column .card-body {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+                ` : ''}
                 .workflow-column .card:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;

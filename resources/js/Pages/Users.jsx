@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, useForm, usePage, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -12,7 +12,7 @@ import Checkbox from "@/Components/Checkbox";
 import DataTable from "@/Components/Common/DataTable";
 import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 
-export default function Users({ users, availableRoles, availablePermissions, availableWorkflowSteps = {} }) {
+export default function Users({ users, availableRoles, availablePermissions, availableWorkflowSteps = {}, availableBranches = [] }) {
     const { auth } = usePage().props;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
@@ -28,13 +28,16 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             email: "",
             password: "",
             password_confirmation: "",
-            role: "FrontDesk",
+            role: "",
+            branch_id: "",
             permissions: {},
             workflow_steps: [],
             password_type: "auto", // 'auto' or 'custom'
             update_password: false, // Toggle for updating password
             is_active: true,
             is_head: false,
+            can_only_print: false,
+            enable_workflow_assignments: false,
         });
 
     const [activeTab, setActiveTab] = useState("basic"); // 'basic', 'permissions', 'workflow', 'history'
@@ -60,6 +63,60 @@ export default function Users({ users, availableRoles, availablePermissions, ava
         return password;
     };
 
+    // Filter permissions based on current selected role
+    const filteredPermissionsByRole = useMemo(() => {
+        if (!availablePermissions) return {};
+
+        const filtered = {};
+        Object.entries(availablePermissions).forEach(([module, permissions]) => {
+            const moduleFiltered = permissions.filter(p => {
+                if (!p.role) return true;
+                const allowedRoles = p.role.split(',').map(r => r.trim());
+                return allowedRoles.includes(data.role);
+            });
+            if (moduleFiltered.length > 0) {
+                filtered[module] = moduleFiltered;
+            }
+        });
+        return filtered;
+    }, [availablePermissions, data.role]);
+
+    // Strip permissions that are not allowed for the selected role
+    // and auto-check all if adding a new user
+    useEffect(() => {
+        if (!availablePermissions || !data.permissions) return;
+
+        const allowedPermissionIds = new Set();
+        Object.values(filteredPermissionsByRole).forEach(permissions => {
+            permissions.forEach(p => allowedPermissionIds.add(p.id));
+        });
+
+        let changed = false;
+        const newPermissions = { ...data.permissions };
+
+        // 1. Remove permissions that are no longer allowed for this role
+        Object.keys(newPermissions).forEach(id => {
+            if (newPermissions[id] === true && !allowedPermissionIds.has(parseInt(id))) {
+                delete newPermissions[id];
+                changed = true;
+            }
+        });
+
+        // 2. If adding a new user, default to checking all allowed permissions
+        if (!editingUser) {
+            allowedPermissionIds.forEach(id => {
+                if (newPermissions[id] !== true) {
+                    newPermissions[id] = true;
+                    changed = true;
+                }
+            });
+        }
+
+        if (changed) {
+            setData("permissions", newPermissions);
+        }
+    }, [data.role, filteredPermissionsByRole, editingUser]);
+
     const userColumns = [
         {
             label: "Name",
@@ -75,6 +132,15 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             render: (user) => (
                 <span>
                     {user.role} {user.is_head ? "(Head)" : ""}
+                </span>
+            ),
+        },
+        {
+            label: "Branch",
+            key: "branch",
+            render: (user) => (
+                <span className="text-sm">
+                    {user.branch ? user.branch.name : <span className="text-muted">-</span>}
                 </span>
             ),
         },
@@ -113,12 +179,15 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 password: "",
                 password_confirmation: "",
                 role: user.role,
+                branch_id: user.branch_id || "",
                 permissions: userPerms,
                 workflow_steps: userWorkflowSteps,
                 password_type: "auto",
                 update_password: false,
                 is_active: user.is_active !== undefined ? user.is_active : true,
                 is_head: user.is_head !== undefined ? user.is_head : false,
+                can_only_print: user.can_only_print !== undefined ? user.can_only_print : false,
+                enable_workflow_assignments: userWorkflowSteps.length > 0,
             });
         } else {
             setEditingUser(null);
@@ -127,13 +196,16 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                 email: "",
                 password: "",
                 password_confirmation: "",
-                role: "FrontDesk",
+                role: "",
+                branch_id: "",
                 permissions: {},
                 workflow_steps: [],
                 password_type: "auto",
                 update_password: false,
                 is_active: true,
                 is_head: false,
+                can_only_print: false,
+                enable_workflow_assignments: false,
             });
             setActiveTab("basic");
         }
@@ -362,7 +434,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                             >
                                 <i className="ti-lock mr-1"></i> Permissions
                             </button>
-                            {data.role === "Production" && (
+                            {(data.role === "Production" || data.is_head) && (
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab("workflow")}
@@ -443,6 +515,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                             setData("role", e.target.value)
                                         }
                                     >
+                                        <option value="">-- Select Role --</option>
                                         {availableRoles.map((role) => (
                                             <option key={role} value={role}>
                                                 {role}
@@ -453,6 +526,32 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                         message={errors.role}
                                         className="mt-2"
                                     />
+                                </div>
+
+                                <div>
+                                    <InputLabel htmlFor="branch_id" value="Branch" />
+                                    <select
+                                        id="branch_id"
+                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                        value={data.branch_id}
+                                        onChange={(e) =>
+                                            setData("branch_id", e.target.value)
+                                        }
+                                    >
+                                        <option value="">-- Select Branch (Optional) --</option>
+                                        {availableBranches.map((branch) => (
+                                            <option key={branch.id} value={branch.id}>
+                                                {branch.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError
+                                        message={errors.branch_id}
+                                        className="mt-2"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Assign this user to a specific branch for order and production management
+                                    </p>
                                 </div>
 
                                 <div>
@@ -667,81 +766,110 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                         {/* Permissions Tab */}
                         {activeTab === "permissions" && (
                             <div className="space-y-4 max-h-96 overflow-y-auto">
-                                {Object.entries(availablePermissions).map(
-                                    ([module, permissions]) => (
-                                        <div
-                                            key={module}
-                                            className="border rounded-md bg-gray-50"
-                                        >
-                                            <div className="flex items-center justify-between px-4 py-2 border-b bg-white rounded-t-md">
-                                                <h4 className="font-semibold capitalize text-sm text-gray-800">
-                                                    {module}
-                                                </h4>
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                                                    {permissions.length} option{permissions.length !== 1 ? "s" : ""}
-                                                </span>
-                                            </div>
-                                            <div className="px-4 py-3">
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                                    {permissions.map((permission) => (
-                                                        <label
-                                                            key={permission.id}
-                                                            htmlFor={`permission-${permission.id}`}
-                                                            className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
-                                                        >
-                                                            <Checkbox
-                                                                id={`permission-${permission.id}`}
-                                                                checked={
-                                                                    data.permissions[
-                                                                    permission.id
-                                                                    ] || false
-                                                                }
-                                                                onChange={(e) =>
-                                                                    handlePermissionChange(
-                                                                        permission.id,
-                                                                        e.target.checked
-                                                                    )
-                                                                }
-                                                            />
-                                                            <span>
-                                                                {permission.label ||
-                                                                    permission.feature}
-                                                            </span>
-                                                        </label>
-                                                    ))}
+                                {Object.keys(filteredPermissionsByRole).length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        No specific permissions available for this role.
+                                    </div>
+                                ) : (
+                                    Object.entries(filteredPermissionsByRole).map(
+                                        ([module, permissions]) => (
+                                            <div
+                                                key={module}
+                                                className="border rounded-md bg-gray-50"
+                                            >
+                                                <div className="flex items-center justify-between px-4 py-2 border-b bg-white rounded-t-md">
+                                                    <h4 className="font-semibold capitalize text-sm text-gray-800">
+                                                        {module.replace('_', ' ')}
+                                                    </h4>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                                        {permissions.length} option{permissions.length !== 1 ? "s" : ""}
+                                                    </span>
+                                                </div>
+                                                <div className="px-4 py-3">
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                        {permissions.map((permission) => (
+                                                            <label
+                                                                key={permission.id}
+                                                                htmlFor={`permission-${permission.id}`}
+                                                                className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
+                                                            >
+                                                                <Checkbox
+                                                                    id={`permission-${permission.id}`}
+                                                                    checked={
+                                                                        data.permissions[
+                                                                        permission.id
+                                                                        ] || false
+                                                                    }
+                                                                    onChange={(e) =>
+                                                                        handlePermissionChange(
+                                                                            permission.id,
+                                                                            e.target.checked
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <span>
+                                                                    {permission.label ||
+                                                                        permission.feature}
+                                                                </span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )
                                     )
                                 )}
                             </div>
                         )}
 
-                        {/* Workflow Tab */}
-                        {activeTab === "workflow" && data.role === "Production" && (
+                        {activeTab === "workflow" && (data.role === "Production" || data.is_head) && (
                             <div>
-                                <InputLabel value="Workflow Step Assignments" />
-                                <p className="mt-1 mb-3 text-xs text-gray-500">
-                                    Select the workflow steps this production user can work on. They will only see tickets assigned to their workflow steps.
-                                </p>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-                                    {Object.entries(availableWorkflowSteps).map(([key, label]) => (
-                                        <label
-                                            key={key}
-                                            htmlFor={`workflow-${key}`}
-                                            className="flex items-center space-x-2 rounded-md px-3 py-2 border border-gray-300 hover:bg-gray-50 cursor-pointer"
-                                        >
-                                            <Checkbox
-                                                id={`workflow-${key}`}
-                                                checked={(data.workflow_steps || []).includes(key)}
-                                                onChange={(e) =>
-                                                    handleWorkflowStepChange(key, e.target.checked)
+                                <div className="mb-4">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <Checkbox
+                                            checked={data.enable_workflow_assignments}
+                                            onChange={(e) => {
+                                                setData("enable_workflow_assignments", e.target.checked);
+                                                if (!e.target.checked) {
+                                                    setData("workflow_steps", []);
                                                 }
-                                            />
-                                            <span className="text-sm text-gray-700">{label}</span>
-                                        </label>
-                                    ))}
+                                            }}
+                                        />
+                                        <span className="text-sm font-semibold text-gray-700">
+                                            Enable Workflow Step Assignments
+                                        </span>
+                                    </label>
+                                    <p className="ml-6 mt-1 text-xs text-gray-500">
+                                        Assign specific production steps to this user
+                                    </p>
                                 </div>
+
+                                {data.enable_workflow_assignments && (
+                                    <div className="ml-6 mt-4">
+                                        <InputLabel value="Allowed Steps" />
+                                        <p className="mt-1 mb-3 text-xs text-gray-500">
+                                            Select the workflow steps this production user can work on. They will only see tickets assigned to these steps.
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                                            {Object.entries(availableWorkflowSteps).map(([key, label]) => (
+                                                <label
+                                                    key={key}
+                                                    htmlFor={`workflow-${key}`}
+                                                    className="flex items-center space-x-2 rounded-md px-3 py-2 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                                                >
+                                                    <Checkbox
+                                                        id={`workflow-${key}`}
+                                                        checked={(data.workflow_steps || []).includes(key)}
+                                                        onChange={(e) =>
+                                                            handleWorkflowStepChange(key, e.target.checked)
+                                                        }
+                                                    />
+                                                    <span className="text-sm text-gray-700">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <InputError
                                     message={errors.workflow_steps}
                                     className="mt-2"
@@ -765,6 +893,33 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                     </p>
                                     <InputError
                                         message={errors.is_head}
+                                        className="mt-2"
+                                    />
+                                </div>
+
+                                {/* Can Only Print Checkbox */}
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <Checkbox
+                                            checked={data.can_only_print}
+                                            onChange={(e) => {
+                                                setData("can_only_print", e.target.checked);
+                                                // If can_only_print is enabled, automatically set workflow_steps to only printing
+                                                if (e.target.checked) {
+                                                    setData("workflow_steps", ["printing"]);
+                                                    setData("enable_workflow_assignments", true);
+                                                }
+                                            }}
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">
+                                            Can Only Print (Printing Only)
+                                        </span>
+                                    </label>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Restrict this Production user to only work on tickets with "ready_to_print" status. They will only see the Printing workflow step and cannot access other production steps.
+                                    </p>
+                                    <InputError
+                                        message={errors.can_only_print}
                                         className="mt-2"
                                     />
                                 </div>
