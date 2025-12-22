@@ -728,7 +728,9 @@ export default function TicketForm({
 
     const jobTypeOptions = availableJobTypes.map((jt) => {
         let label = jt.name;
-        if (jt.price_tiers && jt.price_tiers.length > 0) {
+        if (jt.discount > 0) {
+            label += ` (PROMO - ${parseFloat(jt.discount)}% OFF)`;
+        } else if (jt.price_tiers && jt.price_tiers.length > 0) {
             label += " (Tiered Pricing)";
         } else if (jt.size_rates && jt.size_rates.length > 0) {
             label += " (Size-Based)";

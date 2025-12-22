@@ -882,6 +882,18 @@ export default function Tickets({
                                     </div>
                                     <div className="col-md-6">
                                         <p className="m-b-5">
+                                            <strong>Subtotal:</strong>{" "}
+                                            {formatPeso(
+                                                selectedTicket.subtotal || selectedTicket.total_amount
+                                            )}
+                                        </p>
+                                        {parseFloat(selectedTicket.discount || 0) > 0 && (
+                                            <p className="m-b-5 text-success">
+                                                <strong>Discount:</strong>{" "}
+                                                {parseFloat(selectedTicket.discount)}% OFF
+                                            </p>
+                                        )}
+                                        <p className="m-b-5">
                                             <strong>Total Amount:</strong>{" "}
                                             {formatPeso(
                                                 selectedTicket.total_amount
@@ -893,16 +905,10 @@ export default function Tickets({
                                                 selectedTicket.amount_paid
                                             )}
                                         </p>
-                                        <p className="m-b-0 text-danger font-bold">
+                                        <p className="m-b-0 text-danger font-bold border-t pt-1">
                                             <strong>Balance:</strong>{" "}
                                             {formatPeso(
-                                                parseFloat(
-                                                    selectedTicket.total_amount || 0
-                                                ) -
-                                                parseFloat(
-                                                    selectedTicket.amount_paid ||
-                                                    0
-                                                )
+                                                Math.max(0, parseFloat(selectedTicket.total_amount || 0) - parseFloat(selectedTicket.amount_paid || 0))
                                             )}
                                         </p>
                                     </div>

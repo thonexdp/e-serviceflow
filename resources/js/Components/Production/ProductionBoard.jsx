@@ -270,7 +270,8 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
 
             <style>{`
                 .production-board::-webkit-scrollbar {
-                    height: 8px;
+                    height: ${isFullscreen ? '0' : '8px'};
+                    display: ${isFullscreen ? 'none' : 'block'};
                 }
                 .production-board::-webkit-scrollbar-track {
                     background: #f1f1f1;
@@ -284,7 +285,8 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                     background: #555;
                 }
                 .workflow-column .card-body::-webkit-scrollbar {
-                    width: 6px;
+                    width: ${isFullscreen ? '0' : '6px'};
+                    display: ${isFullscreen ? 'none' : 'block'};
                 }
                 .workflow-column .card-body::-webkit-scrollbar-track {
                     background: #f1f1f1;
@@ -294,6 +296,16 @@ export default function ProductionBoard({ tickets = [], isFullscreen = false }) 
                     background: #ccc;
                     border-radius: 10px;
                 }
+                ${isFullscreen ? `
+                    .production-board {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+                    .workflow-column .card-body {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+                ` : ''}
                 .workflow-column .card:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;

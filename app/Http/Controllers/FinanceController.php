@@ -26,7 +26,7 @@ class FinanceController extends Controller
         $search = $request->input('search');
 
         // Ledger (Payment History)
-        $ledger = Payment::with(['ticket.customer', 'customer', 'documents'])
+        $ledger = Payment::with(['ticket.customer', 'ticket.jobType', 'ticket.payments', 'customer', 'documents'])
             // Apply branch filtering for non-admin users
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->whereHas('ticket', function ($q) use ($user) {
@@ -39,6 +39,9 @@ class FinanceController extends Controller
                 fn($query) => $query->where('status', $request->string('status')),
                 fn($query) => $query->whereNotIn('status', ['pending', 'rejected'])
             )
+            ->whereHas('ticket', function ($query) {
+                $query->where('payment_status', '!=', 'awaiting_verification');
+            })
             ->when($search, function ($query) use ($search) {
                 $term = '%' . $search . '%';
                 $query->where(function ($q) use ($term) {
@@ -60,7 +63,7 @@ class FinanceController extends Controller
                         });
                 });
             })
-            ->orderByDesc('payment_date')
+            ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'ledger_page')
             ->withQueryString();
@@ -109,6 +112,7 @@ class FinanceController extends Controller
         // Dropdown Data
         $openTickets = Ticket::with('customer')
             ->where('payment_status', '!=', 'paid')
+            ->where('payment_status', '!=', 'awaiting_verification')
             // Apply branch filtering for non-admin users
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->where('order_branch_id', $user->branch_id);
@@ -145,10 +149,11 @@ class FinanceController extends Controller
         $user = auth()->user();
         $search = $request->input('search');
 
-        $query = Ticket::with(['customer', 'payments' => function ($q) {
+        $query = Ticket::with(['customer', 'jobType', 'payments' => function ($q) {
             $q->where('status', 'rejected')->latest();
         }])
             ->where('payment_status', '!=', 'paid')
+            ->where('payment_status', '!=', 'awaiting_verification')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
             })
@@ -220,6 +225,7 @@ class FinanceController extends Controller
 
         // Calculate total receivables independently since we don't load all of them anymore
         $receivablesTotal = Ticket::where('payment_status', '!=', 'paid')
+            ->where('payment_status', '!=', 'awaiting_verification')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
             })
@@ -239,6 +245,7 @@ class FinanceController extends Controller
             'receivables_total' => round($receivablesTotal, 2),
             'pending_cheques_count' => 0, // set in index
             'open_tickets' => Ticket::where('payment_status', '!=', 'paid')
+                ->where('payment_status', '!=', 'awaiting_verification')
                 // Apply branch filtering for non-admin users
                 ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                     $query->where('order_branch_id', $user->branch_id);

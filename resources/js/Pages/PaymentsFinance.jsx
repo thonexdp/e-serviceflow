@@ -337,6 +337,7 @@ export default function PaymentsFinance({
             }
 
             setPaymentModalOpen(false);
+            setIsSubmitting(false);
             resetPaymentForm();
             setConfirmConfig({ isOpen: false });
             router.reload({ preserveScroll: true });
@@ -614,6 +615,11 @@ export default function PaymentsFinance({
                                 </span>
                             )}
                         </div>
+                    )}
+                    {row.job_type?.discount > 0 && (
+                        <span className="badge badge-success text-[10px] p-1 mt-1 flex items-center w-fit">
+                            <i className="ti-gift mr-1"></i> PROMO
+                        </span>
                     )}
                 </div>
             )

@@ -96,8 +96,9 @@ class DashboardController extends Controller
                         }
                     };
 
-                    // New orders from online (customer orders) - pending status tickets
+                    // New orders from online (customer orders) - specifically awaiting verification
                     $newOnlineOrders = Ticket::where('status', 'pending')
+                        ->where('payment_status', 'awaiting_verification')
                         ->whereBetween('created_at', [$startDate, $endDate])
                         ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                         ->count();
@@ -185,6 +186,7 @@ class DashboardController extends Controller
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
+                        ->orderByRaw("CASE WHEN payment_status = 'awaiting_verification' THEN 0 ELSE 1 END")
                         ->orderBy('created_at', 'desc');
 
                     // Search
@@ -560,7 +562,7 @@ class DashboardController extends Controller
                     ];
                 },
                 'urgentReceivables' => function () use ($user) {
-                    return Ticket::with('customer')
+                    return Ticket::with(['customer', 'jobType'])
                         ->where('status', 'completed')
                         ->whereIn('payment_status', ['pending', 'partial'])
                         // Apply branch filtering
@@ -577,10 +579,11 @@ class DashboardController extends Controller
                             'total_amount' => $t->total_amount,
                             'balance' => $t->outstanding_balance,
                             'updated_at' => $t->updated_at,
+                            'has_promo' => $t->jobType && $t->jobType->discount > 0,
                         ]);
                 },
                 'latestCollections' => function () use ($user) {
-                    return Payment::with(['ticket.customer', 'recordedBy'])
+                    return Payment::with(['ticket.customer', 'ticket.jobType', 'recordedBy'])
                         ->where('payment_type', 'collection')
                         // Apply branch filtering
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
@@ -597,8 +600,9 @@ class DashboardController extends Controller
                             'method' => $p->payment_method,
                             'date' => $p->payment_date,
                             'ticket_number' => $p->ticket->ticket_number ?? 'N/A',
-                            'customer_name' => $p->ticket->customer->full_name ?? $p->payer_name ?? 'Walk-in',
+                            'customer_name' => $p->ticket->customer->full_name ?? $p->customer->full_name ?? 'Walk-in',
                             'recorded_by' => $p->recordedBy->name ?? 'System',
+                            'has_promo' => $p->ticket && $p->ticket->jobType && $p->ticket->jobType->discount > 0,
                         ]);
                 },
                 'collectionSummary' => function () use ($user) {

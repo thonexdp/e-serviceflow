@@ -33,8 +33,6 @@ export default function Sidebar({ isCollapsed }) {
     // Admin = 1
 
 
-    console.log(auth?.user);
-
     const role = auth?.user?.role;
     const userBranch = auth?.user?.branch;
     const canAcceptOrders = userBranch?.can_accept_orders ?? true;
