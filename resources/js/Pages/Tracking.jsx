@@ -82,7 +82,7 @@ export default function Dashboard({
                                     <div class="btn-group ml-3">
                                         <button
                                             type="button"
-                                            class="btn btn-link btn-outline btn-sm text-blue-500"
+                                            class="btn btn-link btn-outline btn-sm text-orange-500"
                                         >
                                             <span className="ti-download"></span>{" "}
                                             Download
@@ -181,7 +181,7 @@ export default function Dashboard({
                                     <div class="btn-group ml-3">
                                         <button
                                             type="button"
-                                            class="btn btn-link btn-outline btn-sm text-blue-500"
+                                            class="btn btn-link btn-outline btn-sm text-orange-500"
                                         >
                                             <span className="ti-download"></span>{" "}
                                             Download
@@ -394,7 +394,7 @@ export default function Dashboard({
                                                             <td>
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-link btn-outline btn-sm text-blue-500"
+                                                                    class="btn btn-link btn-outline btn-sm text-orange-500"
                                                                     onClick={() =>
                                                                         setReviewModalOpen(
                                                                             true
@@ -424,7 +424,7 @@ export default function Dashboard({
                                                             <td>
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-link btn-outline btn-sm text-blue-500"
+                                                                    class="btn btn-link btn-outline btn-sm text-orange-500"
                                                                     onClick={() =>
                                                                         setUploadModalOpen(
                                                                             true

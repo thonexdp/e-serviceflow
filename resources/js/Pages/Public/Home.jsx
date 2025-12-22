@@ -127,7 +127,7 @@ export default function PrintShoppeLanding() {
 
     const getStatusIcon = (status) => {
         if (status === 'completed') return <CheckCircle className="w-6 h-6 text-green-600" />;
-        if (status === 'current') return <Clock className="w-6 h-6 text-blue-600" />;
+        if (status === 'current') return <Clock className="w-6 h-6 text-orange-600" />;
         return <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>;
     };
 
@@ -157,13 +157,13 @@ export default function PrintShoppeLanding() {
                         {/* Search Section */}
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                             <div className="flex items-center gap-2 mb-4">
-                                <Package className="w-5 h-5 text-indigo-600" />
+                                <Package className="w-5 h-5 text-orange-600" />
                                 <h2 className="text-xl font-semibold text-gray-900">Track Your Order</h2>
                             </div>
                             <p className="text-gray-600 mb-4 text-sm">Enter your tracking number to view order status</p>
 
                             {ticketHistory.length > 0 && !inputFocused && (
-                                <div className="mb-3 flex items-center gap-2 text-xs text-indigo-600">
+                                <div className="mb-3 flex items-center gap-2 text-xs text-orange-600">
                                     <Clock className="w-4 h-4" />
                                     <span>Click the input to see your {ticketHistory.length} recent ticket{ticketHistory.length > 1 ? 's' : ''}</span>
                                 </div>
@@ -185,7 +185,7 @@ export default function PrintShoppeLanding() {
                                         }}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Enter tracking number (e.g., RC-ABC123)"
-                                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm sm:text-base"
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter' && selectedSuggestionIndex < 0) {
                                                 handleSearch();
@@ -204,7 +204,7 @@ export default function PrintShoppeLanding() {
                                                     <button
                                                         key={index}
                                                         onClick={() => handleSelectTicket(ticket.ticket_number)}
-                                                        className={`w-full text-left px-3 py-2 rounded-md hover:bg-indigo-50 transition-colors ${selectedSuggestionIndex === index ? 'bg-indigo-50' : ''
+                                                        className={`w-full text-left px-3 py-2 rounded-md hover:bg-orange-50 transition-colors ${selectedSuggestionIndex === index ? 'bg-orange-50' : ''
                                                             }`}
                                                     >
                                                         <div className="flex items-center justify-between">
@@ -243,7 +243,7 @@ export default function PrintShoppeLanding() {
                                 <button
                                     onClick={handleSearch}
                                     disabled={isSearching || !trackingNumber}
-                                    className="px-3 py-2 sm:px-6 sm:py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2 font-medium transition-colors text-sm sm:text-base whitespace-nowrap"
+                                    className="px-3 py-2 sm:px-6 sm:py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2 font-medium transition-colors text-sm sm:text-base whitespace-nowrap"
                                 >
                                     <Search className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                                     <span className="hidden xs:inline">{isSearching ? 'Searching...' : 'Track'}</span>
@@ -303,7 +303,7 @@ export default function PrintShoppeLanding() {
                                                 </div>
                                                 <div className="flex-1 pb-8">
                                                     <div className="flex items-center justify-between">
-                                                        <h4 className={`font-semibold ${item.status === 'current' ? 'text-blue-600' : item.status === 'completed' ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                        <h4 className={`font-semibold ${item.status === 'current' ? 'text-orange-600' : item.status === 'completed' ? 'text-gray-900' : 'text-gray-400'}`}>
                                                             {item.stage}
                                                         </h4>
                                                         {item.date && (
@@ -333,13 +333,13 @@ export default function PrintShoppeLanding() {
                                                 </div>
                                                 Approved Design
                                             </h3>
-                                            <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                                            {/* <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
                                                 Ready for Production
-                                            </span>
+                                            </span> */}
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {orderData.approved_mockups.map((mockup) => (
-                                                <div key={mockup.id} className="group relative bg-gray-50 rounded-xl border border-gray-100 p-2 transition-all hover:shadow-md hover:border-indigo-200">
+                                                <div key={mockup.id} className="group relative bg-gray-50 rounded-xl border border-gray-100 p-2 transition-all hover:shadow-md hover:border-orange-200">
                                                     <div className="aspect-square w-full overflow-hidden rounded-lg bg-white relative">
                                                         <img
                                                             src={mockup.url}
@@ -349,7 +349,7 @@ export default function PrintShoppeLanding() {
                                                         />
                                                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <div className="bg-white/90 backdrop-blur p-1.5 rounded-lg shadow-sm">
-                                                                <Search className="w-4 h-4 text-indigo-600" />
+                                                                <Search className="w-4 h-4 text-orange-600" />
                                                             </div>
                                                         </div>
                                                     </div>
@@ -367,15 +367,15 @@ export default function PrintShoppeLanding() {
                                                 </div>
                                             ))}
                                         </div>
-                                        {/* <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-between gap-4">
-                                            <p className="text-xs text-indigo-700 flex items-start gap-2">
+                                        {/* <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-100 flex items-center justify-between gap-4">
+                                            <p className="text-xs text-orange-700 flex items-start gap-2">
                                                 <Printer className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                                 <span>This design has been approved and is scheduled for production. Any further changes may affect your expected completion date.</span>
                                             </p>
                                             {orderData.designer && (
                                                 <div className="flex-shrink-0 text-right">
-                                                    <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Designer</p>
-                                                    <p className="text-xs font-semibold text-indigo-900">{orderData.designer}</p>
+                                                    <p className="text-[10px] text-orange-400 uppercase font-bold tracking-wider">Designer</p>
+                                                    <p className="text-xs font-semibold text-orange-900">{orderData.designer}</p>
                                                 </div>
                                             )}
                                         </div> */}
@@ -457,10 +457,10 @@ export default function PrintShoppeLanding() {
                     {/* Sidebar */}
                     <div className="space-y-6">
                         {/* New Order Button */}
-                        <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-sm p-6 text-white">
+                        <div className="bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl shadow-sm p-6 text-white">
                             <h3 className="text-lg font-semibold mb-2">Need Printing Services?</h3>
-                            <p className="text-indigo-100 text-sm mb-4">Create a new order and get professional printing solutions</p>
-                            <button className="w-full bg-white text-indigo-600 px-4 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                            <p className="text-orange-100 text-sm mb-4">Create a new order and get professional printing solutions</p>
+                            <button className="w-full bg-white text-orange-600 px-4 py-3 rounded-lg font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2"
                                 onClick={() => router.visit('/orders', { preserveState: true, preserveScroll: true, replace: true })}
                             >
                                 <Plus className="w-5 h-5" />
@@ -474,7 +474,7 @@ export default function PrintShoppeLanding() {
                             <div className="space-y-4">
                                 {settings?.contact?.phone && (
                                     <div className="flex items-start gap-3">
-                                        <Phone className="w-5 h-5 text-indigo-600 mt-0.5" />
+                                        <Phone className="w-5 h-5 text-orange-600 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-medium text-gray-900">Phone</p>
                                             <p className="text-sm text-gray-600">{settings.contact.phone}</p>
@@ -483,7 +483,7 @@ export default function PrintShoppeLanding() {
                                 )}
                                 {settings?.contact?.email && (
                                     <div className="flex items-start gap-3">
-                                        <Mail className="w-5 h-5 text-indigo-600 mt-0.5" />
+                                        <Mail className="w-5 h-5 text-orange-600 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-medium text-gray-900">Email</p>
                                             <p className="text-sm text-gray-600">{settings.contact.email}</p>
@@ -492,7 +492,7 @@ export default function PrintShoppeLanding() {
                                 )}
                                 {settings?.contact?.facebook && (
                                     <div className="flex items-start gap-3">
-                                        <svg className="w-5 h-5 text-indigo-600 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-5 h-5 text-orange-600 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                                         </svg>
                                         <div>
@@ -503,7 +503,7 @@ export default function PrintShoppeLanding() {
                                 )}
                                 {settings?.contact?.address && (
                                     <div className="flex items-start gap-3">
-                                        <MapPin className="w-5 h-5 text-indigo-600 mt-0.5" />
+                                        <MapPin className="w-5 h-5 text-orange-600 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-medium text-gray-900">Address</p>
                                             <p className="text-sm text-gray-600">{settings.contact.address}</p>
@@ -511,7 +511,7 @@ export default function PrintShoppeLanding() {
                                     </div>
                                 )}
                             </div>
-                            <button disabled={true} className="w-full mt-4 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-lg font-medium text-sm">
+                            <button disabled={true} className="w-full mt-4 bg-orange-50 text-orange-600 px-4 py-2.5 rounded-lg font-medium text-sm">
                                 Send us a message
                             </button>
                         </div>

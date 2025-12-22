@@ -191,7 +191,7 @@ export default function OfficialReceipt({ payment }) {
                             <span>Less: Previous Payments</span>
                             <span>{previousPayments > 0 ? `-${formatPeso(previousPayments)}` : formatPeso(0)}</span>
                         </div>
-                        <div className="flex justify-between items-center mb-2 pt-2 border-t border-gray-300 text-blue-900">
+                        <div className="flex justify-between items-center mb-2 pt-2 border-t border-gray-300 text-orange-900">
                             <span className="font-bold uppercase">Less: Amount Paid (Current)</span>
                             <span className="font-bold text-sm">-{formatPeso(payment.amount)}</span>
                         </div>

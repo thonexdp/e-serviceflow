@@ -16,7 +16,7 @@ export default function FlashMessage({ type = "success", message, duration = 400
         success: "bg-green-600 text-white",
         error: "bg-red-600 text-white",
         warning: "bg-yellow-500 text-black",
-        info: "bg-blue-600 text-white",
+        info: "bg-orange-600 text-white",
     };
 
     return (

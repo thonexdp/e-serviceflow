@@ -90,7 +90,7 @@ export default function JobCategoryForm({ category = null, onSubmit, onCancel })
                     type="submit"
                     disabled={processing}
                     className={`px-4 py-2.5 text-sm font-medium text-white rounded-md transition
-                        ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-400"}
+                        ${processing ? "bg-orange-400 cursor-not-allowed" : "bg-orange-600 hover:bg-orange-700 focus:ring-2 focus:ring-orange-400"}
                     `}
                 >
                     {processing ? (

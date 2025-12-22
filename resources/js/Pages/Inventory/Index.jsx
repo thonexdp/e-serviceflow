@@ -292,7 +292,7 @@ export default function InventoryIndex({
                 <div className="btn-group">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() =>
                             router.get(buildUrl(`/inventory/${row.id}/movements`))
                         }
@@ -476,7 +476,7 @@ export default function InventoryIndex({
                                         onChange={(e) => {
                                             setIsAreaBased(e.target.checked);
                                         }}
-                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                        className="h-4 w-4 text-orange-600 border-gray-300 rounded"
                                     />
                                     <label
                                         htmlFor="is_area_based"

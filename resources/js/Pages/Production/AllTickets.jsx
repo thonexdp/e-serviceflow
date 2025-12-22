@@ -276,7 +276,7 @@ export default function AllTickets({
                 <div className="btn-group-vertical btn-group-sm">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleView(row)}
                     >
                         <i className="ti-eye"></i> View
@@ -398,14 +398,14 @@ export default function AllTickets({
                                                             <td>
                                                                 <button
                                                                     type="button"
-                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    className="btn btn-link btn-sm text-orange-500"
                                                                     onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    className="btn btn-link btn-sm text-orange-500"
                                                                     onClick={() => setSelectedPreviewFile(file)}
                                                                 >
                                                                     <i className="ti-image"></i> Preview

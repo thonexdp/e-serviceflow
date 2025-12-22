@@ -571,7 +571,7 @@ export default function Productions({
                 <div className="btn-group">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleView(ticket)}
                     >
                         <i className="ti-eye"></i> View
@@ -602,7 +602,7 @@ export default function Productions({
                     {canUpdate && (isUserInAssignedList || isProductionHead || isAdmin) ? (
                         <button
                             type="button"
-                            className="btn btn-link btn-sm text-blue-500"
+                            className="btn btn-link btn-sm text-orange-500"
                             onClick={() => handleUpdate(ticket)}
                         >
                             <i className="ti-pencil"></i> Update
@@ -644,7 +644,7 @@ export default function Productions({
             return (
                 <button
                     type="button"
-                    className="btn btn-link btn-sm text-blue-500"
+                    className="btn btn-link btn-sm text-orange-500"
                     onClick={() => handleView(ticket)}
                 >
                     <i className="ti-eye"></i> View
@@ -861,14 +861,14 @@ export default function Productions({
                                                             <td>
                                                                 <button
                                                                     type="button"
-                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    className="btn btn-link btn-sm text-orange-500"
                                                                     onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    className="btn btn-link btn-sm text-orange-500"
                                                                     onClick={() => setSelectedPreviewFile(file)}
                                                                 >
                                                                     <i className="ti-image"></i> Preview

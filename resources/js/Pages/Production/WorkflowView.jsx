@@ -529,7 +529,7 @@ export default function WorkflowView({
                             : canUpdate && (
                                 <button
                                     type="button"
-                                    className="btn btn-link btn-sm text-blue-500"
+                                    className="btn btn-link btn-sm text-orange-500"
                                     onClick={() => handleUpdate(row)}
                                 >
                                     <i className="ti-pencil"></i> Update
@@ -750,7 +750,7 @@ export default function WorkflowView({
 
                                             return (
                                                 <div key={user.id} className="col-md-6 mb-4">
-                                                    <div className="card h-100" style={{ borderLeft: `4px solid ${isCurrentUser ? '#28a745' : '#007bff'}` }}>
+                                                    <div className="card h-100" style={{ borderLeft: `4px solid ${isCurrentUser ? '#28a745' : '#fb8c00'}` }}>
                                                         <div className="card-header" style={{ backgroundColor: isCurrentUser ? '#e8f5e9' : '#f8f9fa' }}>
                                                             <div className="d-flex justify-content-between align-items-center">
                                                                 <div>

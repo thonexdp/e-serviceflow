@@ -487,9 +487,9 @@ export default function TicketForm({ ticket = null, customerId = null, onSubmit,
                             </div>
 
                             {/* Total Amount */}
-                            <div className="p-3 bg-blue-50 rounded-md border border-blue-300 shadow-sm flex justify-between items-center">
-                                <span className="text-xs text-blue-700 uppercase font-semibold tracking-wider">Total Amount</span>
-                                <span className="text-xl font-extrabold text-blue-700">
+                            <div className="p-3 bg-orange-50 rounded-md border border-orange-300 shadow-sm flex justify-between items-center">
+                                <span className="text-xs text-orange-700 uppercase font-semibold tracking-wider">Total Amount</span>
+                                <span className="text-xl font-extrabold text-orange-700">
                                     ₱{parseFloat(formData.total_amount || 0).toLocaleString('en-US', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,

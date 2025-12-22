@@ -411,7 +411,7 @@ export default function Dashboard({
                                             {
                                                 data: yData,
                                                 label: "Order",
-                                                color: "#0b84ff",
+                                                color: "#fb8c00",
                                             },
                                         ]}
                                         height={400}

@@ -69,7 +69,7 @@ export default function InventoryLowStock({
                     </button>
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => router.get(buildUrl(`/inventory/${row.id}/movements`))}
                     >
                         <i className="ti-eye"></i> Movements

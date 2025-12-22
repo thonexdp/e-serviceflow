@@ -429,7 +429,7 @@ export default function Header({
                                                         float: 'right',
                                                         padding: '0',
                                                         fontSize: '12px',
-                                                        color: '#007bff',
+                                                        color: '#fb8c00',
                                                         textDecoration: 'none',
                                                     }}
                                                 >
@@ -448,7 +448,7 @@ export default function Header({
                                                         <li
                                                             key={notification.id}
                                                             style={{
-                                                                backgroundColor: notification.read ? 'transparent' : '#f0f8ff',
+                                                                backgroundColor: notification.read ? 'transparent' : '#fff7ed',
                                                             }}
                                                         >
                                                             <a
@@ -467,7 +467,7 @@ export default function Header({
                                                                         className="ti-email"
                                                                         style={{
                                                                             fontSize: '24px',
-                                                                            color: notification.read ? '#999' : '#007bff'
+                                                                            color: notification.read ? '#999' : '#fb8c00'
                                                                         }}
                                                                     ></i>
                                                                 </div>
@@ -520,7 +520,7 @@ export default function Header({
                                                                                 padding: '2px 5px',
                                                                                 fontSize: '11px',
                                                                                 marginTop: '5px',
-                                                                                color: '#007bff',
+                                                                                color: '#fb8c00',
                                                                             }}
                                                                         >
                                                                             Mark as read
@@ -534,7 +534,7 @@ export default function Header({
                                                         <a
                                                             href={buildUrl(notificationList?.[0]?.type === 'ticket_in_designer' ? 'mock-ups' : 'tickets')} className="more-link"
                                                             style={{
-                                                                color: '#007bff',
+                                                                color: '#fb8c00',
                                                                 textDecoration: 'none',
                                                             }}
                                                         >

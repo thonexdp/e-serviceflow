@@ -246,7 +246,7 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
                             const qty = getUserQuantity(user.id);
 
                             return (
-                                <div key={user.id || idx} className={`d-flex justify-content-between align-items-center rounded p-1 mb-1 border ${isAssignedToMe ? 'bg-blue-50 border-blue-200' : 'bg-light'}`} style={{ fontSize: '0.85rem' }}>
+                                <div key={user.id || idx} className={`d-flex justify-content-between align-items-center rounded p-1 mb-1 border ${isAssignedToMe ? 'bg-orange-50 border-orange-200' : 'bg-light'}`} style={{ fontSize: '0.85rem' }}>
                                     <span className="text-truncate mr-2" style={{ maxWidth: '120px' }} title={user.name}>
                                         <i className={`ti-user mr-1 ${isAssignedToMe ? 'text-primary' : 'text-muted'}`}></i>
                                         <span className={isAssignedToMe ? 'font-weight-bold text-primary' : ''}>{user.name}</span>

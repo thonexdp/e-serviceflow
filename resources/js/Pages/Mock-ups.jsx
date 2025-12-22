@@ -227,7 +227,7 @@ export default function Mockups({
                         {isAssignedToMe && (
                             <button
                                 type="button"
-                                className="btn btn-link btn-sm text-blue-500"
+                                className="btn btn-link btn-sm text-orange-500"
                                 onClick={() => handleUpload(ticket)}
                             >
                                 <i className="ti-upload"></i> Upload
@@ -297,7 +297,7 @@ export default function Mockups({
             return (
                 <button
                     type="button"
-                    className="btn btn-link btn-sm text-blue-500"
+                    className="btn btn-link btn-sm text-orange-500"
                     onClick={() => handleReview(ticket)}
                 >
                     <i className="ti-eye"></i> View
@@ -442,7 +442,7 @@ export default function Mockups({
                                                             <div className="btn-group">
                                                                 <button
                                                                     type="button"
-                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    className="btn btn-link btn-sm text-orange-500"
                                                                     onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
@@ -491,7 +491,7 @@ export default function Mockups({
                                                                 <div className="btn-group">
                                                                     <button
                                                                         type="button"
-                                                                        className="btn btn-link btn-sm text-blue-500"
+                                                                        className="btn btn-link btn-sm text-orange-500"
                                                                         onClick={() => handleDownload(file.id, file.file_name)}
                                                                     >
                                                                         <i className="ti-download"></i> Download
@@ -630,7 +630,7 @@ export default function Mockups({
                                                             <div className="btn-group">
                                                                 <button
                                                                     type="button"
-                                                                    className="btn btn-link btn-sm text-blue-500"
+                                                                    className="btn btn-link btn-sm text-orange-500"
                                                                     onClick={() => handleDownload(file.id, file.file_name)}
                                                                 >
                                                                     <i className="ti-download"></i> Download
