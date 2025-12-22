@@ -30,6 +30,7 @@ class SettingsController extends Controller
             'payment_bank_name' => Setting::get('payment_bank_name', ''),
             'payment_bank_account_name' => Setting::get('payment_bank_account_name', ''),
             'payment_bank_account_number' => Setting::get('payment_bank_account_number', ''),
+            'customer_order_qrcode' => Setting::get('customer_order_qrcode', ''),
         ];
 
 
@@ -94,6 +95,20 @@ class SettingsController extends Controller
         }
         if ($request->has('payment_bank_account_number')) {
             Setting::set('payment_bank_account_number', $request->payment_bank_account_number);
+        }
+
+        // Customer Order QR Code Upload
+        if ($request->hasFile('customer_order_qrcode')) {
+            // Delete old QR code if exists
+            $oldQRCode = Setting::where('key', 'customer_order_qrcode')->first();
+            if ($oldQRCode && $oldQRCode->value) {
+                $rawValue = $oldQRCode->getRawOriginal('value');
+                Storage::delete($rawValue);
+            }
+
+            // Store new QR code
+            $path = $request->file('customer_order_qrcode')->store('settings/qrcodes');
+            Setting::set('customer_order_qrcode', $path, 'image');
         }
 
         return redirect()->back()->with('success', 'Settings updated successfully!');
