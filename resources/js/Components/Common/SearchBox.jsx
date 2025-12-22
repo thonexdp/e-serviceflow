@@ -56,7 +56,7 @@ export default function SearchBox({
                 <input
                     type="text"
                     placeholder={placeholder}
-                    className="w-full rounded-sm border border-gray-300 bg-white pl-10 pr-10 text-sm text-gray-700 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all"
+                    className="w-full rounded-sm border border-gray-300 bg-white pl-10 pr-10 text-sm text-gray-700 placeholder-gray-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all"
                     value={search}
                     onChange={handleChange}
                 />
@@ -80,7 +80,7 @@ export default function SearchBox({
                 {/* Submit button */}
                 <button
                     type="submit"
-                    className="absolute right-1 bg-blue-500 text-white px-3 py-1.5 rounded-md hover:bg-blue-600 focus:ring-2 focus:ring-blue-300 transition z-20"
+                    className="absolute right-1 bg-orange-500 text-white px-3 py-1.5 rounded-md hover:bg-orange-600 focus:ring-2 focus:ring-orange-300 transition z-20"
                 >
                     <i className="ti-arrow-right"></i>
                 </button>

@@ -585,7 +585,7 @@ export default function Productions({
                 <div className="btn-group">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleView(ticket)}
                     >
                         <i className="ti-eye"></i> View
@@ -606,7 +606,7 @@ export default function Productions({
                 <div className="btn-group">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleUpdate(ticket)}
                         disabled={!canUpdate}
                         title={!canUpdate ? "You are not assigned to this workflow step" : ""}
@@ -646,7 +646,7 @@ export default function Productions({
             return (
                 <button
                     type="button"
-                    className="btn btn-link btn-sm text-blue-500"
+                    className="btn btn-link btn-sm text-orange-500"
                     onClick={() => handleView(ticket)}
                 >
                     <i className="ti-eye"></i> View

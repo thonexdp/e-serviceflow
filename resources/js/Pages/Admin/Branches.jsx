@@ -175,7 +175,7 @@ export default function Branches({
                 <div className="btn-group">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleEdit(row)}
                     >
                         <i className="ti-pencil"></i> Edit

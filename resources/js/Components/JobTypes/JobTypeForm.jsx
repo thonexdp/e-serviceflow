@@ -367,7 +367,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     name="is_active"
                     checked={formData.is_active}
                     onChange={handleChange}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                 />
                 <label className="ml-2 text-sm text-gray-700">
                     Active
@@ -1066,7 +1066,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                     type="submit"
                     disabled={processing}
                     className={`px-4 py-2.5 text-sm font-medium text-white rounded-md transition
-                        ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-400"}
+                        ${processing ? "bg-orange-400 cursor-not-allowed" : "bg-orange-600 hover:bg-orange-700 focus:ring-2 focus:ring-orange-400"}
                     `}
                 >
                     {processing ? (

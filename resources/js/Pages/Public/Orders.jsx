@@ -859,7 +859,7 @@ export default function CustomerPOSOrder() {
                                 </svg>
                             </div>
                         ) : (
-                            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+                            <div className="w-16 h-16 border-4 border-orange-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
                         )}
 
                         <h3 className="text-xl font-bold text-gray-800 mb-2">
@@ -922,11 +922,11 @@ export default function CustomerPOSOrder() {
                         <div className="hidden sm:flex items-center gap-2">
                             {[1, 2, 3, 4, 5].map(step => (
                                 <div key={step} className="flex items-center">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStep >= step ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStep >= step ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-500'
                                         }`}>
                                         {step}
                                     </div>
-                                    {step < 5 && <div className={`w-8 h-0.5 ${currentStep > step ? 'bg-indigo-600' : 'bg-gray-200'}`} />}
+                                    {step < 5 && <div className={`w-8 h-0.5 ${currentStep > step ? 'bg-orange-600' : 'bg-gray-200'}`} />}
                                 </div>
                             ))}
                         </div>
@@ -939,8 +939,8 @@ export default function CustomerPOSOrder() {
                 {currentStep === 1 && (
                     <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
                         <div className="text-center mb-8">
-                            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
                             </div>
@@ -957,7 +957,7 @@ export default function CustomerPOSOrder() {
                                     value={formData.customer_email}
                                     onChange={handleEmailChange}
                                     list="email-suggestions"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     placeholder="e.g., juan@example.com"
                                     autoComplete="email"
                                 />
@@ -979,7 +979,7 @@ export default function CustomerPOSOrder() {
                                     type="text"
                                     value={formData.customer_name}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     placeholder="e.g., Juan Dela Cruz"
                                 />
                             </div>
@@ -992,7 +992,7 @@ export default function CustomerPOSOrder() {
                                     type="text"
                                     value={formData.customer_facebook}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_facebook: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     placeholder="e.g., juancruz"
                                 />
                             </div>
@@ -1004,7 +1004,7 @@ export default function CustomerPOSOrder() {
                                     value={formData.customer_phone}
                                     maxLength={11}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     placeholder="09XX XXX XXXX"
                                 />
                             </div>
@@ -1014,7 +1014,7 @@ export default function CustomerPOSOrder() {
                                 <select
                                     value={formData.branch_id}
                                     onChange={(e) => setFormData(prev => ({ ...prev, branch_id: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     required
                                 >
                                     <option value="">-- Choose a branch --</option>
@@ -1033,7 +1033,7 @@ export default function CustomerPOSOrder() {
                                 onClick={() => setCurrentStep(2)}
                                 disabled={!canProceedStep1}
                                 className={`w-full py-4 rounded-lg font-semibold text-white transition-all ${canProceedStep1
-                                    ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg hover:shadow-xl'
+                                    ? 'bg-orange-600 hover:bg-orange-700 shadow-lg hover:shadow-xl'
                                     : 'bg-gray-300 cursor-not-allowed'
                                     }`}
                             >
@@ -1067,8 +1067,8 @@ export default function CustomerPOSOrder() {
                                                 key={category.id}
                                                 onClick={() => setFormData(prev => ({ ...prev, category_id: category.id.toString(), job_type_id: '' }))}
                                                 className={`p-4 rounded-lg border-2 transition-all ${formData.category_id === category.id.toString()
-                                                    ? 'border-indigo-600 bg-indigo-50'
-                                                    : 'border-gray-200 hover:border-indigo-300'
+                                                    ? 'border-orange-600 bg-orange-50'
+                                                    : 'border-gray-200 hover:border-orange-300'
                                                     }`}
                                             >
                                                 <p className="font-semibold text-gray-900">{category.name}</p>
@@ -1091,8 +1091,8 @@ export default function CustomerPOSOrder() {
                                                     key={jobType.id}
                                                     onClick={() => setFormData(prev => ({ ...prev, job_type_id: jobType.id.toString() }))}
                                                     className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.job_type_id === jobType.id.toString()
-                                                        ? 'border-indigo-600 bg-indigo-50 shadow-sm'
-                                                        : 'border-gray-100 hover:border-indigo-300 hover:bg-gray-50'
+                                                        ? 'border-orange-600 bg-orange-50 shadow-sm'
+                                                        : 'border-gray-100 hover:border-orange-300 hover:bg-gray-50'
                                                         }`}
                                                 >
                                                     <div className="flex gap-4 items-center">
@@ -1120,7 +1120,7 @@ export default function CustomerPOSOrder() {
                                                                             </span>
                                                                         )}
                                                                         {hasPriceTiers && (
-                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">
+                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
                                                                                 📊 Bulk
                                                                             </span>
                                                                         )}
@@ -1132,7 +1132,7 @@ export default function CustomerPOSOrder() {
                                                                     </div>
                                                                 </div>
                                                                 {!hasSizeRates && !hasPriceTiers && (
-                                                                    <span className="text-indigo-600 font-bold text-lg">{formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
+                                                                    <span className="text-orange-600 font-bold text-lg">{formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
                                                                 )}
                                                                 {(hasSizeRates || hasPriceTiers) && (
                                                                     <span className="text-gray-400 text-xs mt-1 italic">Starts at {formatPeso(parseFloat(jobType.price || 0).toFixed(2))}</span>
@@ -1173,15 +1173,15 @@ export default function CustomerPOSOrder() {
 
                             {/* Price Tiers Display */}
                             {hasPriceTiers && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <p className="font-semibold text-blue-900 mb-2">📊 Bulk Pricing:</p>
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                    <p className="font-semibold text-orange-900 mb-2">📊 Bulk Pricing:</p>
                                     <div className="space-y-1 text-sm">
                                         {priceTiers.map((tier, idx) => (
                                             <div key={idx} className="flex justify-between">
-                                                <span className="text-blue-800">
+                                                <span className="text-orange-800">
                                                     {tier.min_quantity}{tier.max_quantity ? ` - ${tier.max_quantity}` : '+'} pcs:
                                                 </span>
-                                                <span className="font-semibold text-blue-900">{formatPeso(parseFloat(tier.price).toFixed(2))}/unit</span>
+                                                <span className="font-semibold text-orange-900">{formatPeso(parseFloat(tier.price).toFixed(2))}/unit</span>
                                             </div>
                                         ))}
                                     </div>
@@ -1195,7 +1195,7 @@ export default function CustomerPOSOrder() {
                                     <select
                                         value={formData.size_rate_id}
                                         onChange={(e) => setFormData(prev => ({ ...prev, size_rate_id: e.target.value }))}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                                     >
                                         {sizeRates.map(rate => (
                                             <option key={rate.id} value={rate.id}>
@@ -1246,16 +1246,16 @@ export default function CustomerPOSOrder() {
                                     type="number"
                                     value={formData.quantity}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                                     min="1"
                                 />
                             </div>
 
                             {subtotal > 0 && (
-                                <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                                <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
                                     <div className="flex justify-between items-center">
                                         <span className="text-gray-700 font-medium">Estimated Price:</span>
-                                        <span className="text-2xl font-bold text-indigo-600">{formatPeso(subtotal.toFixed(2))}</span>
+                                        <span className="text-2xl font-bold text-orange-600">{formatPeso(subtotal.toFixed(2))}</span>
                                     </div>
                                 </div>
                             )}
@@ -1273,7 +1273,7 @@ export default function CustomerPOSOrder() {
                                     onClick={() => setCurrentStep(3)}
                                     disabled={!canProceedStep2}
                                     className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedStep2
-                                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                                        ? 'bg-orange-600 hover:bg-orange-700'
                                         : 'bg-gray-300 cursor-not-allowed'
                                         }`}
                                 >
@@ -1303,7 +1303,7 @@ export default function CustomerPOSOrder() {
                                 <textarea
                                     value={formData.description}
                                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                                     rows="4"
                                     placeholder="Describe what you need... (e.g., 'Business cards with my logo on glossy paper')"
                                 />
@@ -1316,7 +1316,7 @@ export default function CustomerPOSOrder() {
                                     value={formData.due_date}
                                     onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
                                     min={new Date().toISOString().split('T')[0]}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                                 />
                             </div>
 
@@ -1327,14 +1327,14 @@ export default function CustomerPOSOrder() {
                                     accept="image/*"
                                     multiple
                                     onChange={handleImageUpload}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                                 />
                                 {/* <p className="text-xs text-gray-500 mt-1">You can upload multiple images (PNG, JPG up to 10MB each)</p> */}
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-1">
-                                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2 mt-1">
+                                    <svg className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <div className="text-sm text-blue-800">
+                                    <div className="text-sm text-orange-800">
                                         <p className="font-medium">File Requirements:</p>
                                         <ul className="mt-1 space-y-0.5 text-xs">
                                             <li>• Maximum size: <strong>10MB per file</strong></li>
@@ -1355,7 +1355,7 @@ export default function CustomerPOSOrder() {
                                                         type="button"
                                                         onClick={() => setActiveDesignTab(index)}
                                                         className={`px-3 py-1 rounded text-sm whitespace-nowrap ${activeDesignTab === index
-                                                            ? 'bg-indigo-600 text-white'
+                                                            ? 'bg-orange-600 text-white'
                                                             : 'bg-gray-200 text-gray-700'
                                                             }`}
                                                     >
@@ -1407,7 +1407,7 @@ export default function CustomerPOSOrder() {
                                     onClick={() => setCurrentStep(4)}
                                     disabled={!canProceedStep3}
                                     className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedStep3
-                                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                                        ? 'bg-orange-600 hover:bg-orange-700'
                                         : 'bg-gray-300 cursor-not-allowed'
                                         }`}
                                 >
@@ -1422,8 +1422,8 @@ export default function CustomerPOSOrder() {
                 {currentStep === 4 && (
                     <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
                         <div className="text-center mb-8">
-                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
@@ -1465,7 +1465,7 @@ export default function CustomerPOSOrder() {
                                 <div className="border-t pt-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-                                        <span className="text-3xl font-bold text-indigo-600">{formatPeso(subtotal.toFixed(2))}</span>
+                                        <span className="text-3xl font-bold text-orange-600">{formatPeso(subtotal.toFixed(2))}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1563,25 +1563,25 @@ export default function CustomerPOSOrder() {
 
                             {/* Bank Transfer Payment Info */}
                             {paymentMethod === 'bank' && settings?.payment?.bank && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                                    <h3 className="font-semibold text-blue-900 mb-4">Bank Transfer Details</h3>
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+                                    <h3 className="font-semibold text-orange-900 mb-4">Bank Transfer Details</h3>
                                     <div className="space-y-3">
                                         {settings.payment.bank.bank_name && (
                                             <div>
-                                                <p className="text-sm font-medium text-blue-800">Bank Name:</p>
-                                                <p className="text-lg font-bold text-blue-900">{settings.payment.bank.bank_name}</p>
+                                                <p className="text-sm font-medium text-orange-800">Bank Name:</p>
+                                                <p className="text-lg font-bold text-orange-900">{settings.payment.bank.bank_name}</p>
                                             </div>
                                         )}
                                         {settings.payment.bank.account_name && (
                                             <div>
-                                                <p className="text-sm font-medium text-blue-800">Account Name:</p>
-                                                <p className="text-lg font-bold text-blue-900">{settings.payment.bank.account_name}</p>
+                                                <p className="text-sm font-medium text-orange-800">Account Name:</p>
+                                                <p className="text-lg font-bold text-orange-900">{settings.payment.bank.account_name}</p>
                                             </div>
                                         )}
                                         {settings.payment.bank.account_number && (
                                             <div>
-                                                <p className="text-sm font-medium text-blue-800">Account Number:</p>
-                                                <p className="text-lg font-bold text-blue-900">{settings.payment.bank.account_number}</p>
+                                                <p className="text-sm font-medium text-orange-800">Account Number:</p>
+                                                <p className="text-lg font-bold text-orange-900">{settings.payment.bank.account_number}</p>
                                             </div>
                                         )}
                                     </div>
@@ -1611,7 +1611,7 @@ export default function CustomerPOSOrder() {
                                                             type="button"
                                                             onClick={() => setActiveProofTab(index)}
                                                             className={`px-3 py-1 rounded text-sm whitespace-nowrap ${activeProofTab === index
-                                                                ? 'bg-indigo-600 text-white'
+                                                                ? 'bg-orange-600 text-white'
                                                                 : 'bg-gray-200 text-gray-700'
                                                                 }`}
                                                         >
@@ -1701,7 +1701,7 @@ export default function CustomerPOSOrder() {
                                                         handleSubmit(false);
                                                     }}
                                                     disabled={processing}
-                                                    className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     {processing ? 'Retrying...' : 'Try Again'}
                                                 </button>
@@ -1735,7 +1735,7 @@ export default function CustomerPOSOrder() {
                                         ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
                                         paymentProofs.some(p => p.invalid)
                                     }
-                                    className={`flex-1 py-4 rounded-lg bg-indigo-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing ||
+                                    className={`flex-1 py-4 rounded-lg bg-orange-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing ||
                                         ((paymentMethod === 'gcash' || paymentMethod === 'bank') && paymentProofs.length === 0) ||
                                         paymentProofs.some(p => p.invalid)
                                         ? 'opacity-50 cursor-not-allowed' : ''
@@ -1761,17 +1761,17 @@ export default function CustomerPOSOrder() {
                             <p className="text-gray-500">Your order has been received. We will contact you shortly.</p>
                         </div>
 
-                        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-6 mb-6">
+                        <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-6">
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center pb-3 border-b">
                                     <span className="text-sm font-medium text-gray-700">Ticket Number:</span>
-                                    <span className="text-xl font-bold text-indigo-600">{submittedTicket.ticket_number}</span>
+                                    <span className="text-xl font-bold text-orange-600">{submittedTicket.ticket_number}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm font-medium text-gray-700">Status:</span>
                                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         submittedTicket.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                            'bg-blue-100 text-blue-800'
+                                            'bg-orange-100 text-orange-800'
                                         }`}>
                                         {submittedTicket.status.toUpperCase()}
                                     </span>
@@ -1780,7 +1780,7 @@ export default function CustomerPOSOrder() {
                                     <span className="text-sm font-medium text-gray-700">Payment Status:</span>
                                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         submittedTicket.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-                                            'bg-blue-100 text-blue-800'
+                                            'bg-orange-100 text-orange-800'
                                         }`}>
                                         {submittedTicket.payment_status.toUpperCase()}
                                     </span>
@@ -1788,12 +1788,12 @@ export default function CustomerPOSOrder() {
                             </div>
                         </div>
 
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
                             <div className="flex gap-3">
-                                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <p className="text-sm text-blue-800">
+                                <p className="text-sm text-orange-800">
                                     <strong>Important:</strong> Please save your ticket number <strong>{submittedTicket.ticket_number}</strong> for tracking your order.
                                     We'll contact you within 24 hours to confirm your order and discuss payment options.
                                 </p>
@@ -1809,7 +1809,7 @@ export default function CustomerPOSOrder() {
                                     }
                                     router.visit('/');
                                 }}
-                                className="w-full py-4 rounded-lg border-2 border-indigo-600 font-bold text-indigo-600 hover:bg-indigo-50 shadow-lg hover:shadow-xl transition-all"
+                                className="w-full py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all"
                             >
                                 ← Back to Home
                             </button>
@@ -1840,7 +1840,7 @@ export default function CustomerPOSOrder() {
                                     setSubmittedTicket(null);
                                     setCurrentStep(1);
                                 }}
-                                className="w-full py-4 rounded-lg bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all"
+                                className="w-full py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all"
                             >
                                 Place Another Order
                             </button>

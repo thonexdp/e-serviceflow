@@ -33,9 +33,9 @@ export default function NotificationToast() {
                 };
             default: // info
                 return {
-                    bg: 'bg-blue-500',
+                    bg: 'bg-orange-500',
                     icon: 'ℹ️',
-                    border: 'border-blue-600',
+                    border: 'border-orange-600',
                 };
         }
     };
