@@ -169,7 +169,7 @@ export default function Productions({
                 document.mozFullScreenElement ||
                 document.msFullscreenElement
             );
-            
+
             if (!isCurrentlyFullscreen && isFullscreen) {
                 // User exited fullscreen via ESC key
                 setIsFullscreen(false);
@@ -183,9 +183,9 @@ export default function Productions({
 
         if (isFullscreen) {
             const element = document.documentElement;
-            
+
             // Try to enter fullscreen
-            const requestFullscreen = 
+            const requestFullscreen =
                 element.requestFullscreen ||
                 element.webkitRequestFullscreen ||
                 element.mozRequestFullScreen ||
@@ -228,7 +228,7 @@ export default function Productions({
             document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
             document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
             document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-            
+
             document.body.classList.remove("production-fullscreen");
             document.querySelector(".header")?.classList.remove("d-none");
             document.querySelector(".sidebar")?.classList.remove("d-none");
@@ -699,16 +699,16 @@ export default function Productions({
 
     // Define table columns (Parity with AllTickets but read-only)
     const ticketColumns = [
-        {
-            label: "#",
-            key: "index",
-            render: (row, index) => {
-                if (isFullscreen) {
-                    return index + 1;
-                }
-                return (tickets.current_page - 1) * tickets.per_page + index + 1;
-            },
-        },
+        // {
+        //     label: "#",
+        //     key: "index",
+        //     render: (row, index) => {
+        //         if (isFullscreen) {
+        //             return index + 1;
+        //         }
+        //         return (tickets.current_page - 1) * tickets.per_page + index + 1;
+        //     },
+        // },
         {
             label: "Ticket ID",
             key: "ticket_number",
@@ -733,13 +733,18 @@ export default function Productions({
                         </div>
                     )}
                     <div>
-                        <strong style={{ fontSize: isFullscreen ? '1.25rem' : '1rem' }}>{row.ticket_number}</strong>
+                        {row.job_type && (
+                            <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
+                                {row.job_type.name}
+                            </div>
+                        )}
+                        <strong style={{ fontSize: isFullscreen ? '1rem' : '1.2rem', color: '#1a1a1a', display: 'block' }}>#{row.ticket_number}</strong>
                     </div>
                 </div>
             )
         },
         {
-            label: "Description/Customer",
+            label: "Description",
             key: "description",
             render: (row) => (
                 <div>
@@ -818,9 +823,9 @@ export default function Productions({
                             return (
                                 <div
                                     key={user.id}
-                                    className="d-flex align-items-center bg-white border rounded-pill shadow-sm"
+                                    className="d-flex align-items-center bg-white border rounded-xl shadow-sm "
                                     style={{
-                                        padding: isFullscreen ? '4px 12px' : '2px 8px',
+                                        padding: isFullscreen ? '2px 8px' : '2px 8px',
                                         fontSize: isFullscreen ? '0.9rem' : '0.75rem',
                                         borderLeft: '4px solid #667eea !important'
                                     }}
@@ -861,11 +866,11 @@ export default function Productions({
             label: "Status",
             key: "status",
             render: (row) => (
-                <div style={{ 
-                    transform: isFullscreen ? 'scale(1.3)' : 'none', 
-                    transformOrigin: 'left',
-                    minWidth: isFullscreen ? '150px' : '120px',
-                    whiteSpace: 'nowrap'
+                <div style={{
+                    fontSize: isFullscreen ? '1.1rem' : '1rem',
+                    minWidth: isFullscreen ? '180px' : '120px',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 'bold'
                 }}>
                     {getStatusBadge(row.status)}
                 </div>
@@ -1177,18 +1182,21 @@ export default function Productions({
                     border-radius: 0;
                     box-shadow: none;
                     padding: 0;
-                    max-height: calc(100vh - 200px);
-                    overflow-y: auto;
-                    overflow-x: auto;
-                    scroll-behavior: auto;
+                    width: 100%;
+                    height: calc(100vh - 110px);
+                    overflow: hidden;
+                }
+                body.production-fullscreen .table-fullscreen-container .table {
+                    width: 100% !important;
+                    margin-bottom: 0;
                 }
                 body.production-fullscreen .table-fullscreen-container .table-responsive {
-                    max-height: 100%;
-                    overflow-y: auto;
-                    overflow-x: auto;
+                    height: 100%;
+                    overflow: hidden;
+                    width: 100%;
                 }
                 body.production-fullscreen .table th {
-                    font-size: 1.1rem;
+                    font-size: 1.2rem;
                     padding: 20px 15px;
                     background-color: #f8f9fa;
                     position: sticky;
@@ -1201,7 +1209,7 @@ export default function Productions({
                 }
                 body.production-fullscreen .table th:nth-last-child(1),
                 body.production-fullscreen .table td:nth-last-child(1) {
-                    min-width: 150px;
+                    min-width: 180px;
                     white-space: nowrap;
                 }
                 .fullscreen-controls {

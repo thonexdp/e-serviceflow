@@ -22,6 +22,9 @@ export default function Settings({ settings: initialSettings }) {
 
     const [qrcodeFile, setQrcodeFile] = useState(null);
     const [qrcodePreview, setQrcodePreview] = useState(initialSettings?.payment_gcash_qrcode || '');
+    const [customerOrderQrcodeFile, setCustomerOrderQrcodeFile] = useState(null);
+    const [customerOrderQrcodePreview, setCustomerOrderQrcodePreview] = useState(initialSettings?.customer_order_qrcode || '');
+    const [showUpload, setShowUpload] = useState(!initialSettings?.customer_order_qrcode);
     const [saving, setSaving] = useState(false);
 
     const handleBusinessHoursChange = (field, value) => {
@@ -40,6 +43,16 @@ export default function Settings({ settings: initialSettings }) {
             setQrcodeFile(file);
             const reader = new FileReader();
             reader.onloadend = () => setQrcodePreview(reader.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleCustomerOrderQRCodeUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setCustomerOrderQrcodeFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => setCustomerOrderQrcodePreview(reader.result);
             reader.readAsDataURL(file);
         }
     };
@@ -71,10 +84,16 @@ export default function Settings({ settings: initialSettings }) {
         formData.append('payment_bank_account_name', settings.payment_bank_account_name);
         formData.append('payment_bank_account_number', settings.payment_bank_account_number);
 
+        // Customer Order QR Code
+        if (customerOrderQrcodeFile) {
+            formData.append('customer_order_qrcode', customerOrderQrcodeFile);
+        }
+
         router.post('/admin/settings', formData, {
             preserveScroll: true,
             onSuccess: () => {
                 setSaving(false);
+                setShowUpload(false);
                 alert('Settings updated successfully!');
             },
             onError: (errors) => {
@@ -265,6 +284,71 @@ export default function Settings({ settings: initialSettings }) {
                                         </div>
                                     </div>
 
+                                    <hr />
+
+                                    {/* Customer Order QR Code Section */}
+                                    <div className="mb-4">
+                                        <h5 className="mb-3">Customer Order QR Code</h5>
+                                        <p className="text-muted small mb-3">
+                                            Upload a QR code that customers can scan to be redirected to your online orders page.
+                                            This QR code can be printed and displayed in your physical shop.
+                                        </p>
+                                        <div className="row">
+                                            <div className="col-md-12 mb-3">
+                                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                                    <label className="form-label mb-0">Order QR Code</label>
+                                                    {customerOrderQrcodePreview && (
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${showUpload ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
+                                                            onClick={() => setShowUpload(!showUpload)}
+                                                        >
+                                                            <i className={`fa ${showUpload ? 'fa-times' : 'fa-upload'} me-1`}></i>
+                                                            {showUpload ? 'Cancel Update' : 'Update QR Code'}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {showUpload && (
+                                                    <div className="mb-3 animate__animated animate__fadeIn">
+                                                        <input
+                                                            type="file"
+                                                            className="form-control"
+                                                            accept="image/*"
+                                                            onChange={handleCustomerOrderQRCodeUpload}
+                                                        />
+                                                        <p className="text-muted small mt-1">Recommended size: 500x500px</p>
+                                                    </div>
+                                                )}
+                                                {customerOrderQrcodePreview && (
+                                                    <div className="mt-3">
+                                                        <div className="d-flex align-items-start gap-4">
+                                                            <div className="qrcode-preview-container">
+                                                                <img
+                                                                    src={customerOrderQrcodePreview}
+                                                                    alt="Customer Order QR Code"
+                                                                    className="border rounded p-2 bg-white"
+                                                                    style={{ maxWidth: '250px', maxHeight: '250px', display: 'block' }}
+                                                                />
+                                                            </div>
+                                                            <div className="d-flex flex-column gap-2 pt-2">
+                                                                <a
+                                                                    href={customerOrderQrcodePreview}
+                                                                    download="customer-order-qrcode"
+                                                                    className="btn btn-outline-primary btn-sm"
+                                                                >
+                                                                    <i className="fa fa-download me-1"></i> Download QR Code
+                                                                </a>
+                                                                <p className="text-muted small mt-2">
+                                                                    <strong>Tip:</strong> You can download this image and use it for your shop's marketing materials or print it directly.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div className="d-flex justify-content-end">
                                         <button type="submit" className="btn btn-primary" disabled={saving}>
                                             {saving ? 'Saving...' : 'Save Settings'}

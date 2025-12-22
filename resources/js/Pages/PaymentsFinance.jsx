@@ -915,7 +915,7 @@ export default function PaymentsFinance({
                                             <i className="ti-receipt mr-2"></i>
                                             Payment Summary
                                         </h5>
-                                        <span className="badge badge-light text-primary">POS MODE</span>
+                                        {/* <span className="badge badge-light text-primary">POS MODE</span> */}
                                     </div>
 
                                     <div className="p-3 space-y-2">
