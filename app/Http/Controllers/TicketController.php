@@ -11,6 +11,7 @@ use App\Models\JobType;
 use App\Models\Payment;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\UserActivityLog;
 use App\Services\PaymentRecorder;
 use App\Events\TicketStatusChanged;
 use App\Http\Controllers\Traits\HasRoleBasedRoutes;
@@ -220,6 +221,14 @@ class TicketController extends BaseCrudController
 
         $ticket = Ticket::create($ticketData);
 
+        UserActivityLog::log(
+            Auth::id(),
+            'ticket_created',
+            "Created ticket #{$ticket->ticket_number} for customer " . ($ticket->customer ? $ticket->customer->full_name : 'Walk-in'),
+            $ticket,
+            $ticket->toArray()
+        );
+
         if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
@@ -370,6 +379,14 @@ class TicketController extends BaseCrudController
 
         $ticket->update($ticketData);
 
+        UserActivityLog::log(
+            Auth::id(),
+            'ticket_updated',
+            "Updated ticket #{$ticket->ticket_number}",
+            $ticket,
+            $ticketData
+        );
+
         foreach ($request->file('attachments', []) as $attachment) {
             if (!$attachment) {
                 continue;
@@ -420,6 +437,13 @@ class TicketController extends BaseCrudController
         }
 
         $ticket->delete();
+
+        UserActivityLog::log(
+            Auth::id(),
+            'ticket_deleted',
+            "Deleted ticket #{$ticket->ticket_number}",
+            $ticket
+        );
 
         return $this->redirectToRoleRoute('tickets.index')
             ->with('success', 'Ticket deleted successfully.');
@@ -510,6 +534,14 @@ class TicketController extends BaseCrudController
         }
 
         $ticket->save();
+
+        UserActivityLog::log(
+            Auth::id(),
+            'ticket_status_updated',
+            "Changed status of ticket #{$ticket->ticket_number} from {$oldStatus} to {$ticket->status}",
+            $ticket,
+            ['old_status' => $oldStatus, 'new_status' => $ticket->status, 'notes' => $validated['notes'] ?? null]
+        );
 
         // Notify users about status change
         if ($oldStatus !== $ticket->status) {

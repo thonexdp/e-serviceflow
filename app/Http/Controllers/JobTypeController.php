@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\JobType;
 use App\Models\JobCategory;
+use App\Models\UserActivityLog;
 use App\Http\Requests\JobTypeRequest;
 use App\Services\JobTypePricingService;
 use Illuminate\Http\Request;
@@ -63,6 +64,14 @@ class JobTypeController extends Controller
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
         $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
 
+        UserActivityLog::log(
+            auth()->id(),
+            'created_job_type',
+            "Created new job type: {$jobType->name}",
+            $jobType,
+            $validated
+        );
+
         return back()->with('success', 'Job type created successfully!');
     }
 
@@ -84,12 +93,28 @@ class JobTypeController extends Controller
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
         $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
 
+        UserActivityLog::log(
+            auth()->id(),
+            'updated_job_type',
+            "Updated job type: {$jobType->name}",
+            $jobType,
+            $validated
+        );
+
         return back()->with('success', 'Job type updated successfully!');
     }
 
     public function destroy(JobType $jobType)
     {
+        $jobTypeName = $jobType->name;
         $jobType->delete();
+
+        UserActivityLog::log(
+            auth()->id(),
+            'deleted_job_type',
+            "Deleted job type: {$jobTypeName}",
+            null
+        );
 
         return back()->with('success', 'Job type deleted successfully!');
     }

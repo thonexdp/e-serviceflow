@@ -8,6 +8,7 @@ use App\Services\PaymentRecorder;
 use Illuminate\Http\Request;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\UserActivityLog;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -33,6 +34,7 @@ class PaymentController extends Controller
             'official_receipt_number' => 'nullable|string|max:100',
             'payment_reference' => 'nullable|string|max:150',
             'notes' => 'nullable|string|max:1000',
+            'discount' => 'nullable|numeric|min:0',
             'status' => 'nullable|string',
             'metadata' => 'nullable|array',
             'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:8192',
@@ -79,6 +81,13 @@ class PaymentController extends Controller
 
         $payment->update(['status' => 'posted']);
 
+        UserActivityLog::log(
+            auth()->id(),
+            'payment_cleared',
+            "Cleared cheque payment of ₱" . number_format($payment->amount, 2) . " for " . ($payment->ticket ? "Ticket #{$payment->ticket->ticket_number}" : "Customer {$payment->payer_name}"),
+            $payment
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Cheque cleared successfully.',
@@ -103,6 +112,14 @@ class PaymentController extends Controller
             'status' => 'rejected',
             'notes' => $validated['notes'] ?? $payment->notes,
         ]);
+
+        UserActivityLog::log(
+            auth()->id(),
+            'payment_rejected',
+            "Rejected cheque payment of ₱" . number_format($payment->amount, 2) . " for " . ($payment->ticket ? "Ticket #{$payment->ticket->ticket_number}" : "Customer {$payment->payer_name}") . ". Reason: " . ($validated['notes'] ?? 'None'),
+            $payment,
+            ['reason' => $validated['notes'] ?? null]
+        );
 
         $this->notifyFrontDeskPayment($payment, 'rejected');
 
