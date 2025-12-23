@@ -983,7 +983,7 @@ function ProductionIncentivesReport({ data }) {
                                     <td className="text-right">{formatPeso(record.incentive_price || 0)}</td>
                                     <td className="text-right">
                                         <strong className="text-success">
-                                            {formatPeso((record.quantity_produced || 0) * (record.incentive_price || 0))}
+                                            {formatPeso(record.incentive_amount || (record.quantity_produced || 0) * (record.incentive_price || 0))}
                                         </strong>
                                     </td>
                                     <td>
@@ -1015,30 +1015,101 @@ function ProductionIncentivesReport({ data }) {
                 <div className="alert alert-info">No incentive records found for the selected period.</div>
             )}
 
+            {/* Summary by Workflow with Detailed User Breakdown */}
+            {summary.by_workflow && summary.by_workflow.length > 0 && (
+                <>
+                    <h5 className="mt-4">Summary by Workflow</h5>
+                    {summary.by_workflow.map((workflow) => (
+                        <div key={workflow.workflow_step} className="mb-4">
+                            <div className="card">
+                                <div className="card-header bg-primary text-white">
+                                    <h6 className="mb-0 text-capitalize">
+                                        {workflow.workflow_step.replace(/_/g, ' ')}
+                                        <span className="ml-3 badge badge-light">
+                                            {workflow.unique_users} User{workflow.unique_users !== 1 ? 's' : ''}
+                                        </span>
+                                    </h6>
+                                </div>
+                                <div className="card-body">
+                                    <div className="row mb-3">
+                                        <div className="col-md-4">
+                                            <strong>Total Quantity Produced:</strong> {workflow.total_quantity}
+                                        </div>
+                                        <div className="col-md-4">
+                                            <strong>Total Incentives:</strong> {formatPeso(workflow.total_incentives)}
+                                        </div>
+                                        <div className="col-md-4">
+                                            <strong>No. of Users:</strong> {workflow.unique_users}
+                                        </div>
+                                    </div>
+                                    
+                                    {workflow.users && workflow.users.length > 0 && (
+                                        <>
+                                            <h6 className="mt-3 mb-2">User Breakdown:</h6>
+                                            <div className="table-responsive">
+                                                <table className="table table-sm table-bordered table-striped">
+                                                    <thead className="thead-light">
+                                                        <tr>
+                                                            <th>User Name</th>
+                                                            <th className="text-right">Quantity Produced</th>
+                                                            <th className="text-right">Total Incentives</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {workflow.users.map((user, index) => (
+                                                            <tr key={user.user_id || index}>
+                                                                <td>{user.user_name}</td>
+                                                                <td className="text-right">{user.total_quantity || 0}</td>
+                                                                <td className="text-right font-weight-bold text-success">
+                                                                    {formatPeso(user.total_incentives || 0)}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr className="table-active">
+                                                            <th>Total</th>
+                                                            <th className="text-right">{workflow.total_quantity}</th>
+                                                            <th className="text-right">{formatPeso(workflow.total_incentives)}</th>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </>
+            )}
+
             {/* Summary by User */}
-            {summary.by_user && Object.keys(summary.by_user).length > 0 && (
+            {summary.by_user && summary.by_user.length > 0 && (
                 <>
                     <h5 className="mt-4">Summary by User</h5>
-                    <table className="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>User Name</th>
-                                <th className="text-right">Total Quantity</th>
-                                <th className="text-right">Total Incentives</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Object.values(summary.by_user).map((userSummary, index) => (
-                                <tr key={index}>
-                                    <td>{userSummary.user_name}</td>
-                                    <td className="text-right">{userSummary.total_quantity || 0}</td>
-                                    <td className="text-right">
-                                        <strong>{formatPeso(userSummary.total_incentives || 0)}</strong>
-                                    </td>
+                    <div className="table-responsive">
+                        <table className="table table-sm table-bordered">
+                            <thead className="thead-light">
+                                <tr>
+                                    <th>User Name</th>
+                                    <th className="text-right">Total Quantity</th>
+                                    <th className="text-right">Total Incentives</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {summary.by_user.map((userSummary, index) => (
+                                    <tr key={index}>
+                                        <td>{userSummary.user_name}</td>
+                                        <td className="text-right">{userSummary.total_quantity || 0}</td>
+                                        <td className="text-right font-weight-bold text-success">
+                                            {formatPeso(userSummary.total_incentives || 0)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </>
             )}
 

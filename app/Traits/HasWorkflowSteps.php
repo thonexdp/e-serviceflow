@@ -30,7 +30,17 @@ trait HasWorkflowSteps
 
         // Find the first enabled step
         foreach ($stepOrder as $step) {
-            if (isset($workflowSteps[$step]) && $workflowSteps[$step]) {
+            // Support both old format (boolean) and new format (object with 'enabled' property)
+            $isEnabled = false;
+            if (isset($workflowSteps[$step])) {
+                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
+                    $isEnabled = $workflowSteps[$step]['enabled'];
+                } else {
+                    $isEnabled = (bool) $workflowSteps[$step];
+                }
+            }
+            
+            if ($isEnabled) {
                 return $step;
             }
         }
@@ -72,7 +82,17 @@ trait HasWorkflowSteps
         // Find the next enabled step
         for ($i = $currentIndex + 1; $i < count($stepOrder); $i++) {
             $step = $stepOrder[$i];
-            if (isset($workflowSteps[$step]) && $workflowSteps[$step]) {
+            // Support both old format (boolean) and new format (object with 'enabled' property)
+            $isEnabled = false;
+            if (isset($workflowSteps[$step])) {
+                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
+                    $isEnabled = $workflowSteps[$step]['enabled'];
+                } else {
+                    $isEnabled = (bool) $workflowSteps[$step];
+                }
+            }
+            
+            if ($isEnabled) {
                 return $step;
             }
         }
@@ -115,7 +135,17 @@ trait HasWorkflowSteps
         // Find the previous enabled step
         for ($i = $currentIndex - 1; $i >= 0; $i--) {
             $step = $stepOrder[$i];
-            if (isset($workflowSteps[$step]) && $workflowSteps[$step]) {
+            // Support both old format (boolean) and new format (object with 'enabled' property)
+            $isEnabled = false;
+            if (isset($workflowSteps[$step])) {
+                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
+                    $isEnabled = $workflowSteps[$step]['enabled'];
+                } else {
+                    $isEnabled = (bool) $workflowSteps[$step];
+                }
+            }
+            
+            if ($isEnabled) {
                 return $step;
             }
         }
@@ -149,7 +179,17 @@ trait HasWorkflowSteps
 
         $activeSteps = [];
         foreach ($stepOrder as $step) {
-            if (isset($workflowSteps[$step]) && $workflowSteps[$step]) {
+            // Support both old format (boolean) and new format (object with 'enabled' property)
+            $isEnabled = false;
+            if (isset($workflowSteps[$step])) {
+                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
+                    $isEnabled = $workflowSteps[$step]['enabled'];
+                } else {
+                    $isEnabled = (bool) $workflowSteps[$step];
+                }
+            }
+            
+            if ($isEnabled) {
                 $activeSteps[] = $step;
             }
         }

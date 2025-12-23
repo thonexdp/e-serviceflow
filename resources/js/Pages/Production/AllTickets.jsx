@@ -479,7 +479,7 @@ export default function AllTickets({
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
-                                                        route={buildUrl("/tickets/all")}
+                                                        route="/tickets/all"
                                                     />
                                                 </div>
                                                 <div className="col-md-3">

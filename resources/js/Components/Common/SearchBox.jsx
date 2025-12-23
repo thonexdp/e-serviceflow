@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import { useDebouncedCallback } from "use-debounce";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function SearchBox({
     placeholder = "Search...",
@@ -14,9 +15,11 @@ export default function SearchBox({
 }) {
     const [search, setSearch] = useState(initialValue);
 
+    const { buildUrl } = useRoleApi();
+
     const debouncedSearch = useDebouncedCallback((value) => {
         router.get(
-            route,
+            buildUrl(route),
             { search: value, ...additionalParams },
             {
                 preserveState,
@@ -41,12 +44,12 @@ export default function SearchBox({
     const handleSubmit = (e) => {
         e.preventDefault();
         debouncedSearch.cancel();
-        router.get(route, { search, ...additionalParams }, { preserveState, preserveScroll });
+        router.get(buildUrl(route), { search, ...additionalParams }, { preserveState, preserveScroll });
     };
 
     const handleClear = () => {
         setSearch("");
-        router.get(route, { ...additionalParams }, { preserveState, preserveScroll, only: ["customers", "tickets"] });
+        router.get(buildUrl(route), { ...additionalParams }, { preserveState, preserveScroll, only: ["customers", "tickets"] });
         if (onSearchChange) onSearchChange("");
     };
 

@@ -498,7 +498,7 @@ export default function CompletedTickets({
                                                     <SearchBox
                                                         placeholder="Search completed tickets..."
                                                         initialValue={filters.search || ""}
-                                                        route={buildUrl("/completed")}
+                                                        route="/completed"
                                                     />
                                                 </div>
                                                 <div className="col-md-3">

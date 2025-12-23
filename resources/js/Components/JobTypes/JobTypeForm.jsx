@@ -19,14 +19,11 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     const [sizeRates, setSizeRates] = useState([]);
     const [promoRules, setPromoRules] = useState([]);
     const [workflowSteps, setWorkflowSteps] = useState({
-        // design: false,
-        printing: false,
-        lamination_heatpress: false,
-        cutting: false,
-        sewing: false,
-        dtf_press: false,
-        // assembly: false,
-        // quality_check: false,
+        printing: { enabled: false, incentive_price: "" },
+        lamination_heatpress: { enabled: false, incentive_price: "" },
+        cutting: { enabled: false, incentive_price: "" },
+        sewing: { enabled: false, incentive_price: "" },
+        dtf_press: { enabled: false, incentive_price: "" },
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
@@ -44,7 +41,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 price: jobType.price || "",
                 price_by: jobType.price_by || "pcs",
                 discount: jobType.discount || "",
-                incentive_price: jobType.incentive_price || "",
                 is_active: jobType.is_active !== undefined ? jobType.is_active : true,
                 sort_order: jobType.sort_order || 0,
             });
@@ -85,15 +81,39 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
             // Load workflow steps if they exist
             if (jobType.workflow_steps) {
+                const steps = {
+                    printing: { enabled: false, incentive_price: "" },
+                    lamination_heatpress: { enabled: false, incentive_price: "" },
+                    cutting: { enabled: false, incentive_price: "" },
+                    sewing: { enabled: false, incentive_price: "" },
+                    dtf_press: { enabled: false, incentive_price: "" },
+                };
+
+                Object.keys(steps).forEach(step => {
+                    const data = jobType.workflow_steps[step];
+                    if (data) {
+                        if (typeof data === 'object' && data !== null) {
+                            steps[step] = {
+                                enabled: !!data.enabled,
+                                incentive_price: data.incentive_price || ""
+                            };
+                        } else {
+                            // Handle legacy boolean data
+                            steps[step] = {
+                                enabled: !!data,
+                                incentive_price: data ? jobType.incentive_price || "" : ""
+                            };
+                        }
+                    }
+                });
+                setWorkflowSteps(steps);
+            } else {
                 setWorkflowSteps({
-                    // design: jobType.workflow_steps.design || false,
-                    printing: jobType.workflow_steps.printing || false,
-                    lamination_heatpress: jobType.workflow_steps.lamination_heatpress || false,
-                    cutting: jobType.workflow_steps.cutting || false,
-                    sewing: jobType.workflow_steps.sewing || false,
-                    dtf_press: jobType.workflow_steps.dtf_press || false,
-                    // assembly: jobType.workflow_steps.assembly || false,
-                    // quality_check: jobType.workflow_steps.quality_check || false,
+                    printing: { enabled: false, incentive_price: "" },
+                    lamination_heatpress: { enabled: false, incentive_price: "" },
+                    cutting: { enabled: false, incentive_price: "" },
+                    sewing: { enabled: false, incentive_price: "" },
+                    dtf_press: { enabled: false, incentive_price: "" },
                 });
             }
             if (jobType && jobType.image_path) {
@@ -107,11 +127,11 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             setSizeRates([]);
             setPromoRules([]);
             setWorkflowSteps({
-                printing: false,
-                lamination_heatpress: false,
-                cutting: false,
-                sewing: false,
-                dtf_press: false,
+                printing: { enabled: false, incentive_price: "" },
+                lamination_heatpress: { enabled: false, incentive_price: "" },
+                cutting: { enabled: false, incentive_price: "" },
+                sewing: { enabled: false, incentive_price: "" },
+                dtf_press: { enabled: false, incentive_price: "" },
             });
             setImagePreview(null);
             setImageFile(null);
@@ -150,7 +170,20 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     const handleWorkflowChange = (step) => {
         setWorkflowSteps((prev) => ({
             ...prev,
-            [step]: !prev[step],
+            [step]: {
+                ...prev[step],
+                enabled: !prev[step].enabled,
+            }
+        }));
+    };
+
+    const handleWorkflowIncentiveChange = (step, value) => {
+        setWorkflowSteps((prev) => ({
+            ...prev,
+            [step]: {
+                ...prev[step],
+                incentive_price: value,
+            }
         }));
     };
 
@@ -329,7 +362,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             category_id: parseInt(formData.category_id),
             price: parseFloat(formData.price),
             discount: formData.discount ? parseFloat(formData.discount) : null,
-            incentive_price: formData.incentive_price ? parseFloat(formData.incentive_price) : null,
             sort_order: parseInt(formData.sort_order) || 0,
             price_tiers: formattedPriceTiers,
             size_rates: formattedSizeRates,
@@ -459,21 +491,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             </div>
 
             <div className="row">
-                <div className="col-md-6">
-                    <FormInput
-                        label="Incentive Price (per piece)"
-                        type="number"
-                        name="incentive_price"
-                        value={formData.incentive_price}
-                        onChange={handleChange}
-                        error={errors.incentive_price}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        helpText="Used to calculate production incentives based on quantity produced"
-                    />
-                </div>
-                <div className="col-md-6">
+                <div className="col-md-12">
                     <div className="form-group">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Item Image (Optional)
@@ -893,143 +911,82 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
             <hr />
             <div className="mt-4">
-                <h5 className="mb-3">Production Workflow Template</h5>
+                <h5 className="mb-3">Production Workflow Template & Incentives</h5>
                 <p className="text-muted text-sm mb-3">
-                    Select the production steps that apply to this job type/product. These steps will be used to track progress in the production board.
+                    Select the production steps that apply to this job type. For each step, you can specify an incentive price per piece.
                 </p>
                 <div className="row">
-                    {/* <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_design"
-                                checked={workflowSteps.design}
-                                onChange={() => handleWorkflowChange('design')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_design">
-                                <i className="ti-pencil-alt mr-1"></i> Design
-                            </label>
+                    {[
+                        { key: 'printing', label: 'Printing', icon: 'ti-printer' },
+                        { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers' },
+                        { key: 'cutting', label: 'Cutting', icon: 'ti-cut' },
+                        { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt' },
+                        { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' },
+                    ].map((step) => (
+                        <div key={step.key} className="col-md-4 mb-4">
+                            <div className="card h-100 p-3 bg-light border-dashed">
+                                <div className="form-check custom-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        className="form-check-input"
+                                        id={`workflow_${step.key}`}
+                                        checked={workflowSteps[step.key].enabled}
+                                        onChange={() => handleWorkflowChange(step.key)}
+                                    />
+                                    <label className="form-check-label font-weight-bold" htmlFor={`workflow_${step.key}`}>
+                                        <i className={`${step.icon} mr-1`}></i> {step.label}
+                                    </label>
+                                </div>
+                                {workflowSteps[step.key].enabled && (
+                                    <div className="mt-2">
+                                        <div className="input-group input-group-sm">
+                                            <div className="input-group-prepend">
+                                                <span className="input-group-text">₱</span>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                value={workflowSteps[step.key].incentive_price}
+                                                onChange={(e) => handleWorkflowIncentiveChange(step.key, e.target.value)}
+                                                placeholder="Incentive"
+                                                step="0.01"
+                                                min="0"
+                                            />
+                                            <div className="input-group-append">
+                                                <span className="input-group-text">/pcs</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div> */}
-                    <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_printing"
-                                checked={workflowSteps.printing}
-                                onChange={() => handleWorkflowChange('printing')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_printing">
-                                <i className="ti-printer mr-1"></i> Printing
-                            </label>
-                        </div>
-                    </div>
-                    <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_lamination"
-                                checked={workflowSteps.lamination_heatpress}
-                                onChange={() => handleWorkflowChange('lamination_heatpress')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_lamination">
-                                <i className="ti-layers mr-1"></i> Lamination/Heatpress
-                            </label>
-                        </div>
-                    </div>
-                    <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_cutting"
-                                checked={workflowSteps.cutting}
-                                onChange={() => handleWorkflowChange('cutting')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_cutting">
-                                <i className="ti-cut mr-1"></i> Cutting
-                            </label>
-                        </div>
-                    </div>
-                    <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_sewing"
-                                checked={workflowSteps.sewing}
-                                onChange={() => handleWorkflowChange('sewing')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_sewing">
-                                <i className="ti-pin-alt mr-1"></i> Sewing
-                            </label>
-                        </div>
-                    </div>
-                    <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_dtf"
-                                checked={workflowSteps.dtf_press}
-                                onChange={() => handleWorkflowChange('dtf_press')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_dtf">
-                                <i className="ti-stamp mr-1"></i> DTF Press (T-shirts)
-                            </label>
-                        </div>
-                    </div>
-                    {/* <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_assembly"
-                                checked={workflowSteps.assembly}
-                                onChange={() => handleWorkflowChange('assembly')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_assembly">
-                                <i className="ti-package mr-1"></i> Assembly
-                            </label>
-                        </div>
-                    </div>
-                    <div className="col-md-3 mb-3">
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                id="workflow_quality"
-                                checked={workflowSteps.quality_check}
-                                onChange={() => handleWorkflowChange('quality_check')}
-                            />
-                            <label className="form-check-label" htmlFor="workflow_quality">
-                                <i className="ti-check-box mr-1"></i> Quality Check
-                            </label>
-                        </div>
-                    </div> */}
+                    ))}
                 </div>
             </div>
 
             <div className="mt-4 p-4 bg-light rounded border">
-                <h6 className="mb-3 font-weight-bold text-dark">Workflow Preview</h6>
+                <h6 className="mb-3 font-weight-bold text-dark">Workflow Preview & Incentives</h6>
                 <div className="d-flex flex-wrap align-items-center gap-2">
                     {Object.entries(workflowSteps)
-                        .filter(([key, value]) => value)
+                        .filter(([key, data]) => data.enabled)
                         .sort((a, b) => {
-                            // const order = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press', 'assembly', 'quality_check'];
                             const order = ['printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
                             return order.indexOf(a[0]) - order.indexOf(b[0]);
                         })
-                        .map(([key, value], index, array) => (
+                        .map(([key, data], index, array) => (
                             <React.Fragment key={key}>
                                 <div className="d-flex align-items-center">
-                                    <div className="badge badge-primary p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
-                                        {key === 'lamination_heatpress' ? 'Lamination/Heatpress' :
-                                            key === 'dtf_press' ? 'DTF Press' :
-                                                key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                    <div className="d-flex flex-column align-items-center">
+                                        <div className="badge badge-primary p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                                            {key === 'lamination_heatpress' ? 'Lamination/Heatpress' :
+                                                key === 'dtf_press' ? 'DTF Press' :
+                                                    key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                        </div>
+                                        {data.incentive_price > 0 && (
+                                            <span className="text-success text-xs font-weight-bold mt-1">
+                                                ₱{data.incentive_price}
+                                            </span>
+                                        )}
                                     </div>
                                     {index < array.length - 1 && (
                                         <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
@@ -1039,7 +996,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         ))}
 
                     {/* Visual connector to Completed if any steps are selected */}
-                    {Object.values(workflowSteps).some(v => v) && (
+                    {Object.values(workflowSteps).some(v => v.enabled) && (
                         <>
                             <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
                             <div className="badge badge-success p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
@@ -1048,7 +1005,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                         </>
                     )}
 
-                    {!Object.values(workflowSteps).some(v => v) && (
+                    {!Object.values(workflowSteps).some(v => v.enabled) && (
                         <span className="text-muted font-italic">Select steps above to see the workflow preview.</span>
                     )}
                 </div>

@@ -619,7 +619,7 @@ export default function FrontDesk({
                                                     {/* </button> */}
                                                 </th>
                                                 <th>Description</th>
-                                                <th>Amount</th>
+                                                {/* <th>Amount</th> */}
                                                 <th>Payment Status</th>
                                                 <th>Files</th>
                                                 <th>Action</th>
@@ -639,7 +639,7 @@ export default function FrontDesk({
                                                             )}
                                                         </td>
                                                         <td>{ticket.description}</td>
-                                                        <td>{formatPeso(ticket.total_amount)}</td>
+                                                        {/* <td>{formatPeso(ticket.total_amount)}</td> */}
                                                         <td>{getPaymentStatusBadge(ticket)}</td>
                                                         <td>
                                                             {ticket.customer_files && ticket.customer_files.length > 0 ? (

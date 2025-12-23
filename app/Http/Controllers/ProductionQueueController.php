@@ -102,7 +102,7 @@ class ProductionQueueController extends Controller
         $perPage = $request->get('per_page', 10);
         $currentPage = $request->get('page', 1);
         $total = $tickets->count();
-        
+
         // If per_page is very large (like 1000), return all tickets without pagination
         if ($perPage >= 1000) {
             $tickets = $tickets->values();
@@ -186,10 +186,23 @@ class ProductionQueueController extends Controller
         }
 
         // Check if user is authorized to start production (for Production users)
-        if ($user && $user->isProduction() && !$user->isAdmin()) {
+        if ($user && $user->isProduction() && !$user->isAdmin() && !$user->isProductionHead()) {
             $firstStep = $ticket->getFirstWorkflowStep();
             if ($firstStep && !$user->isAssignedToWorkflowStep($firstStep)) {
                 return redirect()->back()->with('error', 'You cannot start production on this ticket. The first workflow step "' . ucfirst(str_replace('_', ' ', $firstStep)) . '" is not assigned to you.');
+            }
+
+            // NEW: Check if user is assigned to this specific ticket
+            $assignedUsers = $ticket->assignedUsers;
+            $isUserAssigned = $assignedUsers->contains('id', $user->id);
+
+            // Backward compatibility for single user assignment
+            if (!$isUserAssigned && $ticket->assigned_to_user_id) {
+                $isUserAssigned = $ticket->assigned_to_user_id === $user->id;
+            }
+
+            if (!$isUserAssigned) {
+                return redirect()->back()->with('error', 'You cannot start production on this ticket because you are not assigned to it.');
             }
         }
 
@@ -337,7 +350,7 @@ class ProductionQueueController extends Controller
 
                 // Create production records for each user quantity
                 $currentWorkflowStep = $ticket->current_workflow_step ?? $newWorkflowStep;
-                $incentivePrice = $ticket->jobType->incentive_price ?? 0;
+                $incentivePrice = $ticket->jobType ? $ticket->jobType->getIncentivePriceForStep($currentWorkflowStep) : 0;
                 $createdRecords = [];
 
                 if (!empty($userQuantities) && $currentWorkflowStep) {
@@ -957,6 +970,15 @@ class ProductionQueueController extends Controller
                 'evidenceFiles.user',
             ]);
 
+            // Filter tickets to only show those whose job type includes the current workflow step
+            $query->whereHas('jobType', function ($q) use ($workflowStep) {
+                // Support both old format (boolean) and new format (object with 'enabled' property)
+                $q->where(function ($sq) use ($workflowStep) {
+                    $sq->where("workflow_steps->{$workflowStep}->enabled", true)
+                       ->orWhere("workflow_steps->{$workflowStep}", true);
+                });
+            });
+
             // For printing workflow, include ready_to_print tickets
             if ($workflowStep === 'printing') {
                 // If user can only print, show ready_to_print tickets and in_production tickets with printing step
@@ -1141,7 +1163,7 @@ class ProductionQueueController extends Controller
                 [
                     'quantity_produced' => $producedQuantity,
                     'job_type_id' => $ticket->job_type_id,
-                    'incentive_amount' => $producedQuantity * ($ticket->jobType->incentive_price ?? 0),
+                    'incentive_amount' => $producedQuantity * ($ticket->jobType ? $ticket->jobType->getIncentivePriceForStep($workflowStep) : 0),
                     'recorded_at' => now(),
                 ]
             );
@@ -1260,7 +1282,7 @@ class ProductionQueueController extends Controller
                     [
                         'quantity_produced' => $producedQuantity,
                         'job_type_id' => $ticket->job_type_id,
-                        'incentive_amount' => $producedQuantity * ($ticket->jobType->incentive_price ?? 0),
+                        'incentive_amount' => $producedQuantity * ($ticket->jobType ? $ticket->jobType->getIncentivePriceForStep($workflowStep) : 0),
                         'recorded_at' => now(),
                     ]
                 );
