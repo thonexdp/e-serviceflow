@@ -1659,7 +1659,7 @@ export default function Productions({
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
-                                                        route={buildUrl("/queue")}
+                                                        route="/queue"
                                                     />
                                                 </div>
                                                 <div className="col-md-4">

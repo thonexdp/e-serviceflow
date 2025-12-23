@@ -9,10 +9,15 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
     // Memoize to prevent infinite loop - only recalculate when ticket.assigned_users or ticket.assigned_to_user changes
     const assignedUsers = React.useMemo(() => {
         const users = ticket.assigned_users;
+        let list = [];
         if ((!users || users.length === 0) && ticket.assigned_to_user) {
-            return [ticket.assigned_to_user];
+            list = [ticket.assigned_to_user];
+        } else {
+            list = users || [];
         }
-        return users || [];
+
+        // Filter out designers from the Assigned Users list
+        return list.filter(u => !u.role || (u.role.toLowerCase() !== 'designer'));
     }, [ticket.assigned_users, ticket.assigned_to_user]);
 
     // Initialize local state when dropdown opens
@@ -59,14 +64,14 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
                 const viewportWidth = window.innerWidth;
                 const dropdownWidth = 220;
                 const dropdownHeight = 300;
-                
+
                 const spaceBelow = viewportHeight - buttonRect.bottom;
                 const spaceAbove = buttonRect.top;
                 const spaceRight = viewportWidth - buttonRect.right;
-                
+
                 let top = 0;
                 let left = 0;
-                
+
                 if (spaceBelow >= dropdownHeight) {
                     top = buttonRect.bottom + 4;
                 } else if (spaceAbove >= dropdownHeight) {
@@ -74,23 +79,23 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
                 } else {
                     top = spaceBelow > spaceAbove ? buttonRect.bottom + 4 : Math.max(10, buttonRect.top - Math.min(dropdownHeight, spaceAbove) - 4);
                 }
-                
+
                 if (spaceRight >= dropdownWidth) {
                     left = buttonRect.right + 4;
                 } else {
                     left = buttonRect.left - dropdownWidth - 4;
                 }
-                
+
                 left = Math.max(10, Math.min(left, viewportWidth - dropdownWidth - 10));
                 top = Math.max(10, Math.min(top, viewportHeight - 10));
-                
+
                 setDropdownPosition({ top, left, placement: 'bottom-right' });
             }
         };
 
         window.addEventListener('scroll', handleScroll, true);
         window.addEventListener('resize', handleResize);
-        
+
         return () => {
             window.removeEventListener('scroll', handleScroll, true);
             window.removeEventListener('resize', handleResize);
@@ -105,16 +110,16 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
             const viewportWidth = window.innerWidth;
             const dropdownWidth = 220;
             const dropdownHeight = 300; // max-height of dropdown
-            
+
             const spaceBelow = viewportHeight - buttonRect.bottom;
             const spaceAbove = buttonRect.top;
             const spaceRight = viewportWidth - buttonRect.right;
             const spaceLeft = buttonRect.left;
-            
+
             let top = 0;
             let left = 0;
             let placement = 'bottom-right';
-            
+
             // Determine vertical placement
             if (spaceBelow >= dropdownHeight) {
                 // Enough space below - show below
@@ -134,7 +139,7 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
                     placement = spaceRight >= dropdownWidth ? 'top-right' : 'top-left';
                 }
             }
-            
+
             // Determine horizontal placement
             if (placement.includes('right')) {
                 // Position to the right of button
@@ -153,11 +158,11 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
                     left = buttonRect.right + 4; // 4px gap to the right
                 }
             }
-            
+
             // Ensure dropdown doesn't go off-screen
             left = Math.max(10, Math.min(left, viewportWidth - dropdownWidth - 10));
             top = Math.max(10, Math.min(top, viewportHeight - 10));
-            
+
             setDropdownPosition({ top, left, placement });
         }
     }, [isOpen]);
@@ -171,10 +176,12 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
             .reduce((sum, r) => sum + (r.quantity_produced || 0), 0);
     };
 
-    // Allow can_only_print users to assign only for printing workflow step
-    const isPrintingWorkflow = ticket.current_workflow_step === 'printing' || ticket.status === 'ready_to_print';
-    const canEditByCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
-    const canEdit = (isProductionHead || isAdmin || canEditByCanOnlyPrint) && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
+    // Allow can_only_print users to assign only for printing workflow step - DISABLED as per new requirement
+    // const isPrintingWorkflow = ticket.current_workflow_step === 'printing' || ticket.status === 'ready_to_print';
+    // const canEditByCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
+
+    // Only Head/Admin can assign users
+    const canEdit = (isProductionHead || isAdmin) && (ticket.status === 'in_production' || ticket.status === 'ready_to_print');
 
     // Handle checkbox change using local state to avoid race conditions
     const handleCheckboxChange = (user, checked) => {
@@ -219,20 +226,22 @@ const TicketAssigner = ({ ticket, productionUsers, isProductionHead, isAdmin, ca
                             }}
                         >
                             <div className="text-muted small mb-2 p-1 border-bottom">Select users to assign</div>
-                            {productionUsers.map(user => (
-                                <div key={user.id} className="custom-control custom-checkbox mb-2">
-                                    <input
-                                        type="checkbox"
-                                        className="custom-control-input"
-                                        id={`assign-${ticket.id}-${user.id}`}
-                                        checked={localAssignedIds.includes(user.id)}
-                                        onChange={(e) => handleCheckboxChange(user, e.target.checked)}
-                                    />
-                                    <label className="custom-control-label w-100 cursor-pointer" htmlFor={`assign-${ticket.id}-${user.id}`}>
-                                        {user.name}
-                                    </label>
-                                </div>
-                            ))}
+                            {productionUsers
+                                .filter(u => !u.role || (u.role.toLowerCase() !== 'designer'))
+                                .map(user => (
+                                    <div key={user.id} className="custom-control custom-checkbox mb-2">
+                                        <input
+                                            type="checkbox"
+                                            className="custom-control-input"
+                                            id={`assign-${ticket.id}-${user.id}`}
+                                            checked={localAssignedIds.includes(user.id)}
+                                            onChange={(e) => handleCheckboxChange(user, e.target.checked)}
+                                        />
+                                        <label className="custom-control-label w-100 cursor-pointer" htmlFor={`assign-${ticket.id}-${user.id}`}>
+                                            {user.name}
+                                        </label>
+                                    </div>
+                                ))}
                         </div>
                     )}
                 </div>

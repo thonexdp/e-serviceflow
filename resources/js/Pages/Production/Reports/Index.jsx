@@ -19,8 +19,17 @@ export default function ProductionReports({
     const [customEndDate, setCustomEndDate] = useState(endDate);
     const [selectedUser, setSelectedUser] = useState(filters.user_id || '');
     const [selectedJobType, setSelectedJobType] = useState(filters.job_type_id || '');
+    const [selectedWorkflow, setSelectedWorkflow] = useState(filters.workflow_step || '');
     const [viewingEvidence, setViewingEvidence] = useState(null); // { record, files }
     const [selectedImage, setSelectedImage] = useState(null);
+
+    const workflows = [
+        { value: 'printing', label: 'Printing' },
+        { value: 'lamination_heatpress', label: 'Lamination/Heatpress' },
+        { value: 'cutting', label: 'Cutting' },
+        { value: 'sewing', label: 'Sewing' },
+        { value: 'dtf_press', label: 'DTF Press' },
+    ];
 
     const dateRanges = [
         { value: 'today', label: 'Today' },
@@ -41,6 +50,7 @@ export default function ProductionReports({
             date_range: range,
             user_id: selectedUser,
             job_type_id: selectedJobType,
+            workflow_step: selectedWorkflow,
         };
 
         if (range === 'custom') {
@@ -164,6 +174,22 @@ export default function ProductionReports({
                                     {jobTypes.map((type) => (
                                         <option key={type.id} value={type.id}>
                                             {type.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="col-md-3 mb-3">
+                                <label>Workflow Step</label>
+                                <select
+                                    className="form-control"
+                                    value={selectedWorkflow}
+                                    onChange={(e) => setSelectedWorkflow(e.target.value)}
+                                >
+                                    <option value="">All Workflows</option>
+                                    {workflows.map((wf) => (
+                                        <option key={wf.value} value={wf.value}>
+                                            {wf.label}
                                         </option>
                                     ))}
                                 </select>
@@ -321,6 +347,47 @@ export default function ProductionReports({
 
                         {/* Summaries */}
                         <div className="row mt-5">
+                            {records && records.length > 0 && (
+                                <div className="col-md-12 mb-4">
+                                    <h5 className="mb-3">Summary by Workflow</h5>
+                                    <div className="table-responsive">
+                                        <table className="table table-sm table-bordered">
+                                            <thead className="thead-light">
+                                                <tr>
+                                                    <th>Workflow Step</th>
+                                                    <th className="text-right">No. of Users participated</th>
+                                                    <th className="text-right">Total Quantity Produced</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(() => {
+                                                    const workflowSummary = {};
+                                                    records.forEach(record => {
+                                                        const step = record.workflow_step || 'Unknown';
+                                                        if (!workflowSummary[step]) {
+                                                            workflowSummary[step] = {
+                                                                users: new Set(),
+                                                                quantity: 0
+                                                            };
+                                                        }
+                                                        workflowSummary[step].users.add(record.user_id || record.user_name);
+                                                        workflowSummary[step].quantity += (record.quantity_produced || 0);
+                                                    });
+
+                                                    return Object.entries(workflowSummary).map(([step, data]) => (
+                                                        <tr key={step}>
+                                                            <td className="text-capitalize">{step.replace(/_/g, ' ')}</td>
+                                                            <td className="text-right font-weight-bold">{data.users.size}</td>
+                                                            <td className="text-right font-weight-bold">{data.quantity}</td>
+                                                        </tr>
+                                                    ));
+                                                })()}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
                             {summary.by_job_type && summary.by_job_type.length > 0 && (
                                 <div className={summary.by_user && summary.by_user.length > 0 ? "col-md-6" : "col-md-12"}>
                                     <h5 className="mb-3">Summary by Job Type</h5>

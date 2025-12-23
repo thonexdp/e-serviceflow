@@ -214,8 +214,35 @@ export default function JobTypes({
                             </div>
                         )}
 
-                        {/* Incentive Price */}
-                        {row.incentive_price > 0 && (
+                        {/* Incentive Prices per Workflow - Dropdown */}
+                        {row.workflow_steps && Object.entries(row.workflow_steps).some(([_, data]) => data?.incentive_price > 0) && (
+                            <div className="mt-1">
+                                <div className="dropdown">
+                                    <button 
+                                        className="btn btn-sm btn-outline-success dropdown-toggle" 
+                                        type="button" 
+                                        data-toggle="dropdown"
+                                        style={{ fontSize: '0.75rem', padding: '2px 8px' }}
+                                    >
+                                        <i className="ti-gift"></i> Workflow Incentives
+                                    </button>
+                                    <div className="dropdown-menu">
+                                        {Object.entries(row.workflow_steps)
+                                            .filter(([_, data]) => data?.incentive_price > 0)
+                                            .map(([step, data]) => (
+                                                <div key={step} className="dropdown-item-text px-2 py-1">
+                                                    <span className="text-capitalize font-weight-bold">{step.replace(/_/g, ' ')}:</span>
+                                                    <span className="text-success ml-2">{formatPeso(parseFloat(data.incentive_price).toFixed(2))}/pcs</span>
+                                                </div>
+                                            ))
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Legacy Incentive Price (if any) */}
+                        {(!row.workflow_steps || !Object.entries(row.workflow_steps).some(([_, data]) => data?.incentive_price > 0)) && row.incentive_price > 0 && (
                             <div className="text-success small">
                                 Incentive: {formatPeso(parseFloat(row.incentive_price).toFixed(2))}/pcs
                             </div>

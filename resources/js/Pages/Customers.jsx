@@ -227,7 +227,7 @@ export default function Customers({
                                                         initialValue={
                                                             filters.search || ""
                                                         }
-                                                        route={buildUrl("/customers")}
+                                                        route="/customers"
                                                     />
                                                 </div>
 

@@ -49,6 +49,7 @@ export default function WorkflowView({
     const isAdmin = auth?.user?.role === 'admin';
     const canOnlyPrint = auth?.user?.can_only_print || false;
 
+
     const workflowInfo = WORKFLOW_STEPS[workflowStep] || { label: workflowStep, icon: 'ti-package', color: '#2196F3' };
 
     // WebSocket real-time updates
@@ -84,7 +85,7 @@ export default function WorkflowView({
     };
 
     const handleAssignUsers = (ticket, userIds) => {
-        if (!isProductionHead && !isAdmin && !canOnlyPrint) {
+        if (!isProductionHead && !isAdmin) {
             return;
         }
 
@@ -507,7 +508,10 @@ export default function WorkflowView({
                 // For can_only_print users, allow access to printing workflow
                 const isPrintingWorkflow = workflowStep === 'printing';
                 const canAccessForCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (row.status === 'ready_to_print' || row.status === 'in_production');
-                const canStart = (isProductionHead && hasWorkflowStepAccess) || canAccessForCanOnlyPrint;
+
+                // Allow start strictly if user is assigned (unless Head/Admin)
+                const userHasAccess = hasWorkflowStepAccess || canAccessForCanOnlyPrint;
+                const canStart = isProductionHead || (isUserAssigned && userHasAccess);
 
                 // Can update only if: (user is assigned OR is head/admin) AND ticket is not "Not Started"
                 const canUpdate = (isUserAssigned || isProductionHead) &&
@@ -969,12 +973,16 @@ export default function WorkflowView({
                                                     <SearchBox
                                                         placeholder="Search tickets..."
                                                         initialValue={filters.search || ""}
-                                                        route={buildUrl(`/workflow/${workflowStep}`)}
+                                                        route={`/workflow/${workflowStep}`}
                                                     />
                                                 </div>
                                                 <div className="col-md-4 text-right">
                                                     <button
-                                                        onClick={() => router.reload()}
+                                                        onClick={() => router.visit(buildUrl(`/workflow/${workflowStep}`), {
+                                                            preserveState: false,
+                                                            preserveScroll: true,
+                                                        })}
+
                                                         className="btn btn-outline-primary"
                                                         title="Refresh Data"
                                                         style={{ borderColor: workflowInfo.color, color: workflowInfo.color }}

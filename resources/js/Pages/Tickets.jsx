@@ -6,7 +6,6 @@ import Modal from "@/Components/Main/Modal";
 import CustomerForm from "@/Components/Customers/CustomerForm";
 import TicketForm from "@/Components/Tickets/TicketForm";
 import DataTable from "@/Components/Common/DataTable";
-import SearchBox from "@/Components/Common/SearchBox";
 import FlashMessage from "@/Components/Common/FlashMessage";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import DateRangeFilter from "@/Components/Common/DateRangeFilter";

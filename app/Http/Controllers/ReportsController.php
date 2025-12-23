@@ -628,40 +628,83 @@ class ReportsController extends Controller
 
         $records = $query->orderBy('created_at', 'desc')->get();
 
+        // Calculate incentive amounts based on workflow_steps
+        $recordsWithIncentives = $records->map(function ($record) {
+            $incentivePrice = 0;
+            if ($record->jobType && $record->jobType->workflow_steps) {
+                $workflowSteps = $record->jobType->workflow_steps;
+                $stepData = $workflowSteps[$record->workflow_step] ?? null;
+                if ($stepData && is_array($stepData) && isset($stepData['incentive_price'])) {
+                    $incentivePrice = (float) ($stepData['incentive_price'] ?? 0);
+                }
+            }
+            $record->calculated_incentive_amount = $record->quantity_produced * $incentivePrice;
+            $record->calculated_incentive_price = $incentivePrice;
+            return $record;
+        });
+
         // Calculate summary
         $summary = [
-            'total_incentives' => $records->sum('incentive_amount'),
+            'total_incentives' => $recordsWithIncentives->sum('calculated_incentive_amount'),
             'total_quantity' => $records->sum('quantity_produced'),
             'total_records' => $records->count(),
             'unique_users' => $records->pluck('user_id')->unique()->count(),
-            'by_user' => $records->groupBy('user_id')->map(function ($userRecords) {
+            'by_user' => $recordsWithIncentives->groupBy('user_id')->map(function ($userRecords) {
                 return [
                     'user_name' => $userRecords->first()->user->name ?? 'N/A',
                     'total_quantity' => $userRecords->sum('quantity_produced'),
-                    'total_incentives' => $userRecords->sum('incentive_amount'),
+                    'total_incentives' => $userRecords->sum('calculated_incentive_amount'),
                 ];
             })->values()->toArray(),
-            'by_job_type' => $records->groupBy('job_type_id')->map(function ($jobTypeRecords) {
+            'by_job_type' => $recordsWithIncentives->groupBy('job_type_id')->map(function ($jobTypeRecords) {
                 return [
                     'job_type_name' => $jobTypeRecords->first()->jobType->name ?? 'N/A',
                     'total_quantity' => $jobTypeRecords->sum('quantity_produced'),
-                    'total_incentives' => $jobTypeRecords->sum('incentive_amount'),
+                    'total_incentives' => $jobTypeRecords->sum('calculated_incentive_amount'),
+                ];
+            })->values()->toArray(),
+            'by_workflow' => $recordsWithIncentives->groupBy('workflow_step')->map(function ($workflowRecords) {
+                return [
+                    'workflow_step' => $workflowRecords->first()->workflow_step ?? 'N/A',
+                    'unique_users' => $workflowRecords->pluck('user_id')->unique()->count(),
+                    'total_quantity' => $workflowRecords->sum('quantity_produced'),
+                    'total_incentives' => $workflowRecords->sum('calculated_incentive_amount'),
+                    'users' => $workflowRecords->groupBy('user_id')->map(function ($userRecords) {
+                        return [
+                            'user_id' => $userRecords->first()->user_id,
+                            'user_name' => $userRecords->first()->user->name ?? 'N/A',
+                            'total_quantity' => $userRecords->sum('quantity_produced'),
+                            'total_incentives' => $userRecords->sum('calculated_incentive_amount'),
+                        ];
+                    })->values()->toArray(),
                 ];
             })->values()->toArray(),
         ];
 
         // Format records for display
         $formattedRecords = $records->map(function ($record) {
+            // Get incentive price from workflow_steps
+            $incentivePrice = 0;
+            if ($record->jobType && $record->jobType->workflow_steps) {
+                $workflowSteps = $record->jobType->workflow_steps;
+                $stepData = $workflowSteps[$record->workflow_step] ?? null;
+                if ($stepData && is_array($stepData) && isset($stepData['incentive_price'])) {
+                    $incentivePrice = (float) ($stepData['incentive_price'] ?? 0);
+                }
+            }
+
             return [
                 'id' => $record->id,
                 'date' => $record->created_at->format('Y-m-d'),
                 'created_at' => $record->created_at->toDateTimeString(),
+                'user_id' => $record->user_id,
                 'user_name' => $record->user->name ?? 'N/A',
                 'ticket_number' => $record->ticket->ticket_number ?? 'N/A',
                 'job_type_name' => $record->jobType->name ?? 'N/A',
                 'workflow_step' => $record->workflow_step,
                 'quantity_produced' => $record->quantity_produced,
-                'incentive_price' => $record->jobType->incentive_price ?? 0,
+                'incentive_price' => $incentivePrice,
+                'incentive_amount' => $record->quantity_produced * $incentivePrice,
                 'evidence_files' => $record->evidenceFiles->map(function ($file) {
                     return [
                         'id' => $file->id,
