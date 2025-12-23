@@ -271,12 +271,36 @@ export default function CustomerPOSOrder() {
         }
     };
 
-    const findOrCreateCustomer = async () => {
+    const refreshCsrfToken = async () => {
+        try {
+            const response = await fetch('/csrf-token');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.csrf_token) {
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+                    if (meta) {
+                        meta.setAttribute('content', data.csrf_token);
+                        // Also update axios defaults if it's being used elsewhere
+                        if (window.axios) {
+                            window.axios.defaults.headers.common['X-CSRF-TOKEN'] = data.csrf_token;
+                        }
+                    }
+                    return data.csrf_token;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to refresh CSRF token', e);
+        }
+        return null;
+    };
+
+    const findOrCreateCustomer = async (retry = false) => {
         try {
             const response = await fetch('/api/public/orders/customer/find-or-create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
                 body: JSON.stringify({
@@ -286,6 +310,11 @@ export default function CustomerPOSOrder() {
                     customer_facebook: formData.customer_facebook,
                 }),
             });
+
+            if (response.status === 419 && !retry) {
+                await refreshCsrfToken();
+                return findOrCreateCustomer(true);
+            }
 
             const data = await response.json();
 
@@ -466,6 +495,10 @@ export default function CustomerPOSOrder() {
                     };
                 } else if (response.data.message) {
                     errorData = { general: [response.data.message] };
+                } else if (response.status === 419) {
+                    errorData = {
+                        general: ['CSRF token mismatch. Refreshing session...']
+                    };
                 } else {
                     errorData = {
                         general: ['An unexpected error occurred. Please try again or contact support if the problem persists.']
@@ -482,7 +515,11 @@ export default function CustomerPOSOrder() {
 
                     // Wait 2 seconds before retrying (progressive delay: 2s, 4s, 6s)
                     const delay = nextRetry * 2000;
-                    retryTimeoutRef.current = setTimeout(() => {
+                    retryTimeoutRef.current = setTimeout(async () => {
+                        // If it looks like a CSRF error, refresh token first
+                        if (errorData.general?.some(g => g.includes('CSRF') || g.includes('token mismatch'))) {
+                            await refreshCsrfToken();
+                        }
                         handleSubmit(true, nextRetry);
                     }, delay);
 
@@ -612,7 +649,9 @@ export default function CustomerPOSOrder() {
                 msg.includes('server response') ||
                 msg.includes('connection') ||
                 msg.includes('Network error') ||
-                msg.includes('try again')
+                msg.includes('try again') ||
+                msg.includes('CSRF') ||
+                msg.includes('token mismatch')
             );
         }
 

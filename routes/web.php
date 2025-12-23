@@ -64,6 +64,11 @@ Route::post('/api/public/orders', [PublicOrderController::class, 'storeOrder'])
     ->middleware('throttle:api')
     ->name('public.orders.store');
 
+// CSRF Token Refresh Endpoint
+Route::get('/csrf-token', function () {
+    return response()->json(['csrf_token' => csrf_token()]);
+})->name('csrf.token');
+
 // About page (public)
 Route::get('/orders', function () {
     $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
