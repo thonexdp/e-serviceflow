@@ -1022,11 +1022,11 @@ function ProductionIncentivesReport({ data }) {
                     {summary.by_workflow.map((workflow) => (
                         <div key={workflow.workflow_step} className="mb-4">
                             <div className="card">
-                                <div className="card-header bg-primary text-white">
+                                <div className="card-header bg-orange-400 text-white">
                                     <h6 className="mb-0 text-capitalize">
                                         {workflow.workflow_step.replace(/_/g, ' ')}
                                         <span className="ml-3 badge badge-light">
-                                            {workflow.unique_users} User{workflow.unique_users !== 1 ? 's' : ''}
+                                            <span className="text-orange-400">{workflow.unique_users} User{workflow.unique_users !== 1 ? 's' : ''}</span>
                                         </span>
                                     </h6>
                                 </div>
@@ -1042,7 +1042,7 @@ function ProductionIncentivesReport({ data }) {
                                             <strong>No. of Users:</strong> {workflow.unique_users}
                                         </div>
                                     </div>
-                                    
+
                                     {workflow.users && workflow.users.length > 0 && (
                                         <>
                                             <h6 className="mt-3 mb-2">User Breakdown:</h6>
@@ -1082,64 +1082,69 @@ function ProductionIncentivesReport({ data }) {
                         </div>
                     ))}
                 </>
-            )}
+            )
+            }
 
             {/* Summary by User */}
-            {summary.by_user && summary.by_user.length > 0 && (
-                <>
-                    <h5 className="mt-4">Summary by User</h5>
-                    <div className="table-responsive">
-                        <table className="table table-sm table-bordered">
-                            <thead className="thead-light">
+            {
+                summary.by_user && summary.by_user.length > 0 && (
+                    <>
+                        <h5 className="mt-4">Summary by User</h5>
+                        <div className="table-responsive">
+                            <table className="table table-sm table-bordered">
+                                <thead className="thead-light">
+                                    <tr>
+                                        <th>User Name</th>
+                                        <th className="text-right">Total Quantity</th>
+                                        <th className="text-right">Total Incentives</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {summary.by_user.map((userSummary, index) => (
+                                        <tr key={index}>
+                                            <td>{userSummary.user_name}</td>
+                                            <td className="text-right">{userSummary.total_quantity || 0}</td>
+                                            <td className="text-right font-weight-bold text-success">
+                                                {formatPeso(userSummary.total_incentives || 0)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )
+            }
+
+            {/* Summary by Job Type */}
+            {
+                summary.by_job_type && Object.keys(summary.by_job_type).length > 0 && (
+                    <>
+                        <h5 className="mt-4">Summary by Job Type</h5>
+                        <table className="table table-sm">
+                            <thead>
                                 <tr>
-                                    <th>User Name</th>
+                                    <th>Job Type</th>
                                     <th className="text-right">Total Quantity</th>
                                     <th className="text-right">Total Incentives</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {summary.by_user.map((userSummary, index) => (
+                                {Object.values(summary.by_job_type).map((jobTypeSummary, index) => (
                                     <tr key={index}>
-                                        <td>{userSummary.user_name}</td>
-                                        <td className="text-right">{userSummary.total_quantity || 0}</td>
-                                        <td className="text-right font-weight-bold text-success">
-                                            {formatPeso(userSummary.total_incentives || 0)}
+                                        <td>{jobTypeSummary.job_type_name}</td>
+                                        <td className="text-right">{jobTypeSummary.total_quantity || 0}</td>
+                                        <td className="text-right">
+                                            <strong>{formatPeso(jobTypeSummary.total_incentives || 0)}</strong>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                </>
-            )}
-
-            {/* Summary by Job Type */}
-            {summary.by_job_type && Object.keys(summary.by_job_type).length > 0 && (
-                <>
-                    <h5 className="mt-4">Summary by Job Type</h5>
-                    <table className="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Job Type</th>
-                                <th className="text-right">Total Quantity</th>
-                                <th className="text-right">Total Incentives</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Object.values(summary.by_job_type).map((jobTypeSummary, index) => (
-                                <tr key={index}>
-                                    <td>{jobTypeSummary.job_type_name}</td>
-                                    <td className="text-right">{jobTypeSummary.total_quantity || 0}</td>
-                                    <td className="text-right">
-                                        <strong>{formatPeso(jobTypeSummary.total_incentives || 0)}</strong>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </>
-            )}
-        </div>
+                    </>
+                )
+            }
+        </div >
     );
 }
 
