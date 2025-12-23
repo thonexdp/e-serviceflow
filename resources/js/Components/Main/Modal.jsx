@@ -95,14 +95,14 @@ export default function Modal({
                                 </button>
                                 <button
                                     onClick={onSave}
-                                    className="btn-sm bg-blue-600 text-white hover:bg-blue-700"
+                                    className="btn-sm bg-orange-600 text-white hover:bg-orange-700"
                                 >
                                     {submitButtonText}
                                 </button>
                                 {submitSecond && (
                                     <button
                                         onClick={onSave}
-                                        className="btn-sm bg-blue-600 text-white hover:bg-blue-700"
+                                        className="btn-sm bg-orange-600 text-white hover:bg-orange-700"
                                     >
                                         {submitSecond}
                                     </button>

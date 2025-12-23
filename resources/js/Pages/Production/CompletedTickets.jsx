@@ -285,7 +285,7 @@ export default function CompletedTickets({
                     </button>
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleView(row)}
                     >
                         <i className="ti-eye"></i> View

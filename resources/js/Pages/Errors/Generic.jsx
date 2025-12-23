@@ -52,14 +52,14 @@ export default function GenericError({ status = 500 }) {
                         {status === 419 ? (
                             <button
                                 onClick={() => window.location.reload()}
-                                className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
                             >
                                 Refresh Page
                             </button>
                         ) : (
                             <Link
                                 href="/"
-                                className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
                             >
                                 Go to Homepage
                             </Link>

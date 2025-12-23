@@ -726,7 +726,7 @@ export default function Tickets({
                                         Tickets
                                     </li>
                                     {/* <li className="breadcrumb-item">
-                                        <a href="#" className="text-blue-500" onClick={() => {
+                                        <a href="#" className="text-orange-500" onClick={() => {
                                             router.get(buildUrl("tickets"));
                                         }}>
                                             <i className="ti-reload"></i> Refresh

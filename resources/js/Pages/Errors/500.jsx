@@ -30,7 +30,7 @@ export default function Error500() {
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <button
                             onClick={() => window.location.reload()}
-                            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
                         >
                             Try Again
                         </button>

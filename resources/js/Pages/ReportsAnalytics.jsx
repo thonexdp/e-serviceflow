@@ -10,6 +10,7 @@ import { Head, router } from "@inertiajs/react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { formatPeso } from "@/Utils/currency";
 import { formatDate } from "@/Utils/formatDate";
+import "../../css/reports.css";
 
 export default function ReportsAnalytics({
     user = {},

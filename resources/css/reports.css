@@ -3,8 +3,8 @@
  */
 
 .stat-card {
-    padding: 20px;
-    border-radius: 8px;
+    padding: 12px 15px;
+    border-radius: 6px;
     background: #f8f9fa;
     border: 1px solid #dee2e6;
     margin-bottom: 15px;
@@ -12,13 +12,13 @@
 }
 
 .stat-card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
 }
 
 .stat-card h6 {
-    margin: 0 0 10px 0;
-    font-size: 0.875rem;
+    margin: 0 0 5px 0;
+    font-size: 0.75rem;
     color: #6c757d;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -27,14 +27,14 @@
 
 .stat-card h3 {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #212529;
 }
 
 .stat-card.bg-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-color: #667eea;
+    background: linear-gradient(135deg, #fb8c00 0%, #ffb74d 100%);
+    border-color: #fb8c00;
 }
 
 .stat-card.bg-success {
@@ -57,9 +57,14 @@
     border-color: #a8edea;
 }
 
-.list-group-item.active {
-    background-color: #0b84ff !important;
-    border-color: #0b84ff !important;
+.list-group-item.active,
+.list-group-item.active:hover,
+.list-group-item.active:focus,
+.list-group-item-action:active {
+    z-index: 2;
+    color: #fff;
+    background-color: #fb8c00 !important;
+    border-color: #fb8c00 !important;
 }
 
 .list-group-item i {
@@ -182,7 +187,7 @@
 
 .list-group-item:hover {
     background-color: #f8f9fa;
-    border-left-color: #0b84ff;
+    border-left-color: #fb8c00;
 }
 
 .list-group-item.active {
@@ -226,7 +231,7 @@
 }
 
 .page-header h1 span {
-    color: #0b84ff;
+    color: #fb8c00;
 }
 
 /* Card Enhancements */
@@ -247,9 +252,10 @@
 
 /* Badges */
 .badge {
-    padding: 0.375rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     font-weight: 600;
     border-radius: 0.25rem;
+    font-size: 0.75rem;
 }
 
 /* Alert Styling */

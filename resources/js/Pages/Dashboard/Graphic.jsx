@@ -139,7 +139,7 @@ export default function Dashboard({
                                                     <a
                                                         href={file?.file_path}
                                                         download
-                                                        className="btn btn-link btn-outline btn-sm text-blue-500"
+                                                        className="btn btn-link btn-outline btn-sm text-orange-500"
                                                     >
                                                         <span className="ti-download"></span> Download
                                                     </a>

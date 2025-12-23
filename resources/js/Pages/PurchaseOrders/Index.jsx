@@ -160,7 +160,7 @@ export default function PurchaseOrdersIndex({
                 <div className="btn-group">
                     <button
                         type="button"
-                        className="btn btn-link btn-sm text-blue-500"
+                        className="btn btn-link btn-sm text-orange-500"
                         onClick={() => handleView(row)}
                     >
                         <i className="ti-eye"></i> View

@@ -62,7 +62,7 @@ export default function CustomerSearchBox({ onSelect, _selectedCustomer }) {
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => query.length >= 2 && setShowDropdown(true)}
                 placeholder="Search Customer..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-400 focus:outline-none"
             />
 
             {loading && (
@@ -77,7 +77,7 @@ export default function CustomerSearchBox({ onSelect, _selectedCustomer }) {
                         <li
                             key={customer.id}
                             onClick={() => handleSelect(customer)}
-                            className="px-3 py-2 cursor-pointer hover:bg-blue-100"
+                            className="px-3 py-2 cursor-pointer hover:bg-orange-100"
                         >
                             <span className="font-medium">{customer.full_name}</span>
                             <div className="text-xs text-gray-500">{customer.email || "No email"}</div>

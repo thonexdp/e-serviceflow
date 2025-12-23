@@ -20,7 +20,7 @@ export default function FormInput({
 }) {
   const baseClasses = `
     w-full text-sm rounded-md border border-gray-300 
-    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
+    focus:border-orange-500 focus:ring-2 focus:ring-orange-200 
     outline-none transition duration-150 ease-in-out
     placeholder-gray-400
     ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
@@ -48,7 +48,7 @@ export default function FormInput({
                   : null
               }
               disabled={disabled}
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+              className="h-4 w-4 text-orange-600 border-gray-300 rounded"
             />
             <span className="text-sm">{label}</span>
           </div>
