@@ -122,4 +122,33 @@ class JobType extends Model
             ->withPivot('quantity_per_unit', 'is_required', 'notes')
             ->withTimestamps();
     }
+
+    /**
+     * Get the incentive price for a specific workflow step.
+     * 
+     * @param string $workflowStep The workflow step (e.g., 'printing', 'cutting')
+     * @return float The incentive price for the step, or 0 if not found
+     */
+    public function getIncentivePriceForStep(string $workflowStep): float
+    {
+        // If no workflow_steps configured, fall back to global incentive_price
+        if (!$this->workflow_steps) {
+            return (float) ($this->incentive_price ?? 0);
+        }
+
+        // Check if workflow step exists
+        if (!isset($this->workflow_steps[$workflowStep])) {
+            return (float) ($this->incentive_price ?? 0);
+        }
+
+        $stepData = $this->workflow_steps[$workflowStep];
+
+        // Handle new format (object with enabled and incentive_price)
+        if (is_array($stepData) && isset($stepData['incentive_price'])) {
+            return (float) ($stepData['incentive_price'] ?? 0);
+        }
+
+        // Fall back to global incentive_price for old format
+        return (float) ($this->incentive_price ?? 0);
+    }
 }

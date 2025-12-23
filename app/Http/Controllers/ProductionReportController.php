@@ -46,6 +46,11 @@ class ProductionReportController extends Controller
             $query->where('job_type_id', $request->job_type_id);
         }
 
+        // Apply workflow step filter
+        if ($request->has('workflow_step') && $request->workflow_step) {
+            $query->where('workflow_step', $request->workflow_step);
+        }
+
         $records = $query->orderBy('created_at', 'desc')->get();
 
         // Calculate summary - Excluding Incentives Amount
@@ -126,6 +131,7 @@ class ProductionReportController extends Controller
                 'end_date' => $endDate,
                 'user_id' => $request->user_id ?? null,
                 'job_type_id' => $request->job_type_id ?? null,
+                'workflow_step' => $request->workflow_step ?? null,
             ],
         ]);
     }

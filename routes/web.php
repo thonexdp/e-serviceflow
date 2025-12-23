@@ -199,7 +199,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/branches', [App\Http\Controllers\BranchController::class, 'store'])->name('branches.store');
     Route::put('/branches/{branch}', [App\Http\Controllers\BranchController::class, 'update'])->name('branches.update');
     Route::delete('/branches/{branch}', [App\Http\Controllers\BranchController::class, 'destroy'])->name('branches.destroy');
-    
+
     // Branch API endpoints
     Route::get('/api/branches/active', [App\Http\Controllers\BranchController::class, 'getActiveBranches'])->name('api.branches.active');
     Route::get('/api/branches/order', [App\Http\Controllers\BranchController::class, 'getOrderBranches'])->name('api.branches.order');
