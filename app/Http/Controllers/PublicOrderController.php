@@ -88,7 +88,7 @@ class PublicOrderController extends Controller
             'size_height' => 'nullable|numeric|min:0',
             'size_value' => 'nullable|string|max:50',
             'size_unit' => 'nullable|string|max:10',
-            'due_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:today',
             'subtotal' => 'nullable|numeric|min:0',
             'total_amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:walkin,gcash,bank',
