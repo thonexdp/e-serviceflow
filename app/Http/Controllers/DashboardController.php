@@ -916,21 +916,61 @@ class DashboardController extends Controller
 
     private function getUserTransactions($role, $startDate, $endDate)
     {
-        // Get users by role with their basic info
-        // Since tickets don't have created_by field, we'll show aggregate stats instead
+        // Get users by role
         $users = \App\Models\User::where('role', $role)
             ->limit(10)
             ->get();
 
-        // Get total tickets in period for the role context
-        $totalTickets = Ticket::whereBetween('created_at', [$startDate, $endDate])->count();
-
-        return $users->map(function ($user) use ($totalTickets) {
-            return [
+        return $users->map(function ($user) use ($startDate, $endDate, $role) {
+            $stats = [
                 'name' => $user->name,
-                'tickets_created' => $totalTickets > 0 ? ceil($totalTickets / 3) : 0, // Distribute evenly as placeholder
                 'last_activity' => $user->updated_at->format('M d, Y'),
             ];
+
+            if ($role === 'FrontDesk') {
+                // FrontDesk: Track created tickets and collected payments
+                $stats['metric_1_label'] = 'Tickets Created';
+                $stats['metric_1_value'] = Ticket::where('created_by', $user->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->count();
+
+                $stats['metric_2_label'] = 'Sales Collected';
+                $stats['metric_2_value'] = Payment::where('recorded_by', $user->id)
+                    ->whereBetween('payment_date', [$startDate, $endDate])
+                    ->sum('amount');
+            } elseif ($role === 'Production') {
+                // Production: Track tasks and units produced
+                $stats['metric_1_label'] = 'Tasks Completed';
+                $stats['metric_1_value'] = \App\Models\ProductionRecord::where('user_id', $user->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->count();
+
+                $stats['metric_2_label'] = 'Units Produced';
+                $stats['metric_2_value'] = \App\Models\ProductionRecord::where('user_id', $user->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('quantity_produced');
+            } elseif ($role === 'Designer') {
+                // Designer: Track assigned and completed designs
+                // Assuming legacy single assignment for now, or use assignment table if available
+                $stats['metric_1_label'] = 'Assigned';
+                $stats['metric_1_value'] = Ticket::where('assigned_to_user_id', $user->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->count();
+
+                $stats['metric_2_label'] = 'Completed';
+                $stats['metric_2_value'] = Ticket::where('assigned_to_user_id', $user->id)
+                    ->where('design_status', 'approved') // or 'completed'
+                    ->whereBetween('updated_at', [$startDate, $endDate])
+                    ->count();
+            } else {
+                // Fallback / Other roles
+                $stats['metric_1_label'] = 'Tickets';
+                $stats['metric_1_value'] = 0;
+                $stats['metric_2_label'] = '-';
+                $stats['metric_2_value'] = '-';
+            }
+
+            return $stats;
         });
     }
 

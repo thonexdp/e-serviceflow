@@ -17,6 +17,7 @@ export default function FormInput({
   options = [], // For select inputs
   defaultChecked, // For checkbox
   min,
+  step,
 }) {
   const baseClasses = `
     w-full text-sm rounded-md border border-gray-300 
@@ -102,6 +103,7 @@ export default function FormInput({
             disabled={disabled}
             maxLength={maxLength}
             min={min}
+            step={step}
             className={`${baseClasses} p-2.5`}
           />
         );

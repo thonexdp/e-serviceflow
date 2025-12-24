@@ -118,11 +118,15 @@ export default function PaymentsFinance({
     }, [filters.search]);
 
     const handleRefresh = () => {
+        setLocalSearch("");
         setIsRefreshing(true);
-        router.reload({
+
+        router.visit(buildUrl("finance"), {
+            preserveState: false,
             preserveScroll: true,
             onFinish: () => setIsRefreshing(false),
         });
+
     };
 
     const filteredReceivables = useMemo(() => {
