@@ -34,6 +34,7 @@ export default function CustomerPOSOrder() {
     const [paymentMethod, setPaymentMethod] = useState('walkin');
     const [paymentProofs, setPaymentProofs] = useState([]);
     const [activeProofTab, setActiveProofTab] = useState(0);
+    const [activeBankTab, setActiveBankTab] = useState(0);
     const [submittedTicket, setSubmittedTicket] = useState(null);
     const [settings, setSettings] = useState(null);
     const [qrcodeError, setQrcodeError] = useState(false);
@@ -46,6 +47,7 @@ export default function CustomerPOSOrder() {
     const retryTimeoutRef = useRef(null);
 
     const MAX_RETRIES = 3;
+
 
     // Load saved customers from localStorage on mount
     useEffect(() => {
@@ -952,7 +954,7 @@ export default function CustomerPOSOrder() {
                                 </div>
                                 <div onClick={() => router.visit('/', { preserveState: true, preserveScroll: true, replace: true })}>
                                     <h1 className="text-2xl font-bold text-gray-900">RC PrintShoppe</h1>
-                                    <p className="text-sm text-gray-600">Track Your Order</p>
+                                    <p className="text-sm text-gray-600">Click here to track your order</p>
                                 </div>
                             </div>
                         </div>
@@ -983,34 +985,11 @@ export default function CustomerPOSOrder() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900">Your Information</h2>
+                            <h2 className="text-2xl font-bold text-gray-900">Customer Information</h2>
                             <p className="text-gray-500 mt-2">Let us know how to reach you</p>
                         </div>
 
                         <div className="space-y-6">
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
-                                <input
-                                    type="email"
-                                    value={formData.customer_email}
-                                    onChange={handleEmailChange}
-                                    list="email-suggestions"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    placeholder="e.g., juan@example.com"
-                                    autoComplete="email"
-                                />
-                                <datalist id="email-suggestions">
-                                    {savedCustomers.map((customer, index) => (
-                                        <option key={index} value={customer.email}>
-                                            {customer.name}
-                                        </option>
-                                    ))}
-                                </datalist>
-                                {savedCustomers.length > 0 && formData.customer_email === '' && (
-                                    <p className="text-xs text-gray-500 mt-1">💡 Previously used emails will appear as you type</p>
-                                )}
-                            </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
@@ -1046,6 +1025,28 @@ export default function CustomerPOSOrder() {
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     placeholder="09XX XXX XXXX"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address (optional)</label>
+                                <input
+                                    type="email"
+                                    value={formData.customer_email}
+                                    onChange={handleEmailChange}
+                                    list="email-suggestions"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    placeholder="e.g., juan@example.com"
+                                    autoComplete="email"
+                                />
+                                <datalist id="email-suggestions">
+                                    {savedCustomers.map((customer, index) => (
+                                        <option key={index} value={customer.email}>
+                                            {customer.name}
+                                        </option>
+                                    ))}
+                                </datalist>
+                                {savedCustomers.length > 0 && formData.customer_email === '' && (
+                                    <p className="text-xs text-gray-500 mt-1">💡 Previously used emails will appear as you type</p>
+                                )}
                             </div>
 
                             <div>
@@ -1528,20 +1529,22 @@ export default function CustomerPOSOrder() {
                                         </div>
                                     </label>
 
-                                    <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="payment_method"
-                                            value="gcash"
-                                            checked={paymentMethod === 'gcash'}
-                                            onChange={(e) => setPaymentMethod(e.target.value)}
-                                            className="mt-1 mr-3"
-                                        />
-                                        <div className="flex-1">
-                                            <p className="font-semibold text-gray-900">GCash</p>
-                                            <p className="text-sm text-gray-600">Pay via GCash (downpayment or full payment)</p>
-                                        </div>
-                                    </label>
+                                    {settings?.payment?.gcash?.show_on_customer_page && (
+                                        <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                                            <input
+                                                type="radio"
+                                                name="payment_method"
+                                                value="gcash"
+                                                checked={paymentMethod === 'gcash'}
+                                                onChange={(e) => setPaymentMethod(e.target.value)}
+                                                className="mt-1 mr-3"
+                                            />
+                                            <div className="flex-1">
+                                                <p className="font-semibold text-gray-900">GCash</p>
+                                                <p className="text-sm text-gray-600">Pay via GCash (downpayment or full payment)</p>
+                                            </div>
+                                        </label>
+                                    )}
 
                                     <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                                         <input
@@ -1561,7 +1564,7 @@ export default function CustomerPOSOrder() {
                             </div>
 
                             {/* GCash Payment Info */}
-                            {paymentMethod === 'gcash' && settings?.payment?.gcash && (
+                            {paymentMethod === 'gcash' && settings?.payment?.gcash && settings?.payment?.gcash?.show_on_customer_page !== false && (
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                                     <h3 className="font-semibold text-green-900 mb-4">GCash Payment Details</h3>
                                     <div className="space-y-3">
@@ -1601,29 +1604,82 @@ export default function CustomerPOSOrder() {
                             )}
 
                             {/* Bank Transfer Payment Info */}
-                            {paymentMethod === 'bank' && settings?.payment?.bank && (
+                            {paymentMethod === 'bank' && settings?.payment?.bank_accounts && settings.payment.bank_accounts.length > 0 && (
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
                                     <h3 className="font-semibold text-orange-900 mb-4">Bank Transfer Details</h3>
-                                    <div className="space-y-3">
-                                        {settings.payment.bank.bank_name && (
-                                            <div>
-                                                <p className="text-sm font-medium text-orange-800">Bank Name:</p>
-                                                <p className="text-lg font-bold text-orange-900">{settings.payment.bank.bank_name}</p>
+                                    
+                                    {/* Tabs for multiple bank accounts */}
+                                    {settings.payment.bank_accounts.length > 1 && (
+                                        <div className="flex gap-2 mb-4 overflow-x-auto">
+                                            {settings.payment.bank_accounts.map((_, index) => (
+                                                <button
+                                                    key={index}
+                                                    type="button"
+                                                    onClick={() => setActiveBankTab(index)}
+                                                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                                                        activeBankTab === index
+                                                            ? 'bg-orange-600 text-white'
+                                                            : 'bg-white text-orange-900 hover:bg-orange-100 border border-orange-300'
+                                                    }`}
+                                                >
+                                                    {settings.payment.bank_accounts[index].bank_name || `Bank ${index + 1}`}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Bank Account Details */}
+                                    {settings.payment.bank_accounts[activeBankTab] && (() => {
+                                        const bankAccount = settings.payment.bank_accounts[activeBankTab];
+                                        return (
+                                            <div className="space-y-3">
+                                                {bankAccount.bank_name && (
+                                                    <div>
+                                                        <p className="text-sm font-medium text-orange-800">Bank Name:</p>
+                                                        <p className="text-lg font-bold text-orange-900">{bankAccount.bank_name}</p>
+                                                    </div>
+                                                )}
+                                                {bankAccount.account_name && (
+                                                    <div>
+                                                        <p className="text-sm font-medium text-orange-800">Account Name:</p>
+                                                        <p className="text-lg font-bold text-orange-900">{bankAccount.account_name}</p>
+                                                    </div>
+                                                )}
+                                                {bankAccount.account_number && (
+                                                    <div>
+                                                        <p className="text-sm font-medium text-orange-800">Account Number:</p>
+                                                        <p className="text-lg font-bold text-orange-900">{bankAccount.account_number}</p>
+                                                    </div>
+                                                )}
+                                                {bankAccount.qrcode && (
+                                                    <div>
+                                                        <p className="text-sm font-medium text-orange-800 mb-2">QR Code:</p>
+                                                        <div className="bg-white p-4 rounded border border-orange-300 inline-block">
+                                                            <img
+                                                                src={bankAccount.qrcode}
+                                                                alt={`Bank QR Code ${activeBankTab + 1}`}
+                                                                className="w-32 h-32 object-contain"
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                    if (e.target.nextSibling) {
+                                                                        e.target.nextSibling.style.display = 'flex';
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div className="w-32 h-32 bg-gray-200 hidden items-center justify-center text-xs text-gray-500">
+                                                                QR Code not available
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {settings.payment.bank_accounts.length > 1 && (
+                                                    <p className="text-xs text-orange-700 mt-3">
+                                                        Account {activeBankTab + 1} of {settings.payment.bank_accounts.length}
+                                                    </p>
+                                                )}
                                             </div>
-                                        )}
-                                        {settings.payment.bank.account_name && (
-                                            <div>
-                                                <p className="text-sm font-medium text-orange-800">Account Name:</p>
-                                                <p className="text-lg font-bold text-orange-900">{settings.payment.bank.account_name}</p>
-                                            </div>
-                                        )}
-                                        {settings.payment.bank.account_number && (
-                                            <div>
-                                                <p className="text-sm font-medium text-orange-800">Account Number:</p>
-                                                <p className="text-lg font-bold text-orange-900">{settings.payment.bank.account_number}</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
 

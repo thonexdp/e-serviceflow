@@ -524,6 +524,7 @@ export default function Dashboard({
                                                 <th>#</th>
                                                 <th>Name</th>
                                                 <th>Tickets</th>
+                                                <th>Sales</th>
                                                 <th>Last Activity</th>
                                             </tr>
                                         </thead>
@@ -533,13 +534,16 @@ export default function Dashboard({
                                                     <tr key={index}>
                                                         <td>{index + 1}</td>
                                                         <td>{transaction.name}</td>
-                                                        <td>{transaction.tickets_created}</td>
+                                                        <td>{transaction.metric_1_value}</td>
+                                                        <td className="text-success">
+                                                            ₱ {Number(transaction.metric_2_value).toLocaleString('en-PH')}
+                                                        </td>
                                                         <td>{transaction.last_activity}</td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="4" className="text-center">No activity</td>
+                                                    <td colSpan="5" className="text-center">No activity</td>
                                                 </tr>
                                             )}
                                         </tbody>
@@ -560,7 +564,8 @@ export default function Dashboard({
                                             <tr>
                                                 <th>#</th>
                                                 <th>Name</th>
-                                                <th>Tickets</th>
+                                                <th>Assigned</th>
+                                                <th>Done</th>
                                                 <th>Last Activity</th>
                                             </tr>
                                         </thead>
@@ -570,13 +575,14 @@ export default function Dashboard({
                                                     <tr key={index}>
                                                         <td>{index + 1}</td>
                                                         <td>{transaction.name}</td>
-                                                        <td>{transaction.tickets_created}</td>
+                                                        <td>{transaction.metric_1_value}</td>
+                                                        <td className="text-success">{transaction.metric_2_value}</td>
                                                         <td>{transaction.last_activity}</td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="4" className="text-center">No activity</td>
+                                                    <td colSpan="5" className="text-center">No activity</td>
                                                 </tr>
                                             )}
                                         </tbody>
@@ -597,7 +603,8 @@ export default function Dashboard({
                                             <tr>
                                                 <th>#</th>
                                                 <th>Name</th>
-                                                <th>Tickets</th>
+                                                <th>Tasks</th>
+                                                <th>Units</th>
                                                 <th>Last Activity</th>
                                             </tr>
                                         </thead>
@@ -607,13 +614,14 @@ export default function Dashboard({
                                                     <tr key={index}>
                                                         <td>{index + 1}</td>
                                                         <td>{transaction.name}</td>
-                                                        <td>{transaction.tickets_created}</td>
+                                                        <td>{transaction.metric_1_value}</td>
+                                                        <td className="text-primary">{transaction.metric_2_value}</td>
                                                         <td>{transaction.last_activity}</td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="4" className="text-center">No activity</td>
+                                                    <td colSpan="5" className="text-center">No activity</td>
                                                 </tr>
                                             )}
                                         </tbody>

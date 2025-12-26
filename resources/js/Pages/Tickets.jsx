@@ -63,6 +63,8 @@ export default function Tickets({
             payment_status: filters.payment_status,
             customer_id: _selectedCustomer?.id,
             branch_id: filters.branch_id,
+            order_by: filters.order_by || 'due_date',
+            order_dir: filters.order_dir || 'asc',
             [key]: value,
         };
 

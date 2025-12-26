@@ -117,6 +117,19 @@ class TicketController extends BaseCrudController
             }
         }
 
+        // Handle sorting - default to due_date ascending (nearest first)
+        $orderBy = $request->get('order_by', 'due_date');
+        $orderDir = $request->get('order_dir', 'asc');
+        
+        // Validate order_by field to prevent SQL injection
+        $allowedOrderBy = ['due_date', 'created_at', 'ticket_number', 'status', 'payment_status', 'total_amount'];
+        if (!in_array($orderBy, $allowedOrderBy)) {
+            $orderBy = 'due_date';
+        }
+        
+        // Validate order direction
+        $orderDir = strtolower($orderDir) === 'desc' ? 'desc' : 'asc';
+
         $tickets = $query->with('jobType.category')
             ->orderByRaw("
                 CASE status
@@ -128,7 +141,8 @@ class TicketController extends BaseCrudController
                     ELSE 5
                 END
             ")
-            ->latest()->paginate($request->get('per_page', 15));
+            ->orderBy($orderBy, $orderDir)
+            ->paginate($request->get('per_page', 15));
 
         // Get customers for dropdown/search
         $customers = \App\Models\Customer::latest()->limit(10)->get();
@@ -154,6 +168,8 @@ class TicketController extends BaseCrudController
                 'date_range' => $dateRange,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
+                'order_by' => $orderBy,
+                'order_dir' => $orderDir,
             ],
             'branches' => $user->isAdmin() ? \App\Models\Branch::active()->get() : [],
         ]);

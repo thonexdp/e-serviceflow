@@ -115,9 +115,10 @@ export default function Productions({
     const stats = calculateSummary();
 
     // Handle auto-paging cycle
+    const secondInterval = 15000; //15 seconds
     useEffect(() => {
         let timer;
-        const interval = isFullscreen ? 10000 : (autoPageInterval * 1000);
+        const interval = isFullscreen ? secondInterval : (autoPageInterval * 1000);
         const shouldPage = isFullscreen || (autoPageEnabled && tickets?.links?.length > 3);
 
         if (shouldPage) {
@@ -234,6 +235,47 @@ export default function Productions({
             document.querySelector(".sidebar")?.classList.remove("d-none");
             const content = document.querySelector(".content-wrap");
             if (content) content.style.padding = "";
+        };
+    }, [isFullscreen]);
+
+    // Handle Screen Wake Lock to prevent sleep
+    useEffect(() => {
+        let wakeLock = null;
+
+        const requestWakeLock = async () => {
+            if ('wakeLock' in navigator && isFullscreen) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock is active');
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
+                }
+            }
+        };
+
+        const releaseWakeLock = async () => {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+                console.log('Wake Lock released');
+            }
+        };
+
+        // Handle visibility change to re-acquire lock if tab becomes visible again
+        const handleVisibilityChange = async () => {
+            if (isFullscreen && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        };
+
+        if (isFullscreen) {
+            requestWakeLock();
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        return () => {
+            releaseWakeLock();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [isFullscreen]);
 
@@ -823,10 +865,10 @@ export default function Productions({
                             return (
                                 <div
                                     key={user.id}
-                                    className="d-flex align-items-center bg-white border rounded-xl shadow-sm "
+                                    className="d-flex align-items-center bg-white shadow-sm "
                                     style={{
                                         padding: isFullscreen ? '2px 8px' : '2px 8px',
-                                        fontSize: isFullscreen ? '0.9rem' : '0.75rem',
+                                        fontSize: isFullscreen ? '0.8rem' : '0.75rem',
                                         borderLeft: '4px solid #667eea !important'
                                     }}
                                 >

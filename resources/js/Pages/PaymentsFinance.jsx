@@ -118,11 +118,15 @@ export default function PaymentsFinance({
     }, [filters.search]);
 
     const handleRefresh = () => {
+        setLocalSearch("");
         setIsRefreshing(true);
-        router.reload({
+
+        router.visit(buildUrl("finance"), {
+            preserveState: false,
             preserveScroll: true,
             onFinish: () => setIsRefreshing(false),
         });
+
     };
 
     const filteredReceivables = useMemo(() => {
@@ -1588,23 +1592,64 @@ export default function PaymentsFinance({
                         file={{ file_path: filepath }}
                     />
                 )}
-
+ 
                 {/* Print Styles */}
                 <style>{`
                     @media print {
+                        @page {
+                            size: A4 landscape;
+                            margin: 10mm 15mm;
+                        }
                         body.printing-receipt {
                             visibility: hidden;
                         }
                         body.printing-receipt .official-receipt-print-wrapper {
                             visibility: visible;
                             position: absolute;
-                            left: 0;
                             top: 0;
-                            width: 100%;
-                            height: 100%;
+                            left: 0;
+                            transform: none;
+                            width: 50%;
+                            height: auto;
                             z-index: 9999;
                             background: white;
+                            box-sizing: border-box;
+                            padding-left: 0;
+                            padding-right: 10mm;
                             display: block !important;
+                        }
+
+                        body.printing-receipt .official-receipt-container {
+                            font-family: Arial, Helvetica, sans-serif !important;
+                            font-size: 10pt !important;
+                            line-height: 1.25 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            max-width: none !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                        body.printing-receipt .official-receipt-container h1 {
+                            font-size: 13pt !important;
+                            font-weight: 800 !important;
+                            letter-spacing: 0.5pt !important;
+                        }
+                        body.printing-receipt .official-receipt-container h2 {
+                            font-size: 15pt !important;
+                            font-weight: 800 !important;
+                            letter-spacing: 0.5pt !important;
+                        }
+                        body.printing-receipt .official-receipt-container table {
+                            font-size: 9.5pt !important;
+                        }
+                        body.printing-receipt .official-receipt-container th,
+                        body.printing-receipt .official-receipt-container td {
+                            padding-top: 3px !important;
+                            padding-bottom: 3px !important;
+                        }
+                        body.printing-receipt .official-receipt-container tr {
+                            break-inside: avoid;
+                            page-break-inside: avoid;
                         }
                         body.printing-receipt .official-receipt-print-wrapper * {
                             visibility: visible;
@@ -1635,4 +1680,3 @@ export default function PaymentsFinance({
         </>
     );
 }
-

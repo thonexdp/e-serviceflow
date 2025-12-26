@@ -63,6 +63,11 @@ class ProductionQueueController extends Controller
             ->where(function ($q) {
                 $q->where('design_status', 'approved')
                     ->orWhereNull('design_status');
+            })
+            // Only show tickets with job types that have show_in_dashboard enabled
+            // This filter applies ONLY to the Production Dashboard, not to AllTickets or WorkflowView
+            ->whereHas('jobType', function ($q) {
+                $q->where('show_in_dashboard', true);
             });
 
         // Branch-based filtering for production users
@@ -882,9 +887,7 @@ class ProductionQueueController extends Controller
         return redirect()->back()->with('success', 'Users assigned successfully.');
     }
 
-    /**
-     * Show all tickets regardless of workflow (Production Head view)
-     */
+ 
     public function allTickets(Request $request)
     {
         /** @var \App\Models\User $user */
@@ -942,9 +945,7 @@ class ProductionQueueController extends Controller
         ]);
     }
 
-    /**
-     * Show tickets for specific workflow step
-     */
+
     public function workflowView(Request $request, string $workflowStep)
     {
         try {
