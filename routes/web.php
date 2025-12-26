@@ -212,6 +212,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
 
+
     // Finance Hub
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
@@ -222,6 +223,8 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
 
     // Inventory (Read-only for FrontDesk)
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::get('/inventory/low-stock', [InventoryController::class, 'lowStock'])->name('inventory.low-stock');
+
 
     // Production Queue (View-only for FrontDesk)
     Route::get('/production', [ProductionQueueController::class, 'index'])->name('production.index');

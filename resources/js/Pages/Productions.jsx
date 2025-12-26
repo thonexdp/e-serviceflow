@@ -46,6 +46,7 @@ export default function Productions({
   const [updateModalMessage, setUpdateModalMessage] = useState(null);
   const [userQuantities, setUserQuantities] = useState({});
   const [evidenceFiles, setEvidenceFiles] = useState([]);
+  const [updatedTicketIds, setUpdatedTicketIds] = useState(new Set());
   const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
   const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
@@ -124,7 +125,26 @@ export default function Productions({
 
 
     const handleTicketUpdate = (data) => {
-
+      
+      // Extract ticket ID and ticket_number from the broadcast data
+      // The event broadcasts with structure: { ticket: { id, ticket_number, ... }, notification: { ... } }
+      const ticketId = data?.ticket?.id;
+      const ticketNumber = data?.ticket?.ticket_number;
+      
+      if (ticketId || ticketNumber) {
+        const identifier = ticketId || ticketNumber;
+        console.log('✅ Adding ticket to blink list:', identifier);
+        setUpdatedTicketIds(prev => new Set([...prev, identifier]));
+        
+        // Remove blinking effect after 3 seconds (6 blinks at 0.5s each)
+        setTimeout(() => {
+          setUpdatedTicketIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(identifier);
+            return newSet;
+          });
+        }, 3000);
+      }
 
       router.reload({
         only: ['tickets'],
@@ -1692,7 +1712,12 @@ export default function Productions({
                           columns={ticketColumns}
                           data={tickets.data}
                           pagination={tickets}
-                          emptyMessage="No tickets ready for production." />
+                          emptyMessage="No tickets ready for production."
+                          getRowClassName={(row) => {
+                            const isUpdated = updatedTicketIds.has(row.id) || 
+                                              (row.ticket_number && updatedTicketIds.has(row.ticket_number));
+                            return isUpdated ? 'row-updated-blink' : '';
+                          }} />
 
                                             </div>
                                         </div>
@@ -1704,6 +1729,19 @@ export default function Productions({
                 </div>
             </section>
 
+            <style>{`
+                @keyframes blink {
+                    0%, 100% {
+                        background-color: transparent;
+                    }
+                    50% {
+                        background-color: rgba(102, 126, 234, 0.2);
+                    }
+                }
+                .row-updated-blink {
+                    animation: blink 0.5s ease-in-out 6;
+                }
+            `}</style>
         </AdminLayout>);
 
 }

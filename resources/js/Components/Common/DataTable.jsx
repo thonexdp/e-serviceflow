@@ -8,7 +8,8 @@ export default function DataTable({
   onEdit = null,
   onDelete = null,
   actions = null,
-  emptyMessage = "No data found."
+  emptyMessage = "No data found.",
+  getRowClassName = null
 }) {
   const handlePageChange = (url) => {
     if (url) {
@@ -41,7 +42,7 @@ export default function DataTable({
                     <tbody>
                         {data && data.length > 0 ?
             data.map((row, rowIndex) =>
-            <tr key={row.id || rowIndex}>
+            <tr key={row.id || rowIndex} className={getRowClassName ? getRowClassName(row, rowIndex) : ''}>
                                     {columns.map((column, colIndex) =>
               <td key={colIndex}>
                                             {column.render ?

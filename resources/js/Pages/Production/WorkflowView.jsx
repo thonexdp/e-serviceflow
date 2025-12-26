@@ -43,6 +43,7 @@ export default function WorkflowView({
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [userQuantities, setUserQuantities] = useState({});
   const [userEvidenceFiles, setUserEvidenceFiles] = useState({});
+  const [updatedTicketIds, setUpdatedTicketIds] = useState(new Set());
   const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
   const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
@@ -57,7 +58,58 @@ export default function WorkflowView({
     if (!window.Echo || !auth?.user?.id) return;
 
     const channel = window.Echo.private(`user.${auth.user.id}`);
-    const handleTicketUpdate = () => {
+    const handleTicketUpdate = (data) => {
+      
+      // Extract ticket ID and ticket_number from the broadcast data
+      // The event broadcasts with structure: { ticket: { id, ticket_number, ... }, notification: { ... } }
+      const ticketId = data?.ticket?.id;
+      const ticketNumber = data?.ticket?.ticket_number;
+      
+      if (ticketId || ticketNumber) {
+        const identifier = ticketId || ticketNumber;
+        console.log('✅ Adding ticket to blink list:', identifier);
+        setUpdatedTicketIds(prev => new Set([...prev, identifier]));
+        
+        // Remove blinking effect after 3 seconds (6 blinks at 0.5s each)
+        setTimeout(() => {
+          setUpdatedTicketIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(identifier);
+            return newSet;
+          });
+        }, 3000);
+      }
+
+      // Show notification toast
+      if (data?.notification) {
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease-out;
+            font-size: 14px;
+            font-weight: 500;
+            max-width: 350px;
+          ">
+            <i class="ti-bell mr-2"></i>${data.notification.message || 'Production updated'}
+          </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          notification.style.animation = 'slideOutRight 0.3s ease-in';
+          setTimeout(() => notification.remove(), 300);
+        }, 3000);
+      }
+
       router.reload({
         only: ['tickets'],
         preserveScroll: true,
@@ -67,12 +119,41 @@ export default function WorkflowView({
 
     channel.listen('.ticket.status.changed', handleTicketUpdate);
 
+    // Add animation styles if not already present
+    if (!document.getElementById('workflow-notification-animations')) {
+      const style = document.createElement('style');
+      style.id = 'workflow-notification-animations';
+      style.innerHTML = `
+        @keyframes slideInRight {
+          from {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes slideOutRight {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
     return () => {
       if (channel) {
         channel.stopListening('.ticket.status.changed');
       }
     };
-  }, []);
+  }, [auth?.user?.id]);
 
   const handleView = (ticket) => {
     setSelectedTicket(ticket);
@@ -234,6 +315,7 @@ export default function WorkflowView({
                 type: 'success',
                 text: `${workflowInfo.label} completed and moved to next step!`
               });
+              setLoading(false);
               setTimeout(() => {
                 handleCloseModals();
               }, 1500);
@@ -282,11 +364,13 @@ export default function WorkflowView({
         onSuccess: () => {
           currentIndex++;
           updateNextUser();
+          setLoading(false);
         },
         onError: (errors) => {
           setUpdateModalMessage({ type: 'error', text: errors?.message || `Failed to update progress for ${user.name}.` });
           setLoading(false);
-        }
+        },
+        onFinish: () => setLoading(false)
       });
     };
 
@@ -997,7 +1081,12 @@ export default function WorkflowView({
                           columns={ticketColumns}
                           data={tickets.data}
                           pagination={tickets}
-                          emptyMessage={`No tickets in ${workflowInfo.label} queue.`} />
+                          emptyMessage={`No tickets in ${workflowInfo.label} queue.`}
+                          getRowClassName={(row) => {
+                            const isUpdated = updatedTicketIds.has(row.id) || 
+                                              (row.ticket_number && updatedTicketIds.has(row.ticket_number));
+                            return isUpdated ? 'row-updated-blink' : '';
+                          }} />
 
                                             </div>
                                         </div>
@@ -1009,6 +1098,19 @@ export default function WorkflowView({
                 </div>
             </section>
 
+            <style>{`
+                @keyframes blink {
+                    0%, 100% {
+                        background-color: transparent;
+                    }
+                    50% {
+                        background-color: rgba(102, 126, 234, 0.2);
+                    }
+                }
+                .row-updated-blink {
+                    animation: blink 0.5s ease-in-out 6;
+                }
+            `}</style>
         </AdminLayout>);
 
 }

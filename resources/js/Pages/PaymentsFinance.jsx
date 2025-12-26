@@ -1597,7 +1597,7 @@ export default function PaymentsFinance({
                 <style>{`
                     @media print {
                         @page {
-                            size: A4 landscape;
+                            size: A4 portrait;
                             margin: 10mm 15mm;
                         }
                         body.printing-receipt {
@@ -1607,49 +1607,73 @@ export default function PaymentsFinance({
                             visibility: visible;
                             position: absolute;
                             top: 0;
-                            left: 0;
+                            left: 15mm;
                             transform: none;
-                            width: 50%;
+                            width: 105mm;
                             height: auto;
                             z-index: 9999;
                             background: white;
                             box-sizing: border-box;
-                            padding-left: 0;
-                            padding-right: 10mm;
+                            padding: 0 5mm;
+                            margin: 0;
                             display: block !important;
                         }
 
                         body.printing-receipt .official-receipt-container {
                             font-family: Arial, Helvetica, sans-serif !important;
-                            font-size: 10pt !important;
-                            line-height: 1.25 !important;
+                            font-size: 9pt !important;
+                            line-height: 1.2 !important;
                             padding: 0 !important;
                             margin: 0 !important;
-                            max-width: none !important;
+                            max-width: 100% !important;
+                            width: 100% !important;
                             -webkit-print-color-adjust: exact;
                             print-color-adjust: exact;
                         }
                         body.printing-receipt .official-receipt-container h1 {
-                            font-size: 13pt !important;
+                            font-size: 12pt !important;
                             font-weight: 800 !important;
                             letter-spacing: 0.5pt !important;
+                            margin-bottom: 4px !important;
                         }
                         body.printing-receipt .official-receipt-container h2 {
-                            font-size: 15pt !important;
+                            font-size: 14pt !important;
                             font-weight: 800 !important;
                             letter-spacing: 0.5pt !important;
+                            margin-bottom: 4px !important;
                         }
                         body.printing-receipt .official-receipt-container table {
-                            font-size: 9.5pt !important;
+                            font-size: 8.5pt !important;
+                            width: 100% !important;
+                            table-layout: fixed !important;
                         }
                         body.printing-receipt .official-receipt-container th,
                         body.printing-receipt .official-receipt-container td {
-                            padding-top: 3px !important;
-                            padding-bottom: 3px !important;
+                            padding-top: 2px !important;
+                            padding-bottom: 2px !important;
+                            padding-left: 3px !important;
+                            padding-right: 3px !important;
+                        }
+                        body.printing-receipt .official-receipt-container thead {
+                            display: table-header-group !important;
+                        }
+                        body.printing-receipt .official-receipt-container tbody {
+                            display: table-row-group !important;
+                        }
+                        body.printing-receipt .official-receipt-container tfoot {
+                            display: table-footer-group !important;
                         }
                         body.printing-receipt .official-receipt-container tr {
-                            break-inside: avoid;
-                            page-break-inside: avoid;
+                            break-inside: avoid !important;
+                            page-break-inside: avoid !important;
+                        }
+                        body.printing-receipt .official-receipt-container tbody tr {
+                            break-inside: avoid !important;
+                            page-break-inside: avoid !important;
+                        }
+                        body.printing-receipt .official-receipt-container table {
+                            break-inside: avoid !important;
+                            page-break-inside: avoid !important;
                         }
                         body.printing-receipt .official-receipt-print-wrapper * {
                             visibility: visible;

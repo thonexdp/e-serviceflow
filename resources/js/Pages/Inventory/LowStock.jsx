@@ -7,90 +7,112 @@ import { usePage } from "@inertiajs/react";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function InventoryLowStock({
-  user = {},
-  notifications = [],
-  messages = [],
-  lowStockItems = []
+    user = {},
+    notifications = [],
+    messages = [],
+    lowStockItems = [],
 }) {
-  const { flash } = usePage().props;
-  const { buildUrl, auth } = useRoleApi();
-  const isAdmin = auth?.user?.role === "admin";
+    const { flash, auth } = usePage().props;
+    const { buildUrl } = useRoleApi();
+    const isAdmin = auth?.user?.role === "admin";
+    const canCreatePurchaseOrder =
+        auth?.user?.role === "admin" || auth?.user?.role === "Production";
 
+    const getStockStatusBadge = (stockItem) => {
+        if (stockItem.current_stock <= 0) {
+            return <span className="badge badge-danger">Out of Stock</span>;
+        } else if (stockItem.current_stock <= stockItem.minimum_stock_level) {
+            return <span className="badge badge-warning">Low Stock</span>;
+        }
+        return <span className="badge badge-success">In Stock</span>;
+    };
 
-  const getStockStatusBadge = (stockItem) => {
-    if (stockItem.current_stock <= 0) {
-      return <span className="badge badge-danger">Out of Stock</span>;
-    } else if (stockItem.current_stock <= stockItem.minimum_stock_level) {
-      return <span className="badge badge-warning">Low Stock</span>;
-    }
-    return <span className="badge badge-success">In Stock</span>;
-  };
-
-  const columns = [
-  {
-    label: "#",
-    key: "index",
-    render: (row, index) => index + 1
-  },
-  { label: "SKU", key: "sku" },
-  { label: "Name", key: "name" },
-  { label: "Category", key: "category" },
-  {
-    label: "Current Stock",
-    key: "current_stock",
-    render: (row) =>
-    <span>
-                    {parseFloat(row.current_stock).toFixed(2)} {row.base_unit_of_measure}
+    const columns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) => index + 1,
+        },
+        { label: "SKU", key: "sku" },
+        { label: "Name", key: "name" },
+        { label: "Category", key: "category" },
+        {
+            label: "Current Stock",
+            key: "current_stock",
+            render: (row) => (
+                <span>
+                    {parseFloat(row.current_stock).toFixed(2)}{" "}
+                    {row.base_unit_of_measure}
                 </span>
-
-  },
-  {
-    label: "Minimum Level",
-    key: "minimum_stock_level",
-    render: (row) =>
-    <span>{parseFloat(row.minimum_stock_level).toFixed(2)} {row.base_unit_of_measure}</span>
-
-  },
-  {
-    label: "Status",
-    key: "status",
-    render: (row) => getStockStatusBadge(row)
-  },
-  {
-    label: "Actions",
-    key: "actions",
-    render: (row) =>
-    <div className="btn-group">
-                    <button
-        type="button"
-        className="btn btn-link btn-sm text-primary"
-        onClick={() => router.get(buildUrl(`/purchase-orders/create?stock_item_id=${row.id}`))}>
-
-                        <i className="ti-shopping-cart"></i> Create PO
-                    </button>
-                    {
-      isAdmin &&
-      <button
-        type="button"
-        className="btn btn-link btn-sm text-orange-500"
-        onClick={() => router.get(buildUrl(`/inventory/${row.id}/movements`))}>
-
+            ),
+        },
+        {
+            label: "Minimum Level",
+            key: "minimum_stock_level",
+            render: (row) => (
+                <span>
+                    {parseFloat(row.minimum_stock_level).toFixed(2)}{" "}
+                    {row.base_unit_of_measure}
+                </span>
+            ),
+        },
+        {
+            label: "Status",
+            key: "status",
+            render: (row) => getStockStatusBadge(row),
+        },
+        {
+            label: "Actions",
+            key: "actions",
+            render: (row) => (
+                <div className="btn-group">
+                    {canCreatePurchaseOrder && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-primary"
+                            onClick={() =>
+                                router.get(
+                                    buildUrl(
+                                        `/purchase-orders/create?stock_item_id=${row.id}`
+                                    )
+                                )
+                            }
+                        >
+                            <i className="ti-shopping-cart"></i> Create PO
+                        </button>
+                    )}
+                    {isAdmin && (
+                        <button
+                            type="button"
+                            className="btn btn-link btn-sm text-orange-500"
+                            onClick={() =>
+                                router.get(
+                                    buildUrl(`/inventory/${row.id}/movements`)
+                                )
+                            }
+                        >
                             <i className="ti-eye"></i> Movements
                         </button>
-
-      }
-                    
+                    )}
                 </div>
+            ),
+        },
+    ];
 
-  }];
-
-
-  return (
-    <AdminLayout user={user} notifications={notifications} messages={messages}>
+    return (
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
             <Head title="Low Stock Items" />
 
-            {flash?.success && <FlashMessage type="success" message={flash.success} />}
-            {flash?.error && <FlashMessage type="error" message={flash.error} />}
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
@@ -112,7 +134,9 @@ export default function InventoryLowStock({
                                 <li className="breadcrumb-item">
                                     <a href="/inventory">Inventory</a>
                                 </li>
-                                <li className="breadcrumb-item active">Low Stock</li>
+                                <li className="breadcrumb-item active">
+                                    Low Stock
+                                </li>
                             </ol>
                         </div>
                     </div>
@@ -127,26 +151,36 @@ export default function InventoryLowStock({
                                 <div className="col-lg-12">
                                     <div className="card">
                                         <div className="card-title mt-3 d-flex justify-content-between align-items-center">
-                                            <h4>Low Stock Items ({lowStockItems.length})</h4>
+                                            <h4>
+                                                Low Stock Items (
+                                                {lowStockItems.length})
+                                            </h4>
                                             <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => router.get(buildUrl("/inventory"))}>
-
-                                                <i className="ti-arrow-left"></i> Back to Inventory
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() =>
+                                                    router.get(
+                                                        buildUrl("/inventory")
+                                                    )
+                                                }
+                                            >
+                                                <i className="ti-arrow-left"></i>{" "}
+                                                Back to Inventory
                                             </button>
                                         </div>
                                         <div className="card-body">
-                                            {lowStockItems.length === 0 ?
-                      <div className="alert alert-success">
-                                                    <i className="ti-check"></i> All stock items are above minimum levels!
-                                                </div> :
-
-                      <DataTable
-                        columns={columns}
-                        data={lowStockItems}
-                        emptyMessage="No low stock items found." />
-
-                      }
+                                            {lowStockItems.length === 0 ? (
+                                                <div className="alert alert-success">
+                                                    <i className="ti-check"></i>{" "}
+                                                    All stock items are above
+                                                    minimum levels!
+                                                </div>
+                                            ) : (
+                                                <DataTable
+                                                    columns={columns}
+                                                    data={lowStockItems}
+                                                    emptyMessage="No low stock items found."
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -155,7 +189,6 @@ export default function InventoryLowStock({
                     </div>
                 </div>
             </section>
-
-        </AdminLayout>);
-
+        </AdminLayout>
+    );
 }

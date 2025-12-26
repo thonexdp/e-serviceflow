@@ -19,6 +19,7 @@ export default function Productions({
   filters = {},
   summary = {}
 }) {
+
   const [activeView, setActiveView] = useState("table");
   const [autoPageInterval, setAutoPageInterval] = useState(10);
   const [autoPageEnabled, setAutoPageEnabled] = useState(false);
@@ -32,9 +33,12 @@ export default function Productions({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showFullscreenControls, setShowFullscreenControls] = useState(false);
+  const [updatedTicketIds, setUpdatedTicketIds] = useState(new Set());
   const { flash, auth } = usePage().props;
   const isAdmin = auth?.user?.role === 'admin';
   const assignedWorkflowSteps = auth?.user?.workflow_steps || [];
+
+  const perPage = 10;
 
 
   const canUpdateTicket = (ticket) => {
@@ -115,7 +119,7 @@ export default function Productions({
   const stats = calculateSummary();
 
 
-  const secondInterval = 15000;
+  const secondInterval = 20000;
   useEffect(() => {
     let timer;
     const interval = isFullscreen ? secondInterval : autoPageInterval * 1000;
@@ -124,10 +128,10 @@ export default function Productions({
     if (shouldPage) {
       timer = setInterval(() => {
         const nextPage = tickets.current_page < tickets.last_page ?
-        tickets.current_page + 1 :
-        1;
+          tickets.current_page + 1 :
+          1;
 
-        router.visit(`${window.location.pathname}?per_page=${isFullscreen ? 6 : filters.per_page || 10}&page=${nextPage}`, {
+        router.visit(`${window.location.pathname}?per_page=${isFullscreen ? perPage : filters.per_page || 10}&page=${nextPage}`, {
           preserveScroll: true,
           preserveState: true,
           only: ['tickets']
@@ -146,12 +150,12 @@ export default function Productions({
 
   useEffect(() => {
     if (isFullscreen) {
-      router.visit(`${window.location.pathname}?per_page=6&page=1`, {
+      router.visit(`${window.location.pathname}?per_page=${perPage}&page=1`, {
         preserveScroll: true,
         preserveState: true,
         only: ['tickets']
       });
-    } else if (!isFullscreen && filters.per_page === 6) {
+    } else if (!isFullscreen && filters.per_page === perPage) {
 
       router.visit(`${window.location.pathname}?per_page=10&page=1`, {
         preserveScroll: true,
@@ -165,10 +169,10 @@ export default function Productions({
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = !!(
-      document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.mozFullScreenElement ||
-      document.msFullscreenElement);
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement);
 
 
       if (!isCurrentlyFullscreen && isFullscreen) {
@@ -187,15 +191,22 @@ export default function Productions({
 
 
       const requestFullscreen =
-      element.requestFullscreen ||
-      element.webkitRequestFullscreen ||
-      element.mozRequestFullScreen ||
-      element.msRequestFullscreen;
+        element.requestFullscreen ||
+        element.webkitRequestFullscreen ||
+        element.mozRequestFullScreen ||
+        element.msRequestFullscreen;
 
       if (requestFullscreen) {
-        requestFullscreen.call(element).catch((err) => {
+        try {
+          const result = requestFullscreen.call(element);
+          if (result && typeof result.catch === 'function') {
+            result.catch((err) => {
+              console.error('Error attempting to enable fullscreen:', err);
+            });
+          }
+        } catch (err) {
           console.error('Error attempting to enable fullscreen:', err);
-        });
+        }
       }
 
       document.body.classList.add("production-fullscreen");
@@ -204,17 +215,34 @@ export default function Productions({
       const content = document.querySelector(".content-wrap");
       if (content) content.style.padding = "0";
     } else {
+      // Check if document is actually in fullscreen before trying to exit
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
 
-      const exitFullscreen =
-      document.exitFullscreen ||
-      document.webkitExitFullscreen ||
-      document.mozCancelFullScreen ||
-      document.msExitFullscreen;
+      if (isCurrentlyFullscreen) {
+        const exitFullscreen =
+          document.exitFullscreen ||
+          document.webkitExitFullscreen ||
+          document.mozCancelFullScreen ||
+          document.msExitFullscreen;
 
-      if (exitFullscreen) {
-        exitFullscreen.call(document).catch((err) => {
-          console.error('Error attempting to exit fullscreen:', err);
-        });
+        if (exitFullscreen) {
+          try {
+            const result = exitFullscreen.call(document);
+            if (result && typeof result.catch === 'function') {
+              result.catch((err) => {
+                // Silently handle errors - document might have already exited fullscreen
+                console.warn('Fullscreen exit warning (can be ignored):', err.message);
+              });
+            }
+          } catch (err) {
+            console.warn('Fullscreen exit warning (can be ignored):', err.message);
+          }
+        }
       }
 
       document.body.classList.remove("production-fullscreen");
@@ -230,6 +258,8 @@ export default function Productions({
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
 
+      // Only clean up UI classes, don't try to exit fullscreen in cleanup
+      // The fullscreen state will be handled by the browser or the next effect run
       document.body.classList.remove("production-fullscreen");
       document.querySelector(".header")?.classList.remove("d-none");
       document.querySelector(".sidebar")?.classList.remove("d-none");
@@ -312,7 +342,27 @@ export default function Productions({
 
 
     const handleTicketUpdate = (data) => {
+      console.log('🔔 Dashboard Production received ticket update:', data);
 
+      // Extract ticket ID and ticket_number from the broadcast data
+      // The event broadcasts with structure: { ticket: { id, ticket_number, ... }, notification: { ... } }
+      const ticketId = data?.ticket?.id;
+      const ticketNumber = data?.ticket?.ticket_number;
+
+      if (ticketId || ticketNumber) {
+        const identifier = ticketId || ticketNumber;
+        console.log('✅ Adding ticket to blink list:', identifier);
+        setUpdatedTicketIds(prev => new Set([...prev, identifier]));
+
+        // Remove blinking effect after 3 seconds (6 blinks at 0.5s each)
+        setTimeout(() => {
+          setUpdatedTicketIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(identifier);
+            return newSet;
+          });
+        }, 3000);
+      }
 
       router.reload({
         only: ['tickets', 'summary'],
@@ -321,34 +371,32 @@ export default function Productions({
       });
 
 
-      if (isFullscreen) {
-        const notification = document.createElement('div');
-        notification.innerHTML = `
-                    <div style="
-                        position: fixed;
-                        top: 80px;
-                        right: 20px;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 12px 20px;
-                        border-radius: 8px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                        z-index: 10000;
-                        animation: slideInRight 0.3s ease-out;
-                        font-size: 14px;
-                        font-weight: 500;
-                    ">
-                        <i class="ti-bell mr-2"></i>${data.notification?.message || 'Production updated'}
-                    </div>
-                `;
-        document.body.appendChild(notification);
+      // Always show notification regardless of fullscreen state
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+          <div style="
+              position: fixed;
+              top: 80px;
+              right: 20px;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              z-index: 10000;
+              animation: slideInRight 0.3s ease-out;
+              font-size: 14px;
+              font-weight: 500;
+          ">
+              <i class="ti-bell mr-2"></i>${data.notification?.message || 'Production updated'}
+          </div>
+      `;
+      document.body.appendChild(notification);
 
-
-        setTimeout(() => {
-          notification.style.animation = 'slideOutRight 0.3s ease-in';
-          setTimeout(() => notification.remove(), 300);
-        }, 3000);
-      }
+      setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => notification.remove(), 300);
+      }, 3000);
     };
 
 
@@ -379,6 +427,17 @@ export default function Productions({
                         opacity: 0;
                     }
                 }
+                @keyframes blink {
+                    0%, 100% {
+                        background-color: transparent;
+                    }
+                    50% {
+                        background-color: rgba(102, 126, 234, 0.2);
+                    }
+                }
+                .row-updated-blink {
+                    animation: blink 0.5s ease-in-out 6;
+                }
             `;
       document.head.appendChild(style);
     }
@@ -390,7 +449,7 @@ export default function Productions({
         channel.stopListening('.ticket.status.changed');
       }
     };
-  }, [isFullscreen]);
+  }, [auth?.user?.id, isFullscreen]);
 
   const toggleFullscreen = () => {
     const nextFullscreen = !isFullscreen;
@@ -455,7 +514,7 @@ export default function Productions({
 
     setLoading(true);
     const status =
-    quantity >= selectedTicket.quantity ? "completed" : "in_production";
+      quantity >= selectedTicket.quantity ? "completed" : "in_production";
 
     router.post(
       `/production/${selectedTicket.id}/update`,
@@ -479,11 +538,11 @@ export default function Productions({
 
   const handleMarkCompleted = (ticketId) => {
     if (
-    !confirm(
-      "Mark this ticket as completed? Stock will be automatically deducted."
-    ))
+      !confirm(
+        "Mark this ticket as completed? Stock will be automatically deducted."
+      ))
 
-    return;
+      return;
 
     setLoading(true);
     router.post(
@@ -510,7 +569,7 @@ export default function Productions({
     if (ticket.job_type?.stock_requirements) {
       ticket.job_type.stock_requirements.forEach((req) => {
         const requiredQty =
-        parseFloat(req.quantity_per_unit) * ticket.quantity;
+          parseFloat(req.quantity_per_unit) * ticket.quantity;
         initialConsumptions.push({
           stock_item_id: req.stock_item_id,
           quantity: requiredQty.toFixed(2),
@@ -534,12 +593,12 @@ export default function Productions({
 
   const handleAddStockConsumption = () => {
     setStockConsumptions([
-    ...stockConsumptions,
-    {
-      stock_item_id: "",
-      quantity: "",
-      notes: ""
-    }]
+      ...stockConsumptions,
+      {
+        stock_item_id: "",
+        quantity: "",
+        notes: ""
+      }]
     );
   };
 
@@ -614,8 +673,8 @@ export default function Productions({
     };
     return (
       <b className={`${classes[status] || "text-black"}`}>
-                {labels[status] || status?.toUpperCase() || "PENDING"}
-            </b>);
+        {labels[status] || status?.toUpperCase() || "PENDING"}
+      </b>);
 
   };
 
@@ -625,64 +684,64 @@ export default function Productions({
     if (ticket.status === "ready_to_print") {
       return (
         <div className="btn-group">
-                    <button
+          <button
             type="button"
             className="btn btn-link btn-sm text-orange-500"
             onClick={() => handleView(ticket)}>
 
-                        <i className="ti-eye"></i> View
-                    </button>
-                    <button
+            <i className="ti-eye"></i> View
+          </button>
+          <button
             type="button"
             className="btn btn-link btn-sm text-green-500"
             onClick={() => handleStartProduction(ticket.id)}
             disabled={loading || !canUpdate}
             title={!canUpdate ? "You are not assigned to this workflow step" : ""}>
 
-                        <i className="ti-play"></i> Start
-                    </button>
-                </div>);
+            <i className="ti-play"></i> Start
+          </button>
+        </div>);
 
     } else if (ticket.status === "in_production") {
       return (
         <div className="btn-group">
-                    <button
+          <button
             type="button"
             className="btn btn-link btn-sm text-orange-500"
             onClick={() => handleUpdate(ticket)}
             disabled={!canUpdate}
             title={!canUpdate ? "You are not assigned to this workflow step" : ""}>
 
-                        <i className="ti-pencil"></i> Update
-                    </button>
-                    {ticket.produced_quantity >= ticket.quantity && canUpdate &&
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-success"
-            onClick={() => handleMarkCompleted(ticket.id)}
-            disabled={loading}>
+            <i className="ti-pencil"></i> Update
+          </button>
+          {ticket.produced_quantity >= ticket.quantity && canUpdate &&
+            <button
+              type="button"
+              className="btn btn-link btn-sm text-success"
+              onClick={() => handleMarkCompleted(ticket.id)}
+              disabled={loading}>
 
-                            <i className="ti-check"></i> Complete
-                        </button>
+              <i className="ti-check"></i> Complete
+            </button>
           }
-                    {!canUpdate &&
-          <span className="text-muted small">
-                            <i className="ti-lock"></i> Not your turn
-                        </span>
+          {!canUpdate &&
+            <span className="text-muted small">
+              <i className="ti-lock"></i> Not your turn
+            </span>
           }
-                </div>);
+        </div>);
 
     } else if (ticket.status === "completed") {
       return (
         <span className="text-success">
-                    <i className="ti-check"></i> Completed
-                    {ticket.stock_consumptions &&
-          ticket.stock_consumptions.length > 0 &&
-          <small className="d-block text-muted">
-                                Stock deducted automatically
-                            </small>
+          <i className="ti-check"></i> Completed
+          {ticket.stock_consumptions &&
+            ticket.stock_consumptions.length > 0 &&
+            <small className="d-block text-muted">
+              Stock deducted automatically
+            </small>
           }
-                </span>);
+        </span>);
 
     } else {
       return (
@@ -691,8 +750,8 @@ export default function Productions({
           className="btn btn-link btn-sm text-orange-500"
           onClick={() => handleView(ticket)}>
 
-                    <i className="ti-eye"></i> View
-                </button>);
+          <i className="ti-eye"></i> View
+        </button>);
 
     }
   };
@@ -700,21 +759,21 @@ export default function Productions({
   const getWorkflowBadge = (workflowStep) => {
     if (!workflowStep) return <span className="text-muted">Not Started</span>;
     const WORKFLOW_STEPS_LOCAL = [
-    { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
-    { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
-    { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
-    { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
-    { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
-    { key: 'qa', label: 'Quality Assurance', icon: 'ti-check-box', color: '#4CAF50' }];
+      { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
+      { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
+      { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
+      { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
+      { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
+      { key: 'qa', label: 'Quality Assurance', icon: 'ti-check-box', color: '#4CAF50' }];
 
     const step = WORKFLOW_STEPS_LOCAL.find((s) => s.key === workflowStep);
     if (!step) return <span className="text-muted">{workflowStep}</span>;
 
     return (
       <span className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
-                <i className={`${step.icon} mr-1`}></i>
-                {step.label}
-            </span>);
+        <i className={`${step.icon} mr-1`}></i>
+        {step.label}
+      </span>);
 
   };
 
@@ -751,173 +810,176 @@ export default function Productions({
 
 
 
-  {
-    label: "Ticket ID",
-    key: "ticket_number",
-    render: (row) =>
-    <div className="d-flex align-items-center">
-                    {row.mockup_files && row.mockup_files.length > 0 &&
-      <div className="mr-3">
-                            <img
-          src={row.mockup_files[0].file_path}
-          alt="Preview"
-          className="img-thumbnail"
-          style={{
-            width: isFullscreen ? '110px' : '70px',
-            height: isFullscreen ? '110px' : '70px',
-            objectFit: 'cover',
-            cursor: 'pointer',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
-          onClick={() => handleView(row)} />
-
-                        </div>
-      }
-                    <div>
-                        {row.job_type &&
-        <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
-                                {row.job_type.name}
-                            </div>
-        }
-                        <strong style={{ fontSize: isFullscreen ? '1rem' : '1.2rem', color: '#1a1a1a', display: 'block' }}>#{row.ticket_number}</strong>
-                    </div>
-                </div>
-
-  },
-  {
-    label: "Description",
-    key: "description",
-    render: (row) =>
-    <div>
-                    <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.15rem' : '1rem' }}>{row.description}</div>
-                    <div className="text-primary font-weight-bold" style={{ fontSize: isFullscreen ? '1rem' : '0.85rem' }}>
-                        {row.customer?.firstname} {row.customer?.lastname}
-                    </div>
-                </div>
-
-  },
-  {
-    label: "Quantity / Progress",
-    key: "quantity",
-    render: (row) => {
-      const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
-      const currentStep = row.current_workflow_step;
-      let stepQuantity = 0;
-
-      if (row.status === 'completed') {
-        stepQuantity = totalQty;
-      } else if (currentStep && row.workflow_progress) {
-        const stepProgress = row.workflow_progress.find((wp) => wp.workflow_step === currentStep);
-        stepQuantity = stepProgress?.completed_quantity || 0;
-      } else {
-        stepQuantity = row.produced_quantity || 0;
-      }
-
-      const percentage = totalQty > 0 ? Math.round(stepQuantity / totalQty * 100) : 0;
-
-      return (
-        <div style={{ minWidth: isFullscreen ? '200px' : '150px' }}>
-                        <div className="d-flex justify-content-between mb-1">
-                            <span className={stepQuantity >= totalQty ? "text-success font-weight-bold" : "text-warning font-weight-bold"} style={{ fontSize: isFullscreen ? '1.2rem' : '1rem' }}>
-                                {stepQuantity} / {totalQty}
-                            </span>
-                            <span className="font-weight-bold" style={{ color: '#667eea', fontSize: isFullscreen ? '1.1rem' : '0.9rem' }}>{percentage}%</span>
-                        </div>
-                        <div className="progress shadow-sm" style={{ height: isFullscreen ? '14px' : '8px', borderRadius: '10px' }}>
-                            <div
-              className={`progress-bar progress-bar-striped progress-bar-animated ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
-              style={{ width: `${percentage}%` }}>
-            </div>
-                        </div>
-                    </div>);
-
-    }
-  },
-  {
-    label: "Workflow",
-    key: "current_workflow_step",
-    render: (row) =>
-    <div style={{ transform: isFullscreen ? 'scale(1.2)' : 'none', transformOrigin: 'left' }}>
-                    {getWorkflowBadge(row.current_workflow_step)}
-                </div>
-
-  },
-  {
-    label: "Assigned Users & Progress",
-    key: "assigned_to",
-    render: (row) => {
-      const users = row.assigned_users && row.assigned_users.length > 0 ?
-      row.assigned_users :
-      row.assigned_to_user ? [row.assigned_to_user] : [];
-
-      if (users.length === 0) return <span className="text-muted small italic">Unassigned</span>;
-
-      return (
-        <div className="d-flex flex-wrap gap-2" style={{ maxWidth: isFullscreen ? '400px' : '250px' }}>
-                        {users.map((user) => {
-            const userQty = row.production_records ?
-            row.production_records.
-            filter((r) => r.user_id === user.id && r.workflow_step === row.current_workflow_step).
-            reduce((sum, r) => sum + (r.quantity_produced || 0), 0) :
-            0;
-
-            return (
-              <div
-                key={user.id}
-                className="d-flex align-items-center bg-white shadow-sm "
+    {
+      label: "Ticket ID",
+      key: "ticket_number",
+      render: (row) =>
+        <div className="d-flex align-items-center">
+          {row.mockup_files && row.mockup_files.length > 0 &&
+            <div className="mr-3">
+              <img
+                src={row.mockup_files[0].file_path}
+                alt="Preview"
+                className="img-thumbnail"
                 style={{
-                  padding: isFullscreen ? '2px 8px' : '2px 8px',
-                  fontSize: isFullscreen ? '0.8rem' : '0.75rem',
-                  borderLeft: '4px solid #667eea !important'
-                }}>
+                  width: isFullscreen ? '80px' : '70px',
+                  height: isFullscreen ? '60px' : '70px',
+                  objectFit: isFullscreen ? 'contain' : 'cover',
+                  objectPosition: 'center',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  backgroundColor: isFullscreen ? '#f5f5f5' : 'transparent',
+                  border: isFullscreen ? '1px solid #e0e0e0' : 'none'
+                }}
+                onClick={() => handleView(row)} />
 
-                                    <span className="font-weight-bold mr-2 text-dark">
-                                        {user.name}
-                                    </span>
-                                    <span
-                  className="badge badge-primary px-2"
+            </div>
+          }
+          <div>
+            {row.job_type &&
+              <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
+                {row.job_type.name}
+              </div>
+            }
+            <strong style={{ fontSize: isFullscreen ? '1rem' : '1.2rem', color: '#1a1a1a', display: 'block' }}>#{row.ticket_number}</strong>
+          </div>
+        </div>
+
+    },
+    {
+      label: "Description",
+      key: "description",
+      render: (row) =>
+        <div>
+          <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.15rem' : '1rem' }}>{row.description}</div>
+          <div className="text-primary font-weight-bold" style={{ fontSize: isFullscreen ? '1rem' : '0.85rem' }}>
+            {row.customer?.firstname} {row.customer?.lastname}
+          </div>
+        </div>
+
+    },
+    {
+      label: "Quantity / Progress",
+      key: "quantity",
+      render: (row) => {
+        const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
+        const currentStep = row.current_workflow_step;
+        let stepQuantity = 0;
+
+        if (row.status === 'completed') {
+          stepQuantity = totalQty;
+        } else if (currentStep && row.workflow_progress) {
+          const stepProgress = row.workflow_progress.find((wp) => wp.workflow_step === currentStep);
+          stepQuantity = stepProgress?.completed_quantity || 0;
+        } else {
+          stepQuantity = row.produced_quantity || 0;
+        }
+
+        const percentage = totalQty > 0 ? Math.round(stepQuantity / totalQty * 100) : 0;
+
+        return (
+          <div style={{ minWidth: isFullscreen ? '200px' : '150px' }}>
+            <div className="d-flex justify-content-between mb-1">
+              <span className={stepQuantity >= totalQty ? "text-success font-weight-bold" : "text-warning font-weight-bold"} style={{ fontSize: isFullscreen ? '1.2rem' : '1rem' }}>
+                {stepQuantity} / {totalQty}
+              </span>
+              <span className="font-weight-bold" style={{ color: '#667eea', fontSize: isFullscreen ? '1.1rem' : '0.9rem' }}>{percentage}%</span>
+            </div>
+            <div className="progress shadow-sm" style={{ height: isFullscreen ? '14px' : '8px', borderRadius: '10px' }}>
+              <div
+                className={`progress-bar progress-bar-striped progress-bar-animated ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
+                style={{ width: `${percentage}%` }}>
+              </div>
+            </div>
+          </div>);
+
+      }
+    },
+    {
+      label: "Workflow",
+      key: "current_workflow_step",
+      render: (row) =>
+        <div style={{ transform: isFullscreen ? 'scale(1.2)' : 'none', transformOrigin: 'left' }}>
+          {getWorkflowBadge(row.current_workflow_step)}
+        </div>
+
+    },
+    {
+      label: "Assigned Users & Progress",
+      key: "assigned_to",
+      render: (row) => {
+        const users = row.assigned_users && row.assigned_users.length > 0 ?
+          row.assigned_users :
+          row.assigned_to_user ? [row.assigned_to_user] : [];
+
+        if (users.length === 0) return <span className="text-muted small italic">Unassigned</span>;
+
+        return (
+          <div className="d-flex flex-wrap gap-2" style={{ maxWidth: isFullscreen ? '400px' : '250px' }}>
+            {users.map((user) => {
+              const userQty = row.production_records ?
+                row.production_records.
+                  filter((r) => r.user_id === user.id && r.workflow_step === row.current_workflow_step).
+                  reduce((sum, r) => sum + (r.quantity_produced || 0), 0) :
+                0;
+
+              return (
+                <div
+                  key={user.id}
+                  className="d-flex align-items-center bg-white shadow-sm "
                   style={{
-                    borderRadius: '10px',
-                    backgroundColor: userQty > 0 ? '#667eea' : '#6c757d',
-                    fontSize: isFullscreen ? '0.85rem' : '0.7rem'
+                    padding: isFullscreen ? '2px 8px' : '2px 8px',
+                    fontSize: isFullscreen ? '0.8rem' : '0.75rem',
+                    borderLeft: '4px solid #667eea !important'
                   }}>
 
-                                        {userQty}
-                                    </span>
-                                </div>);
+                  <span className="font-weight-bold mr-2 text-dark">
+                    {user.name}
+                  </span>
+                  <span
+                    className="badge badge-primary px-2"
+                    style={{
+                      borderRadius: '10px',
+                      backgroundColor: userQty > 0 ? '#667eea' : '#6c757d',
+                      fontSize: isFullscreen ? '0.85rem' : '0.7rem'
+                    }}>
 
-          })}
-                    </div>);
+                    {userQty}
+                  </span>
+                </div>);
 
-    }
-  },
-  {
-    label: "Due Date",
-    key: "due_date",
-    render: (row) =>
-    <div className="text-center">
-                    <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.2rem' : '1rem', color: '#1a1a1a' }}>
-                        {formatDate(row.due_date)}
-                    </div>
-                    {getDaysUntilDue(row.due_date, isFullscreen)}
-                </div>
+            })}
+          </div>);
 
-  },
-  {
-    label: "Status",
-    key: "status",
-    render: (row) =>
-    <div style={{
-      fontSize: isFullscreen ? '1.1rem' : '1rem',
-      minWidth: isFullscreen ? '180px' : '120px',
-      whiteSpace: 'nowrap',
-      fontWeight: 'bold'
-    }}>
-                    {getStatusBadge(row.status)}
-                </div>
+      }
+    },
+    {
+      label: "Due Date",
+      key: "due_date",
+      render: (row) =>
+        <div className="text-center">
+          <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.2rem' : '1rem', color: '#1a1a1a' }}>
+            {formatDate(row.due_date)}
+          </div>
+          {getDaysUntilDue(row.due_date, isFullscreen)}
+        </div>
 
-  }];
+    },
+    {
+      label: "Status",
+      key: "status",
+      render: (row) =>
+        <div style={{
+          fontSize: isFullscreen ? '1.1rem' : '1rem',
+          minWidth: isFullscreen ? '180px' : '120px',
+          whiteSpace: 'nowrap',
+          fontWeight: 'bold'
+        }}>
+          {getStatusBadge(row.status)}
+        </div>
+
+    }];
 
 
   return (
@@ -926,9 +988,9 @@ export default function Productions({
       notifications={notifications}
       messages={messages}>
 
-            <Head title="Production Monitor" />
+      <Head title="Production Monitor" />
 
-            <div
+      <div
         className={`position-fixed d-flex align-items-center gap-3 fullscreen-controls`}
         style={{
           top: isFullscreen ? "10px" : "15px",
@@ -945,8 +1007,8 @@ export default function Productions({
           transition: "opacity 0.3s ease-in-out"
         }}>
 
-                {/* Auto Page Controls */}
-                {/* <div className="d-flex align-items-center gap-2 mr-3 border-right pr-3">
+        {/* Auto Page Controls */}
+        {/* <div className="d-flex align-items-center gap-2 mr-3 border-right pr-3">
              <div className="custom-control custom-switch">
                  <input
                      type="checkbox"
@@ -974,25 +1036,25 @@ export default function Productions({
              )}
           </div> */}
 
-                {/* View Switcher */}
-                <div className="btn-group btn-group-sm mr-3 shadow-sm border rounded overflow-hidden">
-                    <button
+        {/* View Switcher */}
+        <div className="btn-group btn-group-sm mr-3 shadow-sm border rounded overflow-hidden">
+          <button
             type="button"
             className={`btn ${activeView === 'table' ? 'btn-primary' : 'btn-light'}`}
             onClick={() => setActiveView('table')}>
 
-                        <i className="ti-layout-grid2 mr-1"></i> Table
-                    </button>
-                    <button
+            <i className="ti-layout-grid2 mr-1"></i> Table
+          </button>
+          <button
             type="button"
             className={`btn ${activeView === 'board' ? 'btn-primary' : 'btn-light'}`}
             onClick={() => setActiveView('board')}>
 
-                        <i className="ti-view-list mr-1"></i> Board
-                    </button>
-                </div>
+            <i className="ti-view-list mr-1"></i> Board
+          </button>
+        </div>
 
-                <button
+        <button
           type="button"
           className="btn shadow-sm"
           onClick={toggleFullscreen}
@@ -1008,154 +1070,154 @@ export default function Productions({
             transition: "all 0.3s ease"
           }}>
 
-                    {isFullscreen ?
-          <>
-                            <i className="ti-close mr-1"></i> Exit Monitor
-                        </> :
+          {isFullscreen ?
+            <>
+              <i className="ti-close mr-1"></i> Exit Monitor
+            </> :
 
-          <>
-                            <i className="ti-fullscreen mr-1"></i> TV/Monitor View
-                        </>
+            <>
+              <i className="ti-fullscreen mr-1"></i> TV/Monitor View
+            </>
           }
-                </button>
+        </button>
+      </div>
+
+      {/* Flash Messages */}
+      {flash?.success &&
+        <FlashMessage type="success" message={flash.success} />
+      }
+      {flash?.error &&
+        <FlashMessage type="error" message={flash.error} />
+      }
+
+      {/* Header / Logo Section */}
+      {isFullscreen ?
+        <div className="d-flex align-items-center justify-content-between p-4 mb-3 border-bottom bg-white shadow-sm" style={{ height: '100px' }}>
+          <div className="d-flex align-items-center">
+            <img
+              src="/images/logo.jpg"
+              alt="Company Logo"
+              style={{ height: '70px', marginRight: '25px', objectFit: 'contain' }}
+              onError={(e) => { e.target.src = '/images/logo.jpg'; }} />
+
+            <div>
+              <h2 className="mb-0 font-weight-bold" style={{ fontSize: '2.5rem', letterSpacing: '-1px', color: '#1a1a1a' }}>
+                PRODUCTION MONITOR
+              </h2>
+              <p className="mb-0 text-muted font-weight-bold" style={{ fontSize: '1.1rem', letterSpacing: '2px', textTransform: 'uppercase' }}>
+                Real-time Shopfloor Workflow
+              </p>
             </div>
+          </div>
+          <div className="text-right">
+            <h2 className="mb-0 font-weight-bold" style={{ fontSize: '3.5rem', color: '#667eea', lineHeight: '1' }}>
+              {currentTime.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true
+              })}
+            </h2>
+            <p className="mb-0 text-muted font-weight-bold" style={{ fontSize: '1.2rem' }}>
+              {currentTime.toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+              })}
+            </p>
+          </div>
+        </div> :
 
-            {/* Flash Messages */}
-            {flash?.success &&
-      <FlashMessage type="success" message={flash.success} />
-      }
-            {flash?.error &&
-      <FlashMessage type="error" message={flash.error} />
-      }
-
-            {/* Header / Logo Section */}
-            {isFullscreen ?
-      <div className="d-flex align-items-center justify-content-between p-4 mb-3 border-bottom bg-white shadow-sm" style={{ height: '100px' }}>
-                    <div className="d-flex align-items-center">
-                        <img
-            src="/images/logo.jpg"
-            alt="Company Logo"
-            style={{ height: '70px', marginRight: '25px', objectFit: 'contain' }}
-            onError={(e) => {e.target.src = '/images/logo.jpg';}} />
-
-                        <div>
-                            <h2 className="mb-0 font-weight-bold" style={{ fontSize: '2.5rem', letterSpacing: '-1px', color: '#1a1a1a' }}>
-                                PRODUCTION MONITOR
-                            </h2>
-                            <p className="mb-0 text-muted font-weight-bold" style={{ fontSize: '1.1rem', letterSpacing: '2px', textTransform: 'uppercase' }}>
-                                Real-time Shopfloor Workflow
-                            </p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <h2 className="mb-0 font-weight-bold" style={{ fontSize: '3.5rem', color: '#667eea', lineHeight: '1' }}>
-                            {currentTime.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: true
-            })}
-                        </h2>
-                        <p className="mb-0 text-muted font-weight-bold" style={{ fontSize: '1.2rem' }}>
-                            {currentTime.toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric"
-            })}
-                        </p>
-                    </div>
-                </div> :
-
-      <div className="row">
-                    <div className="col-lg-8 p-r-0 title-margin-right">
-                        <div className="page-header">
-                            <div className="page-title">
-                                <h1>
-                                    Production Queue <span>Management</span>
-                                </h1>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-lg-4 p-l-0 title-margin-left">
-                        <div className="page-header">
-                            <div className="page-title">
-                                <ol className="breadcrumb">
-                                    <li className="breadcrumb-item">
-                                        <a href="/dashboard">Dashboard</a>
-                                    </li>
-                                    <li className="breadcrumb-item active">
-                                        Production Queue
-                                    </li>
-                                </ol>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div className="row">
+          <div className="col-lg-8 p-r-0 title-margin-right">
+            <div className="page-header">
+              <div className="page-title">
+                <h1>
+                  Production Queue <span>Management</span>
+                </h1>
+              </div>
+            </div>
+          </div>
+          <div className="col-lg-4 p-l-0 title-margin-left">
+            <div className="page-header">
+              <div className="page-title">
+                <ol className="breadcrumb">
+                  <li className="breadcrumb-item">
+                    <a href="/dashboard">Dashboard</a>
+                  </li>
+                  <li className="breadcrumb-item active">
+                    Production Queue
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
       }
 
-            {/* Summary Cards (Only when not in fullscreen) */}
-            {
-      !isFullscreen &&
-      <div className="row mb-4">
-                        <div className="col-lg-3 col-md-6 mb-3">
-                            <CardStatistics
-            label="Total Items Produced Today"
-            statistics={stats.total}
-            icon="ti-package"
-            color="bg-info" />
+      {/* Summary Cards (Only when not in fullscreen) */}
+      {
+        !isFullscreen &&
+        <div className="row mb-4">
+          <div className="col-lg-3 col-md-6 mb-3">
+            <CardStatistics
+              label="Total Items Produced Today"
+              statistics={stats.total}
+              icon="ti-package"
+              color="bg-info" />
 
-                        </div>
-                        <div className="col-lg-3 col-md-6 mb-3">
-                            <CardStatistics
-            label="In Progress"
-            statistics={stats.inProgress}
-            icon="ti-settings"
-            color="bg-warning" />
+          </div>
+          <div className="col-lg-3 col-md-6 mb-3">
+            <CardStatistics
+              label="In Progress"
+              statistics={stats.inProgress}
+              icon="ti-settings"
+              color="bg-warning" />
 
-                        </div>
-                        <div className="col-lg-3 col-md-6 mb-3">
-                            <CardStatistics
-            label="Finished Today"
-            statistics={stats.finished}
-            icon="ti-check"
-            color="bg-success" />
+          </div>
+          <div className="col-lg-3 col-md-6 mb-3">
+            <CardStatistics
+              label="Finished Today"
+              statistics={stats.finished}
+              icon="ti-check"
+              color="bg-success" />
 
-                        </div>
-                        <div className="col-lg-3 col-md-6 mb-3">
-                            <CardStatistics
-            label="Delayed Tickets"
-            statistics={stats.delays}
-            icon="ti-alert"
-            color="bg-danger" />
+          </div>
+          <div className="col-lg-3 col-md-6 mb-3">
+            <CardStatistics
+              label="Delayed Tickets"
+              statistics={stats.delays}
+              icon="ti-alert"
+              color="bg-danger" />
 
-                        </div>
-                    </div>
+          </div>
+        </div>
 
       }
 
-            <section id="main-content">
-                <div
+      <section id="main-content">
+        <div
           className="content-wrap"
           style={
-          isFullscreen ? { marginLeft: "0", padding: "0" } : {}
+            isFullscreen ? { marginLeft: "0", padding: "0" } : {}
           }>
 
-                    <div
+          <div
             className="main"
             style={isFullscreen ? { padding: "0" } : {}}>
 
-                        <div
+            <div
               className="container-fluid"
               style={
-              isFullscreen ?
-              { maxWidth: "100%", padding: "0" } :
-              {}
+                isFullscreen ?
+                  { maxWidth: "100%", padding: "0" } :
+                  {}
               }>
 
-                            <div className="row">
-                                <div className="col-lg-12">
-                                    <div
+              <div className="row">
+                <div className="col-lg-12">
+                  <div
                     className="card"
                     style={{
                       border: "none",
@@ -1163,46 +1225,51 @@ export default function Productions({
                       background: isFullscreen ? 'transparent' : 'white'
                     }}>
 
-                                        {!isFullscreen &&
-                    <div className="card-title mt-3 px-4">
-                                                <div className="d-flex justify-content-between align-items-center">
-                                                    <h4>Production Activity</h4>
-                                                    <div className="d-flex align-items-center gap-3">
-                                                        <SearchBox
-                            placeholder="Search tickets..."
-                            initialValue={filters.search || ""}
-                            route="/production" />
+                    {!isFullscreen &&
+                      <div className="card-title mt-3 px-4">
+                        <div className="d-flex justify-content-between align-items-center">
+                          <h4>Production Activity</h4>
+                          <div className="d-flex align-items-center gap-3">
+                            <SearchBox
+                              placeholder="Search tickets..."
+                              initialValue={filters.search || ""}
+                              route="/production" />
 
-                                                    </div>
-                                                </div>
-                                            </div>
+                          </div>
+                        </div>
+                      </div>
                     }
 
-                                        <div className="card-body" style={{ padding: isFullscreen ? '0' : '1.25rem' }}>
-                                            <div className="mt-2">
-                                                {activeView === 'board' ?
-                        <ProductionBoard tickets={tickets.data} isFullscreen={isFullscreen} /> :
+                    <div className="card-body" style={{ padding: isFullscreen ? '0' : '1.25rem' }}>
+                      <div className="mt-2">
+                        {activeView === 'board' ?
+                          <ProductionBoard tickets={tickets.data} isFullscreen={isFullscreen} /> :
 
-                        <div className={isFullscreen ? "table-fullscreen-container" : ""}>
-                                                        <DataTable
-                            columns={ticketColumns}
-                            data={tickets.data}
-                            pagination={isFullscreen ? null : tickets}
-                            emptyMessage="No tickets found in the production queue." />
+                          <div className={isFullscreen ? "table-fullscreen-container" : ""}>
+                            <DataTable
+                              columns={ticketColumns}
+                              data={tickets.data}
+                              pagination={isFullscreen ? null : tickets}
+                              emptyMessage="No tickets found in the production queue."
+                              getRowClassName={(row) => {
+                                const isUpdated = updatedTicketIds.has(row.id) ||
+                                  (row.ticket_number && updatedTicketIds.has(row.ticket_number));
+                                return isUpdated ? 'row-updated-blink' : '';
+                              }} />
 
-                                                    </div>
+                          </div>
                         }
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                      </div>
                     </div>
+                  </div>
                 </div>
-            </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            <style>{`
+      <style>{`
                 body.production-fullscreen {
                     overflow-x: hidden;
                     background: #f8f9fa !important;
@@ -1284,6 +1351,6 @@ export default function Productions({
                     to { transform: translateX(400px); opacity: 0; }
                 }
             `}</style>
-        </AdminLayout>);
+    </AdminLayout>);
 
 }
