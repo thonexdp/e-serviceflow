@@ -11,107 +11,107 @@ import { useRoleApi } from "@/Hooks/useRoleApi";
 import WorkflowTimeline from "@/Components/Production/WorkflowTimeline";
 
 const TeamMemberCell = ({ productionRecords }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [coords, setCoords] = useState({ top: 0, left: 0 });
-    const buttonRef = useRef(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
 
-    // Get unique users and their workflow steps from production records
-    const userWorkflows = {};
-    if (productionRecords) {
-        productionRecords.forEach(record => {
-            if (record.user) {
-                const userId = record.user.id;
-                const workflowStep = record.workflow_step || 'Unknown';
 
-                if (!userWorkflows[userId]) {
-                    userWorkflows[userId] = {
-                        name: record.user.name,
-                        steps: {}
-                    };
-                }
+  const userWorkflows = {};
+  if (productionRecords) {
+    productionRecords.forEach((record) => {
+      if (record.user) {
+        const userId = record.user.id;
+        const workflowStep = record.workflow_step || 'Unknown';
 
-                if (!userWorkflows[userId].steps[workflowStep]) {
-                    userWorkflows[userId].steps[workflowStep] = 0;
-                }
-                userWorkflows[userId].steps[workflowStep] += record.quantity_produced || 0;
-            }
-        });
-    }
-
-    const userList = Object.values(userWorkflows);
-
-    if (userList.length === 0) {
-        return <span className="text-muted small">No records</span>;
-    }
-
-    const totalMembers = userList.length;
-
-    const toggleDropdown = () => {
-        if (!isExpanded && buttonRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            setCoords({
-                top: rect.bottom + window.scrollY,
-                left: rect.left + window.scrollX - 220 + rect.width // Align right side
-            });
+        if (!userWorkflows[userId]) {
+          userWorkflows[userId] = {
+            name: record.user.name,
+            steps: {}
+          };
         }
-        setIsExpanded(!isExpanded);
-    };
 
-    return (
-        <div className="position-relative">
+        if (!userWorkflows[userId].steps[workflowStep]) {
+          userWorkflows[userId].steps[workflowStep] = 0;
+        }
+        userWorkflows[userId].steps[workflowStep] += record.quantity_produced || 0;
+      }
+    });
+  }
+
+  const userList = Object.values(userWorkflows);
+
+  if (userList.length === 0) {
+    return <span className="text-muted small">No records</span>;
+  }
+
+  const totalMembers = userList.length;
+
+  const toggleDropdown = () => {
+    if (!isExpanded && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX - 220 + rect.width
+      });
+    }
+    setIsExpanded(!isExpanded);
+  };
+
+  return (
+    <div className="position-relative">
             <button
-                ref={buttonRef}
-                type="button"
-                className={`btn btn-sm ${isExpanded ? 'btn-primary' : 'btn-outline-primary'} py-0 px-2 d-flex align-items-center mb-1`}
-                style={{ fontSize: '0.7rem', borderRadius: '12px', whiteSpace: 'nowrap' }}
-                onClick={toggleDropdown}
-            >
+        ref={buttonRef}
+        type="button"
+        className={`btn btn-sm ${isExpanded ? 'btn-primary' : 'btn-outline-primary'} py-0 px-2 d-flex align-items-center mb-1`}
+        style={{ fontSize: '0.7rem', borderRadius: '12px', whiteSpace: 'nowrap' }}
+        onClick={toggleDropdown}>
+
                 <i className={`ti-user mr-1`}></i>
                 {totalMembers} Member{totalMembers > 1 ? 's' : ''}
                 <i className={`ti-angle-${isExpanded ? 'up' : 'down'} ml-1`} style={{ fontSize: '0.6rem' }}></i>
             </button>
 
-            {isExpanded && (
-                <>
+            {isExpanded &&
+      <>
                     {/* Backdrop to close on click outside */}
                     <div
-                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1040 }}
-                        onClick={() => setIsExpanded(false)}
-                    />
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1040 }}
+          onClick={() => setIsExpanded(false)} />
+
                     <div
-                        className="card shadow-lg border p-3"
-                        style={{
-                            position: "fixed", // Changed to fixed to avoid table clipping
-                            zIndex: 1050,
-                            minWidth: "240px",
-                            left: `${coords.left}px`,
-                            top: `${coords.top + 5}px`,
-                            backgroundColor: "#fff",
-                            maxHeight: "350px",
-                            overflowY: "auto",
-                            boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
-                            borderRadius: "8px",
-                            border: '1px solid #dee2e6'
-                        }}
-                    >
+          className="card shadow-lg border p-3"
+          style={{
+            position: "fixed",
+            zIndex: 1050,
+            minWidth: "240px",
+            left: `${coords.left}px`,
+            top: `${coords.top + 5}px`,
+            backgroundColor: "#fff",
+            maxHeight: "350px",
+            overflowY: "auto",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+            borderRadius: "8px",
+            border: '1px solid #dee2e6'
+          }}>
+
                         <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
                             <span className="font-weight-bold text-primary" style={{ fontSize: "0.85rem" }}>
                                 <i className="ti-user mr-1"></i> Team Production
                             </span>
                             <i
-                                className="ti-close text-muted cursor-pointer"
-                                style={{ fontSize: "0.8rem" }}
-                                onClick={() => setIsExpanded(false)}
-                            ></i>
+              className="ti-close text-muted cursor-pointer"
+              style={{ fontSize: "0.8rem" }}
+              onClick={() => setIsExpanded(false)}>
+            </i>
                         </div>
-                        {userList.map((u, idx) => (
-                            <div key={idx} className="mb-3 pb-2 border-bottom last:border-0">
+                        {userList.map((u, idx) =>
+          <div key={idx} className="mb-3 pb-2 border-bottom last:border-0">
                                 <div className="small font-weight-bold text-dark d-flex align-items-center mb-1" style={{ fontSize: "0.80rem" }}>
                                     {u.name}
                                 </div>
                                 <div className="mt-1">
-                                    {Object.entries(u.steps).map(([step, qty], sIdx) => (
-                                        <div key={sIdx} className="d-flex justify-content-between align-items-center ml-2 mb-1" style={{ fontSize: "0.7rem" }}>
+                                    {Object.entries(u.steps).map(([step, qty], sIdx) =>
+              <div key={sIdx} className="d-flex justify-content-between align-items-center ml-2 mb-1" style={{ fontSize: "0.7rem" }}>
                                             <span className="text-capitalize text-muted small mr-2">
                                                 {step.replace(/_/g, " ")}:
                                             </span>
@@ -119,95 +119,95 @@ const TeamMemberCell = ({ productionRecords }) => {
                                                 <b>{qty}</b> pcs
                                             </span>
                                         </div>
-                                    ))}
+              )}
                                 </div>
                             </div>
-                        ))}
+          )}
                     </div>
                 </>
-            )}
-        </div>
-    );
+      }
+        </div>);
+
 };
 
 export default function CompletedTickets({
-    user = {},
-    notifications = [],
-    messages = [],
-    tickets = { data: [] },
-    filters = {},
+  user = {},
+  notifications = [],
+  messages = [],
+  tickets = { data: [] },
+  filters = {}
 }) {
-    const [openViewModal, setViewModalOpen] = useState(false);
-    const [openTimelineModal, setTimelineModalOpen] = useState(false);
-    const [selectedTicket, setSelectedTicket] = useState(null);
-    const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
-    const { flash, auth } = usePage().props;
-    const { buildUrl } = useRoleApi();
+  const [openViewModal, setViewModalOpen] = useState(false);
+  const [openTimelineModal, setTimelineModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+  const { flash, auth } = usePage().props;
+  const { buildUrl } = useRoleApi();
 
-    const handleView = (ticket) => {
-        setSelectedTicket(ticket);
-        setViewModalOpen(true);
-    };
+  const handleView = (ticket) => {
+    setSelectedTicket(ticket);
+    setViewModalOpen(true);
+  };
 
-    const handleViewTimeline = (ticket) => {
-        setSelectedTicket(ticket);
-        setTimelineModalOpen(true);
-    };
+  const handleViewTimeline = (ticket) => {
+    setSelectedTicket(ticket);
+    setTimelineModalOpen(true);
+  };
 
-    const handleCloseModals = () => {
-        setViewModalOpen(false);
-        setTimelineModalOpen(false);
-        setSelectedTicket(null);
-        setSelectedPreviewFile(null);
-    };
+  const handleCloseModals = () => {
+    setViewModalOpen(false);
+    setTimelineModalOpen(false);
+    setSelectedTicket(null);
+    setSelectedPreviewFile(null);
+  };
 
-    const handleDownload = (fileId, filename) => {
-        const url = buildUrl(`/files/${fileId}/download`);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
+  const handleDownload = (fileId, filename) => {
+    const url = buildUrl(`/files/${fileId}/download`);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-    const calculateCompletionTime = (startDate, endDate) => {
-        if (!startDate || !endDate) return 'N/A';
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const diffMs = end - start;
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffHours / 24);
+  const calculateCompletionTime = (startDate, endDate) => {
+    if (!startDate || !endDate) return 'N/A';
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end - start;
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffHours / 24);
 
-        if (diffDays > 0) {
-            return `${diffDays}d ${diffHours % 24}h`;
-        } else {
-            return `${diffHours}h`;
-        }
-    };
+    if (diffDays > 0) {
+      return `${diffDays}d ${diffHours % 24}h`;
+    } else {
+      return `${diffHours}h`;
+    }
+  };
 
-    // Define table columns
-    const ticketColumns = [
-        {
-            label: "#",
-            key: "index",
-            render: (row, index) =>
-                (tickets.current_page - 1) * tickets.per_page + index + 1,
-        },
-        {
-            label: "Ticket",
-            key: "ticket_number",
-            render: (row) => (
-                <div className="d-flex align-items-center">
-                    {row.mockup_files && row.mockup_files.length > 0 && (
-                        <img
-                            src={row.mockup_files[0].file_path}
-                            alt="Preview"
-                            className="img-thumbnail mr-2"
-                            style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
-                            onClick={() => handleView(row)}
-                        />
-                    )}
+
+  const ticketColumns = [
+  {
+    label: "#",
+    key: "index",
+    render: (row, index) =>
+    (tickets.current_page - 1) * tickets.per_page + index + 1
+  },
+  {
+    label: "Ticket",
+    key: "ticket_number",
+    render: (row) =>
+    <div className="d-flex align-items-center">
+                    {row.mockup_files && row.mockup_files.length > 0 &&
+      <img
+        src={row.mockup_files[0].file_path}
+        alt="Preview"
+        className="img-thumbnail mr-2"
+        style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
+        onClick={() => handleView(row)} />
+
+      }
                     <div>
                         <strong>{row.ticket_number}</strong>
                         <div className="text-muted small">{row.description}</div>
@@ -216,102 +216,102 @@ export default function CompletedTickets({
                         </div>
                     </div>
                 </div>
-            )
-        },
-        {
-            label: "Customer",
-            key: "customer",
-            render: (row) => (
-                <div>
+
+  },
+  {
+    label: "Customer",
+    key: "customer",
+    render: (row) =>
+    <div>
                     <strong>{row.customer?.firstname} {row.customer?.lastname}</strong>
                     <div className="text-muted small">{row.customer?.email}</div>
                 </div>
-            )
-        },
-        {
-            label: "Qty",
-            key: "quantity",
-            render: (row) => {
-                const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
-                return (
-                    <div>
+
+  },
+  {
+    label: "Qty",
+    key: "quantity",
+    render: (row) => {
+      const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
+      return (
+        <div>
                         <span className="badge badge-success" style={{ fontSize: '1rem' }}>
                             {totalQty} pcs
                         </span>
                         <div className="progress mt-1" style={{ height: '5px' }}>
                             <div className="progress-bar bg-success" style={{ width: '100%' }}></div>
                         </div>
-                    </div>
-                );
-            },
-        },
-        {
-            label: "Time",
-            key: "completion_time",
-            render: (row) => {
-                const duration = calculateCompletionTime(row.workflow_started_at, row.workflow_completed_at);
-                return (
-                    <div>
+                    </div>);
+
+    }
+  },
+  {
+    label: "Time",
+    key: "completion_time",
+    render: (row) => {
+      const duration = calculateCompletionTime(row.workflow_started_at, row.workflow_completed_at);
+      return (
+        <div>
                         <small className="text-muted">Started:</small>
                         <small> {row.workflow_started_at ? formatDate(row.workflow_started_at) : 'N/A'}</small>
                         <br />
                         <small className="text-muted">Completed:</small>
                         <small> {row.workflow_completed_at ? formatDate(row.workflow_completed_at) : 'N/A'}</small>
                         {/* <div className="mt-1">
-                            <span className="badge badge-info">
-                                <i className="ti-time mr-1"></i>{duration}
-                            </span>
-                        </div> */}
-                    </div>
-                );
-            },
-        },
-        {
-            label: "Team",
-            key: "team_members",
-            render: (row) => <TeamMemberCell productionRecords={row.production_records} />,
-        },
-        {
-            label: "Actions",
-            key: "actions",
-            render: (row) => (
-                <div className="btn-group-vertical btn-group-sm">
+               <span className="badge badge-info">
+                   <i className="ti-time mr-1"></i>{duration}
+               </span>
+            </div> */}
+                    </div>);
+
+    }
+  },
+  {
+    label: "Team",
+    key: "team_members",
+    render: (row) => <TeamMemberCell productionRecords={row.production_records} />
+  },
+  {
+    label: "Actions",
+    key: "actions",
+    render: (row) =>
+    <div className="btn-group-vertical btn-group-sm">
                     <button
-                        type="button"
-                        className="btn btn-link btn-sm text-purple-500"
-                        onClick={() => handleViewTimeline(row)}
-                    >
+        type="button"
+        className="btn btn-link btn-sm text-purple-500"
+        onClick={() => handleViewTimeline(row)}>
+
                         <i className="ti-time"></i> Timeline
                     </button>
                     <button
-                        type="button"
-                        className="btn btn-link btn-sm text-orange-500"
-                        onClick={() => handleView(row)}
-                    >
+        type="button"
+        className="btn btn-link btn-sm text-orange-500"
+        onClick={() => handleView(row)}>
+
                         <i className="ti-eye"></i> View
                     </button>
                 </div>
-            ),
-        },
-    ];
 
-    const mockupFiles = selectedTicket?.mockup_files || [];
+  }];
 
-    return (
-        <AdminLayout
-            user={user}
-            notifications={notifications}
-            messages={messages}
-        >
+
+  const mockupFiles = selectedTicket?.mockup_files || [];
+
+  return (
+    <AdminLayout
+      user={user}
+      notifications={notifications}
+      messages={messages}>
+
             <Head title="Completed Tickets - Production" />
 
             {/* Flash Messages */}
-            {flash?.success && (
-                <FlashMessage type="success" message={flash.success} />
-            )}
-            {flash?.error && (
-                <FlashMessage type="error" message={flash.error} />
-            )}
+            {flash?.success &&
+      <FlashMessage type="success" message={flash.success} />
+      }
+            {flash?.error &&
+      <FlashMessage type="error" message={flash.error} />
+      }
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
@@ -340,13 +340,13 @@ export default function CompletedTickets({
 
             {/* View Modal */}
             <Modal
-                title={`Ticket Details - #${selectedTicket?.ticket_number}`}
-                isOpen={openViewModal}
-                onClose={handleCloseModals}
-                size="5xl"
-            >
-                {selectedTicket && (
-                    <div>
+        title={`Ticket Details - #${selectedTicket?.ticket_number}`}
+        isOpen={openViewModal}
+        onClose={handleCloseModals}
+        size="5xl">
+
+                {selectedTicket &&
+        <div>
                         <div className="alert alert-success mb-4">
                             <i className="ti-check mr-2"></i>
                             This ticket has been completed and all workflows are finished.
@@ -381,102 +381,102 @@ export default function CompletedTickets({
 
                         <div className="mb-4">
                             <h6>Design Files:</h6>
-                            {mockupFiles.length > 0 ? (
-                                <div className="row">
-                                    {mockupFiles.map((file) => (
-                                        <div key={file.id} className="col-md-12 col-lg-12 mb-2">
+                            {mockupFiles.length > 0 ?
+            <div className="row">
+                                    {mockupFiles.map((file) =>
+              <div key={file.id} className="col-md-12 col-lg-12 mb-2">
                                             <div className="card">
                                                 <img
-                                                    src={file.file_path}
-                                                    alt={file.file_name}
-                                                    className="card-img-top"
-                                                    style={{ height: '100%', objectFit: 'cover', cursor: 'pointer' }}
-                                                    onClick={() => setSelectedPreviewFile(file)}
-                                                />
+                    src={file.file_path}
+                    alt={file.file_name}
+                    className="card-img-top"
+                    style={{ height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                    onClick={() => setSelectedPreviewFile(file)} />
+
                                                 <div className="card-body p-2">
                                                     <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-block btn-primary"
-                                                        onClick={() => handleDownload(file.id, file.file_name)}
-                                                    >
+                      type="button"
+                      className="btn btn-sm btn-block btn-primary"
+                      onClick={() => handleDownload(file.id, file.file_name)}>
+
                                                         <i className="ti-download"></i>
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-muted">No design files available</p>
-                            )}
+              )}
+                                </div> :
+
+            <p className="text-muted">No design files available</p>
+            }
                         </div>
 
                         <div className="d-flex justify-content-between">
                             <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={handleCloseModals}
-                            >
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCloseModals}>
+
                                 Close
                             </button>
                             <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    handleCloseModals();
-                                    handleViewTimeline(selectedTicket);
-                                }}
-                            >
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                handleCloseModals();
+                handleViewTimeline(selectedTicket);
+              }}>
+
                                 <i className="ti-time mr-2"></i>View Full Timeline
                             </button>
                         </div>
                     </div>
-                )}
+        }
             </Modal>
 
             {/* Timeline Modal */}
             <Modal
-                title={`Workflow Timeline - Ticket #${selectedTicket?.ticket_number}`}
-                isOpen={openTimelineModal}
-                onClose={handleCloseModals}
-                size="5xl"
-            >
-                {selectedTicket && (
-                    <WorkflowTimeline ticket={selectedTicket} />
-                )}
+        title={`Workflow Timeline - Ticket #${selectedTicket?.ticket_number}`}
+        isOpen={openTimelineModal}
+        onClose={handleCloseModals}
+        size="5xl">
+
+                {selectedTicket &&
+        <WorkflowTimeline ticket={selectedTicket} />
+        }
             </Modal>
 
             {/* Image Preview Modal */}
-            {selectedPreviewFile && (
-                <div
-                    className="modal fade show d-block"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
-                    onClick={() => setSelectedPreviewFile(null)}
-                >
+            {selectedPreviewFile &&
+      <div
+        className="modal fade show d-block"
+        style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+        onClick={() => setSelectedPreviewFile(null)}>
+
                     <div className="modal-dialog modal-lg modal-dialog-centered">
                         <div className="modal-content">
                             <div className="modal-header">
                                 <h5 className="modal-title">Preview</h5>
                                 <button
-                                    type="button"
-                                    className="close"
-                                    onClick={() => setSelectedPreviewFile(null)}
-                                >
+                type="button"
+                className="close"
+                onClick={() => setSelectedPreviewFile(null)}>
+
                                     <span>&times;</span>
                                 </button>
                             </div>
                             <div className="modal-body text-center">
                                 <img
-                                    src={selectedPreviewFile.file_path}
-                                    alt={selectedPreviewFile.file_name}
-                                    className="img-fluid"
-                                    style={{ maxHeight: '70vh' }}
-                                />
+                src={selectedPreviewFile.file_path}
+                alt={selectedPreviewFile.file_name}
+                className="img-fluid"
+                style={{ maxHeight: '70vh' }} />
+
                             </div>
                         </div>
                     </div>
                 </div>
-            )}
+      }
 
             <section id="main-content">
                 <div className="content-wrap">
@@ -496,41 +496,41 @@ export default function CompletedTickets({
                                             <div className="row mt-4 align-items-center">
                                                 <div className="col-md-6">
                                                     <SearchBox
-                                                        placeholder="Search completed tickets..."
-                                                        initialValue={filters.search || ""}
-                                                        route="/completed"
-                                                    />
+                            placeholder="Search completed tickets..."
+                            initialValue={filters.search || ""}
+                            route="/completed" />
+
                                                 </div>
                                                 <div className="col-md-3">
                                                     <FormInput
-                                                        label=""
-                                                        type="select"
-                                                        name="date_range"
-                                                        value={filters.date_range || "all"}
-                                                        onChange={(e) => {
-                                                            router.get(buildUrl("/completed"), {
-                                                                ...filters,
-                                                                date_range: e.target.value === "all" ? null : e.target.value
-                                                            }, {
-                                                                preserveState: false,
-                                                                preserveScroll: true,
-                                                            });
-                                                        }}
-                                                        options={[
-                                                            { value: "all", label: "All Time" },
-                                                            { value: "today", label: "Today" },
-                                                            { value: "this_week", label: "This Week" },
-                                                            { value: "this_month", label: "This Month" },
-                                                            { value: "last_month", label: "Last Month" },
-                                                        ]}
-                                                    />
+                            label=""
+                            type="select"
+                            name="date_range"
+                            value={filters.date_range || "all"}
+                            onChange={(e) => {
+                              router.get(buildUrl("/completed"), {
+                                ...filters,
+                                date_range: e.target.value === "all" ? null : e.target.value
+                              }, {
+                                preserveState: false,
+                                preserveScroll: true
+                              });
+                            }}
+                            options={[
+                            { value: "all", label: "All Time" },
+                            { value: "today", label: "Today" },
+                            { value: "this_week", label: "This Week" },
+                            { value: "this_month", label: "This Month" },
+                            { value: "last_month", label: "Last Month" }]
+                            } />
+
                                                 </div>
                                                 <div className="col-md-3 text-right">
                                                     <button
-                                                        onClick={() => router.reload()}
-                                                        className="btn btn-outline-success"
-                                                        title="Refresh Data"
-                                                    >
+                            onClick={() => router.reload()}
+                            className="btn btn-outline-success"
+                            title="Refresh Data">
+
                                                         <i className="ti-reload mr-2"></i> Refresh
                                                     </button>
                                                 </div>
@@ -538,11 +538,11 @@ export default function CompletedTickets({
 
                                             <div className="mt-4">
                                                 <DataTable
-                                                    columns={ticketColumns}
-                                                    data={tickets.data}
-                                                    pagination={tickets}
-                                                    emptyMessage="No completed tickets found."
-                                                />
+                          columns={ticketColumns}
+                          data={tickets.data}
+                          pagination={tickets}
+                          emptyMessage="No completed tickets found." />
+
                                             </div>
                                         </div>
                                     </div>
@@ -553,7 +553,6 @@ export default function CompletedTickets({
                 </div>
             </section>
 
-        </AdminLayout>
-    );
-}
+        </AdminLayout>);
 
+}

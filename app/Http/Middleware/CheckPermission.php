@@ -8,11 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckPermission
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
+    
     public function handle(Request $request, Closure $next, string $module, string $feature): Response
     {
         $user = $request->user();
@@ -21,12 +17,12 @@ class CheckPermission
             return redirect()->route('login');
         }
 
-        // Admin bypass - admins have all permissions
+        
         if ($user->isAdmin()) {
             return $next($request);
         }
 
-        // Check if user has the required permission
+        
         if (!$user->hasPermission($module, $feature)) {
             abort(403, 'You do not have permission to perform this action.');
         }

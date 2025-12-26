@@ -42,9 +42,7 @@ class PurchaseOrder extends Model
         'approved_at' => 'datetime',
     ];
 
-    /**
-     * Boot the model.
-     */
+    
     protected static function boot()
     {
         parent::boot();
@@ -56,9 +54,7 @@ class PurchaseOrder extends Model
         });
     }
 
-    /**
-     * Generate a unique PO number.
-     */
+    
     protected static function generatePONumber(): string
     {
         $last = static::orderBy('id', 'desc')->first();
@@ -66,41 +62,31 @@ class PurchaseOrder extends Model
         return 'PO-' . date('Y') . '-' . str_pad($num, 6, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * Get purchase order items.
-     */
+    
     public function items()
     {
         return $this->hasMany(PurchaseOrderItem::class);
     }
 
-    /**
-     * Get the user who created the PO.
-     */
+    
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /**
-     * Get the user who approved the PO.
-     */
+    
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    /**
-     * Check if PO can be received.
-     */
+    
     public function canBeReceived(): bool
     {
         return in_array($this->status, ['approved', 'ordered']);
     }
 
-    /**
-     * Check if PO is fully received.
-     */
+    
     public function isFullyReceived(): bool
     {
         return $this->items->every(function ($item) {
@@ -108,9 +94,7 @@ class PurchaseOrder extends Model
         });
     }
 
-    /**
-     * Calculate totals from items.
-     */
+    
     public function calculateTotals()
     {
         $this->subtotal = $this->items->sum('total_cost');

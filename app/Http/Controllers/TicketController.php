@@ -34,33 +34,31 @@ class TicketController extends BaseCrudController
         parent::__construct();
     }
 
-    /**
-     * Display a listing of tickets.
-     */
+    
     public function index(Request $request)
     {
-        /** @var \App\Models\User $user */
+        
         $user = Auth::user();
         $query = Ticket::with(['customer', 'customerFiles', 'payments.documents', 'mockupFiles', 'assignedToUser', 'orderBranch', 'productionBranch']);
 
-        // Apply branch filtering based on user role
+        
         if ($user && !$user->isAdmin()) {
             if ($user->branch_id) {
-                // FrontDesk and Cashier users: only see tickets from their order branch
+                
                 if ($user->isFrontDesk() || $user->isCashier()) {
                     $query->where('order_branch_id', $user->branch_id);
                 }
-                // Production users: only see tickets for their production branch
+                
                 elseif ($user->isProduction()) {
                     $query->where('production_branch_id', $user->branch_id);
                 }
             } else {
-                // If user has no branch assigned and is not admin, show no tickets
+                
                 $query->whereRaw('1 = 0');
             }
         }
 
-        // Apply search
+        
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('ticket_number', 'like', '%' . $request->search . '%')
@@ -72,32 +70,32 @@ class TicketController extends BaseCrudController
             });
         }
 
-        // Filter by status
+        
         if ($request->has('status') && $request->status) {
             $query->where('status', $request->status);
         }
 
-        // Filter by payment status
+        
         if ($request->has('payment_status') && $request->payment_status) {
             $query->where('payment_status', $request->payment_status);
         }
 
-        // Filter by customer
+        
         if ($request->has('customer_id') && $request->customer_id) {
             $query->where('customer_id', $request->customer_id);
         }
 
-        // Filter by branch (for admin)
+        
         if ($user->isAdmin() && $request->has('branch_id') && $request->branch_id) {
             $query->where('order_branch_id', $request->branch_id);
         }
 
-        // Default to Last 30 Days if no date range is specified
+        
         $dateRange = $request->get('date_range');
         $startDate = $request->get('start_date');
         $endDate = $request->get('end_date');
 
-        // If no date_range parameter exists at all, set default to last_30_days
+        
         if (!$request->has('date_range')) {
             $dateRange = 'last_30_days';
             $thirtyDaysAgo = now()->subDays(30)->format('Y-m-d');
@@ -106,7 +104,7 @@ class TicketController extends BaseCrudController
             $endDate = $today;
         }
 
-        // Filter by date range (only if date_range is not explicitly empty)
+        
         if ($dateRange !== '') {
             if ($startDate) {
                 $query->whereDate('created_at', '>=', $startDate);
@@ -117,17 +115,17 @@ class TicketController extends BaseCrudController
             }
         }
 
-        // Handle sorting - default to due_date ascending (nearest first)
+        
         $orderBy = $request->get('order_by', 'due_date');
         $orderDir = $request->get('order_dir', 'asc');
         
-        // Validate order_by field to prevent SQL injection
+        
         $allowedOrderBy = ['due_date', 'created_at', 'ticket_number', 'status', 'payment_status', 'total_amount'];
         if (!in_array($orderBy, $allowedOrderBy)) {
             $orderBy = 'due_date';
         }
         
-        // Validate order direction
+        
         $orderDir = strtolower($orderDir) === 'desc' ? 'desc' : 'asc';
 
         $tickets = $query->with('jobType.category')
@@ -144,10 +142,10 @@ class TicketController extends BaseCrudController
             ->orderBy($orderBy, $orderDir)
             ->paginate($request->get('per_page', 15));
 
-        // Get customers for dropdown/search
+        
         $customers = \App\Models\Customer::latest()->limit(10)->get();
 
-        // Get job categories and types for ticket form
+        
         $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
             $query->where('is_active', true)
                 ->with(['priceTiers', 'sizeRates', 'promoRules'])
@@ -175,9 +173,7 @@ class TicketController extends BaseCrudController
         ]);
     }
 
-    /**
-     * Store a newly created ticket.
-     */
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -212,7 +208,7 @@ class TicketController extends BaseCrudController
 
         $ticketData = $validated;
 
-        // Remove request-only fields before persisting
+        
         $transientKeys = [
             'attachments',
             'payment_proofs',
@@ -224,7 +220,7 @@ class TicketController extends BaseCrudController
             unset($ticketData[$key]);
         }
 
-        // Handle legacy single file upload
+        
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $path = Storage::put('tickets/customer', $file);
@@ -254,7 +250,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        // Store any additional attachments
+        
         foreach ($request->file('attachments', []) as $attachment) {
             if (!$attachment) {
                 continue;
@@ -268,7 +264,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        // Record initial payment if downpayment is provided
+        
         $downpaymentAmount = (float)($ticketData['downpayment'] ?? 0);
         if ($downpaymentAmount > 0) {
             $this->paymentRecorder->record(
@@ -287,8 +283,8 @@ class TicketController extends BaseCrudController
             );
         }
 
-        // Notify designers when ticket is created (status: pending)
-        // if ($ticket->status === 'pending') {
+        
+        
         if ($ticket->status === 'in_designer') {
             $this->notifyTicketCreated($ticket);
         }
@@ -301,32 +297,30 @@ class TicketController extends BaseCrudController
             ->with('success', 'Ticket created successfully.');
     }
 
-    /**
-     * Update the specified ticket.
-     */
+    
     public function update(Request $request, $id)
     {
-        /** @var \App\Models\User $user */
+        
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        // Branch-based access control
+        
         if ($user && !$user->isAdmin()) {
             if ($user->branch_id) {
-                // FrontDesk and Cashier: can only edit tickets from their order branch
+                
                 if ($user->isFrontDesk() || $user->isCashier()) {
                     if ($ticket->order_branch_id !== $user->branch_id) {
                         abort(403, 'You do not have permission to edit this ticket. It belongs to a different branch.');
                     }
                 }
-                // Production: can only edit tickets assigned to their production branch
+                
                 elseif ($user->isProduction()) {
                     if ($ticket->production_branch_id !== $user->branch_id) {
                         abort(403, 'You do not have permission to edit this ticket. Production is handled by a different branch.');
                     }
                 }
             } else {
-                // User has no branch assigned
+                
                 abort(403, 'You do not have permission to edit tickets.');
             }
         }
@@ -373,7 +367,7 @@ class TicketController extends BaseCrudController
             unset($ticketData[$key]);
         }
 
-        // Handle file upload
+        
         if ($request->hasFile('file')) {
             if ($ticket->file_path) {
                 Storage::delete($ticket->file_path);
@@ -420,34 +414,32 @@ class TicketController extends BaseCrudController
             ->with('success', 'Ticket updated successfully.');
     }
 
-    /**
-     * Remove the specified ticket.
-     */
+    
     public function destroy($id)
     {
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        // Branch-based access control
+        
         if ($user && !$user->isAdmin()) {
             if ($user->branch_id) {
-                // FrontDesk and Cashier: can only delete tickets from their order branch
+                
                 if ($user->isFrontDesk() || $user->isCashier()) {
                     if ($ticket->order_branch_id !== $user->branch_id) {
                         abort(403, 'You do not have permission to delete this ticket. It belongs to a different branch.');
                     }
                 }
-                // Production users typically shouldn't delete tickets
+                
                 elseif ($user->isProduction()) {
                     abort(403, 'Production users do not have permission to delete tickets.');
                 }
             } else {
-                // User has no branch assigned
+                
                 abort(403, 'You do not have permission to delete tickets.');
             }
         }
 
-        // Delete associated file
+        
         if ($ticket->file_path) {
             Storage::delete($ticket->file_path);
         }
@@ -526,9 +518,7 @@ class TicketController extends BaseCrudController
     }
 
 
-    /**
-     * Update ticket status with notes
-     */
+    
     public function updateStatus(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -540,11 +530,11 @@ class TicketController extends BaseCrudController
             'design_status' => 'nullable|in:pending,in_designer,cancelled',
         ]);
 
-        // Update the status
+        
         $ticket->status = $validated['status'];
         $ticket->design_status = $validated['status'] === 'in_designer' ? 'pending' : null;
 
-        // If there are notes, you can save them (add a notes field to your tickets table)
+        
         if (!empty($validated['notes'])) {
             $ticket->status_notes = $validated['notes'];
         }
@@ -559,7 +549,7 @@ class TicketController extends BaseCrudController
             ['old_status' => $oldStatus, 'new_status' => $ticket->status, 'notes' => $validated['notes'] ?? null]
         );
 
-        // Notify users about status change
+        
         if ($oldStatus !== $ticket->status) {
             $this->notifyStatusChange($ticket, $oldStatus, $ticket->status);
         }
@@ -571,9 +561,7 @@ class TicketController extends BaseCrudController
         ]);
     }
 
-    /**
-     * Update payment status with payment details
-     */
+    
     public function updatePayment(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -615,9 +603,7 @@ class TicketController extends BaseCrudController
         ]);
     }
 
-    /**
-     * Verify a payment that was previously 'awaiting_verification'.
-     */
+    
     public function verifyPayment(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -626,7 +612,7 @@ class TicketController extends BaseCrudController
             'notes' => 'nullable|string|max:500',
         ]);
 
-        // Update the "unverified" payment record notes if it exists
+        
         $unverifiedPayment = $ticket->payments()->where('amount', 0)->first();
         if ($unverifiedPayment) {
             $unverifiedPayment->update([
@@ -635,12 +621,12 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        // Move status from 'awaiting_verification' to 'pending'
-        // This will make it visible in Receivables for the Cashier to process the actual payment
+        
+        
         $ticket->payment_status = 'pending';
         $ticket->save();
 
-        // Refresh the summary (it will remain 'pending' or 'partial' because no new amount was recorded)
+        
         $ticket->refreshPaymentSummary();
 
         return response()->json([
@@ -677,12 +663,10 @@ class TicketController extends BaseCrudController
         ];
     }
 
-    /**
-     * Notify designers when a new ticket is created (status: pending)
-     */
+    
     protected function notifyTicketCreated(Ticket $ticket): void
     {
-        // Only notify designers from the production branch
+        
         $designers = User::where('role', User::ROLE_DESIGNER)
             ->when($ticket->production_branch_id, function ($query) use ($ticket) {
                 $query->where('branch_id', $ticket->production_branch_id);
@@ -714,11 +698,11 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        // Broadcast event
+        
         event(new TicketStatusChanged(
             $ticket,
             'new',
-            // 'pending',
+            
             'in_designer',
             Auth::user(),
             $recipientIds,
@@ -728,9 +712,7 @@ class TicketController extends BaseCrudController
         ));
     }
 
-    /**
-     * Notify users about ticket status changes
-     */
+    
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
         $triggeredBy = Auth::user();
@@ -739,10 +721,10 @@ class TicketController extends BaseCrudController
         $title = '';
         $message = '';
 
-        // Determine recipients and notification content based on status change
+        
         switch ($newStatus) {
             case 'approved':
-                // Notify FrontDesk from order branch and Production from production branch
+                
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
                     ->when($ticket->order_branch_id, function ($query) use ($ticket) {
                         $query->where('branch_id', $ticket->order_branch_id);
@@ -811,7 +793,7 @@ class TicketController extends BaseCrudController
             return;
         }
 
-        // Create notifications for all recipients
+        
         $users = User::whereIn('id', $recipientIds)->get();
         foreach ($users as $user) {
             Notification::create([
@@ -832,7 +814,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        // Broadcast event
+        
         event(new TicketStatusChanged(
             $ticket,
             $oldStatus,
@@ -845,12 +827,10 @@ class TicketController extends BaseCrudController
         ));
     }
 
-    /**
-     * Notify Cashiers when a new pending ticket is created.
-     */
+    
     protected function notifyCashierNewTicket(Ticket $ticket): void
     {
-        // Only notify cashiers from the order branch
+        
         $cashiers = User::where('role', User::ROLE_CASHIER)
             ->when($ticket->order_branch_id, function ($query) use ($ticket) {
                 $query->where('branch_id', $ticket->order_branch_id);
@@ -881,6 +861,6 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        // We could also broadcast an event here if real-time updates are needed for Cashiers
+        
     }
 }

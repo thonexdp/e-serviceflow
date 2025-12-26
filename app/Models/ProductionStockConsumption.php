@@ -24,9 +24,7 @@ class ProductionStockConsumption extends Model
         'total_cost' => 'decimal:2',
     ];
 
-    /**
-     * Boot the model.
-     */
+    
     protected static function boot()
     {
         parent::boot();
@@ -38,17 +36,13 @@ class ProductionStockConsumption extends Model
         });
     }
 
-    /**
-     * Get the ticket.
-     */
+    
     public function ticket()
     {
         return $this->belongsTo(Ticket::class);
     }
 
-    /**
-     * Get the stock item.
-     */
+    
     public function stockItem()
     {
         return $this->belongsTo(StockItem::class);

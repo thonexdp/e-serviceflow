@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ExpenseController extends Controller
 {
-    /**
-     * Record an expense entry.
-     */
+    
     public function store(Request $request)
     {
         $validated = $request->validate([

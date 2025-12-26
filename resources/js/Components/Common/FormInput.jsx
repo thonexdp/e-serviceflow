@@ -14,10 +14,10 @@ export default function FormInput({
   className = "",
   maxLength = "",
   rows = 3,
-  options = [], // For select inputs
-  defaultChecked, // For checkbox
+  options = [],
+  defaultChecked,
   min,
-  step,
+  step
 }) {
   const baseClasses = `
     w-full text-sm rounded-md border border-gray-300 
@@ -29,7 +29,7 @@ export default function FormInput({
     ${className}
   `;
 
-  // Determine if this is a controlled or uncontrolled component
+
   const isControlled = value !== undefined;
 
   const renderInput = () => {
@@ -40,63 +40,63 @@ export default function FormInput({
             <input
               type="checkbox"
               name={name}
-              {...(isControlled ? { checked: value } : { defaultChecked })}
+              {...isControlled ? { checked: value } : { defaultChecked }}
               onChange={(e) =>
-                onChange
-                  ? onChange({
-                    target: { name, value: e.target.checked },
-                  })
-                  : null
+              onChange ?
+              onChange({
+                target: { name, value: e.target.checked }
+              }) :
+              null
               }
               disabled={disabled}
-              className="h-4 w-4 text-orange-600 border-gray-300 rounded"
-            />
+              className="h-4 w-4 text-orange-600 border-gray-300 rounded" />
+
             <span className="text-sm">{label}</span>
-          </div>
-        );
+          </div>);
+
 
       case "textarea":
         return (
           <textarea
             name={name}
-            {...(isControlled ? { value } : { defaultValue })}
+            {...isControlled ? { value } : { defaultValue }}
             onChange={onChange}
             placeholder={placeholder}
             required={required}
             disabled={disabled}
             rows={rows}
-            className={`${baseClasses} p-2.5`}
-          />
-        );
+            className={`${baseClasses} p-2.5`} />);
+
+
 
       case "select":
         return (
           <select
             name={name}
-            {...(isControlled ? { value } : { defaultValue })}
+            {...isControlled ? { value } : { defaultValue }}
             onChange={onChange}
             required={required}
             disabled={disabled}
-            className={`${baseClasses} p-2.5`}
-          >
+            className={`${baseClasses} p-2.5`}>
+
             <option value="" selected>
               Select
             </option>
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
+            {options.map((option) =>
+            <option key={option.value} value={option.value}>
                 {option.label}
               </option>
-            ))}
+            )}
 
-          </select>
-        );
+          </select>);
+
 
       default:
         return (
           <input
             type={type}
             name={name}
-            {...(isControlled ? { value } : { defaultValue })}
+            {...isControlled ? { value } : { defaultValue }}
             onChange={onChange}
             placeholder={placeholder}
             required={required}
@@ -104,27 +104,27 @@ export default function FormInput({
             maxLength={maxLength}
             min={min}
             step={step}
-            className={`${baseClasses} p-2.5`}
-          />
-        );
+            className={`${baseClasses} p-2.5`} />);
+
+
     }
   };
 
   return (
     <div className="mb-4">
       {/* For checkbox we don't render label above */}
-      {type !== "checkbox" && label && (
-        <label
-          htmlFor={name}
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
+      {type !== "checkbox" && label &&
+      <label
+        htmlFor={name}
+        className="block text-sm font-medium text-gray-700 mb-1">
+
           {label} {required && <span className="text-red-500">*</span>}
         </label>
-      )}
+      }
 
       {renderInput()}
 
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-    </div>
-  );
+    </div>);
+
 }

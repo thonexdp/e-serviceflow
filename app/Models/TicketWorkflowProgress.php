@@ -24,17 +24,13 @@ class TicketWorkflowProgress extends Model
         'completed_quantity' => 'integer',
     ];
 
-    /**
-     * Get the ticket that owns this workflow progress
-     */
+    
     public function ticket()
     {
         return $this->belongsTo(Ticket::class);
     }
 
-    /**
-     * Get the user who completed this step
-     */
+    
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by');

@@ -17,9 +17,7 @@ class Permission extends Model
         'role',
     ];
 
-    /**
-     * Get the users that have this permission
-     */
+    
     public function users()
     {
         return $this->belongsToMany(User::class, 'user_permissions')

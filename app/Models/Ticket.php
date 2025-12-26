@@ -60,9 +60,7 @@ class Ticket extends Model
         'total_quantity',
     ];
 
-    /**
-     * Boot the model.
-     */
+    
     protected static function boot()
     {
         parent::boot();
@@ -73,22 +71,22 @@ class Ticket extends Model
             }
             $ticket->created_by = auth()->id();
 
-            // Auto-assign branches based on user's branch and branch capabilities
+            
             if (auth()->user() && auth()->user()->branch_id) {
                 $userBranch = auth()->user()->branch;
                 
-                // Set order branch to user's branch
+                
                 if (!$ticket->order_branch_id) {
                     $ticket->order_branch_id = $userBranch->id;
                 }
 
-                // Set production branch based on order branch capabilities
+                
                 if (!$ticket->production_branch_id) {
                     if ($userBranch->can_produce) {
-                        // If order branch can produce, use it for production
+                        
                         $ticket->production_branch_id = $userBranch->id;
                     } else {
-                        // Otherwise, use default production branch
+                        
                         $defaultProductionBranch = \App\Models\Branch::getDefaultProductionBranch();
                         if ($defaultProductionBranch) {
                             $ticket->production_branch_id = $defaultProductionBranch->id;
@@ -103,9 +101,7 @@ class Ticket extends Model
         });
     }
 
-    /**
-     * Generate a unique ticket number.
-     */
+    
     protected static function generateTicketNumber(): string
     {
         do {
@@ -114,63 +110,49 @@ class Ticket extends Model
 
         return $code;
 
-        // $last = static::orderBy('id', 'desc')->first();
-        // $num = $last ? $last->id + 1 : 1;
+        
+        
 
-        // return 'RC-' . date('Y') . str_pad($num, 6, '0', STR_PAD_LEFT);
+        
     }
 
-    /**
-     * Get the customer that owns the ticket.
-     */
+    
     public function customer()
     {
         return $this->belongsTo(Customer::class);
     }
 
-    /**
-     * Get the job type for the ticket.
-     */
+    
     public function jobType()
     {
         return $this->belongsTo(JobType::class, 'job_type_id');
     }
 
-    /**
-     * Get the files for the ticket.
-     */
+    
     public function files()
     {
         return $this->hasMany(TicketFile::class);
     }
 
-    /**
-     * Get customer files for the ticket.
-     */
+    
     public function customerFiles()
     {
         return $this->hasMany(TicketFile::class)->where('type', 'customer');
     }
 
-    /**
-     * Get mockup files for the ticket.
-     */
+    
     public function mockupFiles()
     {
         return $this->hasMany(TicketFile::class)->where('type', 'mockup');
     }
 
-    /**
-     * Payments recorded for this ticket.
-     */
+    
     public function payments()
     {
         return $this->hasMany(Payment::class)->orderByDesc('payment_date');
     }
 
-    /**
-     * Outstanding balance accessor.
-     */
+    
     public function getOutstandingBalanceAttribute(): float
     {
         $total = (float)($this->total_amount ?? 0);
@@ -179,19 +161,17 @@ class Ticket extends Model
         return max($total - $paid, 0);
     }
 
-    /**
-     * Sync amount_paid and payment_status with recorded payments.
-     */
+    
     public function refreshPaymentSummary(): void
     {
         if (!$this->exists) {
             return;
         }
 
-        // If payment status is 'awaiting_verification', don't auto-update it
-        // This status must be manually changed by Front Desk after verification
+        
+        
         if ($this->payment_status === 'awaiting_verification') {
-            // Still update amount_paid for reference, but don't change status
+            
             $paid = (float)$this->payments()->where('status', 'posted')->sum('amount');
             $this->forceFill([
                 'amount_paid' => round($paid, 2),
@@ -217,9 +197,7 @@ class Ticket extends Model
         ])->saveQuietly();
     }
 
-    /**
-     * Get the full size attribute.
-     */
+    
     public function getFullSizeAttribute(): ?string
     {
         if ($this->size_value && $this->size_unit) {
@@ -228,33 +206,25 @@ class Ticket extends Model
         return null;
     }
 
-    /**
-     * Get production stock consumptions for this ticket.
-     */
+    
     public function stockConsumptions()
     {
         return $this->hasMany(ProductionStockConsumption::class);
     }
 
-    /**
-     * Get workflow progress records for this ticket.
-     */
+    
     public function workflowProgress()
     {
         return $this->hasMany(TicketWorkflowProgress::class);
     }
 
-    /**
-     * Get the user assigned to this ticket (legacy single assignment).
-     */
+    
     public function assignedToUser()
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
-    /**
-     * Get all users assigned to this ticket for production (many-to-many).
-     */
+    
     public function assignedUsers()
     {
         return $this->belongsToMany(User::class, 'ticket_production_assignments')
@@ -262,34 +232,26 @@ class Ticket extends Model
             ->withTimestamps();
     }
 
-    /**
-     * Get production records for this ticket.
-     */
+    
     public function productionRecords()
     {
         return $this->hasMany(ProductionRecord::class);
     }
 
-    /**
-     * Get workflow evidence files for this ticket.
-     */
+    
     public function evidenceFiles()
     {
         return $this->hasMany(WorkflowEvidence::class, 'ticket_id');
     }
 
-    /**
-     * Parse size_value to extract width and height.
-     * 
-     * @return array{width: float|null, height: float|null}
-     */
+    
     public function parseSizeDimensions(): array
     {
         if (!$this->size_value) {
             return ['width' => null, 'height' => null];
         }
 
-        // Parse "width x height" format (e.g., "10 x 20" or "10x20")
+        
         $parts = preg_split('/\s*x\s*/i', $this->size_value);
 
         if (count($parts) >= 2) {
@@ -301,7 +263,7 @@ class Ticket extends Model
             ];
         }
 
-        // Try to parse single value (for length-based)
+        
         $singleValue = (float) preg_replace('/[^\d.]/', '', $this->size_value);
         if ($singleValue > 0) {
             return ['width' => $singleValue, 'height' => null];
@@ -323,9 +285,9 @@ class Ticket extends Model
 
         $areaPerPiece = $width * $height;  #Calculate area per piece
 
-        // Convert to square meters if needed (assuming size_unit might indicate the unit)
-        // For now, assume dimensions are already in meters if size_unit contains 'm' or 'sqm'
-        // Otherwise, assume they're in the same unit and calculate directly
+        
+        
+        
         if ($this->size_unit && (stripos($this->size_unit, 'sqm') !== false || stripos($this->size_unit, 'm²') !== false)) {
             return $areaPerPiece * $this->quantity;  # Already in square meters
         } elseif ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
@@ -362,15 +324,10 @@ class Ticket extends Model
         return (int)($this->quantity ?? 0) + (int)($this->free_quantity ?? 0);
     }
 
-    /**
-     * Check if a user can edit this ticket based on workflow permissions.
-     * 
-     * @param User|null $user The user to check (defaults to current auth user)
-     * @return bool
-     */
+    
     public function canUserEdit(?User $user = null): bool
     {
-        // Default to current authenticated user
+        
         if (!$user) {
             $user = auth()->user();
         }
@@ -379,30 +336,30 @@ class Ticket extends Model
             return false;
         }
 
-        // Admin can always edit
+        
         if ($user->isAdmin()) {
             return true;
         }
 
-        // FrontDesk can edit tickets in certain statuses
+        
         if ($user->isFrontDesk()) {
             return in_array($this->status, ['pending', 'ready_to_print', 'in_designer']);
         }
 
-        // Designer can edit tickets in designer status
+        
         if ($user->isDesigner()) {
             return $this->status === 'in_designer';
         }
 
-        // Production users can only edit if ticket is in their assigned workflow step
+        
         if ($user->isProduction()) {
-            // For ready_to_print tickets, check if user is assigned to first workflow step
+            
             if ($this->status === 'ready_to_print') {
                 $firstStep = $this->getFirstWorkflowStep();
                 return $firstStep && $user->isAssignedToWorkflowStep($firstStep);
             }
 
-            // For in_production tickets, check if current workflow step matches user's assignment
+            
             if ($this->status === 'in_production' && $this->current_workflow_step) {
                 return $user->isAssignedToWorkflowStep($this->current_workflow_step);
             }
@@ -413,11 +370,7 @@ class Ticket extends Model
         return false;
     }
 
-    /**
-     * Get the user-friendly label for the current workflow step.
-     * 
-     * @return string|null
-     */
+    
     public function getCurrentWorkflowStepLabel(): ?string
     {
         if (!$this->current_workflow_step) {
@@ -427,31 +380,22 @@ class Ticket extends Model
         return ucfirst(str_replace('_', ' ', $this->current_workflow_step));
     }
 
-    /**
-     * Get the branch that accepted the order.
-     */
+    
     public function orderBranch()
     {
         return $this->belongsTo(Branch::class, 'order_branch_id');
     }
 
-    /**
-     * Get the branch responsible for production.
-     */
+    
     public function productionBranch()
     {
         return $this->belongsTo(Branch::class, 'production_branch_id');
     }
 
-    /**
-     * Check if a user can view this ticket based on their branch.
-     * 
-     * @param User|null $user The user to check (defaults to current auth user)
-     * @return bool
-     */
+    
     public function canUserViewByBranch(?User $user = null): bool
     {
-        // Default to current authenticated user
+        
         if (!$user) {
             $user = auth()->user();
         }
@@ -460,27 +404,27 @@ class Ticket extends Model
             return false;
         }
 
-        // Admin can view all tickets
+        
         if ($user->isAdmin()) {
             return true;
         }
 
-        // If user has no branch, deny access (except admin)
+        
         if (!$user->branch_id) {
             return false;
         }
 
-        // FrontDesk and Cashier: can view tickets from their order branch
+        
         if ($user->isFrontDesk() || $user->isCashier()) {
             return $this->order_branch_id === $user->branch_id;
         }
 
-        // Production: can view tickets assigned to their production branch
+        
         if ($user->isProduction()) {
             return $this->production_branch_id === $user->branch_id;
         }
 
-        // Designer: can view all tickets (or implement branch logic if needed)
+        
         if ($user->isDesigner()) {
             return true;
         }
@@ -488,15 +432,10 @@ class Ticket extends Model
         return false;
     }
 
-    /**
-     * Check if a user can edit this ticket based on their branch.
-     * 
-     * @param User|null $user The user to check (defaults to current auth user)
-     * @return bool
-     */
+    
     public function canUserEditByBranch(?User $user = null): bool
     {
-        // Default to current authenticated user
+        
         if (!$user) {
             $user = auth()->user();
         }
@@ -505,22 +444,22 @@ class Ticket extends Model
             return false;
         }
 
-        // Admin can edit all tickets
+        
         if ($user->isAdmin()) {
             return true;
         }
 
-        // If user has no branch, deny access (except admin)
+        
         if (!$user->branch_id) {
             return false;
         }
 
-        // FrontDesk and Cashier: can edit tickets from their order branch
+        
         if ($user->isFrontDesk() || $user->isCashier()) {
             return $this->order_branch_id === $user->branch_id;
         }
 
-        // Production: can edit tickets assigned to their production branch
+        
         if ($user->isProduction()) {
             return $this->production_branch_id === $user->branch_id;
         }

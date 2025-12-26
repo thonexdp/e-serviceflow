@@ -11,319 +11,319 @@ import { formatDate } from "@/Utils/formatDate";
 import CardStatistics from "@/Components/Common/CardStatistics";
 
 export default function Productions({
-    user = {},
-    notifications = [],
-    messages = [],
-    tickets = { data: [] },
-    stockItems = [],
-    filters = {},
-    summary = {},
+  user = {},
+  notifications = [],
+  messages = [],
+  tickets = { data: [] },
+  stockItems = [],
+  filters = {},
+  summary = {}
 }) {
-    const [activeView, setActiveView] = useState("table"); // "table" or "board"
-    const [autoPageInterval, setAutoPageInterval] = useState(10); // Default 15 seconds
-    const [autoPageEnabled, setAutoPageEnabled] = useState(false);
-    const [openViewModal, setViewModalOpen] = useState(false);
-    const [openUpdateModal, setUpdateModalOpen] = useState(false);
-    const [openStockModal, setStockModalOpen] = useState(false);
-    const [selectedTicket, setSelectedTicket] = useState(null);
-    const [producedQuantity, setProducedQuantity] = useState(0);
-    const [stockConsumptions, setStockConsumptions] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [currentTime, setCurrentTime] = useState(new Date());
-    const [showFullscreenControls, setShowFullscreenControls] = useState(false);
-    const { flash, auth } = usePage().props;
-    const isAdmin = auth?.user?.role === 'admin';
-    const assignedWorkflowSteps = auth?.user?.workflow_steps || [];
+  const [activeView, setActiveView] = useState("table");
+  const [autoPageInterval, setAutoPageInterval] = useState(10);
+  const [autoPageEnabled, setAutoPageEnabled] = useState(false);
+  const [openViewModal, setViewModalOpen] = useState(false);
+  const [openUpdateModal, setUpdateModalOpen] = useState(false);
+  const [openStockModal, setStockModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [producedQuantity, setProducedQuantity] = useState(0);
+  const [stockConsumptions, setStockConsumptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showFullscreenControls, setShowFullscreenControls] = useState(false);
+  const { flash, auth } = usePage().props;
+  const isAdmin = auth?.user?.role === 'admin';
+  const assignedWorkflowSteps = auth?.user?.workflow_steps || [];
 
-    // Check if user can update this ticket
-    const canUpdateTicket = (ticket) => {
-        if (isAdmin) return true;
-        if (!auth?.user?.is_production) return false;
 
-        // If no workflow steps assigned, cannot update
-        if (!assignedWorkflowSteps || assignedWorkflowSteps.length === 0) {
-            return false;
-        }
+  const canUpdateTicket = (ticket) => {
+    if (isAdmin) return true;
+    if (!auth?.user?.is_production) return false;
 
-        // For ready_to_print, check if user is assigned to first workflow step
-        if (ticket.status === 'ready_to_print') {
-            // Get first workflow step from ticket's job type
-            if (ticket.job_type?.workflow_steps) {
-                const workflowOrder = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
-                for (const step of workflowOrder) {
-                    if (ticket.job_type.workflow_steps[step]) {
-                        const canUpdate = assignedWorkflowSteps.includes(step);
-                        if (!canUpdate) {
-                            console.log('Ready to print - User not assigned to first step:', {
-                                firstStep: step,
-                                assignedSteps: assignedWorkflowSteps,
-                                ticket: ticket.ticket_number
-                            });
-                        }
-                        return canUpdate;
-                    }
-                }
-            }
-            return false;
-        }
 
-        // For in_production, check if user is assigned to current workflow step
-        if (ticket.current_workflow_step) {
-            const canUpdate = assignedWorkflowSteps.includes(ticket.current_workflow_step);
+    if (!assignedWorkflowSteps || assignedWorkflowSteps.length === 0) {
+      return false;
+    }
+
+
+    if (ticket.status === 'ready_to_print') {
+
+      if (ticket.job_type?.workflow_steps) {
+        const workflowOrder = ['design', 'printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
+        for (const step of workflowOrder) {
+          if (ticket.job_type.workflow_steps[step]) {
+            const canUpdate = assignedWorkflowSteps.includes(step);
             if (!canUpdate) {
-                console.log('In production - User not assigned to current step:', {
-                    currentStep: ticket.current_workflow_step,
-                    assignedSteps: assignedWorkflowSteps,
-                    ticket: ticket.ticket_number
-                });
+              console.log('Ready to print - User not assigned to first step:', {
+                firstStep: step,
+                assignedSteps: assignedWorkflowSteps,
+                ticket: ticket.ticket_number
+              });
             }
             return canUpdate;
+          }
         }
+      }
+      return false;
+    }
 
-        return false;
+
+    if (ticket.current_workflow_step) {
+      const canUpdate = assignedWorkflowSteps.includes(ticket.current_workflow_step);
+      if (!canUpdate) {
+        console.log('In production - User not assigned to current step:', {
+          currentStep: ticket.current_workflow_step,
+          assignedSteps: assignedWorkflowSteps,
+          ticket: ticket.ticket_number
+        });
+      }
+      return canUpdate;
+    }
+
+    return false;
+  };
+
+
+  const calculateSummary = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const allTickets = tickets.data || [];
+    const total = allTickets.length;
+    const inProgress = allTickets.filter(
+      (t) => t.status === "in_production"
+    ).length;
+    const finished = allTickets.filter(
+      (t) => t.status === "completed"
+    ).length;
+    const delays = allTickets.filter((t) => {
+      if (!t.due_date) return false;
+      const dueDate = new Date(t.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today && t.status !== "completed";
+    }).length;
+
+    return {
+      total: summary.total || total,
+      inProgress: summary.inProgress || inProgress,
+      finished: summary.finished || finished,
+      delays: summary.delays || delays
+    };
+  };
+
+  const stats = calculateSummary();
+
+
+  const secondInterval = 15000;
+  useEffect(() => {
+    let timer;
+    const interval = isFullscreen ? secondInterval : autoPageInterval * 1000;
+    const shouldPage = isFullscreen || autoPageEnabled && tickets?.links?.length > 3;
+
+    if (shouldPage) {
+      timer = setInterval(() => {
+        const nextPage = tickets.current_page < tickets.last_page ?
+        tickets.current_page + 1 :
+        1;
+
+        router.visit(`${window.location.pathname}?per_page=${isFullscreen ? 6 : filters.per_page || 10}&page=${nextPage}`, {
+          preserveScroll: true,
+          preserveState: true,
+          only: ['tickets']
+        });
+      }, interval);
+    }
+    return () => clearInterval(timer);
+  }, [autoPageEnabled, autoPageInterval, isFullscreen, tickets.current_page, tickets.last_page, filters.per_page]);
+
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+
+  useEffect(() => {
+    if (isFullscreen) {
+      router.visit(`${window.location.pathname}?per_page=6&page=1`, {
+        preserveScroll: true,
+        preserveState: true,
+        only: ['tickets']
+      });
+    } else if (!isFullscreen && filters.per_page === 6) {
+
+      router.visit(`${window.location.pathname}?per_page=10&page=1`, {
+        preserveScroll: true,
+        preserveState: true,
+        only: ['tickets']
+      });
+    }
+  }, [isFullscreen]);
+
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement);
+
+
+      if (!isCurrentlyFullscreen && isFullscreen) {
+
+        setIsFullscreen(false);
+      }
     };
 
-    // Calculate summary statistics from tickets data
-    const calculateSummary = () => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-        const allTickets = tickets.data || [];
-        const total = allTickets.length;
-        const inProgress = allTickets.filter(
-            (t) => t.status === "in_production"
-        ).length;
-        const finished = allTickets.filter(
-            (t) => t.status === "completed"
-        ).length;
-        const delays = allTickets.filter((t) => {
-            if (!t.due_date) return false;
-            const dueDate = new Date(t.due_date);
-            dueDate.setHours(0, 0, 0, 0);
-            return dueDate < today && t.status !== "completed";
-        }).length;
+    if (isFullscreen) {
+      const element = document.documentElement;
 
-        return {
-            total: summary.total || total,
-            inProgress: summary.inProgress || inProgress,
-            finished: summary.finished || finished,
-            delays: summary.delays || delays,
-        };
+
+      const requestFullscreen =
+      element.requestFullscreen ||
+      element.webkitRequestFullscreen ||
+      element.mozRequestFullScreen ||
+      element.msRequestFullscreen;
+
+      if (requestFullscreen) {
+        requestFullscreen.call(element).catch((err) => {
+          console.error('Error attempting to enable fullscreen:', err);
+        });
+      }
+
+      document.body.classList.add("production-fullscreen");
+      document.querySelector(".header")?.classList.add("d-none");
+      document.querySelector(".sidebar")?.classList.add("d-none");
+      const content = document.querySelector(".content-wrap");
+      if (content) content.style.padding = "0";
+    } else {
+
+      const exitFullscreen =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.mozCancelFullScreen ||
+      document.msExitFullscreen;
+
+      if (exitFullscreen) {
+        exitFullscreen.call(document).catch((err) => {
+          console.error('Error attempting to exit fullscreen:', err);
+        });
+      }
+
+      document.body.classList.remove("production-fullscreen");
+      document.querySelector(".header")?.classList.remove("d-none");
+      document.querySelector(".sidebar")?.classList.remove("d-none");
+      const content = document.querySelector(".content-wrap");
+      if (content) content.style.padding = "";
+    }
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+
+      document.body.classList.remove("production-fullscreen");
+      document.querySelector(".header")?.classList.remove("d-none");
+      document.querySelector(".sidebar")?.classList.remove("d-none");
+      const content = document.querySelector(".content-wrap");
+      if (content) content.style.padding = "";
+    };
+  }, [isFullscreen]);
+
+
+  useEffect(() => {
+    let wakeLock = null;
+
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isFullscreen) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Wake Lock is active');
+        } catch (err) {
+          console.error(`${err.name}, ${err.message}`);
+        }
+      }
     };
 
-    const stats = calculateSummary();
-
-    // Handle auto-paging cycle
-    const secondInterval = 15000; //15 seconds
-    useEffect(() => {
-        let timer;
-        const interval = isFullscreen ? secondInterval : (autoPageInterval * 1000);
-        const shouldPage = isFullscreen || (autoPageEnabled && tickets?.links?.length > 3);
-
-        if (shouldPage) {
-            timer = setInterval(() => {
-                const nextPage = tickets.current_page < tickets.last_page
-                    ? tickets.current_page + 1
-                    : 1;
-
-                router.visit(`${window.location.pathname}?per_page=${isFullscreen ? 6 : (filters.per_page || 10)}&page=${nextPage}`, {
-                    preserveScroll: true,
-                    preserveState: true,
-                    only: ['tickets'],
-                });
-            }, interval);
-        }
-        return () => clearInterval(timer);
-    }, [autoPageEnabled, autoPageInterval, isFullscreen, tickets.current_page, tickets.last_page, filters.per_page]);
-
-    // Real-time clock update
-    useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    // Update per_page when entering/exiting fullscreen
-    useEffect(() => {
-        if (isFullscreen) {
-            router.visit(`${window.location.pathname}?per_page=6&page=1`, {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['tickets'],
-            });
-        } else if (!isFullscreen && filters.per_page === 6) {
-            // Revert to 10 if we were just in fullscreen
-            router.visit(`${window.location.pathname}?per_page=10&page=1`, {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['tickets'],
-            });
-        }
-    }, [isFullscreen]);
-
-    // Handle fullscreen mode with Fullscreen API
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            const isCurrentlyFullscreen = !!(
-                document.fullscreenElement ||
-                document.webkitFullscreenElement ||
-                document.mozFullScreenElement ||
-                document.msFullscreenElement
-            );
-
-            if (!isCurrentlyFullscreen && isFullscreen) {
-                // User exited fullscreen via ESC key
-                setIsFullscreen(false);
-            }
-        };
-
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-        if (isFullscreen) {
-            const element = document.documentElement;
-
-            // Try to enter fullscreen
-            const requestFullscreen =
-                element.requestFullscreen ||
-                element.webkitRequestFullscreen ||
-                element.mozRequestFullScreen ||
-                element.msRequestFullscreen;
-
-            if (requestFullscreen) {
-                requestFullscreen.call(element).catch(err => {
-                    console.error('Error attempting to enable fullscreen:', err);
-                });
-            }
-
-            document.body.classList.add("production-fullscreen");
-            document.querySelector(".header")?.classList.add("d-none");
-            document.querySelector(".sidebar")?.classList.add("d-none");
-            const content = document.querySelector(".content-wrap");
-            if (content) content.style.padding = "0";
-        } else {
-            // Exit fullscreen
-            const exitFullscreen =
-                document.exitFullscreen ||
-                document.webkitExitFullscreen ||
-                document.mozCancelFullScreen ||
-                document.msExitFullscreen;
-
-            if (exitFullscreen) {
-                exitFullscreen.call(document).catch(err => {
-                    console.error('Error attempting to exit fullscreen:', err);
-                });
-            }
-
-            document.body.classList.remove("production-fullscreen");
-            document.querySelector(".header")?.classList.remove("d-none");
-            document.querySelector(".sidebar")?.classList.remove("d-none");
-            const content = document.querySelector(".content-wrap");
-            if (content) content.style.padding = "";
-        }
-
-        return () => {
-            document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-
-            document.body.classList.remove("production-fullscreen");
-            document.querySelector(".header")?.classList.remove("d-none");
-            document.querySelector(".sidebar")?.classList.remove("d-none");
-            const content = document.querySelector(".content-wrap");
-            if (content) content.style.padding = "";
-        };
-    }, [isFullscreen]);
-
-    // Handle Screen Wake Lock to prevent sleep
-    useEffect(() => {
-        let wakeLock = null;
-
-        const requestWakeLock = async () => {
-            if ('wakeLock' in navigator && isFullscreen) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake Lock is active');
-                } catch (err) {
-                    console.error(`${err.name}, ${err.message}`);
-                }
-            }
-        };
-
-        const releaseWakeLock = async () => {
-            if (wakeLock !== null) {
-                await wakeLock.release();
-                wakeLock = null;
-                console.log('Wake Lock released');
-            }
-        };
-
-        // Handle visibility change to re-acquire lock if tab becomes visible again
-        const handleVisibilityChange = async () => {
-            if (isFullscreen && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
-        };
-
-        if (isFullscreen) {
-            requestWakeLock();
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-        }
-
-        return () => {
-            releaseWakeLock();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [isFullscreen]);
-
-    // Handle mouse hover at top of screen to show controls
-    useEffect(() => {
-        if (!isFullscreen) return;
-
-        const handleMouseMove = (e) => {
-            const topThreshold = 100; // Show controls when mouse is within 100px from top
-            setShowFullscreenControls(e.clientY <= topThreshold);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        return () => document.removeEventListener('mousemove', handleMouseMove);
-    }, [isFullscreen]);
-
-    // WebSocket real-time updates
-    useEffect(() => {
-        if (!window.Echo) {
-            console.warn('Echo not initialized. Real-time updates disabled.');
-            return;
-        }
+    const releaseWakeLock = async () => {
+      if (wakeLock !== null) {
+        await wakeLock.release();
+        wakeLock = null;
+        console.log('Wake Lock released');
+      }
+    };
 
 
-        if (!auth?.user?.id) {
-            console.warn('User ID not available for WebSocket connection');
-            return;
-        }
+    const handleVisibilityChange = async () => {
+      if (isFullscreen && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    };
 
-        console.log('🔌 Setting up production board real-time updates...');
+    if (isFullscreen) {
+      requestWakeLock();
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
 
-        // Subscribe to user's private channel for production updates
-        const channel = window.Echo.private(`user.${auth.user.id}`);
+    return () => {
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isFullscreen]);
 
-        // Listen for ticket status changes
-        const handleTicketUpdate = (data) => {
 
-            // Refresh the page data to get updated tickets
-            router.reload({
-                only: ['tickets', 'summary'],
-                preserveScroll: true,
-                preserveState: true,
-            });
+  useEffect(() => {
+    if (!isFullscreen) return;
 
-            // Show a subtle notification in fullscreen mode
-            if (isFullscreen) {
-                const notification = document.createElement('div');
-                notification.innerHTML = `
+    const handleMouseMove = (e) => {
+      const topThreshold = 100;
+      setShowFullscreenControls(e.clientY <= topThreshold);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, [isFullscreen]);
+
+
+  useEffect(() => {
+    if (!window.Echo) {
+      console.warn('Echo not initialized. Real-time updates disabled.');
+      return;
+    }
+
+
+    if (!auth?.user?.id) {
+      console.warn('User ID not available for WebSocket connection');
+      return;
+    }
+
+    console.log('🔌 Setting up production board real-time updates...');
+
+
+    const channel = window.Echo.private(`user.${auth.user.id}`);
+
+
+    const handleTicketUpdate = (data) => {
+
+
+      router.reload({
+        only: ['tickets', 'summary'],
+        preserveScroll: true,
+        preserveState: true
+      });
+
+
+      if (isFullscreen) {
+        const notification = document.createElement('div');
+        notification.innerHTML = `
                     <div style="
                         position: fixed;
                         top: 80px;
@@ -341,24 +341,24 @@ export default function Productions({
                         <i class="ti-bell mr-2"></i>${data.notification?.message || 'Production updated'}
                     </div>
                 `;
-                document.body.appendChild(notification);
+        document.body.appendChild(notification);
 
-                // Remove notification after 3 seconds
-                setTimeout(() => {
-                    notification.style.animation = 'slideOutRight 0.3s ease-in';
-                    setTimeout(() => notification.remove(), 300);
-                }, 3000);
-            }
-        };
 
-        // Listen for the ticket status changed event
-        channel.listen('.ticket.status.changed', handleTicketUpdate);
+        setTimeout(() => {
+          notification.style.animation = 'slideOutRight 0.3s ease-in';
+          setTimeout(() => notification.remove(), 300);
+        }, 3000);
+      }
+    };
 
-        // Add CSS animation if not already present
-        if (!document.getElementById('production-animations')) {
-            const style = document.createElement('style');
-            style.id = 'production-animations';
-            style.innerHTML = `
+
+    channel.listen('.ticket.status.changed', handleTicketUpdate);
+
+
+    if (!document.getElementById('production-animations')) {
+      const style = document.createElement('style');
+      style.id = 'production-animations';
+      style.innerHTML = `
                 @keyframes slideInRight {
                     from {
                         transform: translateX(400px);
@@ -380,444 +380,444 @@ export default function Productions({
                     }
                 }
             `;
-            document.head.appendChild(style);
+      document.head.appendChild(style);
+    }
+
+
+    return () => {
+      console.log('🔌 Cleaning up production board WebSocket...');
+      if (channel) {
+        channel.stopListening('.ticket.status.changed');
+      }
+    };
+  }, [isFullscreen]);
+
+  const toggleFullscreen = () => {
+    const nextFullscreen = !isFullscreen;
+    setIsFullscreen(nextFullscreen);
+
+    if (nextFullscreen) {
+      setActiveView("table");
+      setAutoPageEnabled(false);
+    } else {
+      setAutoPageEnabled(false);
+
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
+
+  const handleView = (ticket) => {
+    setSelectedTicket(ticket);
+    setViewModalOpen(true);
+  };
+
+  const handleUpdate = (ticket) => {
+    setSelectedTicket(ticket);
+    setProducedQuantity(ticket.produced_quantity || 0);
+    setUpdateModalOpen(true);
+  };
+
+  const handleCloseModals = () => {
+    setViewModalOpen(false);
+    setUpdateModalOpen(false);
+    setStockModalOpen(false);
+    setSelectedTicket(null);
+    setProducedQuantity(0);
+    setStockConsumptions([]);
+  };
+
+  const handleStartProduction = (ticketId) => {
+    setLoading(true);
+    router.post(
+      `/production/${ticketId}/start`,
+      {},
+      {
+        preserveScroll: true,
+        preserveState: false,
+        onSuccess: () => {
+          setLoading(false);
+        },
+        onError: () => {
+          setLoading(false);
         }
+      }
+    );
+  };
 
-        // Cleanup on unmount
-        return () => {
-            console.log('🔌 Cleaning up production board WebSocket...');
-            if (channel) {
-                channel.stopListening('.ticket.status.changed');
-            }
-        };
-    }, [isFullscreen]); // Re-run when fullscreen changes
+  const handleUpdateProgress = () => {
+    if (!selectedTicket) return;
 
-    const toggleFullscreen = () => {
-        const nextFullscreen = !isFullscreen;
-        setIsFullscreen(nextFullscreen);
+    const quantity = parseInt(producedQuantity) || 0;
+    if (quantity < 0 || quantity > selectedTicket.quantity) {
+      alert(`Quantity must be between 0 and ${selectedTicket.quantity}`);
+      return;
+    }
 
-        if (nextFullscreen) {
-            setActiveView("table");
-            setAutoPageEnabled(false); // Disable auto-paging in favor of auto-scroll
-        } else {
-            setAutoPageEnabled(false);
-            // Reset scroll position when exiting
-            window.scrollTo({ top: 0, behavior: 'instant' });
+    setLoading(true);
+    const status =
+    quantity >= selectedTicket.quantity ? "completed" : "in_production";
+
+    router.post(
+      `/production/${selectedTicket.id}/update`,
+      {
+        produced_quantity: quantity,
+        status: status
+      },
+      {
+        preserveScroll: true,
+        preserveState: false,
+        onSuccess: () => {
+          handleCloseModals();
+          setLoading(false);
+        },
+        onError: () => {
+          setLoading(false);
         }
-    };
+      }
+    );
+  };
 
-    const handleView = (ticket) => {
-        setSelectedTicket(ticket);
-        setViewModalOpen(true);
-    };
+  const handleMarkCompleted = (ticketId) => {
+    if (
+    !confirm(
+      "Mark this ticket as completed? Stock will be automatically deducted."
+    ))
 
-    const handleUpdate = (ticket) => {
-        setSelectedTicket(ticket);
-        setProducedQuantity(ticket.produced_quantity || 0);
-        setUpdateModalOpen(true);
-    };
+    return;
 
-    const handleCloseModals = () => {
-        setViewModalOpen(false);
-        setUpdateModalOpen(false);
-        setStockModalOpen(false);
-        setSelectedTicket(null);
-        setProducedQuantity(0);
-        setStockConsumptions([]);
-    };
-
-    const handleStartProduction = (ticketId) => {
-        setLoading(true);
-        router.post(
-            `/production/${ticketId}/start`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: false,
-                onSuccess: () => {
-                    setLoading(false);
-                },
-                onError: () => {
-                    setLoading(false);
-                },
-            }
-        );
-    };
-
-    const handleUpdateProgress = () => {
-        if (!selectedTicket) return;
-
-        const quantity = parseInt(producedQuantity) || 0;
-        if (quantity < 0 || quantity > selectedTicket.quantity) {
-            alert(`Quantity must be between 0 and ${selectedTicket.quantity}`);
-            return;
+    setLoading(true);
+    router.post(
+      `/production/${ticketId}/complete`,
+      {},
+      {
+        preserveScroll: true,
+        preserveState: false,
+        onSuccess: () => {
+          setLoading(false);
+        },
+        onError: () => {
+          setLoading(false);
         }
+      }
+    );
+  };
 
-        setLoading(true);
-        const status =
-            quantity >= selectedTicket.quantity ? "completed" : "in_production";
+  const handleOpenStockModal = (ticket) => {
+    setSelectedTicket(ticket);
 
-        router.post(
-            `/production/${selectedTicket.id}/update`,
-            {
-                produced_quantity: quantity,
-                status: status,
-            },
-            {
-                preserveScroll: true,
-                preserveState: false,
-                onSuccess: () => {
-                    handleCloseModals();
-                    setLoading(false);
-                },
-                onError: () => {
-                    setLoading(false);
-                },
-            }
-        );
-    };
 
-    const handleMarkCompleted = (ticketId) => {
-        if (
-            !confirm(
-                "Mark this ticket as completed? Stock will be automatically deducted."
-            )
-        )
-            return;
+    const initialConsumptions = [];
+    if (ticket.job_type?.stock_requirements) {
+      ticket.job_type.stock_requirements.forEach((req) => {
+        const requiredQty =
+        parseFloat(req.quantity_per_unit) * ticket.quantity;
+        initialConsumptions.push({
+          stock_item_id: req.stock_item_id,
+          quantity: requiredQty.toFixed(2),
+          notes: req.notes || ""
+        });
+      });
+    }
 
-        setLoading(true);
-        router.post(
-            `/production/${ticketId}/complete`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: false,
-                onSuccess: () => {
-                    setLoading(false);
-                },
-                onError: () => {
-                    setLoading(false);
-                },
-            }
-        );
-    };
 
-    const handleOpenStockModal = (ticket) => {
-        setSelectedTicket(ticket);
+    if (initialConsumptions.length === 0) {
+      initialConsumptions.push({
+        stock_item_id: "",
+        quantity: "",
+        notes: ""
+      });
+    }
 
-        // Pre-populate with suggested stocks based on job type requirements
-        const initialConsumptions = [];
-        if (ticket.job_type?.stock_requirements) {
-            ticket.job_type.stock_requirements.forEach((req) => {
-                const requiredQty =
-                    parseFloat(req.quantity_per_unit) * ticket.quantity;
-                initialConsumptions.push({
-                    stock_item_id: req.stock_item_id,
-                    quantity: requiredQty.toFixed(2),
-                    notes: req.notes || "",
-                });
-            });
+    setStockConsumptions(initialConsumptions);
+    setStockModalOpen(true);
+  };
+
+  const handleAddStockConsumption = () => {
+    setStockConsumptions([
+    ...stockConsumptions,
+    {
+      stock_item_id: "",
+      quantity: "",
+      notes: ""
+    }]
+    );
+  };
+
+  const handleRemoveStockConsumption = (index) => {
+    setStockConsumptions(stockConsumptions.filter((_, i) => i !== index));
+  };
+
+  const handleStockConsumptionChange = (index, field, value) => {
+    const updated = [...stockConsumptions];
+    updated[index][field] = value;
+    setStockConsumptions(updated);
+  };
+
+  const handleRecordStockConsumption = (e) => {
+    e.preventDefault();
+    if (!selectedTicket) return;
+
+    const validConsumptions = stockConsumptions.filter(
+      (c) => c.stock_item_id && parseFloat(c.quantity) > 0
+    );
+
+    if (validConsumptions.length === 0) {
+      alert("Please add at least one stock consumption record.");
+      return;
+    }
+
+    setLoading(true);
+    router.post(
+      `/production/${selectedTicket.id}/record-stock`,
+      {
+        stock_consumptions: validConsumptions.map((c) => ({
+          stock_item_id: parseInt(c.stock_item_id),
+          quantity: parseFloat(c.quantity),
+          notes: c.notes || null
+        }))
+      },
+      {
+        preserveScroll: true,
+        preserveState: false,
+        onSuccess: () => {
+          handleCloseModals();
+          setLoading(false);
+        },
+        onError: () => {
+          setLoading(false);
         }
+      }
+    );
+  };
 
-        // If no requirements, add one empty row
-        if (initialConsumptions.length === 0) {
-            initialConsumptions.push({
-                stock_item_id: "",
-                quantity: "",
-                notes: "",
-            });
-        }
+  const handleQuickAdd = (amount) => {
+    const current = parseInt(producedQuantity) || 0;
+    const newValue = Math.min(
+      current + amount,
+      selectedTicket?.quantity || 0
+    );
+    setProducedQuantity(newValue);
+  };
 
-        setStockConsumptions(initialConsumptions);
-        setStockModalOpen(true);
+  const getStatusBadge = (status) => {
+    const classes = {
+      ready_to_print: "text-info",
+      in_production: "text-warning",
+      completed: "text-success",
+      pending: "text-secondary"
     };
-
-    const handleAddStockConsumption = () => {
-        setStockConsumptions([
-            ...stockConsumptions,
-            {
-                stock_item_id: "",
-                quantity: "",
-                notes: "",
-            },
-        ]);
+    const labels = {
+      ready_to_print: "Ready to Print",
+      in_production: "In Progress",
+      completed: "Completed",
+      pending: "Pending"
     };
-
-    const handleRemoveStockConsumption = (index) => {
-        setStockConsumptions(stockConsumptions.filter((_, i) => i !== index));
-    };
-
-    const handleStockConsumptionChange = (index, field, value) => {
-        const updated = [...stockConsumptions];
-        updated[index][field] = value;
-        setStockConsumptions(updated);
-    };
-
-    const handleRecordStockConsumption = (e) => {
-        e.preventDefault();
-        if (!selectedTicket) return;
-
-        const validConsumptions = stockConsumptions.filter(
-            (c) => c.stock_item_id && parseFloat(c.quantity) > 0
-        );
-
-        if (validConsumptions.length === 0) {
-            alert("Please add at least one stock consumption record.");
-            return;
-        }
-
-        setLoading(true);
-        router.post(
-            `/production/${selectedTicket.id}/record-stock`,
-            {
-                stock_consumptions: validConsumptions.map((c) => ({
-                    stock_item_id: parseInt(c.stock_item_id),
-                    quantity: parseFloat(c.quantity),
-                    notes: c.notes || null,
-                })),
-            },
-            {
-                preserveScroll: true,
-                preserveState: false,
-                onSuccess: () => {
-                    handleCloseModals();
-                    setLoading(false);
-                },
-                onError: () => {
-                    setLoading(false);
-                },
-            }
-        );
-    };
-
-    const handleQuickAdd = (amount) => {
-        const current = parseInt(producedQuantity) || 0;
-        const newValue = Math.min(
-            current + amount,
-            selectedTicket?.quantity || 0
-        );
-        setProducedQuantity(newValue);
-    };
-
-    const getStatusBadge = (status) => {
-        const classes = {
-            ready_to_print: "text-info",
-            in_production: "text-warning",
-            completed: "text-success",
-            pending: "text-secondary",
-        };
-        const labels = {
-            ready_to_print: "Ready to Print",
-            in_production: "In Progress",
-            completed: "Completed",
-            pending: "Pending",
-        };
-        return (
-            <b className={`${classes[status] || "text-black"}`}>
+    return (
+      <b className={`${classes[status] || "text-black"}`}>
                 {labels[status] || status?.toUpperCase() || "PENDING"}
-            </b>
-        );
-    };
+            </b>);
 
-    const getActionButton = (ticket) => {
-        const canUpdate = canUpdateTicket(ticket);
+  };
 
-        if (ticket.status === "ready_to_print") {
-            return (
-                <div className="btn-group">
+  const getActionButton = (ticket) => {
+    const canUpdate = canUpdateTicket(ticket);
+
+    if (ticket.status === "ready_to_print") {
+      return (
+        <div className="btn-group">
                     <button
-                        type="button"
-                        className="btn btn-link btn-sm text-orange-500"
-                        onClick={() => handleView(ticket)}
-                    >
+            type="button"
+            className="btn btn-link btn-sm text-orange-500"
+            onClick={() => handleView(ticket)}>
+
                         <i className="ti-eye"></i> View
                     </button>
                     <button
-                        type="button"
-                        className="btn btn-link btn-sm text-green-500"
-                        onClick={() => handleStartProduction(ticket.id)}
-                        disabled={loading || !canUpdate}
-                        title={!canUpdate ? "You are not assigned to this workflow step" : ""}
-                    >
+            type="button"
+            className="btn btn-link btn-sm text-green-500"
+            onClick={() => handleStartProduction(ticket.id)}
+            disabled={loading || !canUpdate}
+            title={!canUpdate ? "You are not assigned to this workflow step" : ""}>
+
                         <i className="ti-play"></i> Start
                     </button>
-                </div>
-            );
-        } else if (ticket.status === "in_production") {
-            return (
-                <div className="btn-group">
+                </div>);
+
+    } else if (ticket.status === "in_production") {
+      return (
+        <div className="btn-group">
                     <button
-                        type="button"
-                        className="btn btn-link btn-sm text-orange-500"
-                        onClick={() => handleUpdate(ticket)}
-                        disabled={!canUpdate}
-                        title={!canUpdate ? "You are not assigned to this workflow step" : ""}
-                    >
+            type="button"
+            className="btn btn-link btn-sm text-orange-500"
+            onClick={() => handleUpdate(ticket)}
+            disabled={!canUpdate}
+            title={!canUpdate ? "You are not assigned to this workflow step" : ""}>
+
                         <i className="ti-pencil"></i> Update
                     </button>
-                    {ticket.produced_quantity >= ticket.quantity && canUpdate && (
-                        <button
-                            type="button"
-                            className="btn btn-link btn-sm text-success"
-                            onClick={() => handleMarkCompleted(ticket.id)}
-                            disabled={loading}
-                        >
+                    {ticket.produced_quantity >= ticket.quantity && canUpdate &&
+          <button
+            type="button"
+            className="btn btn-link btn-sm text-success"
+            onClick={() => handleMarkCompleted(ticket.id)}
+            disabled={loading}>
+
                             <i className="ti-check"></i> Complete
                         </button>
-                    )}
-                    {!canUpdate && (
-                        <span className="text-muted small">
+          }
+                    {!canUpdate &&
+          <span className="text-muted small">
                             <i className="ti-lock"></i> Not your turn
                         </span>
-                    )}
-                </div>
-            );
-        } else if (ticket.status === "completed") {
-            return (
-                <span className="text-success">
+          }
+                </div>);
+
+    } else if (ticket.status === "completed") {
+      return (
+        <span className="text-success">
                     <i className="ti-check"></i> Completed
                     {ticket.stock_consumptions &&
-                        ticket.stock_consumptions.length > 0 && (
-                            <small className="d-block text-muted">
+          ticket.stock_consumptions.length > 0 &&
+          <small className="d-block text-muted">
                                 Stock deducted automatically
                             </small>
-                        )}
-                </span>
-            );
-        } else {
-            return (
-                <button
-                    type="button"
-                    className="btn btn-link btn-sm text-orange-500"
-                    onClick={() => handleView(ticket)}
-                >
+          }
+                </span>);
+
+    } else {
+      return (
+        <button
+          type="button"
+          className="btn btn-link btn-sm text-orange-500"
+          onClick={() => handleView(ticket)}>
+
                     <i className="ti-eye"></i> View
-                </button>
-            );
-        }
-    };
+                </button>);
 
-    const getWorkflowBadge = (workflowStep) => {
-        if (!workflowStep) return <span className="text-muted">Not Started</span>;
-        const WORKFLOW_STEPS_LOCAL = [
-            { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
-            { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
-            { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
-            { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
-            { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
-            { key: 'qa', label: 'Quality Assurance', icon: 'ti-check-box', color: '#4CAF50' },
-        ];
-        const step = WORKFLOW_STEPS_LOCAL.find(s => s.key === workflowStep);
-        if (!step) return <span className="text-muted">{workflowStep}</span>;
+    }
+  };
 
-        return (
-            <span className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
+  const getWorkflowBadge = (workflowStep) => {
+    if (!workflowStep) return <span className="text-muted">Not Started</span>;
+    const WORKFLOW_STEPS_LOCAL = [
+    { key: 'printing', label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
+    { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers', color: '#FF9800' },
+    { key: 'cutting', label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
+    { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
+    { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
+    { key: 'qa', label: 'Quality Assurance', icon: 'ti-check-box', color: '#4CAF50' }];
+
+    const step = WORKFLOW_STEPS_LOCAL.find((s) => s.key === workflowStep);
+    if (!step) return <span className="text-muted">{workflowStep}</span>;
+
+    return (
+      <span className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
                 <i className={`${step.icon} mr-1`}></i>
                 {step.label}
-            </span>
-        );
-    };
+            </span>);
 
-    const getDaysUntilDue = (dateString, isFullscreen) => {
-        if (!dateString) return null;
-        const dueDate = new Date(dateString);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        dueDate.setHours(0, 0, 0, 0);
+  };
 
-        const diffTime = dueDate - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const getDaysUntilDue = (dateString, isFullscreen) => {
+    if (!dateString) return null;
+    const dueDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
 
-        if (diffDays < 0) {
-            return <div className="text-danger font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>{Math.abs(diffDays)} days overdue</div>;
-        } else if (diffDays === 0) {
-            return <div className="text-warning font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>Due today</div>;
-        } else if (diffDays <= 2) {
-            return <div className="text-warning font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>{diffDays} days left</div>;
-        } else {
-            return <div className="text-muted font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>{diffDays} days left</div>;
-        }
-    };
+    const diffTime = dueDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    // Define table columns (Parity with AllTickets but read-only)
-    const ticketColumns = [
-        // {
-        //     label: "#",
-        //     key: "index",
-        //     render: (row, index) => {
-        //         if (isFullscreen) {
-        //             return index + 1;
-        //         }
-        //         return (tickets.current_page - 1) * tickets.per_page + index + 1;
-        //     },
-        // },
-        {
-            label: "Ticket ID",
-            key: "ticket_number",
-            render: (row) => (
-                <div className="d-flex align-items-center">
-                    {row.mockup_files && row.mockup_files.length > 0 && (
-                        <div className="mr-3">
+    if (diffDays < 0) {
+      return <div className="text-danger font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>{Math.abs(diffDays)} days overdue</div>;
+    } else if (diffDays === 0) {
+      return <div className="text-warning font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>Due today</div>;
+    } else if (diffDays <= 2) {
+      return <div className="text-warning font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>{diffDays} days left</div>;
+    } else {
+      return <div className="text-muted font-weight-bold" style={{ fontSize: isFullscreen ? '1.1rem' : '0.8rem' }}>{diffDays} days left</div>;
+    }
+  };
+
+
+  const ticketColumns = [
+
+
+
+
+
+
+
+
+
+
+  {
+    label: "Ticket ID",
+    key: "ticket_number",
+    render: (row) =>
+    <div className="d-flex align-items-center">
+                    {row.mockup_files && row.mockup_files.length > 0 &&
+      <div className="mr-3">
                             <img
-                                src={row.mockup_files[0].file_path}
-                                alt="Preview"
-                                className="img-thumbnail"
-                                style={{
-                                    width: isFullscreen ? '110px' : '70px',
-                                    height: isFullscreen ? '110px' : '70px',
-                                    objectFit: 'cover',
-                                    cursor: 'pointer',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                }}
-                                onClick={() => handleView(row)}
-                            />
+          src={row.mockup_files[0].file_path}
+          alt="Preview"
+          className="img-thumbnail"
+          style={{
+            width: isFullscreen ? '110px' : '70px',
+            height: isFullscreen ? '110px' : '70px',
+            objectFit: 'cover',
+            cursor: 'pointer',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+          onClick={() => handleView(row)} />
+
                         </div>
-                    )}
+      }
                     <div>
-                        {row.job_type && (
-                            <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
+                        {row.job_type &&
+        <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
                                 {row.job_type.name}
                             </div>
-                        )}
+        }
                         <strong style={{ fontSize: isFullscreen ? '1rem' : '1.2rem', color: '#1a1a1a', display: 'block' }}>#{row.ticket_number}</strong>
                     </div>
                 </div>
-            )
-        },
-        {
-            label: "Description",
-            key: "description",
-            render: (row) => (
-                <div>
+
+  },
+  {
+    label: "Description",
+    key: "description",
+    render: (row) =>
+    <div>
                     <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.15rem' : '1rem' }}>{row.description}</div>
                     <div className="text-primary font-weight-bold" style={{ fontSize: isFullscreen ? '1rem' : '0.85rem' }}>
                         {row.customer?.firstname} {row.customer?.lastname}
                     </div>
                 </div>
-            )
-        },
-        {
-            label: "Quantity / Progress",
-            key: "quantity",
-            render: (row) => {
-                const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
-                const currentStep = row.current_workflow_step;
-                let stepQuantity = 0;
 
-                if (row.status === 'completed') {
-                    stepQuantity = totalQty;
-                } else if (currentStep && row.workflow_progress) {
-                    const stepProgress = row.workflow_progress.find(wp => wp.workflow_step === currentStep);
-                    stepQuantity = stepProgress?.completed_quantity || 0;
-                } else {
-                    stepQuantity = row.produced_quantity || 0;
-                }
+  },
+  {
+    label: "Quantity / Progress",
+    key: "quantity",
+    render: (row) => {
+      const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
+      const currentStep = row.current_workflow_step;
+      let stepQuantity = 0;
 
-                const percentage = totalQty > 0 ? Math.round((stepQuantity / totalQty) * 100) : 0;
+      if (row.status === 'completed') {
+        stepQuantity = totalQty;
+      } else if (currentStep && row.workflow_progress) {
+        const stepProgress = row.workflow_progress.find((wp) => wp.workflow_step === currentStep);
+        stepQuantity = stepProgress?.completed_quantity || 0;
+      } else {
+        stepQuantity = row.produced_quantity || 0;
+      }
 
-                return (
-                    <div style={{ minWidth: isFullscreen ? '200px' : '150px' }}>
+      const percentage = totalQty > 0 ? Math.round(stepQuantity / totalQty * 100) : 0;
+
+      return (
+        <div style={{ minWidth: isFullscreen ? '200px' : '150px' }}>
                         <div className="d-flex justify-content-between mb-1">
                             <span className={stepQuantity >= totalQty ? "text-success font-weight-bold" : "text-warning font-weight-bold"} style={{ fontSize: isFullscreen ? '1.2rem' : '1rem' }}>
                                 {stepQuantity} / {totalQty}
@@ -826,218 +826,218 @@ export default function Productions({
                         </div>
                         <div className="progress shadow-sm" style={{ height: isFullscreen ? '14px' : '8px', borderRadius: '10px' }}>
                             <div
-                                className={`progress-bar progress-bar-striped progress-bar-animated ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
-                                style={{ width: `${percentage}%` }}
-                            ></div>
+              className={`progress-bar progress-bar-striped progress-bar-animated ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
+              style={{ width: `${percentage}%` }}>
+            </div>
                         </div>
-                    </div>
-                );
-            },
-        },
-        {
-            label: "Workflow",
-            key: "current_workflow_step",
-            render: (row) => (
-                <div style={{ transform: isFullscreen ? 'scale(1.2)' : 'none', transformOrigin: 'left' }}>
+                    </div>);
+
+    }
+  },
+  {
+    label: "Workflow",
+    key: "current_workflow_step",
+    render: (row) =>
+    <div style={{ transform: isFullscreen ? 'scale(1.2)' : 'none', transformOrigin: 'left' }}>
                     {getWorkflowBadge(row.current_workflow_step)}
                 </div>
-            ),
-        },
-        {
-            label: "Assigned Users & Progress",
-            key: "assigned_to",
-            render: (row) => {
-                const users = row.assigned_users && row.assigned_users.length > 0
-                    ? row.assigned_users
-                    : (row.assigned_to_user ? [row.assigned_to_user] : []);
 
-                if (users.length === 0) return <span className="text-muted small italic">Unassigned</span>;
+  },
+  {
+    label: "Assigned Users & Progress",
+    key: "assigned_to",
+    render: (row) => {
+      const users = row.assigned_users && row.assigned_users.length > 0 ?
+      row.assigned_users :
+      row.assigned_to_user ? [row.assigned_to_user] : [];
 
-                return (
-                    <div className="d-flex flex-wrap gap-2" style={{ maxWidth: isFullscreen ? '400px' : '250px' }}>
+      if (users.length === 0) return <span className="text-muted small italic">Unassigned</span>;
+
+      return (
+        <div className="d-flex flex-wrap gap-2" style={{ maxWidth: isFullscreen ? '400px' : '250px' }}>
                         {users.map((user) => {
-                            const userQty = row.production_records
-                                ? row.production_records
-                                    .filter(r => r.user_id === user.id && r.workflow_step === row.current_workflow_step)
-                                    .reduce((sum, r) => sum + (r.quantity_produced || 0), 0)
-                                : 0;
+            const userQty = row.production_records ?
+            row.production_records.
+            filter((r) => r.user_id === user.id && r.workflow_step === row.current_workflow_step).
+            reduce((sum, r) => sum + (r.quantity_produced || 0), 0) :
+            0;
 
-                            return (
-                                <div
-                                    key={user.id}
-                                    className="d-flex align-items-center bg-white shadow-sm "
-                                    style={{
-                                        padding: isFullscreen ? '2px 8px' : '2px 8px',
-                                        fontSize: isFullscreen ? '0.8rem' : '0.75rem',
-                                        borderLeft: '4px solid #667eea !important'
-                                    }}
-                                >
+            return (
+              <div
+                key={user.id}
+                className="d-flex align-items-center bg-white shadow-sm "
+                style={{
+                  padding: isFullscreen ? '2px 8px' : '2px 8px',
+                  fontSize: isFullscreen ? '0.8rem' : '0.75rem',
+                  borderLeft: '4px solid #667eea !important'
+                }}>
+
                                     <span className="font-weight-bold mr-2 text-dark">
                                         {user.name}
                                     </span>
                                     <span
-                                        className="badge badge-primary px-2"
-                                        style={{
-                                            borderRadius: '10px',
-                                            backgroundColor: userQty > 0 ? '#667eea' : '#6c757d',
-                                            fontSize: isFullscreen ? '0.85rem' : '0.7rem'
-                                        }}
-                                    >
+                  className="badge badge-primary px-2"
+                  style={{
+                    borderRadius: '10px',
+                    backgroundColor: userQty > 0 ? '#667eea' : '#6c757d',
+                    fontSize: isFullscreen ? '0.85rem' : '0.7rem'
+                  }}>
+
                                         {userQty}
                                     </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                );
-            },
-        },
-        {
-            label: "Due Date",
-            key: "due_date",
-            render: (row) => (
-                <div className="text-center">
+                                </div>);
+
+          })}
+                    </div>);
+
+    }
+  },
+  {
+    label: "Due Date",
+    key: "due_date",
+    render: (row) =>
+    <div className="text-center">
                     <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.2rem' : '1rem', color: '#1a1a1a' }}>
                         {formatDate(row.due_date)}
                     </div>
                     {getDaysUntilDue(row.due_date, isFullscreen)}
                 </div>
-            ),
-        },
-        {
-            label: "Status",
-            key: "status",
-            render: (row) => (
-                <div style={{
-                    fontSize: isFullscreen ? '1.1rem' : '1rem',
-                    minWidth: isFullscreen ? '180px' : '120px',
-                    whiteSpace: 'nowrap',
-                    fontWeight: 'bold'
-                }}>
+
+  },
+  {
+    label: "Status",
+    key: "status",
+    render: (row) =>
+    <div style={{
+      fontSize: isFullscreen ? '1.1rem' : '1rem',
+      minWidth: isFullscreen ? '180px' : '120px',
+      whiteSpace: 'nowrap',
+      fontWeight: 'bold'
+    }}>
                     {getStatusBadge(row.status)}
                 </div>
-            ),
-        },
-    ];
 
-    return (
-        <AdminLayout
-            user={user}
-            notifications={notifications}
-            messages={messages}
-        >
+  }];
+
+
+  return (
+    <AdminLayout
+      user={user}
+      notifications={notifications}
+      messages={messages}>
+
             <Head title="Production Monitor" />
 
             <div
-                className={`position-fixed d-flex align-items-center gap-3 fullscreen-controls`}
-                style={{
-                    top: isFullscreen ? "10px" : "15px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 9999,
-                    backgroundColor: "rgba(255,255,255,0.95)",
-                    padding: "8px 24px",
-                    borderRadius: "50px",
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                    backdropFilter: "blur(10px)",
-                    opacity: isFullscreen ? (showFullscreenControls ? 1 : 0) : 1,
-                    pointerEvents: isFullscreen ? (showFullscreenControls ? 'auto' : 'none') : 'auto',
-                    transition: "opacity 0.3s ease-in-out",
-                }}
-            >
+        className={`position-fixed d-flex align-items-center gap-3 fullscreen-controls`}
+        style={{
+          top: isFullscreen ? "10px" : "15px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 9999,
+          backgroundColor: "rgba(255,255,255,0.95)",
+          padding: "8px 24px",
+          borderRadius: "50px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+          backdropFilter: "blur(10px)",
+          opacity: isFullscreen ? showFullscreenControls ? 1 : 0 : 1,
+          pointerEvents: isFullscreen ? showFullscreenControls ? 'auto' : 'none' : 'auto',
+          transition: "opacity 0.3s ease-in-out"
+        }}>
+
                 {/* Auto Page Controls */}
                 {/* <div className="d-flex align-items-center gap-2 mr-3 border-right pr-3">
-                    <div className="custom-control custom-switch">
-                        <input
-                            type="checkbox"
-                            className="custom-control-input"
-                            id="autoPageSwitch"
-                            checked={autoPageEnabled}
-                            onChange={(e) => setAutoPageEnabled(e.target.checked)}
-                        />
-                        <label className="custom-control-label small font-weight-bold" htmlFor="autoPageSwitch" style={{ cursor: 'pointer' }}>
-                            Auto-Page
-                        </label>
-                    </div>
-                    {autoPageEnabled && (
-                        <div className="d-flex align-items-center gap-2 ml-2">
-                            <input
-                                type="number"
-                                className="form-control form-control-sm"
-                                style={{ width: '60px', borderRadius: '4px' }}
-                                value={autoPageInterval}
-                                onChange={(e) => setAutoPageInterval(Math.max(5, parseInt(e.target.value) || 5))}
-                                title="Seconds per page"
-                            />
-                            <small className="text-muted font-weight-bold">sec</small>
-                        </div>
-                    )}
-                </div> */}
+             <div className="custom-control custom-switch">
+                 <input
+                     type="checkbox"
+                     className="custom-control-input"
+                     id="autoPageSwitch"
+                     checked={autoPageEnabled}
+                     onChange={(e) => setAutoPageEnabled(e.target.checked)}
+                 />
+                 <label className="custom-control-label small font-weight-bold" htmlFor="autoPageSwitch" style={{ cursor: 'pointer' }}>
+                     Auto-Page
+                 </label>
+             </div>
+             {autoPageEnabled && (
+                 <div className="d-flex align-items-center gap-2 ml-2">
+                     <input
+                         type="number"
+                         className="form-control form-control-sm"
+                         style={{ width: '60px', borderRadius: '4px' }}
+                         value={autoPageInterval}
+                         onChange={(e) => setAutoPageInterval(Math.max(5, parseInt(e.target.value) || 5))}
+                         title="Seconds per page"
+                     />
+                     <small className="text-muted font-weight-bold">sec</small>
+                 </div>
+             )}
+          </div> */}
 
                 {/* View Switcher */}
                 <div className="btn-group btn-group-sm mr-3 shadow-sm border rounded overflow-hidden">
                     <button
-                        type="button"
-                        className={`btn ${activeView === 'table' ? 'btn-primary' : 'btn-light'}`}
-                        onClick={() => setActiveView('table')}
-                    >
+            type="button"
+            className={`btn ${activeView === 'table' ? 'btn-primary' : 'btn-light'}`}
+            onClick={() => setActiveView('table')}>
+
                         <i className="ti-layout-grid2 mr-1"></i> Table
                     </button>
                     <button
-                        type="button"
-                        className={`btn ${activeView === 'board' ? 'btn-primary' : 'btn-light'}`}
-                        onClick={() => setActiveView('board')}
-                    >
+            type="button"
+            className={`btn ${activeView === 'board' ? 'btn-primary' : 'btn-light'}`}
+            onClick={() => setActiveView('board')}>
+
                         <i className="ti-view-list mr-1"></i> Board
                     </button>
                 </div>
 
                 <button
-                    type="button"
-                    className="btn shadow-sm"
-                    onClick={toggleFullscreen}
-                    style={{
-                        borderRadius: "25px",
-                        padding: "8px 16px",
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                        backgroundColor: isFullscreen ? "#dc3545" : "#667eea",
-                        border: "none",
-                        color: "white",
-                        transition: "all 0.3s ease",
-                    }}
-                >
-                    {isFullscreen ? (
-                        <>
+          type="button"
+          className="btn shadow-sm"
+          onClick={toggleFullscreen}
+          style={{
+            borderRadius: "25px",
+            padding: "8px 16px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            backgroundColor: isFullscreen ? "#dc3545" : "#667eea",
+            border: "none",
+            color: "white",
+            transition: "all 0.3s ease"
+          }}>
+
+                    {isFullscreen ?
+          <>
                             <i className="ti-close mr-1"></i> Exit Monitor
-                        </>
-                    ) : (
-                        <>
+                        </> :
+
+          <>
                             <i className="ti-fullscreen mr-1"></i> TV/Monitor View
                         </>
-                    )}
+          }
                 </button>
             </div>
 
             {/* Flash Messages */}
-            {flash?.success && (
-                <FlashMessage type="success" message={flash.success} />
-            )}
-            {flash?.error && (
-                <FlashMessage type="error" message={flash.error} />
-            )}
+            {flash?.success &&
+      <FlashMessage type="success" message={flash.success} />
+      }
+            {flash?.error &&
+      <FlashMessage type="error" message={flash.error} />
+      }
 
             {/* Header / Logo Section */}
-            {isFullscreen ? (
-                <div className="d-flex align-items-center justify-content-between p-4 mb-3 border-bottom bg-white shadow-sm" style={{ height: '100px' }}>
+            {isFullscreen ?
+      <div className="d-flex align-items-center justify-content-between p-4 mb-3 border-bottom bg-white shadow-sm" style={{ height: '100px' }}>
                     <div className="d-flex align-items-center">
                         <img
-                            src="/images/logo.jpg"
-                            alt="Company Logo"
-                            style={{ height: '70px', marginRight: '25px', objectFit: 'contain' }}
-                            onError={(e) => { e.target.src = '/images/logo.jpg'; }}
-                        />
+            src="/images/logo.jpg"
+            alt="Company Logo"
+            style={{ height: '70px', marginRight: '25px', objectFit: 'contain' }}
+            onError={(e) => {e.target.src = '/images/logo.jpg';}} />
+
                         <div>
                             <h2 className="mb-0 font-weight-bold" style={{ fontSize: '2.5rem', letterSpacing: '-1px', color: '#1a1a1a' }}>
                                 PRODUCTION MONITOR
@@ -1050,24 +1050,24 @@ export default function Productions({
                     <div className="text-right">
                         <h2 className="mb-0 font-weight-bold" style={{ fontSize: '3.5rem', color: '#667eea', lineHeight: '1' }}>
                             {currentTime.toLocaleTimeString("en-US", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                second: "2-digit",
-                                hour12: true
-                            })}
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: true
+            })}
                         </h2>
                         <p className="mb-0 text-muted font-weight-bold" style={{ fontSize: '1.2rem' }}>
                             {currentTime.toLocaleDateString("en-US", {
-                                weekday: "long",
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                            })}
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric"
+            })}
                         </p>
                     </div>
-                </div>
-            ) : (
-                <div className="row">
+                </div> :
+
+      <div className="row">
                     <div className="col-lg-8 p-r-0 title-margin-right">
                         <div className="page-header">
                             <div className="page-title">
@@ -1092,106 +1092,106 @@ export default function Productions({
                         </div>
                     </div>
                 </div>
-            )}
+      }
 
             {/* Summary Cards (Only when not in fullscreen) */}
             {
-                !isFullscreen && (
-                    <div className="row mb-4">
+      !isFullscreen &&
+      <div className="row mb-4">
                         <div className="col-lg-3 col-md-6 mb-3">
                             <CardStatistics
-                                label="Total Items Produced Today"
-                                statistics={stats.total}
-                                icon="ti-package"
-                                color="bg-info"
-                            />
+            label="Total Items Produced Today"
+            statistics={stats.total}
+            icon="ti-package"
+            color="bg-info" />
+
                         </div>
                         <div className="col-lg-3 col-md-6 mb-3">
                             <CardStatistics
-                                label="In Progress"
-                                statistics={stats.inProgress}
-                                icon="ti-settings"
-                                color="bg-warning"
-                            />
+            label="In Progress"
+            statistics={stats.inProgress}
+            icon="ti-settings"
+            color="bg-warning" />
+
                         </div>
                         <div className="col-lg-3 col-md-6 mb-3">
                             <CardStatistics
-                                label="Finished Today"
-                                statistics={stats.finished}
-                                icon="ti-check"
-                                color="bg-success"
-                            />
+            label="Finished Today"
+            statistics={stats.finished}
+            icon="ti-check"
+            color="bg-success" />
+
                         </div>
                         <div className="col-lg-3 col-md-6 mb-3">
                             <CardStatistics
-                                label="Delayed Tickets"
-                                statistics={stats.delays}
-                                icon="ti-alert"
-                                color="bg-danger"
-                            />
+            label="Delayed Tickets"
+            statistics={stats.delays}
+            icon="ti-alert"
+            color="bg-danger" />
+
                         </div>
                     </div>
-                )
-            }
+
+      }
 
             <section id="main-content">
                 <div
-                    className="content-wrap"
-                    style={
-                        isFullscreen ? { marginLeft: "0", padding: "0" } : {}
-                    }
-                >
+          className="content-wrap"
+          style={
+          isFullscreen ? { marginLeft: "0", padding: "0" } : {}
+          }>
+
                     <div
-                        className="main"
-                        style={isFullscreen ? { padding: "0" } : {}}
-                    >
+            className="main"
+            style={isFullscreen ? { padding: "0" } : {}}>
+
                         <div
-                            className="container-fluid"
-                            style={
-                                isFullscreen
-                                    ? { maxWidth: "100%", padding: "0" }
-                                    : {}
-                            }
-                        >
+              className="container-fluid"
+              style={
+              isFullscreen ?
+              { maxWidth: "100%", padding: "0" } :
+              {}
+              }>
+
                             <div className="row">
                                 <div className="col-lg-12">
                                     <div
-                                        className="card"
-                                        style={{
-                                            border: "none",
-                                            boxShadow: isFullscreen ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
-                                            background: isFullscreen ? 'transparent' : 'white'
-                                        }}
-                                    >
-                                        {!isFullscreen && (
-                                            <div className="card-title mt-3 px-4">
+                    className="card"
+                    style={{
+                      border: "none",
+                      boxShadow: isFullscreen ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
+                      background: isFullscreen ? 'transparent' : 'white'
+                    }}>
+
+                                        {!isFullscreen &&
+                    <div className="card-title mt-3 px-4">
                                                 <div className="d-flex justify-content-between align-items-center">
                                                     <h4>Production Activity</h4>
                                                     <div className="d-flex align-items-center gap-3">
                                                         <SearchBox
-                                                            placeholder="Search tickets..."
-                                                            initialValue={filters.search || ""}
-                                                            route="/production"
-                                                        />
+                            placeholder="Search tickets..."
+                            initialValue={filters.search || ""}
+                            route="/production" />
+
                                                     </div>
                                                 </div>
                                             </div>
-                                        )}
+                    }
 
                                         <div className="card-body" style={{ padding: isFullscreen ? '0' : '1.25rem' }}>
                                             <div className="mt-2">
-                                                {activeView === 'board' ? (
-                                                    <ProductionBoard tickets={tickets.data} isFullscreen={isFullscreen} />
-                                                ) : (
-                                                    <div className={isFullscreen ? "table-fullscreen-container" : ""}>
+                                                {activeView === 'board' ?
+                        <ProductionBoard tickets={tickets.data} isFullscreen={isFullscreen} /> :
+
+                        <div className={isFullscreen ? "table-fullscreen-container" : ""}>
                                                         <DataTable
-                                                            columns={ticketColumns}
-                                                            data={tickets.data}
-                                                            pagination={isFullscreen ? null : tickets}
-                                                            emptyMessage="No tickets found in the production queue."
-                                                        />
+                            columns={ticketColumns}
+                            data={tickets.data}
+                            pagination={isFullscreen ? null : tickets}
+                            emptyMessage="No tickets found in the production queue." />
+
                                                     </div>
-                                                )}
+                        }
                                             </div>
                                         </div>
                                     </div>
@@ -1284,6 +1284,6 @@ export default function Productions({
                     to { transform: translateX(400px); opacity: 0; }
                 }
             `}</style>
-        </AdminLayout>
-    );
+        </AdminLayout>);
+
 }

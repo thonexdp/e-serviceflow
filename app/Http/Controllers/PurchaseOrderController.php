@@ -21,14 +21,12 @@ class PurchaseOrderController extends Controller
         $this->stockService = $stockService;
     }
 
-    /**
-     * Display a listing of purchase orders.
-     */
+    
     public function index(Request $request)
     {
         $query = PurchaseOrder::with(['creator', 'approver', 'items.stockItem']);
 
-        // Search
+        
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('po_number', 'like', '%' . $request->search . '%')
@@ -36,7 +34,7 @@ class PurchaseOrderController extends Controller
             });
         }
 
-        // Filter by status
+        
         if ($request->has('status') && $request->status && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
@@ -50,9 +48,7 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new purchase order.
-     */
+    
     public function create()
     {
         $stockItems = StockItem::where('is_active', true)
@@ -64,9 +60,7 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created purchase order.
-     */
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -118,9 +112,7 @@ class PurchaseOrderController extends Controller
         });
     }
 
-    /**
-     * Display the specified purchase order.
-     */
+    
     public function show($id)
     {
         $purchaseOrder = PurchaseOrder::with([
@@ -134,14 +126,12 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified purchase order.
-     */
+    
     public function update(Request $request, $id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
 
-        // Only allow updates if in draft status
+        
         if ($purchaseOrder->status !== 'draft') {
             return redirect()->back()->with('error', 'Cannot update purchase order that is not in draft status.');
         }
@@ -164,9 +154,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order updated successfully.');
     }
 
-    /**
-     * Approve purchase order.
-     */
+    
     public function approve($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -184,9 +172,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order approved successfully.');
     }
 
-    /**
-     * Mark purchase order as ordered.
-     */
+    
     public function markOrdered($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -202,9 +188,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order marked as ordered.');
     }
 
-    /**
-     * Receive purchase order items.
-     */
+    
     public function receive(Request $request, $id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -228,9 +212,7 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    /**
-     * Cancel purchase order.
-     */
+    
     public function cancel($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -246,9 +228,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order cancelled successfully.');
     }
 
-    /**
-     * Remove the specified purchase order.
-     */
+    
     public function destroy($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);

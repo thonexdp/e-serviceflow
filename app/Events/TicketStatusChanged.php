@@ -25,9 +25,7 @@ class TicketStatusChanged implements ShouldBroadcastNow
     public string $title;
     public string $message;
 
-    /**
-     * Create a new event instance.
-     */
+    
     public function __construct(
         Ticket $ticket,
         string $oldStatus,
@@ -48,11 +46,7 @@ class TicketStatusChanged implements ShouldBroadcastNow
         $this->message = $message;
     }
 
-    /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
-     */
+    
     public function broadcastOn(): array
     {
         $channels = [];
@@ -62,17 +56,13 @@ class TicketStatusChanged implements ShouldBroadcastNow
         return $channels;
     }
 
-    /**
-     * The event's broadcast name.
-     */
+    
     public function broadcastAs(): string
     {
         return 'ticket.status.changed';
     }
 
-    /**
-     * Get the data to broadcast.
-     */
+    
     public function broadcastWith(): array
     {
         return [

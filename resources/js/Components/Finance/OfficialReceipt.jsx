@@ -2,47 +2,47 @@ import React from "react";
 import { formatPeso } from "@/Utils/currency";
 
 export default function OfficialReceipt({ payment }) {
-    if (!payment) return null;
+  if (!payment) return null;
 
-    // Helper to format date
-    const formatDate = (dateString) => {
-        if (!dateString) return "";
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    };
 
-    const ticket = payment.ticket || {};
-    const hasItems = ticket.items && ticket.items.length > 0;
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+  };
 
-    // Calculations
-    const grandTotal = parseFloat(ticket.total_amount || payment.amount || 0);
-    const subTotal = parseFloat(ticket.subtotal || grandTotal);
-    const discountAmount = Math.max(0, subTotal - grandTotal);
-    const discountPercent = parseFloat(ticket.discount || 0);
+  const ticket = payment.ticket || {};
+  const hasItems = ticket.items && ticket.items.length > 0;
 
-    const currentPaymentAmount = parseFloat(payment.amount || 0);
 
-    // Sum only successful payments
-    const successfulPayments = (ticket.payments || []).filter(p =>
-        p.status !== 'rejected' && p.status !== 'pending'
-    );
+  const grandTotal = parseFloat(ticket.total_amount || payment.amount || 0);
+  const subTotal = parseFloat(ticket.subtotal || grandTotal);
+  const discountAmount = Math.max(0, subTotal - grandTotal);
+  const discountPercent = parseFloat(ticket.discount || 0);
 
-    // To be safe, if the current payment is NOT in the list yet, we should add it
-    const isCurrentPaymentInList = successfulPayments.some(p => p.id === payment.id);
+  const currentPaymentAmount = parseFloat(payment.amount || 0);
 
-    const totalPaidSoFar = successfulPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0) +
-        (isCurrentPaymentInList ? 0 : currentPaymentAmount);
 
-    const previousPayments = Math.max(0, totalPaidSoFar - currentPaymentAmount);
+  const successfulPayments = (ticket.payments || []).filter((p) =>
+  p.status !== 'rejected' && p.status !== 'pending'
+  );
 
-    // Force balance to 0 if ticket is fully paid to avoid rounding issues
-    const balanceRemaining = ticket.payment_status === 'paid' ? 0 : Math.max(0, grandTotal - totalPaidSoFar);
 
-    return (
-        <div className="official-receipt-container font-sans text-sm p-8 max-w-3xl mx-auto bg-white text-black">
+  const isCurrentPaymentInList = successfulPayments.some((p) => p.id === payment.id);
+
+  const totalPaidSoFar = successfulPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0) + (
+  isCurrentPaymentInList ? 0 : currentPaymentAmount);
+
+  const previousPayments = Math.max(0, totalPaidSoFar - currentPaymentAmount);
+
+
+  const balanceRemaining = ticket.payment_status === 'paid' ? 0 : Math.max(0, grandTotal - totalPaidSoFar);
+
+  return (
+    <div className="official-receipt-container font-sans text-sm p-8 max-w-3xl mx-auto bg-white text-black">
 
             {/* Header */}
             <div className="flex justify-between items-start mb-6">
@@ -50,11 +50,11 @@ export default function OfficialReceipt({ payment }) {
                     {/* Logo Area */}
                     <div className="w-16 h-16 bg-gray-100 flex items-center justify-center rounded-sm border border-gray-300 overflow-hidden">
                         <img
-                            src="/images/logo.jpg"
-                            alt="Logo"
-                            className="w-full h-full object-cover"
-                            onError={(e) => (e.target.style.display = "none")}
-                        />
+              src="/images/logo.jpg"
+              alt="Logo"
+              className="w-full h-full object-cover"
+              onError={(e) => e.target.style.display = "none"} />
+
                     </div>
                     <div>
                         <h1 className="text-xl font-extrabold tracking-tight text-gray-900 uppercase">
@@ -118,9 +118,9 @@ export default function OfficialReceipt({ payment }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {hasItems ? (
-                            ticket.items.map((item, index) => (
-                                <tr key={index} className="border-b border-gray-200">
+                        {hasItems ?
+            ticket.items.map((item, index) =>
+            <tr key={index} className="border-b border-gray-200">
                                     <td className="py-2 px-3 text-center border-r border-gray-300">{index + 1}</td>
                                     <td className="py-2 px-3 border-r border-gray-300">
                                         <div className="font-medium">{item.description}</div>
@@ -136,9 +136,9 @@ export default function OfficialReceipt({ payment }) {
                                         {formatPeso(item.unit_price * item.quantity)}
                                     </td>
                                 </tr>
-                            ))
-                        ) : (
-                            <tr className="border-b border-gray-200">
+            ) :
+
+            <tr className="border-b border-gray-200">
                                 <td className="py-4 px-3 text-center border-r border-gray-300">1</td>
                                 <td className="py-4 px-3 border-r border-gray-300 italic text-gray-500">
                                     {ticket.job_type?.name || ticket.job_type || payment.notes || (ticket.ticket_number ? `Payment for Ticket #${ticket.ticket_number}` : "Service Rendered")}
@@ -147,7 +147,7 @@ export default function OfficialReceipt({ payment }) {
                                 <td className="py-4 px-3 text-center border-r border-gray-300">—</td>
                                 <td className="py-4 px-3 text-right">{formatPeso(payment.amount)}</td>
                             </tr>
-                        )}
+            }
 
                         {/* Minimum height filler if needed, or just let it collapse */}
                     </tbody>
@@ -159,13 +159,13 @@ export default function OfficialReceipt({ payment }) {
                             <td className="py-1 px-3 text-right">{formatPeso(subTotal)}</td>
                         </tr>
                         {/* Discount */}
-                        {discountAmount > 0 && (
-                            <tr className="border-b border-gray-300 text-red-600">
+                        {discountAmount > 0 &&
+            <tr className="border-b border-gray-300 text-red-600">
                                 <td colSpan="3" className="border-r border-gray-300"></td>
                                 <td className="py-1 px-3 text-right border-r border-gray-300">Discount:</td>
                                 <td className="py-1 px-3 text-right">-{formatPeso(discountAmount)}</td>
                             </tr>
-                        )}
+            }
                         {/* Grand Total */}
                         <tr className="bg-gray-200 border-t-2 border-gray-800">
                             <td colSpan="3" className="border-r border-gray-400 bg-white"></td>
@@ -198,9 +198,9 @@ export default function OfficialReceipt({ payment }) {
 
                         <div className="ml-4 pl-4 border-l-2 border-gray-300 mb-2 italic text-gray-500 text-[10px]">
                             <div>Method: <span className="font-semibold text-black">{payment.payment_method?.replace("_", " ")}</span></div>
-                            {payment.payment_reference && (
-                                <div>Ref: {payment.payment_reference}</div>
-                            )}
+                            {payment.payment_reference &&
+              <div>Ref: {payment.payment_reference}</div>
+              }
                         </div>
 
                         <div className="flex justify-between items-center pt-2 border-t-2 border-gray-400 text-red-600">
@@ -223,6 +223,6 @@ export default function OfficialReceipt({ payment }) {
                     <p className="uppercase tracking-wider mt-1">System Generated Receipt</p>
                 </div>
             </div>
-        </div>
-    );
+        </div>);
+
 }

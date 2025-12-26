@@ -4,11 +4,7 @@ namespace App\Traits;
 
 trait HasWorkflowSteps
 {
-    /**
-     * Get the first active workflow step for this ticket based on its job type.
-     * 
-     * @return string|null
-     */
+    
     public function getFirstWorkflowStep(): ?string
     {
         if (!$this->jobType || !$this->jobType->workflow_steps) {
@@ -17,9 +13,9 @@ trait HasWorkflowSteps
 
         $workflowSteps = $this->jobType->workflow_steps;
 
-        // Define the order of workflow steps
+        
         $stepOrder = [
-            // 'design',
+            
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -28,9 +24,9 @@ trait HasWorkflowSteps
             'qa',
         ];
 
-        // Find the first enabled step
+        
         foreach ($stepOrder as $step) {
-            // Support both old format (boolean) and new format (object with 'enabled' property)
+            
             $isEnabled = false;
             if (isset($workflowSteps[$step])) {
                 if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
@@ -48,11 +44,7 @@ trait HasWorkflowSteps
         return null;
     }
 
-    /**
-     * Get the next workflow step for this ticket.
-     * 
-     * @return string|null
-     */
+    
     public function getNextWorkflowStep(): ?string
     {
         if (!$this->jobType || !$this->jobType->workflow_steps || !$this->current_workflow_step) {
@@ -61,9 +53,9 @@ trait HasWorkflowSteps
 
         $workflowSteps = $this->jobType->workflow_steps;
 
-        // Define the order of workflow steps
+        
         $stepOrder = [
-            // 'design',
+            
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -72,17 +64,17 @@ trait HasWorkflowSteps
             'qa',
         ];
 
-        // Find current step index
+        
         $currentIndex = array_search($this->current_workflow_step, $stepOrder);
 
         if ($currentIndex === false) {
             return $this->getFirstWorkflowStep();
         }
 
-        // Find the next enabled step
+        
         for ($i = $currentIndex + 1; $i < count($stepOrder); $i++) {
             $step = $stepOrder[$i];
-            // Support both old format (boolean) and new format (object with 'enabled' property)
+            
             $isEnabled = false;
             if (isset($workflowSteps[$step])) {
                 if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
@@ -97,15 +89,11 @@ trait HasWorkflowSteps
             }
         }
 
-        // No more steps, workflow is complete
+        
         return null;
     }
 
-    /**
-     * Get the previous workflow step for this ticket.
-     * 
-     * @return string|null
-     */
+    
     public function getPreviousWorkflowStep(): ?string
     {
         if (!$this->jobType || !$this->jobType->workflow_steps || !$this->current_workflow_step) {
@@ -114,9 +102,9 @@ trait HasWorkflowSteps
 
         $workflowSteps = $this->jobType->workflow_steps;
 
-        // Define the order of workflow steps
+        
         $stepOrder = [
-            // 'design',
+            
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -125,17 +113,17 @@ trait HasWorkflowSteps
             'qa',
         ];
 
-        // Find current step index
+        
         $currentIndex = array_search($this->current_workflow_step, $stepOrder);
 
         if ($currentIndex === false || $currentIndex === 0) {
             return null;
         }
 
-        // Find the previous enabled step
+        
         for ($i = $currentIndex - 1; $i >= 0; $i--) {
             $step = $stepOrder[$i];
-            // Support both old format (boolean) and new format (object with 'enabled' property)
+            
             $isEnabled = false;
             if (isset($workflowSteps[$step])) {
                 if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
@@ -153,11 +141,7 @@ trait HasWorkflowSteps
         return null;
     }
 
-    /**
-     * Get all active workflow steps for this ticket in order.
-     * 
-     * @return array
-     */
+    
     public function getActiveWorkflowSteps(): array
     {
         if (!$this->jobType || !$this->jobType->workflow_steps) {
@@ -166,9 +150,9 @@ trait HasWorkflowSteps
 
         $workflowSteps = $this->jobType->workflow_steps;
 
-        // Define the order of workflow steps
+        
         $stepOrder = [
-            // 'design',
+            
             'printing',
             'lamination_heatpress',
             'cutting',
@@ -179,7 +163,7 @@ trait HasWorkflowSteps
 
         $activeSteps = [];
         foreach ($stepOrder as $step) {
-            // Support both old format (boolean) and new format (object with 'enabled' property)
+            
             $isEnabled = false;
             if (isset($workflowSteps[$step])) {
                 if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
@@ -197,11 +181,7 @@ trait HasWorkflowSteps
         return $activeSteps;
     }
 
-    /**
-     * Calculate workflow progress percentage.
-     * 
-     * @return int Progress percentage (0-100)
-     */
+    
     public function getWorkflowProgress(): int
     {
         $activeSteps = $this->getActiveWorkflowSteps();
@@ -220,21 +200,17 @@ trait HasWorkflowSteps
             return 0;
         }
 
-        // Calculate percentage based on completed steps
+        
         return (int) round((($currentIndex + 1) / count($activeSteps)) * 100);
     }
 
-    /**
-     * Advance to the next workflow step.
-     * 
-     * @return bool True if advanced, false if already at last step
-     */
+    
     public function advanceWorkflowStep(): bool
     {
         $nextStep = $this->getNextWorkflowStep();
 
         if ($nextStep === null) {
-            // No more steps, mark as completed
+            
             $this->update([
                 'status' => 'completed',
                 'current_workflow_step' => null,
@@ -249,11 +225,7 @@ trait HasWorkflowSteps
         return true;
     }
 
-    /**
-     * Move back to the previous workflow step.
-     * 
-     * @return bool True if moved back, false if already at first step
-     */
+    
     public function revertWorkflowStep(): bool
     {
         $previousStep = $this->getPreviousWorkflowStep();
@@ -269,11 +241,7 @@ trait HasWorkflowSteps
         return true;
     }
 
-    /**
-     * Initialize workflow step when starting production.
-     * 
-     * @return void
-     */
+    
     public function initializeWorkflow(): void
     {
         if (!$this->current_workflow_step) {

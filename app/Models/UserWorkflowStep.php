@@ -14,9 +14,7 @@ class UserWorkflowStep extends Model
         'workflow_step',
     ];
 
-    /**
-     * Get the user that owns this workflow step assignment
-     */
+    
     public function user()
     {
         return $this->belongsTo(User::class);

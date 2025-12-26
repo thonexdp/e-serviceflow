@@ -29,25 +29,19 @@ class Notification extends Model
         'data' => 'array',
     ];
 
-    /**
-     * Get the user that owns the notification.
-     */
+    
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the notifiable entity (Ticket, etc.).
-     */
+    
     public function notifiable(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Mark notification as read.
-     */
+    
     public function markAsRead(): void
     {
         if (!$this->read) {
@@ -58,9 +52,7 @@ class Notification extends Model
         }
     }
 
-    /**
-     * Mark notification as unread.
-     */
+    
     public function markAsUnread(): void
     {
         $this->update([

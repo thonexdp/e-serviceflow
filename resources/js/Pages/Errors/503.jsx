@@ -1,8 +1,8 @@
 import { Link, Head } from '@inertiajs/react';
 
 export default function Error503() {
-    return (
-        <>
+  return (
+    <>
             <Head title="503 - Service Unavailable" />
             <div className="min-h-screen bg-white flex items-center justify-center p-4">
                 <div className="max-w-2xl w-full text-center">
@@ -30,14 +30,14 @@ export default function Error503() {
                     {/* Action buttons */}
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <button
-                            onClick={() => window.location.reload()}
-                            className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                        >
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors">
+
                             Refresh Page
                         </button>
                     </div>
                 </div>
             </div>
-        </>
-    );
+        </>);
+
 }
