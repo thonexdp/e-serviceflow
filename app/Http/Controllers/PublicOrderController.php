@@ -19,9 +19,7 @@ class PublicOrderController extends Controller
 {
     public function __construct(protected PaymentRecorder $paymentRecorder) {}
 
-    /**
-     * Find or create a customer by email
-     */
+    
     public function findOrCreateCustomer(Request $request)
     {
         $validated = $request->validate([
@@ -31,16 +29,16 @@ class PublicOrderController extends Controller
             'customer_facebook' => 'nullable|string|max:255',
         ]);
 
-        // Split name into firstname and lastname
+        
         $nameParts = explode(' ', trim($validated['customer_name']), 2);
         $firstname = $nameParts[0] ?? '';
         $lastname = $nameParts[1] ?? '';
 
-        // Try to find existing customer by email
+        
         $customer = Customer::where('email', $validated['email'])->first();
 
         if ($customer) {
-            // Update customer info if provided (only update if new values are provided)
+            
             $updateData = [];
             if ($firstname) $updateData['firstname'] = $firstname;
             if ($lastname) $updateData['lastname'] = $lastname;
@@ -54,7 +52,7 @@ class PublicOrderController extends Controller
                 $customer->update($updateData);
             }
         } else {
-            // Create new customer
+            
             $customer = Customer::create([
                 'firstname' => $firstname,
                 'lastname' => $lastname,
@@ -70,9 +68,7 @@ class PublicOrderController extends Controller
         ]);
     }
 
-    /**
-     * Store a public order (create ticket)
-     */
+    
     public function storeOrder(Request $request)
     {
 
@@ -99,10 +95,10 @@ class PublicOrderController extends Controller
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
 
-        // Get the selected branch
+        
         $selectedBranch = \App\Models\Branch::find($validated['branch_id']);
 
-        // Validate that the branch can accept orders
+        
         if (!$selectedBranch || !$selectedBranch->can_accept_orders || !$selectedBranch->is_active) {
             return response()->json([
                 'success' => false,
@@ -110,16 +106,16 @@ class PublicOrderController extends Controller
             ], 422);
         }
 
-        // Determine production branch
-        // If the order branch can produce, use it; otherwise, use default production branch
+        
+        
         $productionBranchId = $selectedBranch->can_produce
             ? $selectedBranch->id
             : \App\Models\Branch::where('is_default_production', true)->value('id');
 
-        // Set payment status based on payment method and whether payment proofs will be uploaded
-        // - 'awaiting_verification': Online payment (gcash/bank) with proofs - needs Front Desk verification
-        // - 'pending': Walk-in payment - will be processed at counter
-        // All public orders are set to 'awaiting_verification' so Front Desk can verify them when the customer visits/confirms.
+        
+        
+        
+        
         $paymentStatus = 'awaiting_verification';
 
         $ticketData = [
@@ -138,7 +134,7 @@ class PublicOrderController extends Controller
             'status' => 'pending',
         ];
 
-        // Handle size values
+        
         if (isset($validated['size_value'])) {
             $ticketData['size_value'] = $validated['size_value'];
         }
@@ -146,22 +142,22 @@ class PublicOrderController extends Controller
             $ticketData['size_unit'] = $validated['size_unit'];
         }
 
-        // Handle file upload
+        
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $path = Storage::put('tickets/customer', $file);
             $ticketData['file_path'] = $path;
         }
 
-        // Apply pricing calculation
+        
         $this->applyPricing($ticketData, $request);
 
-        // Remove transient fields
+        
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 
         $ticket = Ticket::create($ticketData);
 
-        // Store file as ticket attachment
+        
         if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
@@ -171,7 +167,7 @@ class PublicOrderController extends Controller
             ]);
         }
 
-        // Store any additional attachments (design files)
+        
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments', []) as $attachment) {
                 if (!$attachment) {
@@ -187,13 +183,13 @@ class PublicOrderController extends Controller
             }
         }
 
-        // Record initial payment if payment proofs are provided
+        
         if ($request->hasFile('payment_proofs') && ($paymentMethod === 'gcash' || $paymentMethod === 'bank')) {
             $this->paymentRecorder->record(
                 [
                     'ticket_id' => $ticket->id,
                     'payment_method' => $paymentMethod,
-                    'amount' => 0, // Will be updated by frontdesk
+                    'amount' => 0, 
                     'payment_date' => now()->toDateString(),
                     'allocation' => 'downpayment',
                     'notes' => 'Payment proof uploaded during order submission.',
@@ -203,12 +199,12 @@ class PublicOrderController extends Controller
             );
         }
 
-        // Notify FrontDesk users from the specific branch about the new order
+        
         try {
-            // Get active frontdesk users from the same branch as the order
+            
             $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
                 ->where('is_active', true)
-                ->where('branch_id', $validated['branch_id']) // Only notify users from the order's branch
+                ->where('branch_id', $validated['branch_id']) 
                 ->get();
 
             if ($frontDeskUsers->isNotEmpty()) {
@@ -216,11 +212,11 @@ class PublicOrderController extends Controller
                 $ticketNumber = $ticket->ticket_number;
                 $branchName = $selectedBranch->name ?? 'Branch';
 
-                // Create notification title and message
+                
                 $notificationTitle = 'New Order from Customer';
                 $notificationMessage = "{$customerName} has created a new order ({$ticketNumber}) for {$branchName}";
 
-                // Store notification in database for each frontdesk user from this branch
+                
                 foreach ($frontDeskUsers as $user) {
                     Notification::create([
                         'user_id' => $user->id,
@@ -241,8 +237,8 @@ class PublicOrderController extends Controller
                     ]);
                 }
 
-                // Broadcast real-time notification using TicketStatusChanged event
-                // Use a system user as the trigger (first frontdesk user or create a dummy user)
+                
+                
                 $systemUser = $frontDeskUsers->first();
                 $userIds = $frontDeskUsers->pluck('id')->toArray();
 
@@ -250,7 +246,7 @@ class PublicOrderController extends Controller
                     $ticket,
                     'new',
                     'pending',
-                    $systemUser, // Use first frontdesk user as the trigger
+                    $systemUser, 
                     $userIds,
                     'order_created',
                     $notificationTitle,
@@ -263,7 +259,7 @@ class PublicOrderController extends Controller
                 ]);
             }
         } catch (\Exception $e) {
-            // Log error but don't fail the order creation
+            
             Log::error('Failed to send notification to frontdesk users', [
                 'ticket_id' => $ticket->id,
                 'error' => $e->getMessage(),
@@ -278,9 +274,7 @@ class PublicOrderController extends Controller
         ]);
     }
 
-    /**
-     * Apply pricing calculation (similar to TicketController)
-     */
+    
     protected function applyPricing(array &$ticketData, Request $request): void
     {
         $jobTypeId = $ticketData['job_type_id'] ?? null;

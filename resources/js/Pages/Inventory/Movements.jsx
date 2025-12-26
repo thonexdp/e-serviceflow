@@ -6,89 +6,89 @@ import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function InventoryMovements({
-    user = {},
-    notifications = [],
-    messages = [],
-    stockItem = {},
-    movements = { data: [] },
+  user = {},
+  notifications = [],
+  messages = [],
+  stockItem = {},
+  movements = { data: [] }
 }) {
-    const { buildUrl } = useRoleApi();
+  const { buildUrl } = useRoleApi();
 
-    const getMovementTypeBadge = (type) => {
-        const classes = {
-            in: "badge-success",
-            out: "badge-danger",
-            adjustment: "badge-warning",
-            transfer: "badge-info",
-        };
-        return (
-            <span className={`badge ${classes[type] || "badge-secondary"}`}>
-                {type?.toUpperCase()}
-            </span>
-        );
+  const getMovementTypeBadge = (type) => {
+    const classes = {
+      in: "badge-success",
+      out: "badge-danger",
+      adjustment: "badge-warning",
+      transfer: "badge-info"
     };
+    return (
+      <span className={`badge ${classes[type] || "badge-secondary"}`}>
+                {type?.toUpperCase()}
+            </span>);
 
-    const movementColumns = [
-        {
-            label: "#",
-            key: "index",
-            render: (row, index) =>
-                (movements.current_page - 1) * movements.per_page + index + 1,
-        },
-        {
-            label: "Date",
-            key: "created_at",
-            render: (row) => formatDate(row.created_at),
-        },
-        {
-            label: "Type",
-            key: "movement_type",
-            render: (row) => getMovementTypeBadge(row.movement_type),
-        },
-        {
-            label: "Quantity",
-            key: "quantity",
-            render: (row) => (
-                <span className={(row.movement_type === "in" || row.movement_type === "adjustment") && parseInt(row.quantity) > 0 ? "text-success" : "text-danger"}>
+  };
+
+  const movementColumns = [
+  {
+    label: "#",
+    key: "index",
+    render: (row, index) =>
+    (movements.current_page - 1) * movements.per_page + index + 1
+  },
+  {
+    label: "Date",
+    key: "created_at",
+    render: (row) => formatDate(row.created_at)
+  },
+  {
+    label: "Type",
+    key: "movement_type",
+    render: (row) => getMovementTypeBadge(row.movement_type)
+  },
+  {
+    label: "Quantity",
+    key: "quantity",
+    render: (row) =>
+    <span className={(row.movement_type === "in" || row.movement_type === "adjustment") && parseInt(row.quantity) > 0 ? "text-success" : "text-danger"}>
                     {(row.movement_type === "in" || row.movement_type === "adjustment") && parseInt(row.quantity) > 0 ? "+" : "-"}
                     {parseFloat(row.quantity).toFixed(2)} {stockItem.base_unit_of_measure}
                 </span>
-            ),
-        },
-        {
-            label: "Unit Cost",
-            key: "unit_cost",
-            render: (row) => `₱${parseFloat(row.unit_cost || 0).toFixed(2)}`,
-        },
-        {
-            label: "Total Cost",
-            key: "total_cost",
-            render: (row) => `₱${parseFloat(row.total_cost || 0).toFixed(2)}`,
-        },
-        {
-            label: "Stock Before",
-            key: "stock_before",
-            render: (row) => `${parseFloat(row.stock_before).toFixed(2)} ${stockItem.base_unit_of_measure}`,
-        },
-        {
-            label: "Stock After",
-            key: "stock_after",
-            render: (row) => `${parseFloat(row.stock_after).toFixed(2)} ${stockItem.base_unit_of_measure}`,
-        },
-        {
-            label: "User",
-            key: "user",
-            render: (row) => row.user?.name || "System",
-        },
-        {
-            label: "Notes",
-            key: "notes",
-            render: (row) => row.notes || "-",
-        },
-    ];
 
-    return (
-        <AdminLayout user={user} notifications={notifications} messages={messages}>
+  },
+  {
+    label: "Unit Cost",
+    key: "unit_cost",
+    render: (row) => `₱${parseFloat(row.unit_cost || 0).toFixed(2)}`
+  },
+  {
+    label: "Total Cost",
+    key: "total_cost",
+    render: (row) => `₱${parseFloat(row.total_cost || 0).toFixed(2)}`
+  },
+  {
+    label: "Stock Before",
+    key: "stock_before",
+    render: (row) => `${parseFloat(row.stock_before).toFixed(2)} ${stockItem.base_unit_of_measure}`
+  },
+  {
+    label: "Stock After",
+    key: "stock_after",
+    render: (row) => `${parseFloat(row.stock_after).toFixed(2)} ${stockItem.base_unit_of_measure}`
+  },
+  {
+    label: "User",
+    key: "user",
+    render: (row) => row.user?.name || "System"
+  },
+  {
+    label: "Notes",
+    key: "notes",
+    render: (row) => row.notes || "-"
+  }];
+
+
+  return (
+    <AdminLayout user={user} notifications={notifications} messages={messages}>
             <Head title={`Stock Movements - ${stockItem.name}`} />
 
             <div className="row">
@@ -106,8 +106,8 @@ export default function InventoryMovements({
                         <div className="page-title">
                             <ol className="breadcrumb">
                                 {/* <li className="breadcrumb-item">
-                                    <a href="/dashboard">Dashboard</a>
-                                </li> */}
+                     <a href="/dashboard">Dashboard</a>
+                  </li> */}
                                 <li className="breadcrumb-item">
                                     <a href={buildUrl("/inventory")}>Inventory</a>
                                 </li>
@@ -130,9 +130,9 @@ export default function InventoryMovements({
                                                 Stock Movements - {stockItem.name} ({stockItem.sku})
                                             </h4>
                                             <button
-                                                className="btn btn-secondary btn-sm"
-                                                onClick={() => router.get(buildUrl("/inventory"))}
-                                            >
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => router.get(buildUrl("/inventory"))}>
+
                                                 <i className="ti-arrow-left"></i> Back to Inventory
                                             </button>
                                         </div>
@@ -150,11 +150,11 @@ export default function InventoryMovements({
                                             </div>
 
                                             <DataTable
-                                                columns={movementColumns}
-                                                data={movements.data}
-                                                pagination={movements}
-                                                emptyMessage="No stock movements found."
-                                            />
+                        columns={movementColumns}
+                        data={movements.data}
+                        pagination={movements}
+                        emptyMessage="No stock movements found." />
+
                                         </div>
                                     </div>
                                 </div>
@@ -164,7 +164,6 @@ export default function InventoryMovements({
                 </div>
             </section>
 
-        </AdminLayout>
-    );
-}
+        </AdminLayout>);
 
+}

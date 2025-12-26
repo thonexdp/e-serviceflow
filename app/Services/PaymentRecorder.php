@@ -13,12 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentRecorder
 {
-    /**
-     * Create a payment entry along with attachments if provided.
-     *
-     * @param  array<string, mixed>  $payload
-     * @param  array<int, UploadedFile>  $attachments
-     */
+    
     public function record(array $payload, array $attachments = []): Payment
     {
         return DB::transaction(function () use ($payload, $attachments) {
@@ -26,7 +21,7 @@ class PaymentRecorder
             if (!empty($payload['ticket_id'])) {
                 $ticket = Ticket::with('customer')->findOrFail($payload['ticket_id']);
 
-                // If discount is provided, update the ticket's discount and total amount
+                
                 if (isset($payload['discount'])) {
                     $oldDiscount = $ticket->discount;
                     $ticket->discount = (float)$payload['discount'];
@@ -36,7 +31,7 @@ class PaymentRecorder
                         $ticket->total_amount = round($subtotal - $discountAmount, 2);
                         $ticket->save();
 
-                        // Log discount change
+                        
                         if ($oldDiscount != $ticket->discount) {
                             UserActivityLog::log(
                                 Auth::id(),
@@ -86,7 +81,7 @@ class PaymentRecorder
                 'metadata' => $payload['metadata'] ?? null,
             ]);
 
-            // Log payment recording
+            
             UserActivityLog::log(
                 Auth::id(),
                 'payment_recorded',

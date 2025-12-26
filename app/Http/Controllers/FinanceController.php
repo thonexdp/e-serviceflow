@@ -14,20 +14,16 @@ use Inertia\Response;
 
 class FinanceController extends Controller
 {
-    /**
-     * Render the Payments & Finance hub with ledger, receivables, expenses, and cash flow tabs.
-     */
-    /**
-     * Render the Payments & Finance hub with ledger, receivables, expenses, and cash flow tabs.
-     */
+    
+    
     public function index(Request $request): Response
     {
         $user = auth()->user();
         $search = $request->input('search');
 
-        // Ledger (Payment History)
+        
         $ledger = Payment::with(['ticket.customer', 'ticket.jobType', 'ticket.payments', 'customer', 'documents'])
-            // Apply branch filtering for non-admin users
+            
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->whereHas('ticket', function ($q) use ($user) {
                     $q->where('order_branch_id', $user->branch_id);
@@ -68,10 +64,10 @@ class FinanceController extends Controller
             ->paginate(15, ['*'], 'ledger_page')
             ->withQueryString();
 
-        // Receivables - always load
+        
         $receivables = $this->buildReceivables($request);
 
-        // Expenses - always load
+        
         $expenses = Expense::with('ticket')
             ->when($search, function ($query) use ($search) {
                 $term = '%' . $search . '%';
@@ -91,12 +87,12 @@ class FinanceController extends Controller
             ->paginate(15, ['*'], 'expenses_page')
             ->withQueryString();
 
-        // Cash Flow - keep empty or load if needed
+        
         $cashFlow = [];
 
-        // Pending Payments - always load
+        
         $pendingPayments = Payment::with(['ticket.customer', 'customer', 'documents'])
-            // Apply branch filtering for non-admin users
+            
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->whereHas('ticket', function ($q) use ($user) {
                     $q->where('order_branch_id', $user->branch_id);
@@ -106,14 +102,14 @@ class FinanceController extends Controller
             ->orderByDesc('payment_date')
             ->get();
 
-        // Summary Statistics (Always loaded for header cards)
+        
         $summary = $this->buildSummary();
 
-        // Dropdown Data
+        
         $openTickets = Ticket::with('customer')
             ->where('payment_status', '!=', 'paid')
             ->where('payment_status', '!=', 'awaiting_verification')
-            // Apply branch filtering for non-admin users
+            
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->where('order_branch_id', $user->branch_id);
             })
@@ -125,7 +121,7 @@ class FinanceController extends Controller
             ->limit(50)
             ->get(['id', 'firstname', 'lastname']);
 
-        // Update summary with accurate count
+        
         $summary['pending_cheques_count'] = $pendingPayments->count();
 
 
@@ -157,7 +153,7 @@ class FinanceController extends Controller
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
             })
-            // Apply branch filtering for non-admin users
+            
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->where('order_branch_id', $user->branch_id);
             });
@@ -175,7 +171,7 @@ class FinanceController extends Controller
             });
         }
 
-        return $query->orderByDesc('created_at') // Sort by ticket creation date (descending)
+        return $query->orderByDesc('created_at') 
             ->paginate(15, ['*'], 'receivables_page')
             ->withQueryString()
             ->through(function ($ticket) {
@@ -190,7 +186,7 @@ class FinanceController extends Controller
                     'balance' => $ticket->total_amount - $ticket->amount_paid,
                     'discount' => $ticket->discount,
                     'due_date' => $ticket->due_date,
-                    'created_at' => $ticket->created_at, // useful for debug/display
+                    'created_at' => $ticket->created_at, 
                     'has_rejected_payment' => $ticket->payments->isNotEmpty(),
                     'last_rejected_payment' => $ticket->payments->first(),
                 ];
@@ -214,7 +210,7 @@ class FinanceController extends Controller
         $collections = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', $monthRange)
-            // Apply branch filtering for non-admin users
+            
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->whereHas('ticket', function ($q) use ($user) {
                     $q->where('order_branch_id', $user->branch_id);
@@ -224,13 +220,13 @@ class FinanceController extends Controller
 
         $expenses = Expense::whereBetween('expense_date', $monthRange)->sum('amount');
 
-        // Calculate total receivables independently since we don't load all of them anymore
+        
         $receivablesTotal = Ticket::where('payment_status', '!=', 'paid')
             ->where('payment_status', '!=', 'awaiting_verification')
             ->whereDoesntHave('payments', function ($q) {
                 $q->where('status', 'pending');
             })
-            // Apply branch filtering for non-admin users
+            
             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                 $query->where('order_branch_id', $user->branch_id);
             })
@@ -244,7 +240,7 @@ class FinanceController extends Controller
             'expenses_month' => round($expenses, 2),
             'net_cash_flow_month' => round($collections - $expenses, 2),
             'receivables_total' => round($receivablesTotal, 2),
-            'pending_cheques_count' => 0, // set in index
+            'pending_cheques_count' => 0, 
             'open_tickets' => Ticket::where('payment_status', '!=', 'paid')
                 ->where('payment_status', '!=', 'awaiting_verification')
                 // Apply branch filtering for non-admin users

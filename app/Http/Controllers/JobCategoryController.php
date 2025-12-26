@@ -8,9 +8,7 @@ use Inertia\Inertia;
 
 class JobCategoryController extends Controller
 {
-    /**
-     * Display a listing of job categories.
-     */
+    
     public function index(Request $request)
     {
         $categories = JobCategory::query()
@@ -26,9 +24,7 @@ class JobCategoryController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created job category.
-     */
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -40,9 +36,7 @@ class JobCategoryController extends Controller
         return redirect()->back()->with('success', 'Job category created successfully!');
     }
 
-    /**
-     * Update the specified job category.
-     */
+    
     public function update(Request $request, $id)
     {
         $jobCategory = JobCategory::findOrFail($id);
@@ -56,15 +50,13 @@ class JobCategoryController extends Controller
         return redirect()->back()->with('success', 'Job category updated successfully!');
     }
 
-    /**
-     * Remove the specified job category.
-     */
+    
     public function destroy($id)
     {
         try {
             $jobCategory = JobCategory::findOrFail($id);
             
-            // Check if category has job types
+            
             if ($jobCategory->jobTypes()->count() > 0) {
                 return redirect()->back()->with('error', 'Cannot delete category. It has associated job types.');
             }

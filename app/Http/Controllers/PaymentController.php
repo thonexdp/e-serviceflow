@@ -16,9 +16,7 @@ class PaymentController extends Controller
 {
     public function __construct(protected PaymentRecorder $recorder) {}
 
-    /**
-     * Persist a payment transaction and optionally attach proofs.
-     */
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -70,9 +68,7 @@ class PaymentController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
-    /**
-     * Clear a pending cheque payment.
-     */
+    
     public function clear(Payment $payment)
     {
         if ($payment->status !== 'pending') {
@@ -95,9 +91,7 @@ class PaymentController extends Controller
         ]);
     }
 
-    /**
-     * Reject/Bounce a pending cheque payment.
-     */
+    
     public function reject(Request $request, Payment $payment)
     {
         if ($payment->status !== 'pending') {
@@ -130,22 +124,18 @@ class PaymentController extends Controller
         ]);
     }
 
-    /**
-     * Download a payment attachment.
-     */
+    
     public function downloadDocument(PaymentDocument $document)
     {
         return Storage::disk('public')->download($document->file_path, $document->original_name);
     }
 
-    /**
-     * Notify Front Desk about payment status (success or rejected).
-     */
+    
     protected function notifyFrontDeskPayment(Payment $payment, string $statusType): void
     {
         $ticket = $payment->ticket;
 
-        // Only notify frontdesk users from the ticket's order branch
+        
         $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
             ->when($ticket && $ticket->order_branch_id, function ($query) use ($ticket) {
                 $query->where('branch_id', $ticket->order_branch_id);

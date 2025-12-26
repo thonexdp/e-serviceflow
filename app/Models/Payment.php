@@ -50,7 +50,7 @@ class Payment extends Model
         });
 
         static::deleted(function (Payment $payment) {
-            // deleted is triggered for soft deletes as well
+            
             $payment->ticket?->refreshPaymentSummary();
         });
     }

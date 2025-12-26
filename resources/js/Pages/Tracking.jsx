@@ -4,56 +4,56 @@ import { Head } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
 
 export default function Dashboard({
-    user = {},
-    notifications = [],
-    messages = [],
+  user = {},
+  notifications = [],
+  messages = []
 }) {
-    const [openCustomerModal, setCustomerModalOpen] = useState(false);
-    const [forms, setForms] = useState({
-        client: {
-            firstname: "",
-            middlename: "",
-            lastname: "",
-            phone: "",
-            address: "",
-        },
-    });
+  const [openCustomerModal, setCustomerModalOpen] = useState(false);
+  const [forms, setForms] = useState({
+    client: {
+      firstname: "",
+      middlename: "",
+      lastname: "",
+      phone: "",
+      address: ""
+    }
+  });
 
-    const [openReviewModal, setReviewModalOpen] = useState(false);
-    const [openUploadModal, setUploadModalOpen] = useState(false);
+  const [openReviewModal, setReviewModalOpen] = useState(false);
+  const [openUploadModal, setUploadModalOpen] = useState(false);
 
-    const handleSave = () => {
-        setCustomerModalOpen(false);
-        setForms([
-            {
-                client: {
-                    firstname: "",
-                    middlename: "",
-                    lastname: "",
-                    phone: "",
-                    email: "",
-                    address: "",
-                },
-            },
-        ]);
-    };
+  const handleSave = () => {
+    setCustomerModalOpen(false);
+    setForms([
+    {
+      client: {
+        firstname: "",
+        middlename: "",
+        lastname: "",
+        phone: "",
+        email: "",
+        address: ""
+      }
+    }]
+    );
+  };
 
-    return (
-        <AdminLayout
-            user={user}
-            notifications={notifications}
-            messages={messages}
-        >
+  return (
+    <AdminLayout
+      user={user}
+      notifications={notifications}
+      messages={messages}>
+
             <Head title="Dashboard" />
 
             <Modal
-                title="Review"
-                isOpen={openReviewModal}
-                onClose={() => setReviewModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Submit"
-            >
+        title="Review"
+        isOpen={openReviewModal}
+        onClose={() => setReviewModalOpen(false)}
+        onSave={handleSave}
+        size="3xl"
+        submitButtonText="Submit">
+
                 <form>
                     <div className="mb-4">
                         <h3>
@@ -81,16 +81,16 @@ export default function Dashboard({
                                     <span className="mr-2">Design1.png</span> |
                                     <div class="btn-group ml-3">
                                         <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-orange-500"
-                                        >
+                      type="button"
+                      class="btn btn-link btn-outline btn-sm text-orange-500">
+
                                             <span className="ti-download"></span>{" "}
                                             Download
                                         </button>
                                         <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-green-800"
-                                        >
+                      type="button"
+                      class="btn btn-link btn-outline btn-sm text-green-800">
+
                                             <span className="ti-eye"></span>{" "}
                                             Preview
                                         </button>
@@ -104,20 +104,20 @@ export default function Dashboard({
                     <div>
                         <label className="block text-sm font-medium">
                             <input
-                                type="checkbox"
-                                name="status"
-                                class="mail-checkbox"
-                            />{" "}
+                type="checkbox"
+                name="status"
+                class="mail-checkbox" />
+              {" "}
                             <b>Approved</b>
                         </label>
                     </div>
                     <div>
                         <label className="block text-sm font-medium">
                             <input
-                                type="checkbox"
-                                name="status"
-                                class="mail-checkbox"
-                            />{" "}
+                type="checkbox"
+                name="status"
+                class="mail-checkbox" />
+              {" "}
                             <b>Request Revisions</b>
                         </label>
                     </div>
@@ -126,33 +126,33 @@ export default function Dashboard({
                             Notes :
                         </label>
                         <input
-                            type="text"
-                            className="mt-1 w-full border p-2" // fixed small width
-                            placeholder=""
-                            value=""
-                        // value={forms.ticket.quantity}
-                        // onChange={(e) =>
-                        //     setForms({
-                        //         ...forms,
-                        //         ticket: {
-                        //             ...forms.ticket,
-                        //             quantity: e.target.value,
-                        //         },
-                        //     })
-                        // }
-                        />
+              type="text"
+              className="mt-1 w-full border p-2"
+              placeholder=""
+              value="" />
+
+
+
+
+
+
+
+
+
+
+
                     </div>
                 </form>
             </Modal>
 
             <Modal
-                title="Upload"
-                isOpen={openUploadModal}
-                onClose={() => setUploadModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Upload & Send for Approval"
-            >
+        title="Upload"
+        isOpen={openUploadModal}
+        onClose={() => setUploadModalOpen(false)}
+        onSave={handleSave}
+        size="3xl"
+        submitButtonText="Upload & Send for Approval">
+
                 <form>
                     <div className="mb-4">
                         <h3>
@@ -180,16 +180,16 @@ export default function Dashboard({
                                     <span className="mr-2">Design1.png</span> |
                                     <div class="btn-group ml-3">
                                         <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-orange-500"
-                                        >
+                      type="button"
+                      class="btn btn-link btn-outline btn-sm text-orange-500">
+
                                             <span className="ti-download"></span>{" "}
                                             Download
                                         </button>
                                         <button
-                                            type="button"
-                                            class="btn btn-link btn-outline btn-sm text-green-800"
-                                        >
+                      type="button"
+                      class="btn btn-link btn-outline btn-sm text-green-800">
+
                                             <span className="ti-eye"></span>{" "}
                                             Preview
                                         </button>
@@ -202,32 +202,32 @@ export default function Dashboard({
                         <div>
                             <h6>Mock Files Here : </h6>
                             <button
-                                type="button"
-                                class="btn btn-link btn-outline btn-sm text-green-800"
-                            >
+                type="button"
+                class="btn btn-link btn-outline btn-sm text-green-800">
+
                                 <span className="ti-eye"></span>{" "}
                                 Preview
                             </button>
                             <div className="mt-4">
                                 <div className="flex items-center justify-center w-full">
                                     <label
-                                        htmlFor="dropzone-file"
-                                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                                    >
+                    htmlFor="dropzone-file"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                             <svg
-                                                className="w-8 h-8 mb-3 text-gray-400"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                            >
+                        className="w-8 h-8 mb-3 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+
                                                 <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth="2"
-                                                    d="M7 16V4m10 0v12M4 8h16M4 12h16M4 16h16"
-                                                />
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M7 16V4m10 0v12M4 8h16M4 12h16M4 16h16" />
+
                                             </svg>
                                             <p className="mb-2 text-sm text-gray-500">
                                                 <span className="font-semibold">
@@ -240,21 +240,21 @@ export default function Dashboard({
                                             </p>
                                         </div>
                                         <input
-                                            id="dropzone-file"
-                                            type="file"
-                                            className="hidden"
-                                            multiple
-                                            onChange={(e) => {
-                                                const files = Array.from(
-                                                    e.target.files
-                                                );
-                                                console.log(files);
-                                                setForm({
-                                                    ...form,
-                                                    attachments: files,
-                                                });
-                                            }}
-                                        />
+                      id="dropzone-file"
+                      type="file"
+                      className="hidden"
+                      multiple
+                      onChange={(e) => {
+                        const files = Array.from(
+                          e.target.files
+                        );
+                        console.log(files);
+                        setForm({
+                          ...form,
+                          attachments: files
+                        });
+                      }} />
+
                                     </label>
                                 </div>
 
@@ -266,21 +266,21 @@ export default function Dashboard({
                             Notes to Customer :
                         </label>
                         <input
-                            type="text"
-                            className="mt-1 w-full border p-2" // fixed small width
-                            placeholder=""
-                            value=""
-                        // value={forms.ticket.quantity}
-                        // onChange={(e) =>
-                        //     setForms({
-                        //         ...forms,
-                        //         ticket: {
-                        //             ...forms.ticket,
-                        //             quantity: e.target.value,
-                        //         },
-                        //     })
-                        // }
-                        />
+              type="text"
+              className="mt-1 w-full border p-2"
+              placeholder=""
+              value="" />
+
+
+
+
+
+
+
+
+
+
+
                     </div>
                 </form>
             </Modal>
@@ -316,17 +316,17 @@ export default function Dashboard({
                                 <div class="col-lg-12">
                                     <div class="card">
                                         {/* <div class="button-list float-start">
-                                            <button
-                                                type="button"
-                                                className="btn btn-primary btn-flat btn-sm btn-addon m-b-10 m-l-5"
-                                                onClick={() =>
-                                                    setCustomerModalOpen(true)
-                                                }
-                                            >
-                                                <i class="ti-plus"></i>Add
-                                                Upload Mock-Up
-                                            </button>
-                                        </div> */}
+                         <button
+                             type="button"
+                             className="btn btn-primary btn-flat btn-sm btn-addon m-b-10 m-l-5"
+                             onClick={() =>
+                                 setCustomerModalOpen(true)
+                             }
+                         >
+                             <i class="ti-plus"></i>Add
+                             Upload Mock-Up
+                         </button>
+                      </div> */}
                                         <div class="card-title mt-3">
                                             <h4>Mock-Ups Lists </h4>
                                         </div>
@@ -335,10 +335,10 @@ export default function Dashboard({
                                                 <div className="col-lg-3">
                                                     <div class="form-group">
                                                         <input
-                                                            type="text"
-                                                            class="form-control input-sm input-focus"
-                                                            placeholder="Search"
-                                                        />
+                              type="text"
+                              class="form-control input-sm input-focus"
+                              placeholder="Search" />
+
                                                     </div>
                                                 </div>
                                                 <div className="col-lg-3">
@@ -393,14 +393,14 @@ export default function Dashboard({
                                                             </td>
                                                             <td>
                                                                 <button
-                                                                    type="button"
-                                                                    class="btn btn-link btn-outline btn-sm text-orange-500"
-                                                                    onClick={() =>
-                                                                        setReviewModalOpen(
-                                                                            true
-                                                                        )
-                                                                    }
-                                                                >
+                                  type="button"
+                                  class="btn btn-link btn-outline btn-sm text-orange-500"
+                                  onClick={() =>
+                                  setReviewModalOpen(
+                                    true
+                                  )
+                                  }>
+
                                                                     <span className="ti-eye"></span>{" "}
                                                                     Review
                                                                 </button>
@@ -423,14 +423,14 @@ export default function Dashboard({
                                                             </td>
                                                             <td>
                                                                 <button
-                                                                    type="button"
-                                                                    class="btn btn-link btn-outline btn-sm text-orange-500"
-                                                                    onClick={() =>
-                                                                        setUploadModalOpen(
-                                                                            true
-                                                                        )
-                                                                    }
-                                                                >
+                                  type="button"
+                                  class="btn btn-link btn-outline btn-sm text-orange-500"
+                                  onClick={() =>
+                                  setUploadModalOpen(
+                                    true
+                                  )
+                                  }>
+
                                                                     <span className="ti-eye"></span>{" "}
                                                                     Upload
                                                                 </button>
@@ -466,6 +466,6 @@ export default function Dashboard({
                 </div>
             </section>
 
-        </AdminLayout>
-    );
+        </AdminLayout>);
+
 }

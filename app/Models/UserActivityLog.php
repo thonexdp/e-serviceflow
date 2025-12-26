@@ -24,25 +24,19 @@ class UserActivityLog extends Model
         'changes' => 'array',
     ];
 
-    /**
-     * Get the user that performed the action
-     */
+    
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the related model (polymorphic)
-     */
+    
     public function model()
     {
         return $this->morphTo();
     }
 
-    /**
-     * Log a user activity
-     */
+    
     public static function log($userId, $action, $description = null, $model = null, $changes = null)
     {
         return self::create([

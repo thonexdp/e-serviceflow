@@ -14,9 +14,7 @@ class JobCategory extends Model
         'name',
     ];
 
-    /**
-     * Get the job types for the category.
-     */
+    
     public function jobTypes()
     {
         return $this->hasMany(JobType::class, 'category_id');

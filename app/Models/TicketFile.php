@@ -18,18 +18,13 @@ class TicketFile extends Model
         'type',
     ];
 
-    /**
-     * Get the ticket that owns the file.
-     */
+    
     public function ticket()
     {
         return $this->belongsTo(Ticket::class);
     }
 
-    /**
-     * Get the full URL for the file path.
-     * This ensures files are accessible from Cloud Storage.
-     */
+    
     protected function filePath(): Attribute
     {
         return Attribute::make(
@@ -40,18 +35,18 @@ class TicketFile extends Model
 
                 $disk = config('filesystems.default');
 
-                // For GCS, generate the full public URL
+                
                 if ($disk === 'gcs') {
                     $bucket = config('filesystems.disks.gcs.bucket');
                     return "https://storage.googleapis.com/{$bucket}/{$value}";
                 }
 
-                // For local/public storage, use the /storage/ prefix
+                
                 if ($disk === 'public' || $disk === 'local') {
                     return "/storage/{$value}";
                 }
 
-                // Fallback: try to use Storage::url()
+                
                 try {
                     return Storage::url($value);
                 } catch (\Exception $e) {

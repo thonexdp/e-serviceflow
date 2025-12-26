@@ -8,43 +8,43 @@ import TextInput from '@/Components/TextInput';
 import { useForm } from '@inertiajs/react';
 
 export default function DeleteUserForm({ className = '' }) {
-    const [confirmingUserDeletion, setConfirmingUserDeletion] = useState(false);
-    const passwordInput = useRef();
+  const [confirmingUserDeletion, setConfirmingUserDeletion] = useState(false);
+  const passwordInput = useRef();
 
-    const {
-        data,
-        setData,
-        delete: destroy,
-        processing,
-        reset,
-        errors,
-    } = useForm({
-        password: '',
+  const {
+    data,
+    setData,
+    delete: destroy,
+    processing,
+    reset,
+    errors
+  } = useForm({
+    password: ''
+  });
+
+  const confirmUserDeletion = () => {
+    setConfirmingUserDeletion(true);
+  };
+
+  const deleteUser = (e) => {
+    e.preventDefault();
+
+    destroy(route('profile.destroy'), {
+      preserveScroll: true,
+      onSuccess: () => closeModal(),
+      onError: () => passwordInput.current.focus(),
+      onFinish: () => reset()
     });
+  };
 
-    const confirmUserDeletion = () => {
-        setConfirmingUserDeletion(true);
-    };
+  const closeModal = () => {
+    setConfirmingUserDeletion(false);
 
-    const deleteUser = (e) => {
-        e.preventDefault();
+    reset();
+  };
 
-        destroy(route('profile.destroy'), {
-            preserveScroll: true,
-            onSuccess: () => closeModal(),
-            onError: () => passwordInput.current.focus(),
-            onFinish: () => reset(),
-        });
-    };
-
-    const closeModal = () => {
-        setConfirmingUserDeletion(false);
-
-        reset();
-    };
-
-    return (
-        <section className={`space-y-6 ${className}`}>
+  return (
+    <section className={`space-y-6 ${className}`}>
             <header>
                 <h2 className="text-lg font-medium text-gray-900">Delete Account</h2>
 
@@ -71,16 +71,16 @@ export default function DeleteUserForm({ className = '' }) {
                         <InputLabel htmlFor="password" value="Password" className="sr-only" />
 
                         <TextInput
-                            id="password"
-                            type="password"
-                            name="password"
-                            ref={passwordInput}
-                            value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
-                            className="mt-1 block w-3/4"
-                            isFocused
-                            placeholder="Password"
-                        />
+              id="password"
+              type="password"
+              name="password"
+              ref={passwordInput}
+              value={data.password}
+              onChange={(e) => setData('password', e.target.value)}
+              className="mt-1 block w-3/4"
+              isFocused
+              placeholder="Password" />
+
 
                         <InputError message={errors.password} className="mt-2" />
                     </div>
@@ -94,6 +94,6 @@ export default function DeleteUserForm({ className = '' }) {
                     </div>
                 </form>
             </Modal>
-        </section>
-    );
+        </section>);
+
 }

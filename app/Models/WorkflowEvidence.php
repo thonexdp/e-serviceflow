@@ -27,49 +27,37 @@ class WorkflowEvidence extends Model
         'file_size' => 'integer',
     ];
 
-    /**
-     * Get the ticket this evidence belongs to
-     */
+    
     public function ticket()
     {
         return $this->belongsTo(Ticket::class);
     }
 
-    /**
-     * Get the user who uploaded this evidence
-     */
+    
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the workflow log this evidence is associated with
-     */
+    
     public function workflowLog()
     {
         return $this->belongsTo(WorkflowLog::class);
     }
 
-    /**
-     * Scope to get evidence for a specific workflow step
-     */
+    
     public function scopeForWorkflow($query, string $workflowStep)
     {
         return $query->where('workflow_step', $workflowStep);
     }
 
-    /**
-     * Scope to get evidence for a specific user
-     */
+    
     public function scopeForUser($query, int $userId)
     {
         return $query->where('user_id', $userId);
     }
 
-    /**
-     * Get file size in human-readable format
-     */
+    
     public function getFileSizeHumanAttribute()
     {
         if (!$this->file_size) {
@@ -83,9 +71,7 @@ class WorkflowEvidence extends Model
         return number_format($bytes / pow(1024, $power), 2) . ' ' . $units[$power];
     }
 
-    /**
-     * Check if file is an image
-     */
+    
     public function getIsImageAttribute()
     {
         return str_starts_with($this->mime_type ?? '', 'image/');

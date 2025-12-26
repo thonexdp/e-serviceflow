@@ -6,15 +6,15 @@ import Modal from '@/Components/Main/Modal';
 
 export default function Dashboard({ user = {}, notifications = [], messages = [] }) {
 
-    const [openPaymentModal, setPaymentModalOpen] = useState(false);
+  const [openPaymentModal, setPaymentModalOpen] = useState(false);
 
-    const handleSave = () => {
+  const handleSave = () => {
 
-    }
+  };
 
 
-    return (
-        <AdminLayout user={user} notifications={notifications} messages={messages}>
+  return (
+    <AdminLayout user={user} notifications={notifications} messages={messages}>
             <Head title="Dashboard" />
 
             <div className="row">
@@ -40,13 +40,13 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
             </div>
 
             <Modal
-                title="Payments"
-                isOpen={openPaymentModal}
-                onClose={() => setPaymentModalOpen(false)}
-                onSave={handleSave}
-                size="3xl"
-                submitButtonText="Record Payment"
-            >
+        title="Payments"
+        isOpen={openPaymentModal}
+        onClose={() => setPaymentModalOpen(false)}
+        onSave={handleSave}
+        size="3xl"
+        submitButtonText="Record Payment">
+
                 <form>
                     <div className="flex items-center my-4">
                         <div className="flex-grow border-t border-gray-300"></div>
@@ -73,22 +73,22 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 Paymeny Amount :
                             </label>
                             <input
-                                type="text"
-                                className="mt-1 w-full border rounded-md p-2"
-                                placeholder="Amount"
-                                value=""
-                            // value={forms.ticket.due_date}
+                type="text"
+                className="mt-1 w-full border rounded-md p-2"
+                placeholder="Amount"
+                value="" />
 
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             due_date: e.target.value,
-                            //         },
-                            //     })
-                            // }
-                            />
+
+
+
+
+
+
+
+
+
+
+
                         </div>
                         <div>
                             <label className="block text-sm font-medium">
@@ -107,21 +107,21 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 Notes
                             </label>
                             <input
-                                type="text"
-                                className="mt-1 w-full border rounded-md p-2" // fixed small width
-                                placeholder="Status"
-                                value=""
-                            // value={forms.ticket.quantity}
-                            // onChange={(e) =>
-                            //     setForms({
-                            //         ...forms,
-                            //         ticket: {
-                            //             ...forms.ticket,
-                            //             quantity: e.target.value,
-                            //         },
-                            //     })
-                            // }
-                            />
+                type="text"
+                className="mt-1 w-full border rounded-md p-2"
+                placeholder="Status"
+                value="" />
+
+
+
+
+
+
+
+
+
+
+
                         </div>
                     </div>
                 </form>
@@ -210,9 +210,9 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                     <div className="col-lg-3">
                         <div className="card">
                             {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
+                       <h4>Table Basic </h4>
+                       
+                   </div> */}
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table w-full">
@@ -237,9 +237,9 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                     <div className="col-lg-3">
                         <div className="card">
                             {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
+                       <h4>Table Basic </h4>
+                       
+                   </div> */}
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table w-full">
@@ -264,9 +264,9 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                     <div className="col-lg-3">
                         <div className="card">
                             {/* <div className="card-title">
-                                    <h4>Table Basic </h4>
-                                    
-                                </div> */}
+                       <h4>Table Basic </h4>
+                       
+                   </div> */}
                             <div className="card-body">
                                 <div className="table-responsive">
                                     <table className="table w-full">
@@ -416,7 +416,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 <div className="media">
                                     <div className="media-left">
                                         <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
+                      alt="..." /></a>
                                     </div>
                                     <div className="media-body">
                                         <h4 className="media-heading color-primary">john doe</h4>
@@ -427,7 +427,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 <div className="media">
                                     <div className="media-left">
                                         <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
+                      alt="..." /></a>
                                     </div>
                                     <div className="media-body">
                                         <h4 className="media-heading color-success">Mr. John</h4>
@@ -438,7 +438,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 <div className="media">
                                     <div className="media-left">
                                         <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
+                      alt="..." /></a>
                                     </div>
                                     <div className="media-body">
                                         <h4 className="media-heading color-danger">Mr. John</h4>
@@ -449,7 +449,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 <div className="media">
                                     <div className="media-left">
                                         <a href="#"><img className="media-object" src="images/avatar/1.jpg"
-                                            alt="..." /></a>
+                      alt="..." /></a>
                                     </div>
                                     <div className="media-body">
                                         <h4 className="media-heading color-primary">john doe</h4>
@@ -460,7 +460,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 <div className="media">
                                     <div className="media-left">
                                         <a href="#"><img className="media-object" src="images/avatar/2.jpg"
-                                            alt="..." /></a>
+                      alt="..." /></a>
                                     </div>
                                     <div className="media-body">
                                         <h4 className="media-heading color-success">Mr. John</h4>
@@ -471,7 +471,7 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
                                 <div className="media no-border">
                                     <div className="media-left">
                                         <a href="#"><img className="media-object" src="images/avatar/3.jpg"
-                                            alt="..." /></a>
+                      alt="..." /></a>
                                     </div>
                                     <div className="media-body">
                                         <h4 className="media-heading color-info">Mr. John</h4>
@@ -558,6 +558,6 @@ export default function Dashboard({ user = {}, notifications = [], messages = []
             </section>
 
             <Footer />
-        </AdminLayout>
-    );
+        </AdminLayout>);
+
 }

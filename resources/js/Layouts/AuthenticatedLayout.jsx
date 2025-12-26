@@ -3,19 +3,19 @@ import NotificationToast from '@/Components/NotificationToast';
 
 
 export default function AuthenticatedLayout({
-    user = null,
-    header,
-    children,
-    notifications = [],
-    messages = []
+  user = null,
+  header,
+  children,
+  notifications = [],
+  messages = []
 }) {
-    // Safe user access with fallbacks
-    const userName = user?.name || 'Guest';
-    const userEmail = user?.email || '';
-    const userAvatar = user?.avatar || '/images/avatar/default.jpg';
 
-    return (
-        <div className="min-h-screen bg-gray-100">
+  const userName = user?.name || 'Guest';
+  const userEmail = user?.email || '';
+  const userAvatar = user?.avatar || '/images/avatar/default.jpg';
+
+  return (
+    <div className="min-h-screen bg-gray-100">
             {/* Real-time notifications */}
             <NotificationToast />
 
@@ -30,15 +30,15 @@ export default function AuthenticatedLayout({
                 </div>
             </nav>
 
-            {header && (
-                <header className="bg-white shadow">
+            {header &&
+      <header className="bg-white shadow">
                     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                         {header}
                     </div>
                 </header>
-            )}
+      }
 
             <main>{children}</main>
-        </div>
-    );
+        </div>);
+
 }

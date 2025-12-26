@@ -22,40 +22,18 @@ use App\Models\JobCategory;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-/*
-|-----------------------------  ---------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
-*/
-
-/*
-|--------------------------------------------------------------------------
-| Public Routes (No Authentication Required)
-|--------------------------------------------------------------------------
-*/
-
-// Customer view (public homepage)
 Route::get('/', function () {
-    // TODO: Implement customer-facing homepage
     return Inertia::render('Public/Home');
 })->name('home');
 
-// Order tracking (public)
 Route::get('/track', function () {
     return view('tracking');
 })->name('track');
 
-// Public API for ticket search
 Route::post('/api/public/tickets/search', [PublicTicketController::class, 'search'])
     ->middleware('throttle:api')
     ->name('public.tickets.search');
 
-// Public API for orders
 Route::post('/api/public/orders/customer/find-or-create', [PublicOrderController::class, 'findOrCreateCustomer'])
     ->middleware('throttle:api')
     ->name('public.orders.customer.find-or-create');
@@ -64,12 +42,10 @@ Route::post('/api/public/orders', [PublicOrderController::class, 'storeOrder'])
     ->middleware('throttle:api')
     ->name('public.orders.store');
 
-// CSRF Token Refresh Endpoint
 Route::get('/csrf-token', function () {
     return response()->json(['csrf_token' => csrf_token()]);
 })->name('csrf.token');
 
-// About page (public)
 Route::get('/orders', function () {
     $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
         $query->where('is_active', true)
@@ -78,7 +54,6 @@ Route::get('/orders', function () {
             ->orderBy('name');
     }])->orderBy('name')->get();
 
-    // Get branches that can accept orders
     $branches = \App\Models\Branch::where('is_active', true)
         ->where('can_accept_orders', true)
         ->orderBy('sort_order')
@@ -92,7 +67,6 @@ Route::get('/orders', function () {
 })->name('orders');
 
 
-// Notifications
 Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
 Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
 Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
@@ -100,10 +74,8 @@ Route::patch('/notifications/read-all', [NotificationController::class, 'markAll
 Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
 Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->group(function () {
-    // Admin Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Tickets Management
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
@@ -217,7 +189,6 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// Shared routes for all authenticated users (password update)
 Route::middleware('auth')->group(function () {
     Route::put('/user/password', [ProfileController::class, 'updatePassword'])->name('user.password.update');
 });
@@ -241,6 +212,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
 
+
     // Finance Hub
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
@@ -251,6 +223,8 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
 
     // Inventory (Read-only for FrontDesk)
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::get('/inventory/low-stock', [InventoryController::class, 'lowStock'])->name('inventory.low-stock');
+
 
     // Production Queue (View-only for FrontDesk)
     Route::get('/production', [ProductionQueueController::class, 'index'])->name('production.index');
@@ -311,18 +285,14 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     Route::post('/queue/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->name('queue.record-stock');
     Route::post('/queue/{id}/assign-users', [ProductionQueueController::class, 'assignUsers'])->name('queue.assign-users');
 
-    // New Workflow-Based Routes
-    // All Tickets View (Production Head only)
     Route::get('/tickets/all', [ProductionQueueController::class, 'allTickets'])
         ->middleware('production_head')
         ->name('tickets.all');
 
-    // Assign users to workflow steps (Production Head only)
     Route::post('/tickets/{ticket}/assign-workflow', [ProductionQueueController::class, 'assignWorkflow'])
         ->middleware('production_head')
         ->name('tickets.assign-workflow');
 
-    // Workflow-specific views
     Route::get('/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
         ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
         ->name('workflow.view');
@@ -339,10 +309,8 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
         ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
         ->name('workflow.complete');
 
-    // Completed tickets
     Route::get('/completed', [ProductionQueueController::class, 'completedTickets'])->name('completed');
 
-    // Inventory (View for stock consumption)
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
     Route::put('/inventory/{id}', [InventoryController::class, 'update'])->name('inventory.update');
@@ -351,7 +319,6 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     Route::get('/inventory/{id}/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
     Route::get('/inventory/low-stock', [InventoryController::class, 'lowStock'])->name('inventory.low-stock');
 
-    // Purchase Orders
     Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
     Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
@@ -363,15 +330,12 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
     Route::post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
     Route::post('/purchase-orders/{id}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
 
-    // Tickets (View-only for context)
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
     Route::get('/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('files.download');
 
-    // Reports
     Route::get('/reports', [App\Http\Controllers\ProductionReportController::class, 'index'])->name('reports');
 
-    // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
@@ -385,10 +349,8 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
 });
 
 Route::prefix('cashier')->middleware(['auth', 'role:admin,Cashier'])->name('cashier.')->group(function () {
-    // Cashier Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Finance Hub
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
     Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
@@ -398,15 +360,12 @@ Route::prefix('cashier')->middleware(['auth', 'role:admin,Cashier'])->name('cash
     Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
 
-    // Tickets (Read-only view for payment lookup)
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
 
-    // Customer Management
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
 
-    // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
@@ -419,11 +378,6 @@ Route::prefix('cashier')->middleware(['auth', 'role:admin,Cashier'])->name('cash
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Fallback Route - Redirect to appropriate dashboard based on role
-|--------------------------------------------------------------------------
-*/
 
 Route::get('/dashboard', function () {
     if (!auth()->check()) {
@@ -445,31 +399,12 @@ Route::get('/dashboard', function () {
         return redirect()->route('cashier.dashboard');
     }
 
-    // Default fallback
     return redirect()->route('home');
 })->middleware('auth')->name('dashboard');
 
-// Legacy tracking route (kept for backward compatibility)
 Route::get('/tracking', function () {
     return redirect()->route('track');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Error Page Test Routes (Remove in Production)
-|--------------------------------------------------------------------------
-| These routes allow you to test the custom error pages during development.
-| Comment out or remove these routes before deploying to production.
-*/
-
-if (config('app.debug')) {
-    Route::get('/test-error-401', fn() => abort(401))->name('test.error.401');
-    Route::get('/test-error-403', fn() => abort(403))->name('test.error.403');
-    Route::get('/test-error-404', fn() => abort(404))->name('test.error.404');
-    Route::get('/test-error-419', fn() => abort(419))->name('test.error.419');
-    Route::get('/test-error-429', fn() => abort(429))->name('test.error.429');
-    Route::get('/test-error-500', fn() => abort(500))->name('test.error.500');
-    Route::get('/test-error-503', fn() => abort(503))->name('test.error.503');
-}
 
 require __DIR__ . '/auth.php';

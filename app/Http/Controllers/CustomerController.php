@@ -8,9 +8,7 @@ use Inertia\Inertia;
 
 class CustomerController extends Controller
 {
-    /**
-     * Display a listing of customers.
-     */
+    
     public function index(Request $request)
     {
         $customers = Customer::query()
@@ -26,7 +24,7 @@ class CustomerController extends Controller
             })
             ->latest()
             ->paginate(20);
-        // ->withQueryString();
+        
 
         return Inertia::render('Customers', [
             'customers' => $customers,
@@ -53,9 +51,7 @@ class CustomerController extends Controller
     }
 
 
-    /**
-     * Store a newly created customer.
-     */
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -80,9 +76,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer created successfully!');
     }
 
-    /**
-     * Update the specified customer.
-     */
+    
     public function update(Request $request, Customer $customer)
     {
         $validated = $request->validate([
@@ -99,9 +93,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer updated successfully!');
     }
 
-    /**
-     * Remove the specified customer.
-     */
+    
     public function destroy(Customer $customer)
     {
         try {

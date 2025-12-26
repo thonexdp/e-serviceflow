@@ -21,17 +21,13 @@ class Customer extends Model
 
     protected $appends = ['full_name'];
 
-    /**
-     * Get the full name attribute.
-     */
+    
     public function getFullNameAttribute(): string
     {
         return "{$this->firstname} {$this->lastname}";
     }
 
-    /**
-     * Get the tickets for the customer.
-     */
+    
     public function tickets()
     {
         return $this->hasMany(Ticket::class);

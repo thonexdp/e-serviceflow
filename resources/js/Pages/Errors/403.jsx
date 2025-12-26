@@ -1,8 +1,8 @@
 import { Link, Head } from '@inertiajs/react';
 
 export default function Error403() {
-    return (
-        <>
+  return (
+    <>
             <Head title="403 - Access Forbidden" />
             <div className="min-h-screen bg-white flex items-center justify-center p-4">
                 <div className="max-w-2xl w-full text-center">
@@ -29,20 +29,20 @@ export default function Error403() {
                     {/* Action buttons */}
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Link
-                            href="/"
-                            className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                        >
+              href="/"
+              className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors">
+
                             Go to Homepage
                         </Link>
                         <button
-                            onClick={() => window.history.back()}
-                            className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                        >
+              onClick={() => window.history.back()}
+              className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+
                             Go Back
                         </button>
                     </div>
                 </div>
             </div>
-        </>
-    );
+        </>);
+
 }
