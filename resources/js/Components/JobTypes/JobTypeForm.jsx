@@ -12,6 +12,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         discount: "",
         incentive_price: "",
         is_active: true,
+        show_in_dashboard: true,
         sort_order: 0,
     });
 
@@ -42,6 +43,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                 price_by: jobType.price_by || "pcs",
                 discount: jobType.discount || "",
                 is_active: jobType.is_active !== undefined ? jobType.is_active : true,
+                show_in_dashboard: jobType.show_in_dashboard !== undefined ? jobType.show_in_dashboard : true,
                 sort_order: jobType.sort_order || 0,
             });
             setPriceTiers(
@@ -391,19 +393,35 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     return (
         <form onSubmit={handleSubmit}>
             <div className="row mt-1 justify-end">
-                <label className="block text-sm font-medium text-gray-700 mr-2">
-                    Status:
-                </label>
-                <input
-                    type="checkbox"
-                    name="is_active"
-                    checked={formData.is_active}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700">
-                    Active
-                </label>
+                <div className="d-flex align-items-center gap-4">
+                    <div className="d-flex align-items-center">
+                        <label className="block text-sm font-medium text-gray-700 mr-2">
+                            Status:
+                        </label>
+                        <input
+                            type="checkbox"
+                            name="is_active"
+                            checked={formData.is_active}
+                            onChange={handleChange}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                        />
+                        <label className="ml-2 text-sm text-gray-700">
+                            Active
+                        </label>
+                    </div>
+                    <div className="d-flex align-items-center">
+                        <input
+                            type="checkbox"
+                            name="show_in_dashboard"
+                            checked={formData.show_in_dashboard}
+                            onChange={handleChange}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                        />
+                        <label className="ml-2 text-sm text-gray-700">
+                            Show in Dashboard
+                        </label>
+                    </div>
+                </div>
             </div>
             <div className="row">
                 <div className="col-md-6">

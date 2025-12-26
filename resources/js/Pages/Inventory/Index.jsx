@@ -30,6 +30,7 @@ export default function InventoryIndex({
     const [adjustQuantity, setAdjustQuantity] = useState(0);
     const [adjustNotes, setAdjustNotes] = useState("");
     const [isAreaBased, setIsAreaBased] = useState(false);
+    const [isGarment, setIsGarment] = useState(false);
     const { flash, auth, errors } = usePage().props;
 
     const isAdmin = auth?.user?.role === "admin";
@@ -37,6 +38,7 @@ export default function InventoryIndex({
     const handleOpenModal = (stockItem = null) => {
         setEditingStockItem(stockItem);
         setIsAreaBased(stockItem?.is_area_based || false);
+        setIsGarment(stockItem?.is_garment || false);
         setStockModalOpen(true);
     };
     const hasPermission = (module, feature) => {
@@ -53,12 +55,19 @@ export default function InventoryIndex({
         setAdjustQuantity(0);
         setAdjustNotes("");
         setIsAreaBased(false);
+        setIsGarment(false);
         setSubmitting(false);
         setLoading(false);
     };
 
     const handleOpenAdjustModal = (stockItem) => {
+        if (!hasPermission('inventory', 'adjust')) {
+            alert('You do not have permission to adjust stock.');
+            return;
+        }
         setSelectedStockItem(stockItem);
+        setAdjustQuantity(0);
+        setAdjustNotes("");
         setAdjustModalOpen(true);
     };
 
@@ -74,7 +83,12 @@ export default function InventoryIndex({
             data.is_area_based === "on" ||
             data.is_area_based === true ||
             isAreaBased;
-        data.job_type_id = parseInt(data.job_type_id);
+        data.is_garment =
+            data.is_garment === "on" ||
+            data.is_garment === true ||
+            isGarment;
+        // Only set job_type_id if provided (garment items don't require it)
+        data.job_type_id = data.job_type_id ? parseInt(data.job_type_id) : null;
         data.current_stock = parseFloat(data.current_stock) || 0;
         data.minimum_stock_level = parseFloat(data.minimum_stock_level) || 0;
         data.maximum_stock_level = parseFloat(data.maximum_stock_level) || 0;
@@ -125,10 +139,24 @@ export default function InventoryIndex({
         e.preventDefault();
         if (!selectedStockItem) return;
 
+        if (!hasPermission('inventory', 'adjust')) {
+            alert('You do not have permission to adjust stock.');
+            return;
+        }
+
+        let quantity = parseFloat(adjustQuantity);
+        
+        // If user has 'adjust' permission but not 'update', convert positive to negative
+        if (hasPermission('inventory', 'adjust') && !hasPermission('inventory', 'update')) {
+            if (quantity > 0) {
+                quantity = -quantity;
+            }
+        }
+
         router.post(
             buildUrl(`/inventory/${selectedStockItem.id}/adjust`),
             {
-                quantity: parseFloat(adjustQuantity),
+                quantity: quantity,
                 notes: adjustNotes,
             },
             {
@@ -287,43 +315,76 @@ export default function InventoryIndex({
         {
             label: "Actions",
             key: "actions",
-            adminOnly: true,
-            render: (row) => (
-                <div className="btn-group">
-                    <button
-                        type="button"
-                        className="btn btn-link btn-sm text-orange-500"
-                        onClick={() =>
-                            router.get(buildUrl(`/inventory/${row.id}/movements`))
-                        }
-                    >
-                        <i className="ti-eye"></i> Movements
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-link btn-sm text-warning"
-                        onClick={() => handleOpenAdjustModal(row)}
-                    >
-                        <i className="ti-pencil"></i> Adjust
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-link btn-sm text-primary"
-                        onClick={() => handleOpenModal(row)}
-                    >
-                        <i className="ti-pencil"></i> Edit
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-link btn-sm text-danger"
-                        onClick={() => handleDelete(row.id)}
-                    >
-                        <i className="ti-trash"></i> Delete
-                    </button>
-                </div>
-            ),
+            render: (row) => {
+                const canRead = isAdmin || hasPermission('inventory', 'read');
+                const canUpdate = isAdmin || hasPermission('inventory', 'update');
+                const canDelete = isAdmin || hasPermission('inventory', 'delete');
+                const canAdjust = isAdmin || hasPermission('inventory', 'adjust');
+
+                // Don't show actions column if user has no permissions
+                if (!canRead && !canUpdate && !canDelete && !canAdjust) {
+                    return null;
+                }
+
+                return (
+                    <div className="btn-group">
+                        {isAdmin && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-orange-500"
+                                onClick={() =>
+                                    router.get(buildUrl(`/inventory/${row.id}/movements`))
+                                }
+                            >
+                                <i className="ti-eye"></i> Movements
+                            </button>
+                        )}
+                        {canAdjust && (isAdmin || row.is_garment) && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-warning"
+                                onClick={() => handleOpenAdjustModal(row)}
+                            >
+                                <i className="ti-pencil"></i> Adjust
+                            </button>
+                        )}
+                        {canUpdate && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-primary"
+                                onClick={() => handleOpenModal(row)}
+                            >
+                                <i className="ti-pencil"></i> Edit
+                            </button>
+                        )}
+                        {canDelete && (
+                            <button
+                                type="button"
+                                className="btn btn-link btn-sm text-danger"
+                                onClick={() => handleDelete(row.id)}
+                            >
+                                <i className="ti-trash"></i> Delete
+                            </button>
+                        )}
+                    </div>
+                );
+            },
         },
-    ].filter((col) => !col.adminOnly || isAdmin);
+    ].filter((col) => {
+        // Filter out adminOnly columns if user is not admin
+        if (col.adminOnly && !isAdmin) {
+            return false;
+        }
+        // Filter out actions column if user has no permissions
+        if (col.key === 'actions') {
+            const canRead = isAdmin || hasPermission('inventory', 'read');
+            const canUpdate = isAdmin || hasPermission('inventory', 'update');
+            const canDelete = isAdmin || hasPermission('inventory', 'delete');
+            const canAdjust = isAdmin || hasPermission('inventory', 'adjust');
+            return canRead || canUpdate || canDelete || canAdjust;
+        }
+        return true;
+    });
 
     return (
         <AdminLayout
@@ -427,7 +488,7 @@ export default function InventoryIndex({
                                 type="select"
                                 name="job_type_id"
                                 defaultValue={editingStockItem?.job_type_id}
-                                required
+                                required={!isGarment}
                                 error={errors?.job_type_id}
                                 options={[
                                     { value: "", label: "Select Job Type" },
@@ -488,6 +549,31 @@ export default function InventoryIndex({
                                 <small className="text-muted d-block mt-1">
                                     Check if this material is cut by area
                                     (tarpaulin, fabric, etc.)
+                                </small>
+                            </div>
+                        </div>
+                        <div className="col-md-6">
+                            <div className="mb-4">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        name="is_garment"
+                                        id="is_garment"
+                                        checked={isGarment}
+                                        onChange={(e) => {
+                                            setIsGarment(e.target.checked);
+                                        }}
+                                        className="h-4 w-4 text-orange-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="is_garment"
+                                        className="text-sm font-medium text-gray-700"
+                                    >
+                                        Garment
+                                    </label>
+                                </div>
+                                <small className="text-muted d-block mt-1">
+                                    Check if this is a garment item that requires manual stock management (Job Type becomes optional)
                                 </small>
                             </div>
                         </div>
@@ -636,16 +722,46 @@ export default function InventoryIndex({
                                 {selectedStockItem.base_unit_of_measure}
                             </p>
                         </div>
-                        <FormInput
-                            label="Adjustment Quantity"
-                            type="number"
-                            name="quantity"
-                            value={adjustQuantity}
-                            onChange={(e) => setAdjustQuantity(e.target.value)}
-                            step="0.01"
-                            required
-                            placeholder="Positive for increase, negative for decrease"
-                        />
+                        <div className="mb-4">
+                            <label
+                                htmlFor="adjustment_quantity"
+                                className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                                Adjustment Quantity <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="adjustment_quantity"
+                                type="number"
+                                name="quantity"
+                                value={adjustQuantity}
+                                onChange={(e) => {
+                                    setAdjustQuantity(e.target.value);
+                                }}
+                                onBlur={(e) => {
+                                    // If user has 'adjust' but not 'update', automatically convert positive to negative on blur
+                                    if (hasPermission('inventory', 'adjust') && !hasPermission('inventory', 'update')) {
+                                        const numValue = parseFloat(e.target.value);
+                                        if (!isNaN(numValue) && numValue > 0) {
+                                            setAdjustQuantity(-numValue);
+                                        }
+                                    }
+                                }}
+                                step="0.01"
+                                required
+                                min={hasPermission('inventory', 'update') ? undefined : -999999}
+                                placeholder={
+                                    hasPermission('inventory', 'update')
+                                        ? "Positive for increase, negative for decrease"
+                                        : "Enter value to deduct stock (automatically converted to negative)"
+                                }
+                                className="w-full text-sm rounded-md border border-gray-300 p-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition duration-150 ease-in-out placeholder-gray-400 bg-white"
+                            />
+                        </div>
+                        {!hasPermission('inventory', 'update') && (
+                            <small className="text-muted d-block mt-1">
+                                You can only deduct stock. Positive values will be automatically converted to negative.
+                            </small>
+                        )}
                         <FormInput
                             label="Notes"
                             type="textarea"
@@ -709,7 +825,7 @@ export default function InventoryIndex({
                                             <div>
                                                 {lowStockCount > 0 && (
                                                     <a
-                                                        href="/inventory/low-stock"
+                                                        href={buildUrl('/inventory/low-stock')}
                                                         className="btn btn-warning btn-sm mr-2"
                                                     >
                                                         <i className="ti-alert"></i>{" "}
@@ -717,7 +833,7 @@ export default function InventoryIndex({
                                                         {lowStockCount})
                                                     </a>
                                                 )}
-                                                {isAdmin && (
+                                                {(isAdmin || hasPermission('inventory', 'create')) && (
                                                     <button
                                                         className="btn btn-primary btn-sm"
                                                         onClick={() =>

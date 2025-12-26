@@ -15,6 +15,8 @@ export default function Cashier({
         totalReceivables: 0,
         readyForPickupUnpaid: 0,
         todayTransactionsCount: 0,
+        pendingChequesAmount: 0,
+        monthExpenses: 0,
     },
     urgentReceivables = [],
     latestCollections = [],
@@ -101,20 +103,20 @@ export default function Cashier({
                     </div>
                     <div className="col-lg-3">
                         <CardStatistics
-                            label="This Month"
-                            statistics={formatPeso(statistics.monthCollections)}
-                            icon="ti-stats-up"
+                            label="Pending Cheques"
+                            statistics={formatPeso(statistics.pendingChequesAmount || 0)}
+                            icon="ti-credit-card"
                             color="bg-info"
-                            subtitle="Total collections MTD"
+                            subtitle="Payments awaiting clearance"
                         />
                     </div>
                     <div className="col-lg-3">
                         <CardStatistics
-                            label="Net Receivables"
-                            statistics={formatPeso(statistics.totalReceivables)}
-                            icon="ti-receipt"
+                            label="This Month's Expenses"
+                            statistics={formatPeso(statistics.monthExpenses || 0)}
+                            icon="ti-shopping-cart"
                             color="bg-danger"
-                            subtitle="Total outstanding balances"
+                            subtitle="Total expenses MTD"
                         />
                     </div>
                     <div className="col-lg-3">
