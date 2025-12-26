@@ -105,14 +105,10 @@ class Ticket extends Model
     protected static function generateTicketNumber(): string
     {
         do {
-            $code = 'RC-' . strtoupper(Str::random(8));
+            $code = 'RC-' . now()->year . '-' . strtoupper(Str::random(4));
         } while (static::where('ticket_number', $code)->exists());
-
-        return $code;
-
         
-        
-
+        return $code;        
         
     }
 
