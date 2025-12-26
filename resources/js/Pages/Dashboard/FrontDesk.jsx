@@ -7,6 +7,7 @@ import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import CardStatistics from "@/Components/Common/CardStatistics";
 import { formatPeso } from "@/Utils/currency";
 import { formatDate } from "@/Utils/formatDate";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function FrontDesk({
     user = {},
@@ -57,6 +58,7 @@ export default function FrontDesk({
     const [verifyFormData, setVerifyFormData] = useState({
         notes: "",
     });
+    const { api } = useRoleApi();
 
     const refreshDashboard = () => {
         setRefreshing(true);
@@ -183,19 +185,13 @@ export default function FrontDesk({
     const handleVerifyPayment = async () => {
         setIsUpdating(true);
         try {
-            // Using the api instance if available or just router
-            router.patch(`/frontdesk/tickets/${selectedTicket.id}/verify-payment`, verifyFormData, {
-                onSuccess: () => {
-                    closeVerifyModal();
-                    refreshDashboard();
-                },
-                onError: (errors) => {
-                    alert(errors.message || "Failed to verify order.");
-                }
-            });
+            await api.patch(`/tickets/${selectedTicket.id}/verify-payment`, verifyFormData);
+
+            closeVerifyModal();
+            refreshDashboard();
         } catch (error) {
             console.error("Verification failed", error);
-            alert("Failed to verify order. Please try again.");
+            alert(error.response?.data?.message || "Failed to verify payment. Please check your data.");
         } finally {
             setIsUpdating(false);
         }
@@ -662,12 +658,14 @@ export default function FrontDesk({
                                                             )}
                                                         </td>
                                                         <td>
+                                                            {ticket.payment_status === 'awaiting_verification' && (
                                                             <button
                                                                 className="btn btn-sm btn-success btn-flat"
                                                                 onClick={() => handleOpenVerifyModal(ticket)}
                                                             >
                                                                 <i className="ti-check-box"></i> Verify
                                                             </button>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 ))

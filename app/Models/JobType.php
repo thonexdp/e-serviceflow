@@ -23,6 +23,7 @@ class JobType extends Model
         'incentive_price',
         'promo_text',
         'is_active',
+        'show_in_dashboard',
         'sort_order',
         'workflow_steps',
     ];
@@ -32,6 +33,7 @@ class JobType extends Model
         'discount' => 'decimal:2',
         'incentive_price' => 'decimal:2',
         'is_active' => 'boolean',
+        'show_in_dashboard' => 'boolean',
         'sort_order' => 'integer',
         'workflow_steps' => 'array',
     ];

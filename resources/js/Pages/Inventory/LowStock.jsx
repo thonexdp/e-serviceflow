@@ -13,7 +13,8 @@ export default function InventoryLowStock({
     lowStockItems = [],
 }) {
     const { flash } = usePage().props;
-    const { buildUrl } = useRoleApi();
+    const { buildUrl, auth } = useRoleApi();
+    const isAdmin = auth?.user?.role === "admin";
 
 
     const getStockStatusBadge = (stockItem) => {
@@ -67,13 +68,18 @@ export default function InventoryLowStock({
                     >
                         <i className="ti-shopping-cart"></i> Create PO
                     </button>
-                    <button
-                        type="button"
-                        className="btn btn-link btn-sm text-orange-500"
-                        onClick={() => router.get(buildUrl(`/inventory/${row.id}/movements`))}
-                    >
-                        <i className="ti-eye"></i> Movements
-                    </button>
+                    {
+                        isAdmin && (
+                            <button
+                            type="button"
+                            className="btn btn-link btn-sm text-orange-500"
+                            onClick={() => router.get(buildUrl(`/inventory/${row.id}/movements`))}
+                        >
+                            <i className="ti-eye"></i> Movements
+                        </button>
+                        )
+                    }
+                    
                 </div>
             ),
         },

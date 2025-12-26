@@ -93,8 +93,15 @@ class InventoryController extends Controller
     {
         try {
 
+            // Check if is_garment is checked (can be true, 1, '1', or 'on')
+            $isGarment = $request->has('is_garment') && 
+                        ($request->is_garment === true || 
+                         $request->is_garment === 1 || 
+                         $request->is_garment === '1' || 
+                         $request->is_garment === 'on');
+
             $validated = $request->validate([
-                'job_type_id' => 'required|exists:job_types,id',
+                'job_type_id' => $isGarment ? 'nullable|exists:job_types,id' : 'required|exists:job_types,id',
                 'sku' => [
                     'required',
                     'string',
@@ -105,6 +112,7 @@ class InventoryController extends Controller
                 'description' => 'nullable|string',
                 'base_unit_of_measure' => 'required|string|max:50',
                 'is_area_based' => 'boolean',
+                'is_garment' => 'boolean',
                 'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
                 'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
                 'current_stock' => 'nullable|numeric|min:0',
@@ -147,12 +155,20 @@ class InventoryController extends Controller
     {
         $stockItem = StockItem::findOrFail($id);
 
+        // Check if is_garment is checked (can be true, 1, '1', or 'on')
+        $isGarment = $request->has('is_garment') && 
+                    ($request->is_garment === true || 
+                     $request->is_garment === 1 || 
+                     $request->is_garment === '1' || 
+                     $request->is_garment === 'on');
+
         $validated = $request->validate([
-            'job_type_id' => 'required|exists:job_types,id',
+            'job_type_id' => $isGarment ? 'nullable|exists:job_types,id' : 'required|exists:job_types,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'base_unit_of_measure' => 'required|string|max:50',
             'is_area_based' => 'boolean',
+            'is_garment' => 'boolean',
             'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
             'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
             'minimum_stock_level' => 'nullable|numeric|min:0',

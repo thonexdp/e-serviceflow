@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import AdminLayout from '@/Components/Layouts/AdminLayout';
 
@@ -15,9 +15,10 @@ export default function Settings({ settings: initialSettings }) {
         },
         payment_gcash_account_name: initialSettings?.payment_gcash_account_name || '',
         payment_gcash_number: initialSettings?.payment_gcash_number || '',
-        payment_bank_name: initialSettings?.payment_bank_name || '',
-        payment_bank_account_name: initialSettings?.payment_bank_account_name || '',
-        payment_bank_account_number: initialSettings?.payment_bank_account_number || '',
+        payment_gcash_show_on_customer_page: initialSettings?.payment_gcash_show_on_customer_page !== undefined 
+            ? initialSettings.payment_gcash_show_on_customer_page 
+            : true,
+        payment_bank_accounts: initialSettings?.payment_bank_accounts || [],
     });
 
     const [qrcodeFile, setQrcodeFile] = useState(null);
@@ -26,6 +27,22 @@ export default function Settings({ settings: initialSettings }) {
     const [customerOrderQrcodePreview, setCustomerOrderQrcodePreview] = useState(initialSettings?.customer_order_qrcode || '');
     const [showUpload, setShowUpload] = useState(!initialSettings?.customer_order_qrcode);
     const [saving, setSaving] = useState(false);
+    const [bankQrcodeFiles, setBankQrcodeFiles] = useState({});
+    const [bankQrcodePreviews, setBankQrcodePreviews] = useState({});
+    const [alertMessage, setAlertMessage] = useState({ type: '', message: '' });
+
+    // Initialize bank QR code previews from initial settings
+    useEffect(() => {
+        if (initialSettings?.payment_bank_accounts) {
+            const previews = {};
+            initialSettings.payment_bank_accounts.forEach((account, index) => {
+                if (account.qrcode) {
+                    previews[index] = account.qrcode;
+                }
+            });
+            setBankQrcodePreviews(previews);
+        }
+    }, []);
 
     const handleBusinessHoursChange = (field, value) => {
         setSettings(prev => ({
@@ -57,6 +74,60 @@ export default function Settings({ settings: initialSettings }) {
         }
     };
 
+    const handleBankQRCodeUpload = (index, e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setBankQrcodeFiles(prev => ({ ...prev, [index]: file }));
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setBankQrcodePreviews(prev => ({ ...prev, [index]: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const addBankAccount = () => {
+        setSettings(prev => ({
+            ...prev,
+            payment_bank_accounts: [
+                ...prev.payment_bank_accounts,
+                {
+                    bank_name: '',
+                    account_name: '',
+                    account_number: '',
+                    qrcode: ''
+                }
+            ]
+        }));
+    };
+
+    const removeBankAccount = (index) => {
+        setSettings(prev => ({
+            ...prev,
+            payment_bank_accounts: prev.payment_bank_accounts.filter((_, i) => i !== index)
+        }));
+        // Clean up file states
+        setBankQrcodeFiles(prev => {
+            const newState = { ...prev };
+            delete newState[index];
+            return newState;
+        });
+        setBankQrcodePreviews(prev => {
+            const newState = { ...prev };
+            delete newState[index];
+            return newState;
+        });
+    };
+
+    const updateBankAccount = (index, field, value) => {
+        setSettings(prev => ({
+            ...prev,
+            payment_bank_accounts: prev.payment_bank_accounts.map((account, i) =>
+                i === index ? { ...account, [field]: value } : account
+            )
+        }));
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         setSaving(true);
@@ -75,14 +146,20 @@ export default function Settings({ settings: initialSettings }) {
         // Payment - GCash
         formData.append('payment_gcash_account_name', settings.payment_gcash_account_name);
         formData.append('payment_gcash_number', settings.payment_gcash_number);
+        formData.append('payment_gcash_show_on_customer_page', settings.payment_gcash_show_on_customer_page ? '1' : '0');
         if (qrcodeFile) {
             formData.append('payment_gcash_qrcode', qrcodeFile);
         }
 
-        // Payment - Bank
-        formData.append('payment_bank_name', settings.payment_bank_name);
-        formData.append('payment_bank_account_name', settings.payment_bank_account_name);
-        formData.append('payment_bank_account_number', settings.payment_bank_account_number);
+        // Payment - Bank Accounts (as JSON)
+        formData.append('payment_bank_accounts', JSON.stringify(settings.payment_bank_accounts));
+        
+        // Upload bank QR codes
+        Object.keys(bankQrcodeFiles).forEach(index => {
+            if (bankQrcodeFiles[index]) {
+                formData.append(`payment_bank_qrcode_${index}`, bankQrcodeFiles[index]);
+            }
+        });
 
         // Customer Order QR Code
         if (customerOrderQrcodeFile) {
@@ -94,12 +171,16 @@ export default function Settings({ settings: initialSettings }) {
             onSuccess: () => {
                 setSaving(false);
                 setShowUpload(false);
-                alert('Settings updated successfully!');
+                setAlertMessage({ type: 'success', message: 'Settings updated successfully!' });
+                // Auto-dismiss success message after 5 seconds
+                setTimeout(() => {
+                    setAlertMessage({ type: '', message: '' });
+                }, 5000);
             },
             onError: (errors) => {
                 setSaving(false);
                 console.error('Error updating settings:', errors);
-                alert('Failed to update settings. Please try again.');
+                setAlertMessage({ type: 'danger', message: 'Failed to update settings. Please try again.' });
             }
         });
     };
@@ -208,6 +289,23 @@ export default function Settings({ settings: initialSettings }) {
                                     <div className="mb-4">
                                         <h5 className="mb-3">GCash Payment Details</h5>
                                         <div className="row">
+                                            <div className="col-md-12 mb-3">
+                                                <div className="form-check">
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        checked={settings.payment_gcash_show_on_customer_page}
+                                                        onChange={(e) => setSettings({ ...settings, payment_gcash_show_on_customer_page: e.target.checked })}
+                                                        id="showGcashOnCustomerPage"
+                                                    />
+                                                    <label className="form-check-label" htmlFor="showGcashOnCustomerPage">
+                                                        Show GCash payment details on customer order page
+                                                    </label>
+                                                </div>
+                                                <p className="text-muted small mt-1">
+                                                    When checked, customers will see GCash payment details when placing an order. Uncheck to hide it.
+                                                </p>
+                                            </div>
                                             <div className="col-md-6 mb-3">
                                                 <label className="form-label">Account Name</label>
                                                 <input
@@ -249,39 +347,88 @@ export default function Settings({ settings: initialSettings }) {
 
                                     {/* Bank Transfer Payment */}
                                     <div className="mb-4">
-                                        <h5 className="mb-3">Bank Transfer Details</h5>
-                                        <div className="row">
-                                            <div className="col-md-4 mb-3">
-                                                <label className="form-label">Bank Name</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-control"
-                                                    value={settings.payment_bank_name}
-                                                    onChange={(e) => setSettings({ ...settings, payment_bank_name: e.target.value })}
-                                                    placeholder="BDO (Banco de Oro)"
-                                                />
-                                            </div>
-                                            <div className="col-md-4 mb-3">
-                                                <label className="form-label">Account Name</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-control"
-                                                    value={settings.payment_bank_account_name}
-                                                    onChange={(e) => setSettings({ ...settings, payment_bank_account_name: e.target.value })}
-                                                    placeholder="RC PrintShoppe"
-                                                />
-                                            </div>
-                                            <div className="col-md-4 mb-3">
-                                                <label className="form-label">Account Number</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-control"
-                                                    value={settings.payment_bank_account_number}
-                                                    onChange={(e) => setSettings({ ...settings, payment_bank_account_number: e.target.value })}
-                                                    placeholder="1234 5678 9012"
-                                                />
-                                            </div>
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 className="mb-0">Bank Transfer Details</h5>
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm btn-primary"
+                                                onClick={addBankAccount}
+                                            >
+                                                <i className="fa fa-plus me-1"></i> Add Bank Account
+                                            </button>
                                         </div>
+                                        {settings.payment_bank_accounts.length === 0 && (
+                                            <div className="alert alert-info">
+                                                No bank accounts added yet. Click "Add Bank Account" to add one.
+                                            </div>
+                                        )}
+                                        {settings.payment_bank_accounts.map((account, index) => (
+                                            <div key={index} className="card mb-3">
+                                                <div className="card-header d-flex justify-content-between align-items-center">
+                                                    <strong>Bank Account #{index + 1}</strong>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-danger"
+                                                        onClick={() => removeBankAccount(index)}
+                                                    >
+                                                        <i className="fa fa-trash me-1"></i> Remove
+                                                    </button>
+                                                </div>
+                                                <div className="card-body">
+                                                    <div className="row">
+                                                        <div className="col-md-4 mb-3">
+                                                            <label className="form-label">Bank Name</label>
+                                                            <input
+                                                                type="text"
+                                                                className="form-control"
+                                                                value={account.bank_name}
+                                                                onChange={(e) => updateBankAccount(index, 'bank_name', e.target.value)}
+                                                                placeholder="BDO (Banco de Oro)"
+                                                            />
+                                                        </div>
+                                                        <div className="col-md-4 mb-3">
+                                                            <label className="form-label">Account Name</label>
+                                                            <input
+                                                                type="text"
+                                                                className="form-control"
+                                                                value={account.account_name}
+                                                                onChange={(e) => updateBankAccount(index, 'account_name', e.target.value)}
+                                                                placeholder="RC PrintShoppe"
+                                                            />
+                                                        </div>
+                                                        <div className="col-md-4 mb-3">
+                                                            <label className="form-label">Account Number</label>
+                                                            <input
+                                                                type="text"
+                                                                className="form-control"
+                                                                value={account.account_number}
+                                                                onChange={(e) => updateBankAccount(index, 'account_number', e.target.value)}
+                                                                placeholder="1234 5678 9012"
+                                                            />
+                                                        </div>
+                                                        <div className="col-md-12 mb-3">
+                                                            <label className="form-label">Bank QR Code (Optional)</label>
+                                                            <input
+                                                                type="file"
+                                                                className="form-control"
+                                                                accept="image/*"
+                                                                onChange={(e) => handleBankQRCodeUpload(index, e)}
+                                                            />
+                                                            {(bankQrcodePreviews[index] || account.qrcode) && (
+                                                                <div className="mt-2">
+                                                                    <img 
+                                                                        src={bankQrcodePreviews[index] || account.qrcode} 
+                                                                        alt={`Bank QR Code ${index + 1}`} 
+                                                                        className="border" 
+                                                                        style={{ maxWidth: '200px', maxHeight: '200px' }} 
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
 
                                     <hr />
@@ -349,6 +496,23 @@ export default function Settings({ settings: initialSettings }) {
                                             </div>
                                         </div>
                                     </div>
+                                    {alertMessage.message && (
+                                        <div className={`alert alert-${alertMessage.type} alert-dismissible fade show`} role="alert">
+                                            {alertMessage.type === 'success' && (
+                                                <i className="fa fa-check-circle me-2"></i>
+                                            )}
+                                            {alertMessage.type === 'danger' && (
+                                                <i className="fa fa-exclamation-circle me-2"></i>
+                                            )}
+                                            {alertMessage.message}
+                                            <button
+                                                type="button"
+                                                className="btn-close"
+                                                onClick={() => setAlertMessage({ type: '', message: '' })}
+                                                aria-label="Close"
+                                            ></button>
+                                        </div>
+                                    )}
                                     <div className="d-flex justify-content-end">
                                         <button type="submit" className="btn btn-primary" disabled={saving}>
                                             {saving ? 'Saving...' : 'Save Settings'}

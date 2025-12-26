@@ -24,6 +24,7 @@ class JobTypeRequest extends FormRequest
             'incentive_price' => 'nullable|numeric|min:0',
             'promo_text' => 'nullable|string|max:255',
             'is_active' => 'boolean',
+            'show_in_dashboard' => 'boolean',
             'sort_order' => 'nullable|integer|min:0',
             'image' => 'nullable|image|max:2048',
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Ticket;
 use App\Models\Payment;
+use App\Models\Expense;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -520,6 +521,7 @@ class DashboardController extends Controller
                     return [
                         'todayCollections' => (float) Payment::whereBetween('payment_date', [$today, $tomorrow])
                             ->where('payment_type', 'collection')
+                            ->where('status', 'posted') // Only count posted/cleared payments, exclude pending cheques
                             // Apply branch filtering
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
@@ -529,6 +531,7 @@ class DashboardController extends Controller
                             ->sum('amount'),
                         'monthCollections' => (float) Payment::whereBetween('payment_date', [$thisMonthStart, $thisMonthEnd])
                             ->where('payment_type', 'collection')
+                            ->where('status', 'posted') // Only count posted/cleared payments, exclude pending cheques
                             // Apply branch filtering
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
@@ -552,6 +555,7 @@ class DashboardController extends Controller
                             })
                             ->count(),
                         'todayTransactionsCount' => Payment::whereBetween('payment_date', [$today, $tomorrow])
+                            ->where('status', 'posted') // Only count posted/cleared payments, exclude pending cheques
                             // Apply branch filtering
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
@@ -559,6 +563,16 @@ class DashboardController extends Controller
                                 });
                             })
                             ->count(),
+                        'pendingChequesAmount' => (float) Payment::where('status', 'pending')
+                            // Apply branch filtering
+                            ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
+                                $query->whereHas('ticket', function ($q) use ($user) {
+                                    $q->where('order_branch_id', $user->branch_id);
+                                });
+                            })
+                            ->sum('amount'),
+                        'monthExpenses' => (float) Expense::whereBetween('expense_date', [$thisMonthStart, $thisMonthEnd])
+                            ->sum('amount'),
                     ];
                 },
                 'urgentReceivables' => function () use ($user) {
@@ -585,6 +599,7 @@ class DashboardController extends Controller
                 'latestCollections' => function () use ($user) {
                     return Payment::with(['ticket.customer', 'ticket.jobType', 'recordedBy'])
                         ->where('payment_type', 'collection')
+                        ->where('status', 'posted') // Only show posted/cleared payments, exclude pending cheques
                         // Apply branch filtering
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->whereHas('ticket', function ($q) use ($user) {
@@ -611,6 +626,7 @@ class DashboardController extends Controller
 
                     return Payment::whereBetween('payment_date', [$today, $tomorrow])
                         ->where('payment_type', 'collection')
+                        ->where('status', 'posted') // Only count posted/cleared payments, exclude pending cheques
                         // Apply branch filtering
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->whereHas('ticket', function ($q) use ($user) {
