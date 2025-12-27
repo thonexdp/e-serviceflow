@@ -13,7 +13,9 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    'default' => env('APP_ENV') === 'production' 
+        ? (env('FILESYSTEM_DISK', 's3')) 
+        : (env('FILESYSTEM_DISK', 'local')),
 
     /*
     |--------------------------------------------------------------------------
@@ -53,6 +55,10 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'public',
+            'options' => [
+                'CacheControl' => 'max-age=31536000, public',
+            ],
             'throw' => false,
         ],
 

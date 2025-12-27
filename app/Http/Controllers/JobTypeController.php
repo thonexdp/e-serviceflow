@@ -56,7 +56,7 @@ class JobTypeController extends Controller
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            $path = Storage::put('job-types', $file);
+            $path = storage()->put('job-types', $file);
             $validated['image_path'] = $path;
         }
 
@@ -82,10 +82,10 @@ class JobTypeController extends Controller
         if ($request->hasFile('image')) {
             
             if ($jobType->getRawOriginal('image_path')) {
-                Storage::delete($jobType->getRawOriginal('image_path'));
+                storage()->delete($jobType->getRawOriginal('image_path'));
             }
             $file = $request->file('image');
-            $path = Storage::put('job-types', $file);
+            $path = storage()->put('job-types', $file);
             $validated['image_path'] = $path;
         }
 

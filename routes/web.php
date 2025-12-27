@@ -410,7 +410,7 @@ Route::get('/tracking', function () {
 Route::get('/debug-storage', function () {
 
     // Check which disk is set in .env
-    $disk = env('FILESYSTEM_DISK', 'public');
+    $disk = env('FILESYSTEM_DISK', 's3');
 
     // Try to write a test file
     $filename = 'debug-test.txt';

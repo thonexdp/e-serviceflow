@@ -127,7 +127,7 @@ class PaymentController extends Controller
     
     public function downloadDocument(PaymentDocument $document)
     {
-        return Storage::disk('public')->download($document->file_path, $document->original_name);
+        return storage()->download($document->file_path, $document->original_name);
     }
 
     

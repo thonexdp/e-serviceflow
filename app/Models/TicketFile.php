@@ -48,6 +48,9 @@ class TicketFile extends Model
 
                 
                 try {
+                    if ($disk === 's3') {
+                        return storage()->url($value);
+                    }
                     return Storage::url($value);
                 } catch (\Exception $e) {
                     return "/storage/{$value}";
