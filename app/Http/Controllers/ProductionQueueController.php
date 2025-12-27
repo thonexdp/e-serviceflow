@@ -388,10 +388,10 @@ class ProductionQueueController extends Controller
                 if ($request->hasFile('evidence_files') && !empty($createdRecords)) {
                     foreach ($request->file('evidence_files') as $file) {
                         $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                        $filePath = $file->storeAs('production_evidence', $fileName, storage_disk());
+                        $filePath = $file->storeAs('production_evidence', $fileName, \storage_disk());
 
 
-                        $fileUrl = storage()->url($filePath);
+                        $fileUrl = \storage()->url($filePath);
 
 
                         foreach ($createdRecords as $record) {
@@ -1315,7 +1315,7 @@ class ProductionQueueController extends Controller
             if ($request->hasFile('evidence_files')) {
                 foreach ($request->file('evidence_files') as $file) {
                     $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, storage_disk());
+                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, \storage_disk());
 
                     \App\Models\WorkflowEvidence::create([
                         'ticket_id' => $ticket->id,
@@ -1424,7 +1424,7 @@ class ProductionQueueController extends Controller
                 if ($request->hasFile('evidence_files')) {
                     foreach ($request->file('evidence_files') as $file) {
                         $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, storage_disk());
+                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, \storage_disk());
 
                         \App\Models\WorkflowEvidence::create([
                             'ticket_id' => $ticket->id,

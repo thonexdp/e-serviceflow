@@ -45,7 +45,7 @@ class AppServiceProvider extends ServiceProvider
              */
             function storage($disk = null)
             {
-                $disk = $disk ?? storage_disk();
+                $disk = $disk ?? \storage_disk();
                 return Storage::disk($disk);
             }
         }

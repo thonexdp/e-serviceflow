@@ -94,7 +94,7 @@ class PaymentRecorder
                 if (!$file instanceof UploadedFile) {
                     continue;
                 }
-                $storedPath = storage()->put('payments', $file);
+                $storedPath = \storage()->put('payments', $file);
                 PaymentDocument::create([
                     'payment_id' => $payment->id,
                     'uploaded_by' => Auth::id(),

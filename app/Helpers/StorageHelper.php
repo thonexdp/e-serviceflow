@@ -25,7 +25,7 @@ if (!function_exists('storage')) {
      */
     function storage($disk = null)
     {
-        $disk = $disk ?? storage_disk();
+        $disk = $disk ?? \storage_disk();
         return Storage::disk($disk);
     }
 }
