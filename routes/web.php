@@ -20,6 +20,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SettingsController;
 use App\Models\JobCategory;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -404,6 +405,35 @@ Route::get('/dashboard', function () {
 
 Route::get('/tracking', function () {
     return redirect()->route('track');
+});
+
+Route::get('/debug-storage', function () {
+
+    // Check which disk is set in .env
+    $disk = env('FILESYSTEM_DISK', 'public');
+
+    // Try to write a test file
+    $filename = 'debug-test.txt';
+    $content = 'Hello World from ' . $disk . ' disk';
+
+    try {
+        Storage::disk($disk)->put($filename, $content);
+        $url = Storage::disk($disk)->url($filename);
+
+        return response()->json([
+            'status' => 'success',
+            'disk' => $disk,
+            'file' => $filename,
+            'url' => $url,
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'disk' => $disk,
+            'message' => $e->getMessage(),
+        ]);
+    }
 });
 
 
