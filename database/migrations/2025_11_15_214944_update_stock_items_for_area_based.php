@@ -11,24 +11,51 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Link stock items to job types (only if column doesn't exist)
+        if (!Schema::hasColumn('stock_items', 'job_type_id')) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                $table->foreignId('job_type_id')->nullable()->after('id')->constrained('job_types')->onDelete('cascade');
+            });
+        }
+        
+        // Add dimension fields for area-based materials (tarpaulin, fabric, etc.)
+        if (!Schema::hasColumn('stock_items', 'length')) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                $table->decimal('length', 10, 2)->nullable()->after('base_unit_of_measure')->comment('Length in base unit');
+            });
+        }
+        
+        if (!Schema::hasColumn('stock_items', 'width')) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                $table->decimal('width', 10, 2)->nullable()->after('length')->comment('Width in base unit');
+            });
+        }
+        
+        if (!Schema::hasColumn('stock_items', 'is_area_based')) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                $table->boolean('is_area_based')->default(false)->after('width')->comment('If true, stock is managed by area (length x width)');
+            });
+        }
+        
+        // Remove the old category index if it exists
         Schema::table('stock_items', function (Blueprint $table) {
-            // Link stock items to job types
-            $table->foreignId('job_type_id')->nullable()->after('id')->constrained('job_types')->onDelete('cascade');
-            
-            // Add dimension fields for area-based materials (tarpaulin, fabric, etc.)
-            $table->decimal('length', 10, 2)->nullable()->after('base_unit_of_measure')->comment('Length in base unit');
-            $table->decimal('width', 10, 2)->nullable()->after('length')->comment('Width in base unit');
-            $table->boolean('is_area_based')->default(false)->after('width')->comment('If true, stock is managed by area (length x width)');
-            
-            // Change category to reference job_type (we'll keep category as text for now but link to job_type)
-            // Remove the old category index since we're changing the logic
-            $table->dropIndex(['category']);
+            try {
+                $table->dropIndex(['category']);
+            } catch (\Exception $e) {
+                // Index might not exist, ignore
+            }
         });
         
-        // Add index for job_type_id
-        Schema::table('stock_items', function (Blueprint $table) {
-            $table->index('job_type_id');
-        });
+        // Add index for job_type_id (only if column exists and index doesn't)
+        if (Schema::hasColumn('stock_items', 'job_type_id')) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                try {
+                    $table->index('job_type_id');
+                } catch (\Exception $e) {
+                    // Index might already exist, ignore
+                }
+            });
+        }
     }
 
     /**

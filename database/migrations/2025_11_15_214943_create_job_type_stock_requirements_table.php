@@ -11,18 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('job_type_stock_requirements', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('job_type_id')->constrained('job_types')->onDelete('cascade');
-            $table->foreignId('stock_item_id')->constrained('stock_items')->onDelete('cascade');
-            $table->decimal('quantity_per_unit', 10, 2)->default(1)->comment('Quantity needed per production unit (e.g., per print)');
-            $table->boolean('is_required')->default(true)->comment('Is this stock required for this job type?');
-            $table->text('notes')->nullable();
-            $table->timestamps();
+        if (!Schema::hasTable('job_type_stock_requirements')) {
+            Schema::create('job_type_stock_requirements', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('job_type_id')->constrained('job_types')->onDelete('cascade');
+                $table->foreignId('stock_item_id')->constrained('stock_items')->onDelete('cascade');
+                $table->decimal('quantity_per_unit', 10, 2)->default(1)->comment('Quantity needed per production unit (e.g., per print)');
+                $table->boolean('is_required')->default(true)->comment('Is this stock required for this job type?');
+                $table->text('notes')->nullable();
+                $table->timestamps();
 
-            $table->unique(['job_type_id', 'stock_item_id']);
-            $table->index('job_type_id');
-        });
+                $table->unique(['job_type_id', 'stock_item_id']);
+                $table->index('job_type_id');
+            });
+        }
     }
 
     /**
