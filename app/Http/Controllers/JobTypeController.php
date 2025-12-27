@@ -56,7 +56,8 @@ class JobTypeController extends Controller
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            $path = \storage()->put('job-types', $file);
+            $disk = function_exists('storage_disk') ? storage_disk() : (app()->environment('production') ? 's3' : 'public');
+            $path = Storage::disk($disk)->put('job-types', $file);
             $validated['image_path'] = $path;
         }
 
@@ -80,12 +81,13 @@ class JobTypeController extends Controller
         $validated = $request->validated();
 
         if ($request->hasFile('image')) {
+            $disk = function_exists('storage_disk') ? storage_disk() : (app()->environment('production') ? 's3' : 'public');
             
             if ($jobType->getRawOriginal('image_path')) {
-                \storage()->delete($jobType->getRawOriginal('image_path'));
+                Storage::disk($disk)->delete($jobType->getRawOriginal('image_path'));
             }
             $file = $request->file('image');
-            $path = \storage()->put('job-types', $file);
+            $path = Storage::disk($disk)->put('job-types', $file);
             $validated['image_path'] = $path;
         }
 

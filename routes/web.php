@@ -468,37 +468,69 @@ Route::get('/debug-storage', function () {
             'message' => 'File uploaded successfully',
         ];
 
-        // Test 3: Check if file exists
-        $exists = $storage->exists($testFilename);
-        $results['upload_test']['file_exists'] = $exists;
-
-        // Test 4: Get file URL
+        // Test 3: Check if file exists (use the returned path from put())
+        // Note: DigitalOcean Spaces sometimes has issues with exists() check
+        // So we'll try to read the file instead as a more reliable check
+        $checkPath = $uploaded ?: $testFilename;
         try {
-            $url = $storage->url($testFilename);
+            $exists = $storage->exists($checkPath);
+            $results['upload_test']['file_exists'] = $exists;
+            $results['upload_test']['checked_path'] = $checkPath;
+        } catch (\Exception $e) {
+            // If exists() fails, try reading the file as a workaround
+            // This is a known issue with some S3-compatible services
+            try {
+                $testRead = $storage->get($checkPath);
+                $results['upload_test']['file_exists'] = [
+                    'status' => 'success (via read)',
+                    'exists' => true,
+                    'note' => 'exists() method failed, but file is accessible via get()',
+                    'error' => $e->getMessage(),
+                ];
+            } catch (\Exception $readException) {
+                $results['upload_test']['file_exists'] = [
+                    'status' => 'warning',
+                    'exists' => false,
+                    'message' => 'exists() check failed: ' . $e->getMessage(),
+                    'read_also_failed' => $readException->getMessage(),
+                    'note' => 'File upload reported success, but verification failed. This may be a permissions issue.',
+                ];
+            }
+        }
+
+        // Test 4: Get file URL (use the returned path from put())
+        try {
+            $urlPath = $uploaded ?: $testFilename;
+            $url = $storage->url($urlPath);
             $results['url_test'] = [
                 'status' => 'success',
                 'url' => $url,
+                'url_path' => $urlPath,
                 'message' => 'URL generated successfully',
             ];
         } catch (\Exception $e) {
             $results['url_test'] = [
                 'status' => 'warning',
                 'message' => $e->getMessage(),
+                'attempted_path' => $uploaded ?: $testFilename,
             ];
         }
 
-        // Test 5: Try to read the file back
+        // Test 5: Try to read the file back (use the returned path from put())
         try {
-            $readContent = $storage->get($testFilename);
+            $readPath = $uploaded ?: $testFilename;
+            $readContent = $storage->get($readPath);
             $results['upload_test']['read_test'] = [
                 'status' => 'success',
                 'content_length' => strlen($readContent),
                 'matches' => $readContent === $testContent,
+                'read_path' => $readPath,
             ];
         } catch (\Exception $e) {
             $results['upload_test']['read_test'] = [
                 'status' => 'error',
                 'message' => $e->getMessage(),
+                'attempted_path' => $uploaded ?: $testFilename,
             ];
         }
 

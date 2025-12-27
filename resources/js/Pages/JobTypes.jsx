@@ -69,19 +69,39 @@ export default function JobTypes({
     buildUrl(`/job-types/${editingJobType.id}`) :
     buildUrl("/job-types");
 
+    // Check if there's a file to upload
+    const hasFile = data.image && data.image instanceof File;
 
+    // Prepare the data - Inertia.js will automatically use FormData when it detects File objects
+    const submitData = { ...data };
+    
+    // Remove null/undefined values to avoid issues
+    Object.keys(submitData).forEach(key => {
+      if (submitData[key] === null || submitData[key] === undefined) {
+        delete submitData[key];
+      }
+    });
 
-    if (editingJobType && data.image) {
-      router.post(url, { ...data, _method: "put" }, {
+    // If there's a file, use POST with _method for PUT (required for file uploads in Laravel)
+    if (hasFile && editingJobType) {
+      submitData._method = 'PUT';
+      router.post(url, submitData, {
+        onSuccess: handleCloseModals,
+        preserveState: false,
+        preserveScroll: true
+      });
+    } else if (hasFile && !editingJobType) {
+      // New job type with file
+      router.post(url, submitData, {
         onSuccess: handleCloseModals,
         preserveState: false,
         preserveScroll: true
       });
     } else {
+      // No file, use regular PUT/POST
       const method = editingJobType ? "put" : "post";
-
-      router[method](url, data, {
-
+      router[method](url, submitData, {
+        onSuccess: handleCloseModals,
         preserveState: false,
         preserveScroll: true
       });
