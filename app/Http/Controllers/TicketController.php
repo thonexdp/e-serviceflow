@@ -223,7 +223,8 @@ class TicketController extends BaseCrudController
         
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $path = \storage()->put('tickets/customer', $file);
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $path = Storage::disk($disk)->put('tickets/customer', $file, $disk === 's3' ? 'public' : []);
             $ticketData['file_path'] = $path;
         }
 
@@ -255,7 +256,8 @@ class TicketController extends BaseCrudController
             if (!$attachment) {
                 continue;
             }
-            $storedPath = \storage()->put('tickets/customer', $attachment);
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $storedPath = Storage::disk($disk)->put('tickets/customer', $attachment, $disk === 's3' ? 'public' : []);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
                 'file_name' => $attachment->getClientOriginalName(),
@@ -370,10 +372,12 @@ class TicketController extends BaseCrudController
         
         if ($request->hasFile('file')) {
             if ($ticket->file_path) {
-                \storage()->delete($ticket->file_path);
+                $disk = app()->environment('production') ? 's3' : 'public';
+                Storage::disk($disk)->delete($ticket->file_path);
             }
             $file = $request->file('file');
-            $path = \storage()->put('tickets/customer', $file);
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $path = Storage::disk($disk)->put('tickets/customer', $file, $disk === 's3' ? 'public' : []);
             $ticketData['file_path'] = $path;
 
             TicketFile::create([
@@ -401,7 +405,8 @@ class TicketController extends BaseCrudController
             if (!$attachment) {
                 continue;
             }
-            $storedPath = \storage()->put('tickets/customer', $attachment);
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $storedPath = Storage::disk($disk)->put('tickets/customer', $attachment, $disk === 's3' ? 'public' : []);
             TicketFile::create([
                 'ticket_id' => $ticket->id,
                 'file_name' => $attachment->getClientOriginalName(),

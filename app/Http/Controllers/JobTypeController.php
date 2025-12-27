@@ -9,6 +9,7 @@ use App\Http\Requests\JobTypeRequest;
 use App\Services\JobTypePricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class JobTypeController extends Controller
@@ -56,9 +57,68 @@ class JobTypeController extends Controller
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            $disk = function_exists('storage_disk') ? storage_disk() : (app()->environment('production') ? 's3' : 'public');
-            $path = Storage::disk($disk)->put('job-types', $file);
-            $validated['image_path'] = $path;
+            // Explicitly use 's3' in production, 'public' otherwise
+            $disk = (app()->environment('production') || env('APP_ENV') === 'production') ? 's3' : 'public';
+            
+            // Verify S3 config in production
+            if ($disk === 's3') {
+                $s3Config = config('filesystems.disks.s3');
+                Log::info('S3 Configuration Check', [
+                    'disk' => $disk,
+                    'bucket' => $s3Config['bucket'] ?? 'NOT SET',
+                    'region' => $s3Config['region'] ?? 'NOT SET',
+                    'endpoint' => $s3Config['endpoint'] ?? 'NOT SET',
+                    'has_key' => !empty($s3Config['key']),
+                    'has_secret' => !empty($s3Config['secret']),
+                ]);
+            }
+            
+            try {
+                // For S3/DigitalOcean Spaces, explicitly set visibility to 'public'
+                // Pass 'public' as string for visibility
+                $path = $disk === 's3' 
+                    ? Storage::disk($disk)->put('job-types', $file, 'public')
+                    : Storage::disk($disk)->put('job-types', $file);
+                $validated['image_path'] = $path;
+                
+                // Verify file was actually saved
+                try {
+                    $exists = Storage::disk($disk)->exists($path);
+                } catch (\Exception $existsException) {
+                    // Some S3 services have issues with exists(), try reading instead
+                    try {
+                        $testContent = Storage::disk($disk)->get($path);
+                        $exists = !empty($testContent);
+                    } catch (\Exception $readException) {
+                        $exists = false;
+                    }
+                }
+                
+                // Log for debugging in production
+                if (app()->environment('production')) {
+                    Log::info('JobType image uploaded', [
+                        'disk' => $disk,
+                        'path' => $path,
+                        'bucket' => config('filesystems.disks.s3.bucket'),
+                        'file_size' => $file->getSize(),
+                        'file_exists' => $exists,
+                        'url' => Storage::disk($disk)->url($path),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('JobType image upload failed', [
+                    'disk' => $disk,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'bucket' => config('filesystems.disks.s3.bucket'),
+                    's3_config' => $disk === 's3' ? [
+                        'bucket' => config('filesystems.disks.s3.bucket'),
+                        'region' => config('filesystems.disks.s3.region'),
+                        'endpoint' => config('filesystems.disks.s3.endpoint'),
+                    ] : null,
+                ]);
+                throw $e;
+            }
         }
 
         $jobType = JobType::create($validated);
@@ -81,14 +141,82 @@ class JobTypeController extends Controller
         $validated = $request->validated();
 
         if ($request->hasFile('image')) {
-            $disk = function_exists('storage_disk') ? storage_disk() : (app()->environment('production') ? 's3' : 'public');
+            // Explicitly use 's3' in production, 'public' otherwise
+            $disk = (app()->environment('production') || env('APP_ENV') === 'production') ? 's3' : 'public';
             
             if ($jobType->getRawOriginal('image_path')) {
-                Storage::disk($disk)->delete($jobType->getRawOriginal('image_path'));
+                try {
+                    Storage::disk($disk)->delete($jobType->getRawOriginal('image_path'));
+                } catch (\Exception $e) {
+                    // Log but don't fail if old file doesn't exist
+                    Log::warning('Failed to delete old job type image', [
+                        'path' => $jobType->getRawOriginal('image_path'),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
+            
             $file = $request->file('image');
-            $path = Storage::disk($disk)->put('job-types', $file);
-            $validated['image_path'] = $path;
+            
+            // Verify S3 config in production
+            if ($disk === 's3') {
+                $s3Config = config('filesystems.disks.s3');
+                Log::info('S3 Configuration Check (Update)', [
+                    'disk' => $disk,
+                    'bucket' => $s3Config['bucket'] ?? 'NOT SET',
+                    'region' => $s3Config['region'] ?? 'NOT SET',
+                    'endpoint' => $s3Config['endpoint'] ?? 'NOT SET',
+                    'has_key' => !empty($s3Config['key']),
+                    'has_secret' => !empty($s3Config['secret']),
+                ]);
+            }
+            
+            try {
+                // For S3/DigitalOcean Spaces, explicitly set visibility to 'public'
+                // Pass 'public' as string for visibility
+                $path = $disk === 's3' 
+                    ? Storage::disk($disk)->put('job-types', $file, 'public')
+                    : Storage::disk($disk)->put('job-types', $file);
+                $validated['image_path'] = $path;
+                
+                // Verify file was actually saved
+                try {
+                    $exists = Storage::disk($disk)->exists($path);
+                } catch (\Exception $existsException) {
+                    // Some S3 services have issues with exists(), try reading instead
+                    try {
+                        $testContent = Storage::disk($disk)->get($path);
+                        $exists = !empty($testContent);
+                    } catch (\Exception $readException) {
+                        $exists = false;
+                    }
+                }
+                
+                // Log for debugging in production
+                if (app()->environment('production')) {
+                    Log::info('JobType image updated', [
+                        'disk' => $disk,
+                        'path' => $path,
+                        'bucket' => config('filesystems.disks.s3.bucket'),
+                        'file_size' => $file->getSize(),
+                        'file_exists' => $exists,
+                        'url' => Storage::disk($disk)->url($path),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('JobType image update failed', [
+                    'disk' => $disk,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'bucket' => config('filesystems.disks.s3.bucket'),
+                    's3_config' => $disk === 's3' ? [
+                        'bucket' => config('filesystems.disks.s3.bucket'),
+                        'region' => config('filesystems.disks.s3.region'),
+                        'endpoint' => config('filesystems.disks.s3.endpoint'),
+                    ] : null,
+                ]);
+                throw $e;
+            }
         }
 
         $jobType->update($validated);

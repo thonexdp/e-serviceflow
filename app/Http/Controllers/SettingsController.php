@@ -137,11 +137,13 @@ class SettingsController extends Controller
             if ($oldQRCode && $oldQRCode->value) {
                 
                 $rawValue = $oldQRCode->getRawOriginal('value');
-                \storage()->delete($rawValue);
+                $disk = app()->environment('production') ? 's3' : 'public';
+                Storage::disk($disk)->delete($rawValue);
             }
 
             
-            $path = $request->file('payment_gcash_qrcode')->store('settings/qrcodes', \storage_disk());
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $path = $request->file('payment_gcash_qrcode')->store('settings/qrcodes', $disk);
             Setting::set('payment_gcash_qrcode', $path, 'image');
         }
 
@@ -168,7 +170,8 @@ class SettingsController extends Controller
                         }
                         
                         
-                        $path = $request->file($qrcodeKey)->store('settings/qrcodes', \storage_disk());
+                        $disk = app()->environment('production') ? 's3' : 'public';
+                        $path = $request->file($qrcodeKey)->store('settings/qrcodes', $disk);
                         $account['qrcode'] = $path;
                     } else {
                         
@@ -204,11 +207,13 @@ class SettingsController extends Controller
             $oldQRCode = Setting::where('key', 'customer_order_qrcode')->first();
             if ($oldQRCode && $oldQRCode->value) {
                 $rawValue = $oldQRCode->getRawOriginal('value');
-                \storage()->delete($rawValue);
+                $disk = app()->environment('production') ? 's3' : 'public';
+                Storage::disk($disk)->delete($rawValue);
             }
 
             
-            $path = $request->file('customer_order_qrcode')->store('settings/qrcodes', \storage_disk());
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $path = $request->file('customer_order_qrcode')->store('settings/qrcodes', $disk);
             Setting::set('customer_order_qrcode', $path, 'image');
         }
 

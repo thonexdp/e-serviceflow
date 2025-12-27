@@ -49,7 +49,9 @@ class TicketFile extends Model
                 
                 try {
                     if ($disk === 's3') {
-                        return \storage()->url($value);
+                        // Use Storage::disk() directly to avoid helper function issues
+                        $s3Disk = app()->environment('production') ? 's3' : 'public';
+                        return Storage::disk($s3Disk)->url($value);
                     }
                     return Storage::url($value);
                 } catch (\Exception $e) {

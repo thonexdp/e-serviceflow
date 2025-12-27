@@ -145,7 +145,8 @@ class PublicOrderController extends Controller
         
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $path = \storage()->put('tickets/customer', $file);
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $path = Storage::disk($disk)->put('tickets/customer', $file, $disk === 's3' ? 'public' : []);
             $ticketData['file_path'] = $path;
         }
 
@@ -173,7 +174,8 @@ class PublicOrderController extends Controller
                 if (!$attachment) {
                     continue;
                 }
-                $storedPath = \storage()->put('tickets/customer', $attachment);
+                $disk = app()->environment('production') ? 's3' : 'public';
+                $storedPath = Storage::disk($disk)->put('tickets/customer', $attachment, $disk === 's3' ? 'public' : []);
                 TicketFile::create([
                     'ticket_id' => $ticket->id,
                     'file_name' => $attachment->getClientOriginalName(),
