@@ -16,9 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 class ReportsController extends Controller
 {
-    /**
-     * Display the reports dashboard
-     */
+    
     public function index(Request $request)
     {
         $reportType = $request->input('report_type', 'sales');
@@ -26,10 +24,10 @@ class ReportsController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        // Calculate date ranges
+        
         $dates = $this->calculateDateRange($dateRange, $startDate, $endDate);
 
-        // Get report data based on type
+        
         $reportData = match ($reportType) {
             'sales' => $this->getSalesReport($dates),
             'revenue_cashflow' => $this->getRevenueCashflowReport($dates),
@@ -113,12 +111,10 @@ class ReportsController extends Controller
         };
     }
 
-    /**
-     * Sales Report - Daily, Monthly, Yearly breakdown with payment methods
-     */
+    
     private function getSalesReport($dates)
     {
-        // Daily sales
+        
         $dailySales = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', [$dates['start'], $dates['end']])
@@ -127,7 +123,7 @@ class ReportsController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Monthly aggregation
+        
         $monthlySales = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', [$dates['start'], $dates['end']])
@@ -136,7 +132,7 @@ class ReportsController extends Controller
             ->orderBy('month')
             ->get();
 
-        // Payment methods breakdown
+        
         $paymentMethods = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', [$dates['start'], $dates['end']])
@@ -144,7 +140,7 @@ class ReportsController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        // Summary
+        
         $summary = [
             'total_sales' => $dailySales->sum('total'),
             'total_transactions' => $dailySales->sum('transactions'),
@@ -162,9 +158,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Revenue & Cashflow Report
-     */
+    
     private function getRevenueCashflowReport($dates)
     {
         $payments = Payment::posted()
@@ -179,7 +173,7 @@ class ReportsController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Get expenses if table exists
+        
         $expenses = [];
         try {
             $expenses = Expense::whereBetween('expense_date', [$dates['start'], $dates['end']])
@@ -188,10 +182,10 @@ class ReportsController extends Controller
                 ->get()
                 ->keyBy('date');
         } catch (\Exception $e) {
-            // Expenses table doesn't exist yet
+            
         }
 
-        // Calculate net cashflow including expenses
+        
         $cashflow = $payments->map(function ($item) use ($expenses) {
             $expenseAmount = $expenses[$item->date]->total ?? 0;
             return [
@@ -214,9 +208,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Receivables Report - Unpaid Balances
-     */
+    
     private function getReceivablesReport($dates)
     {
         $receivables = Ticket::with('customer')
@@ -230,7 +222,7 @@ class ReportsController extends Controller
             ->orderBy('due_date')
             ->get();
 
-        // Aging analysis
+        
         $aging = [
             'current' => $receivables->where('days_overdue', '<=', 0)->sum('outstanding_balance'),
             '1_30_days' => $receivables->whereBetween('days_overdue', [1, 30])->sum('outstanding_balance'),
@@ -250,35 +242,33 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Net Income Report
-     */
+    
     private function getNetIncomeReport($dates)
     {
-        // Revenue
+        
         $revenue = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', [$dates['start'], $dates['end']])
             ->sum('amount');
 
-        // Discounts
+        
         $discounts = Ticket::whereBetween('created_at', [$dates['start'], $dates['end']])
             ->where('status', '!=', 'cancelled')
             ->sum('discount');
 
-        // Expenses
+        
         $expenses = 0;
         try {
             $expenses = Expense::whereBetween('expense_date', [$dates['start'], $dates['end']])
                 ->sum('amount');
         } catch (\Exception $e) {
-            // Expenses table doesn't exist
+            
         }
 
-        // Calculate actual COGS from inventory consumption
+        
         $actualCOGS = $this->calculateActualCOGS($dates['start'], $dates['end']);
 
-        // Net income calculation
+        
         $netIncome = $revenue - $discounts - $actualCOGS - $expenses;
         $grossProfit = $revenue - $discounts - $actualCOGS;
         $grossMargin = $revenue > 0 ? (($grossProfit / $revenue) * 100) : 0;
@@ -296,9 +286,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Inventory Consumption Report
-     */
+    
     private function getInventoryConsumptionReport($dates)
     {
         try {
@@ -332,9 +320,7 @@ class ReportsController extends Controller
         }
     }
 
-    /**
-     * Product Profitability Report
-     */
+    
     private function getProductProfitabilityReport($dates)
     {
         $tickets = Ticket::with('jobType')
@@ -345,7 +331,7 @@ class ReportsController extends Controller
 
         $byJobType = $tickets->groupBy('job_type_id')->map(function ($items) {
             $totalRevenue = $items->sum('amount_paid');
-            // Calculate actual COGS for these tickets
+            
             $ticketIds = $items->pluck('id');
             $totalCost = \App\Models\ProductionStockConsumption::whereIn('ticket_id', $ticketIds)
                 ->sum('total_cost') ?? 0;
@@ -371,9 +357,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Production Report
-     */
+    
     private function getProductionReport($dates)
     {
         $tickets = Ticket::with('customer')
@@ -384,7 +368,7 @@ class ReportsController extends Controller
         $completed = $tickets->where('status', 'completed');
         $inProgress = $tickets->where('status', 'in_production');
 
-        // Average production time (for completed tickets)
+        
         $avgProductionTime = $completed->map(function ($ticket) {
             return $ticket->created_at->diffInHours($ticket->updated_at);
         })->avg();
@@ -401,9 +385,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Customer Insights Report
-     */
+    
     private function getCustomerInsightsReport($dates)
     {
         $customers = Customer::withCount([
@@ -441,9 +423,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Online Orders Report
-     */
+    
     private function getOnlineOrdersReport($dates)
     {
         $onlineOrders = Ticket::with('customer')
@@ -461,9 +441,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Designer Approvals Report
-     */
+    
     private function getDesignerApprovalsReport($dates)
     {
         $tickets = Ticket::with(['customer'])
@@ -490,9 +468,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Payment Confirmation Report
-     */
+    
     private function getPaymentConfirmationsReport($dates)
     {
         $pendingPayments = Ticket::with('customer')
@@ -517,9 +493,7 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Expenses Report
-     */
+    
     private function getExpensesReport($dates)
     {
         try {
@@ -553,9 +527,7 @@ class ReportsController extends Controller
         }
     }
 
-    /**
-     * OR / Receipt Report
-     */
+    
     private function getReceiptsReport($dates)
     {
         $receipts = Payment::with(['ticket.customer'])
@@ -574,16 +546,14 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Staff Performance Report
-     */
+    
     private function getStaffPerformanceReport($dates)
     {
         $users = User::whereIn('role', ['FrontDesk', 'Designer', 'Production'])
             ->withCount('activityLogs')
             ->get()
             ->map(function ($user) use ($dates) {
-                // Get recent activity count
+                
                 $recentActivityCount = \App\Models\UserActivityLog::where('user_id', $user->id)
                     ->whereBetween('created_at', [$dates['start'], $dates['end']])
                     ->count();
@@ -608,27 +578,25 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Get production incentives report
-     */
+    
     private function getProductionIncentivesReport($dates, Request $request)
     {
         $query = \App\Models\ProductionRecord::with(['user', 'ticket', 'jobType', 'evidenceFiles'])
             ->whereBetween('created_at', [$dates['start'], $dates['end']]);
 
-        // Apply user filter
+        
         if ($request->has('user_id') && $request->user_id) {
             $query->where('user_id', $request->user_id);
         }
 
-        // Apply job type filter
+        
         if ($request->has('job_type_id') && $request->job_type_id) {
             $query->where('job_type_id', $request->job_type_id);
         }
 
         $records = $query->orderBy('created_at', 'desc')->get();
 
-        // Calculate incentive amounts based on workflow_steps
+        
         $recordsWithIncentives = $records->map(function ($record) {
             $incentivePrice = 0;
             if ($record->jobType && $record->jobType->workflow_steps) {
@@ -643,7 +611,7 @@ class ReportsController extends Controller
             return $record;
         });
 
-        // Calculate summary
+        
         $summary = [
             'total_incentives' => $recordsWithIncentives->sum('calculated_incentive_amount'),
             'total_quantity' => $records->sum('quantity_produced'),
@@ -681,9 +649,9 @@ class ReportsController extends Controller
             })->values()->toArray(),
         ];
 
-        // Format records for display
+        
         $formattedRecords = $records->map(function ($record) {
-            // Get incentive price from workflow_steps
+            
             $incentivePrice = 0;
             if ($record->jobType && $record->jobType->workflow_steps) {
                 $workflowSteps = $record->jobType->workflow_steps;
@@ -727,15 +695,12 @@ class ReportsController extends Controller
         ];
     }
 
-    /**
-     * Calculate actual COGS from inventory consumption
-     * Handles both unit-based (mugs) and area-based (tarpaulin) items
-     */
+    
     private function calculateActualCOGS($startDate, $endDate)
     {
         try {
-            // Get all stock consumptions for tickets in the date range
-            // COGS is calculated when materials are consumed during production
+            
+            
             $cogs = \App\Models\ProductionStockConsumption::whereHas('ticket', function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('created_at', [$startDate, $endDate])
                     ->where('status', '!=', 'cancelled');
@@ -744,18 +709,16 @@ class ReportsController extends Controller
 
             return $cogs ?? 0;
         } catch (\Exception $e) {
-            // If ProductionStockConsumption table doesn't exist, return 0
+            
             return 0;
         }
     }
 
-    /**
-     * Export report as PDF
-     */
+    
     public function exportPdf(Request $request)
     {
-        // This will be implemented with a PDF library like DomPDF or TCPDF
-        // For now, return the same data that can be printed from the browser
+        
+        
         return response()->json(['message' => 'PDF export coming soon']);
     }
 }

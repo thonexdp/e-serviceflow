@@ -31,25 +31,19 @@ class StockMovement extends Model
         'stock_after' => 'decimal:2',
     ];
 
-    /**
-     * Get the stock item.
-     */
+    
     public function stockItem()
     {
         return $this->belongsTo(StockItem::class);
     }
 
-    /**
-     * Get the user who created the movement.
-     */
+    
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the related model (polymorphic).
-     */
+    
     public function reference()
     {
         return $this->morphTo('reference', 'reference_type', 'reference_id');

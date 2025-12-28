@@ -1,94 +1,94 @@
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 
-/**
- * Real-Time Notification Hook
- * 
- * Usage in any component:
- * 
- * import useRealTimeNotifications from '@/Hooks/useRealTimeNotifications';
- * 
- * function MyComponent() {
- *     const { notifications, clearNotification } = useRealTimeNotifications();
- * 
- *     return (
- *         <div>
- *             {notifications.map(notification => (
- *                 <div key={notification.id}>
- *                     {notification.title}: {notification.message}
- *                     <button onClick={() => clearNotification(notification.id)}>Close</button>
- *                 </div>
- *             ))}
- *         </div>
- *     );
- * }
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export default function useRealTimeNotifications() {
-    const { auth } = usePage().props;
-    const [notifications, setNotifications] = useState([]);
+  const { auth } = usePage().props;
+  const [notifications, setNotifications] = useState([]);
 
-    useEffect(() => {
-        if (!window.Echo || !auth?.user?.id) {
-            console.warn('Echo or user not available for real-time notifications');
-            return;
-        }
+  useEffect(() => {
+    if (!window.Echo || !auth?.user?.id) {
+      console.warn('Echo or user not available for real-time notifications');
+      return;
+    }
 
-        // Subscribe to user's private channel
-        const channel = window.Echo.private(`user.${auth.user.id}`);
 
-        // Listen for generic user notifications
-        channel.listen('.user.notification', (data) => {
+    const channel = window.Echo.private(`user.${auth.user.id}`);
 
-            // Add notification with unique ID
-            const notification = {
-                id: Date.now(),
-                ...data,
-            };
 
-            setNotifications(prev => [...prev, notification]);
+    channel.listen('.user.notification', (data) => {
 
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                setNotifications(prev => prev.filter(n => n.id !== notification.id));
-            }, 5000);
-        });
 
-        // Listen for ticket status changes
-        channel.listen('.ticket.status.changed', (data) => {
+      const notification = {
+        id: Date.now(),
+        ...data
+      };
 
-            const notification = {
-                id: Date.now(),
-                title: data.notification.title,
-                message: data.notification.message,
-                type: data.notification.type,
-                data: data,
-            };
+      setNotifications((prev) => [...prev, notification]);
 
-            setNotifications(prev => [...prev, notification]);
 
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                setNotifications(prev => prev.filter(n => n.id !== notification.id));
-            }, 5000);
-        });
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+      }, 5000);
+    });
 
-        // Cleanup on unmount
-        return () => {
-            window.Echo.leave(`user.${auth.user.id}`);
-        };
-    }, [auth?.user?.id]);
 
-    const clearNotification = (id) => {
-        setNotifications(prev => prev.filter(n => n.id !== id));
+    channel.listen('.ticket.status.changed', (data) => {
+
+      const notification = {
+        id: Date.now(),
+        title: data.notification.title,
+        message: data.notification.message,
+        type: data.notification.type,
+        data: data
+      };
+
+      setNotifications((prev) => [...prev, notification]);
+
+
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+      }, 5000);
+    });
+
+
+    return () => {
+      window.Echo.leave(`user.${auth.user.id}`);
     };
+  }, [auth?.user?.id]);
 
-    const clearAll = () => {
-        setNotifications([]);
-    };
+  const clearNotification = (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
 
-    return {
-        notifications,
-        clearNotification,
-        clearAll,
-    };
+  const clearAll = () => {
+    setNotifications([]);
+  };
+
+  return {
+    notifications,
+    clearNotification,
+    clearAll
+  };
 }

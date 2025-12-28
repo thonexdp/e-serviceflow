@@ -8,11 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserIsProductionHead
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
+    
     public function handle(Request $request, Closure $next): Response
     {
         $user = auth()->user();
@@ -21,7 +17,7 @@ class EnsureUserIsProductionHead
             return redirect()->route('login');
         }
 
-        // Allow admin or production head
+        
         if ($user->role === 'admin') {
             return $next($request);
         }

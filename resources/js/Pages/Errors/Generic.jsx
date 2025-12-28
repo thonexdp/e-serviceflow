@@ -1,29 +1,29 @@
 import { Link, Head } from '@inertiajs/react';
 
 export default function GenericError({ status = 500 }) {
-    const errorMessages = {
-        401: {
-            title: 'Unauthorized',
-            description: 'You need to be authenticated to access this resource. Please log in to continue.',
-        },
-        419: {
-            title: 'Page Expired',
-            description: 'Your session has expired. Please refresh the page and try again.',
-        },
-        429: {
-            title: 'Too Many Requests',
-            description: 'You\'re making too many requests. Please slow down and try again in a few moments.',
-        },
-        default: {
-            title: 'Something Went Wrong',
-            description: 'An unexpected error occurred. Please try again or contact support if the problem persists.',
-        },
-    };
+  const errorMessages = {
+    401: {
+      title: 'Unauthorized',
+      description: 'You need to be authenticated to access this resource. Please log in to continue.'
+    },
+    419: {
+      title: 'Page Expired',
+      description: 'Your session has expired. Please refresh the page and try again.'
+    },
+    429: {
+      title: 'Too Many Requests',
+      description: 'You\'re making too many requests. Please slow down and try again in a few moments.'
+    },
+    default: {
+      title: 'Something Went Wrong',
+      description: 'An unexpected error occurred. Please try again or contact support if the problem persists.'
+    }
+  };
 
-    const error = errorMessages[status] || errorMessages.default;
+  const error = errorMessages[status] || errorMessages.default;
 
-    return (
-        <>
+  return (
+    <>
             <Head title={`${status} - ${error.title}`} />
             <div className="min-h-screen bg-white flex items-center justify-center p-4">
                 <div className="max-w-2xl w-full text-center">
@@ -49,30 +49,30 @@ export default function GenericError({ status = 500 }) {
 
                     {/* Action buttons */}
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        {status === 419 ? (
-                            <button
-                                onClick={() => window.location.reload()}
-                                className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                            >
+                        {status === 419 ?
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors">
+
                                 Refresh Page
-                            </button>
-                        ) : (
-                            <Link
-                                href="/"
-                                className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                            >
+                            </button> :
+
+            <Link
+              href="/"
+              className="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors">
+
                                 Go to Homepage
                             </Link>
-                        )}
+            }
                         <button
-                            onClick={() => window.history.back()}
-                            className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                        >
+              onClick={() => window.history.back()}
+              className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+
                             Go Back
                         </button>
                     </div>
                 </div>
             </div>
-        </>
-    );
+        </>);
+
 }

@@ -9,7 +9,7 @@ class JobTypeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // add permissions later if needed
+        return true; 
     }
 
     public function rules(): array
@@ -28,7 +28,7 @@ class JobTypeRequest extends FormRequest
             'sort_order' => 'nullable|integer|min:0',
             'image' => 'nullable|image|max:2048',
 
-            // Price tiers
+            
             'price_tiers' => 'nullable|array',
             'price_tiers.*.label' => 'nullable|string|max:120',
             'price_tiers.*.min_quantity' => 'required_with:price_tiers.*.price|integer|min:1',
@@ -36,7 +36,7 @@ class JobTypeRequest extends FormRequest
             'price_tiers.*.price' => 'required_with:price_tiers.*.min_quantity|numeric|min:0',
             'price_tiers.*.notes' => 'nullable|string|max:255',
 
-            // Size rates
+            
             'size_rates' => 'nullable|array',
             'size_rates.*.variant_name' => 'nullable|string|max:120',
             'size_rates.*.description' => 'nullable|string|max:255',
@@ -49,7 +49,7 @@ class JobTypeRequest extends FormRequest
             'size_rates.*.max_height' => 'nullable|numeric|min:0',
             'size_rates.*.is_default' => 'boolean',
 
-            // Promo rules
+            
             'promo_rules' => 'nullable|array',
             'promo_rules.*.buy_quantity' => 'required_with:promo_rules.*.free_quantity|integer|min:1',
             'promo_rules.*.free_quantity' => 'required_with:promo_rules.*.buy_quantity|integer|min:1',
@@ -64,7 +64,7 @@ class JobTypeRequest extends FormRequest
     {
         return [
             function () {
-                // Additional custom validation
+                
                 $priceTiers = $this->input('price_tiers', []);
 
                 foreach ($priceTiers as $tier) {

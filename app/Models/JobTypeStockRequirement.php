@@ -23,30 +23,19 @@ class JobTypeStockRequirement extends Model
         'is_required' => 'boolean',
     ];
 
-    /**
-     * Get the job type.
-     */
+    
     public function jobType()
     {
         return $this->belongsTo(JobType::class);
     }
 
-    /**
-     * Get the stock item.
-     */
+    
     public function stockItem()
     {
         return $this->belongsTo(StockItem::class);
     }
 
-    /**
-     * Calculate required quantity for a given production quantity.
-     * 
-     * @param int $productionQuantity Number of pieces produced
-     * @param float|null $area Total area in square meters (for area-based calculations)
-     * @param float|null $length Total length in meters (for length-based calculations)
-     * @return float Required stock quantity
-     */
+    
     public function calculateRequiredQuantity(
         int $productionQuantity,
         ?float $area = null,
@@ -56,19 +45,19 @@ class JobTypeStockRequirement extends Model
 
         switch ($calculationType) {
             case 'area':
-                // For area-based: quantity_per_unit is per sqm
-                // Example: 0.5 sqm per sqm of production = 0.5 * area
+                
+                
                 return $this->quantity_per_unit * ($area ?? 0);
 
             case 'length':
-                // For length-based: quantity_per_unit is per meter
-                // Example: 0.1 meters per meter of production = 0.1 * length
+                
+                
                 return $this->quantity_per_unit * ($length ?? 0);
 
             case 'quantity':
             default:
-                // For quantity-based: quantity_per_unit is per piece
-                // Example: 2 pieces per production unit = 2 * quantity
+                
+                
                 return $this->quantity_per_unit * $productionQuantity;
         }
     }

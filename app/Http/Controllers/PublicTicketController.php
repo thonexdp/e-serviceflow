@@ -8,12 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class PublicTicketController extends Controller
 {
-    /**
-     * Search for a ticket by ticket number (public endpoint).
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
+    
     public function search(Request $request)
     {
         $request->validate([
@@ -22,7 +17,7 @@ class PublicTicketController extends Controller
 
         $ticketNumber = $request->input('ticket_number');
 
-        // Search for the ticket
+        
         $ticket = Ticket::where('ticket_number', $ticketNumber)
             ->with([
                 'customer:id,firstname,lastname,email,phone',
@@ -42,7 +37,7 @@ class PublicTicketController extends Controller
             ], 404);
         }
 
-        // Transform the ticket data for the frontend
+        
         $orderData = $this->transformTicketData($ticket);
 
         return response()->json([
@@ -51,20 +46,15 @@ class PublicTicketController extends Controller
         ]);
     }
 
-    /**
-     * Transform ticket data to match the frontend structure.
-     * 
-     * @param Ticket $ticket
-     * @return array
-     */
+    
     private function transformTicketData(Ticket $ticket): array
     {
-        // Calculate payment information
+        
         $totalAmount = (float) $ticket->total_amount;
         $amountPaid = (float) $ticket->amount_paid;
         $balance = max($totalAmount - $amountPaid, 0);
 
-        // Determine payment status label
+        
         $paymentStatusLabel = 'Pending';
         if ($ticket->payment_status === 'paid') {
             $paymentStatusLabel = 'Paid';
@@ -72,10 +62,10 @@ class PublicTicketController extends Controller
             $paymentStatusLabel = 'Partially Paid';
         }
 
-        // Build timeline based on ticket status
+        
         $timeline = $this->buildTimeline($ticket);
 
-        // Build order items array
+        
         $items = [];
         if ($ticket->jobType) {
             $specifications = [];
@@ -128,17 +118,12 @@ class PublicTicketController extends Controller
         ];
     }
 
-    /**
-     * Build timeline array based on ticket status.
-     * 
-     * @param Ticket $ticket
-     * @return array
-     */
+    
     private function buildTimeline(Ticket $ticket): array
     {
         $currentStatus = $ticket->status;
 
-        // Define the standard workflow stages
+        
         $stages = [
             'pending' => 'Ticket Created',
             'designing' => 'Design In Progress',
@@ -148,7 +133,7 @@ class PublicTicketController extends Controller
             'completed' => 'Completed',
         ];
 
-        // Map status to stage order
+        
         $statusOrder = [
             'pending' => 0,
             'designing' => 1,
@@ -171,8 +156,8 @@ class PublicTicketController extends Controller
 
             if ($stageOrder < $currentOrder) {
                 $status = 'completed';
-                // For completed stages, we could add actual dates if tracked
-                $date = ''; // Could be enhanced with actual timestamps
+                
+                $date = ''; 
             } elseif ($stageOrder === $currentOrder) {
                 $status = 'current';
                 $date = $ticket->updated_at->format('M d, g:i A');
@@ -190,12 +175,7 @@ class PublicTicketController extends Controller
         return $timeline;
     }
 
-    /**
-     * Get human-readable status label.
-     * 
-     * @param string $status
-     * @return string
-     */
+    
     private function getStatusLabel(string $status): string
     {
         $labels = [

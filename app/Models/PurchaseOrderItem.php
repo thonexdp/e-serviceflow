@@ -26,9 +26,7 @@ class PurchaseOrderItem extends Model
         'received_quantity' => 'decimal:2',
     ];
 
-    /**
-     * Boot the model.
-     */
+    
     protected static function boot()
     {
         parent::boot();
@@ -38,33 +36,25 @@ class PurchaseOrderItem extends Model
         });
     }
 
-    /**
-     * Get the purchase order.
-     */
+    
     public function purchaseOrder()
     {
         return $this->belongsTo(PurchaseOrder::class);
     }
 
-    /**
-     * Get the stock item.
-     */
+    
     public function stockItem()
     {
         return $this->belongsTo(StockItem::class);
     }
 
-    /**
-     * Check if item is fully received.
-     */
+    
     public function isFullyReceived(): bool
     {
         return $this->received_quantity >= $this->quantity;
     }
 
-    /**
-     * Get remaining quantity to receive.
-     */
+    
     public function getRemainingQuantityAttribute(): float
     {
         return max(0, $this->quantity - $this->received_quantity);

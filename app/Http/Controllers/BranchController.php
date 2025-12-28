@@ -9,19 +9,17 @@ use Inertia\Inertia;
 
 class BranchController extends Controller
 {
-    /**
-     * Display a listing of branches.
-     */
+    
     public function index(Request $request)
     {
-        // Only admin can access branch management
+        
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
 
         $query = Branch::query();
 
-        // Apply search
+        
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->search . '%')
@@ -30,7 +28,7 @@ class BranchController extends Controller
             });
         }
 
-        // Filter by active status
+        
         if ($request->has('is_active') && $request->is_active !== null && $request->is_active !== '') {
             $query->where('is_active', $request->is_active);
         }
@@ -45,12 +43,10 @@ class BranchController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created branch.
-     */
+    
     public function store(Request $request)
     {
-        // Only admin can create branches
+        
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
@@ -69,7 +65,7 @@ class BranchController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        // If setting as default production, unset others
+        
         if ($validated['is_default_production'] ?? false) {
             Branch::where('is_default_production', true)->update(['is_default_production' => false]);
         }
@@ -87,12 +83,10 @@ class BranchController extends Controller
             ->with('success', 'Branch created successfully.');
     }
 
-    /**
-     * Update the specified branch.
-     */
+    
     public function update(Request $request, Branch $branch)
     {
-        // Only admin can update branches
+        
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
@@ -111,7 +105,7 @@ class BranchController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        // If setting as default production, unset others
+        
         if ($validated['is_default_production'] ?? false) {
             Branch::where('id', '!=', $branch->id)
                 ->where('is_default_production', true)
@@ -132,23 +126,21 @@ class BranchController extends Controller
             ->with('success', 'Branch updated successfully.');
     }
 
-    /**
-     * Remove the specified branch.
-     */
+    
     public function destroy(Branch $branch)
     {
-        // Only admin can delete branches
+        
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
 
-        // Check if branch has users
+        
         if ($branch->users()->count() > 0) {
             return redirect()->route('admin.branches.index')
                 ->with('error', 'Cannot delete branch with assigned users. Please reassign users first.');
         }
 
-        // Check if branch has tickets
+        
         if ($branch->orderedTickets()->count() > 0 || $branch->productionTickets()->count() > 0) {
             return redirect()->route('admin.branches.index')
                 ->with('error', 'Cannot delete branch with existing tickets.');
@@ -169,9 +161,7 @@ class BranchController extends Controller
             ->with('success', 'Branch deleted successfully.');
     }
 
-    /**
-     * Get all active branches (API endpoint).
-     */
+    
     public function getActiveBranches()
     {
         $branches = Branch::active()
@@ -182,9 +172,7 @@ class BranchController extends Controller
         return response()->json($branches);
     }
 
-    /**
-     * Get branches that can accept orders (API endpoint).
-     */
+    
     public function getOrderBranches()
     {
         $branches = Branch::active()
@@ -196,9 +184,7 @@ class BranchController extends Controller
         return response()->json($branches);
     }
 
-    /**
-     * Get branches that can produce (API endpoint).
-     */
+    
     public function getProductionBranches()
     {
         $branches = Branch::active()

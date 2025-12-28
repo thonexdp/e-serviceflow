@@ -23,9 +23,7 @@ class JobTypePromoRule extends Model
         'free_quantity' => 'integer',
     ];
 
-    /**
-     * Get the job type that owns this promo rule
-     */
+    
     public function jobType()
     {
         return $this->belongsTo(JobType::class);

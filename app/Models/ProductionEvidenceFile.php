@@ -21,9 +21,7 @@ class ProductionEvidenceFile extends Model
         'file_size' => 'integer',
     ];
 
-    /**
-     * Get the production record that owns this evidence file.
-     */
+    
     public function productionRecord()
     {
         return $this->belongsTo(ProductionRecord::class);

@@ -80,7 +80,7 @@ class JobTypeController extends Controller
         $validated = $request->validated();
 
         if ($request->hasFile('image')) {
-            // Delete old image if exists
+            
             if ($jobType->getRawOriginal('image_path')) {
                 Storage::delete($jobType->getRawOriginal('image_path'));
             }
@@ -119,15 +119,13 @@ class JobTypeController extends Controller
         return back()->with('success', 'Job type deleted successfully!');
     }
 
-    /**
-     * Sync promo rules for a job type
-     */
+    
     private function syncPromoRules(JobType $jobType, array $promoRules)
     {
-        // Delete existing promo rules for this job type
+        
         $jobType->promoRules()->delete();
 
-        // Create new promo rules
+        
         foreach ($promoRules as $rule) {
             if (!empty($rule['buy_quantity']) && !empty($rule['free_quantity'])) {
                 $jobType->promoRules()->create([

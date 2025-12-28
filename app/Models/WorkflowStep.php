@@ -24,17 +24,13 @@ class WorkflowStep extends Model
         'step_order' => 'integer',
     ];
 
-    /**
-     * Scope to get only active workflow steps
-     */
+    
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Scope to order by step order
-     */
+    
     public function scopeOrdered($query)
     {
         return $query->orderBy('step_order', 'asc');

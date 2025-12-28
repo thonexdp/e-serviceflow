@@ -18,16 +18,14 @@ class InventoryController extends Controller
         $this->stockService = $stockService;
     }
 
-    /**
-     * Display a listing of stock items.
-     */
+    
     public function index(Request $request)
     {
         $query = StockItem::with(['jobType', 'productionConsumptions' => function ($q) {
-            $q->latest()->limit(5); // Get recent consumptions
+            $q->latest()->limit(5); 
         }]);
 
-        // Search
+        
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('sku', 'like', '%' . $request->search . '%')
@@ -38,12 +36,12 @@ class InventoryController extends Controller
             });
         }
 
-        // Filter by job type
+        
         if ($request->has('job_type_id') && $request->job_type_id) {
             $query->where('job_type_id', $request->job_type_id);
         }
 
-        // Filter by stock status
+        
         if ($request->has('stock_status') && $request->stock_status) {
             if ($request->stock_status === 'low') {
                 $query->whereRaw('current_stock <= minimum_stock_level');
@@ -52,7 +50,7 @@ class InventoryController extends Controller
             }
         }
 
-        // Filter by active status
+        
         if ($request->has('is_active')) {
             $query->where('is_active', $request->is_active);
         } else {
@@ -61,19 +59,19 @@ class InventoryController extends Controller
 
         $stockItems = $query->orderBy('name')->paginate($request->get('per_page', 15));
 
-        // Load production consumptions for each stock item (for display)
+        
         foreach ($stockItems->items() as $stockItem) {
             $stockItem->load(['productionConsumptions' => function ($q) {
                 $q->with('ticket')->latest()->limit(3);
             }]);
         }
 
-        // Get job types for filter
+        
         $jobTypes = \App\Models\JobType::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        // Get low stock items count
+        
         $lowStockCount = StockItem::where('is_active', true)
             ->whereRaw('current_stock <= minimum_stock_level')
             ->count();
@@ -86,14 +84,12 @@ class InventoryController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created stock item.
-     */
+    
     public function store(Request $request)
     {
         try {
 
-            // Check if is_garment is checked (can be true, 1, '1', or 'on')
+            
             $isGarment = $request->has('is_garment') && 
                         ($request->is_garment === true || 
                          $request->is_garment === 1 || 
@@ -124,12 +120,12 @@ class InventoryController extends Controller
                 'is_active' => 'boolean',
             ]);
 
-            // Create stock item with 0 stock initially to avoid double counting
+            
             $initialStock = $validated['current_stock'] ?? 0;
-            $validated['current_stock'] = 0; // Set to 0 first
+            $validated['current_stock'] = 0; 
             $stockItem = StockItem::create($validated);
 
-            // Record initial stock movement if stock is provided (this will add it properly)
+            
             if ($initialStock > 0) {
                 $this->stockService->recordMovement(
                     $stockItem,
@@ -148,14 +144,12 @@ class InventoryController extends Controller
         }
     }
 
-    /**
-     * Update the specified stock item.
-     */
+    
     public function update(Request $request, $id)
     {
         $stockItem = StockItem::findOrFail($id);
 
-        // Check if is_garment is checked (can be true, 1, '1', or 'on')
+        
         $isGarment = $request->has('is_garment') && 
                     ($request->is_garment === true || 
                      $request->is_garment === 1 || 
@@ -186,9 +180,7 @@ class InventoryController extends Controller
         return redirect()->back()->with('success', 'Stock item updated successfully.');
     }
 
-    /**
-     * Remove the specified stock item.
-     */
+    
     public function destroy($id)
     {
         $stockItem = StockItem::findOrFail($id);
@@ -197,9 +189,7 @@ class InventoryController extends Controller
         return redirect()->back()->with('success', 'Stock item deleted successfully.');
     }
 
-    /**
-     * Adjust stock level.
-     */
+    
     public function adjustStock(Request $request, $id)
     {
         $stockItem = StockItem::findOrFail($id);
@@ -222,9 +212,7 @@ class InventoryController extends Controller
         return redirect()->back()->with('success', 'Stock adjusted successfully.');
     }
 
-    /**
-     * Get stock movements for a stock item.
-     */
+    
     public function movements($id, Request $request)
     {
         $stockItem = StockItem::findOrFail($id);
@@ -240,9 +228,7 @@ class InventoryController extends Controller
         ]);
     }
 
-    /**
-     * Get low stock items.
-     */
+    
     public function lowStock()
     {
         $lowStockItems = $this->stockService->getLowStockItems();
