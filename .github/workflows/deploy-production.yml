@@ -1,0 +1,176 @@
+name: Deploy to Production (DigitalOcean)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  APP_NAME: rc-printshoppe
+  DROPLET_HOST: ${{ secrets.DO_DROPLET_HOST }}
+  DROPLET_USER: ${{ secrets.DO_DROPLET_USER || 'root' }}
+  DEPLOY_PATH: ${{ secrets.DO_DEPLOY_PATH || '/var/www/rc-printshoppe' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        env:
+          VITE_PUSHER_APP_KEY: ${{ secrets.VITE_PUSHER_APP_KEY }}
+          VITE_PUSHER_HOST: ${{ secrets.VITE_PUSHER_HOST }}
+          VITE_PUSHER_PORT: ${{ secrets.VITE_PUSHER_PORT }}
+          VITE_PUSHER_SCHEME: ${{ secrets.VITE_PUSHER_SCHEME }}
+          VITE_PUSHER_APP_CLUSTER: ${{ secrets.VITE_PUSHER_APP_CLUSTER }}
+        run: npm run build
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, zip, gd, pdo_mysql, intl, bcmath
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: |
+          composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+      - name: Create deployment archive
+        run: |
+          tar -czf deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='.env' \
+            --exclude='storage/logs/*' \
+            --exclude='storage/framework/cache/*' \
+            --exclude='storage/framework/sessions/*' \
+            --exclude='storage/framework/views/*' \
+            --exclude='tests' \
+            --exclude='.gitignore' \
+            --exclude='README.md' \
+            --exclude='*.md' \
+            .
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          ssh-keyscan -H ${{ env.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to DigitalOcean Droplet
+        run: |
+          # Copy files to server
+          scp deploy.tar.gz ${{ env.DROPLET_USER }}@${{ env.DROPLET_HOST }}:/tmp/
+          
+          # SSH into server and deploy
+          ssh ${{ env.DROPLET_USER }}@${{ env.DROPLET_HOST }} << 'ENDSSH'
+            set -e
+            
+            # Create deployment directory if it doesn't exist
+            mkdir -p ${{ env.DEPLOY_PATH }}
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Backup current deployment
+            if [ -d "current" ]; then
+              echo "Backing up current deployment..."
+              BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
+              mkdir -p ../backups
+              cp -r current ../$BACKUP_DIR || true
+            fi
+            
+            # Create new release directory
+            RELEASE_DIR="releases/$(date +%Y%m%d_%H%M%S)"
+            mkdir -p releases
+            mkdir -p $RELEASE_DIR
+            
+            # Extract new release
+            echo "Extracting new release..."
+            tar -xzf /tmp/deploy.tar.gz -C $RELEASE_DIR
+            rm /tmp/deploy.tar.gz
+            
+            # Install Composer dependencies on server
+            echo "Installing Composer dependencies..."
+            cd $RELEASE_DIR
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            
+            # Run Laravel optimizations
+            echo "Running Laravel optimizations..."
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            
+            # Run database migrations
+            echo "Running database migrations..."
+            php artisan migrate --force
+            
+            # Create storage symlink if it doesn't exist
+            if [ ! -L public/storage ]; then
+              php artisan storage:link
+            fi
+            
+            # Set permissions
+            echo "Setting permissions..."
+            chown -R www-data:www-data storage bootstrap/cache
+            chmod -R 775 storage bootstrap/cache
+            
+            # Switch to new release
+            echo "Switching to new release..."
+            cd ${{ env.DEPLOY_PATH }}
+            rm -f current
+            ln -s $RELEASE_DIR current
+            
+            # Restart PHP-FPM (adjust based on your setup)
+            echo "Restarting services..."
+            systemctl restart php8.2-fpm || service php8.2-fpm restart || true
+            systemctl restart nginx || service nginx restart || true
+            
+            # Clear application cache
+            cd current
+            php artisan cache:clear
+            php artisan config:clear
+            php artisan route:clear
+            php artisan view:clear
+            
+            # Reload config
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            
+            echo "Deployment completed successfully!"
+          ENDSSH
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f deploy.tar.gz
+
+      - name: Deployment Summary
+        run: |
+          echo "🚀 Deployment to Production Complete!"
+          echo "----------------------------------------"
+          echo "Application: ${{ env.APP_NAME }}"
+          echo "Server: ${{ env.DROPLET_HOST }}"
+          echo "Deploy Path: ${{ env.DEPLOY_PATH }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+

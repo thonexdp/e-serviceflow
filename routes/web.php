@@ -20,6 +20,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SettingsController;
 use App\Models\JobCategory;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -405,6 +406,156 @@ Route::get('/dashboard', function () {
 Route::get('/tracking', function () {
     return redirect()->route('track');
 });
+
+Route::get('/debug-storage', function () {
+    $results = [
+        'timestamp' => now()->toDateTimeString(),
+        'environment' => app()->environment(),
+        'config' => [],
+        'connection_test' => [],
+        'upload_test' => [],
+        'url_test' => [],
+    ];
+
+    // Get configuration - use helper if available, otherwise determine from env
+    $diskName = function_exists('storage_disk') 
+        ? storage_disk() 
+        : (app()->environment('production') ? 's3' : 'public');
+    $config = config('filesystems.disks.' . $diskName);
+    
+    $results['config'] = [
+        'active_disk' => $diskName,
+        'default_disk' => config('filesystems.default'),
+        'bucket' => $config['bucket'] ?? 'N/A',
+        'region' => $config['region'] ?? 'N/A',
+        'endpoint' => $config['endpoint'] ?? 'N/A',
+        'has_key' => !empty($config['key']),
+        'has_secret' => !empty($config['secret']),
+        'visibility' => $config['visibility'] ?? 'N/A',
+    ];
+
+    try {
+        // Test 1: Check if we can connect and list files (or at least access the disk)
+        $storage = function_exists('storage') 
+            ? storage() 
+            : Storage::disk($diskName);
+        $results['connection_test'] = [
+            'status' => 'success',
+            'message' => 'Storage disk initialized successfully',
+        ];
+    } catch (\Exception $e) {
+        $results['connection_test'] = [
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ];
+        return response()->json($results, 500);
+    }
+
+    try {
+        // Test 2: Upload a test file
+        $testFilename = 'debug/test-' . time() . '.txt';
+        $testContent = 'Storage connection test - ' . now()->toDateTimeString() . PHP_EOL;
+        $testContent .= 'Environment: ' . app()->environment() . PHP_EOL;
+        $testContent .= 'Disk: ' . $diskName . PHP_EOL;
+        
+        $uploaded = $storage->put($testFilename, $testContent);
+        
+        $results['upload_test'] = [
+            'status' => 'success',
+            'filename' => $testFilename,
+            'path' => $uploaded,
+            'message' => 'File uploaded successfully',
+        ];
+
+        // Test 3: Check if file exists (use the returned path from put())
+        // Note: DigitalOcean Spaces sometimes has issues with exists() check
+        // So we'll try to read the file instead as a more reliable check
+        $checkPath = $uploaded ?: $testFilename;
+        try {
+            $exists = $storage->exists($checkPath);
+            $results['upload_test']['file_exists'] = $exists;
+            $results['upload_test']['checked_path'] = $checkPath;
+        } catch (\Exception $e) {
+            // If exists() fails, try reading the file as a workaround
+            // This is a known issue with some S3-compatible services
+            try {
+                $testRead = $storage->get($checkPath);
+                $results['upload_test']['file_exists'] = [
+                    'status' => 'success (via read)',
+                    'exists' => true,
+                    'note' => 'exists() method failed, but file is accessible via get()',
+                    'error' => $e->getMessage(),
+                ];
+            } catch (\Exception $readException) {
+                $results['upload_test']['file_exists'] = [
+                    'status' => 'warning',
+                    'exists' => false,
+                    'message' => 'exists() check failed: ' . $e->getMessage(),
+                    'read_also_failed' => $readException->getMessage(),
+                    'note' => 'File upload reported success, but verification failed. This may be a permissions issue.',
+                ];
+            }
+        }
+
+        // Test 4: Get file URL (use the returned path from put())
+        try {
+            $urlPath = $uploaded ?: $testFilename;
+            $url = $storage->url($urlPath);
+            $results['url_test'] = [
+                'status' => 'success',
+                'url' => $url,
+                'url_path' => $urlPath,
+                'message' => 'URL generated successfully',
+            ];
+        } catch (\Exception $e) {
+            $results['url_test'] = [
+                'status' => 'warning',
+                'message' => $e->getMessage(),
+                'attempted_path' => $uploaded ?: $testFilename,
+            ];
+        }
+
+        // Test 5: Try to read the file back (use the returned path from put())
+        try {
+            $readPath = $uploaded ?: $testFilename;
+            $readContent = $storage->get($readPath);
+            $results['upload_test']['read_test'] = [
+                'status' => 'success',
+                'content_length' => strlen($readContent),
+                'matches' => $readContent === $testContent,
+                'read_path' => $readPath,
+            ];
+        } catch (\Exception $e) {
+            $results['upload_test']['read_test'] = [
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'attempted_path' => $uploaded ?: $testFilename,
+            ];
+        }
+
+        // Clean up test file (optional - you might want to keep it for verification)
+        // storage()->delete($testFilename);
+
+    } catch (\Exception $e) {
+        $results['upload_test'] = [
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ];
+    }
+
+    // Determine overall status
+    $overallStatus = 'success';
+    if ($results['connection_test']['status'] === 'error' || 
+        $results['upload_test']['status'] === 'error') {
+        $overallStatus = 'error';
+    }
+
+    $results['overall_status'] = $overallStatus;
+
+    return response()->json($results, $overallStatus === 'success' ? 200 : 500);
+})->middleware('auth')->name('debug.storage');
 
 
 require __DIR__ . '/auth.php';

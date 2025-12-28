@@ -9,6 +9,7 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ProductionQueueController extends Controller
 {
@@ -388,10 +389,12 @@ class ProductionQueueController extends Controller
                 if ($request->hasFile('evidence_files') && !empty($createdRecords)) {
                     foreach ($request->file('evidence_files') as $file) {
                         $fileName = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                        $filePath = $file->storeAs('production_evidence', $fileName, 'public');
+                        $disk = app()->environment('production') ? 's3' : 'public';
+                        $filePath = $file->storeAs('production_evidence', $fileName, $disk);
 
 
-                        $fileUrl = asset('storage/' . $filePath);
+                        $disk = app()->environment('production') ? 's3' : 'public';
+                        $fileUrl = Storage::disk($disk)->url($filePath);
 
 
                         foreach ($createdRecords as $record) {
@@ -1315,7 +1318,7 @@ class ProductionQueueController extends Controller
             if ($request->hasFile('evidence_files')) {
                 foreach ($request->file('evidence_files') as $file) {
                     $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, 'public');
+                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, \storage_disk());
 
                     \App\Models\WorkflowEvidence::create([
                         'ticket_id' => $ticket->id,
@@ -1424,7 +1427,7 @@ class ProductionQueueController extends Controller
                 if ($request->hasFile('evidence_files')) {
                     foreach ($request->file('evidence_files') as $file) {
                         $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, 'public');
+                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, \storage_disk());
 
                         \App\Models\WorkflowEvidence::create([
                             'ticket_id' => $ticket->id,

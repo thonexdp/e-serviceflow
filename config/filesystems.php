@@ -13,7 +13,9 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    'default' => env('APP_ENV') === 'production' 
+        ? (env('FILESYSTEM_DISK', 's3')) 
+        : (env('FILESYSTEM_DISK', 'local')),
 
     /*
     |--------------------------------------------------------------------------
@@ -50,9 +52,17 @@ return [
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION'),
             'bucket' => env('AWS_BUCKET'),
-            'url' => env('AWS_URL'),
+            'url' => env('AWS_URL') ?: (
+                env('AWS_BUCKET') && env('AWS_DEFAULT_REGION')
+                    ? 'https://' . env('AWS_BUCKET') . '.' . env('AWS_DEFAULT_REGION') . '.digitaloceanspaces.com'
+                    : null
+            ),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'public',
+            'options' => [
+                'CacheControl' => 'max-age=31536000, public',
+            ],
             'throw' => false,
         ],
 

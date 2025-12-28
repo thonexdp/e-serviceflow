@@ -933,7 +933,7 @@ class DashboardController extends Controller
         return $users->map(function ($user) use ($startDate, $endDate, $role) {
             $stats = [
                 'name' => $user->name,
-                'last_activity' => $user->updated_at->format('M d, Y'),
+                'last_activity' => $user->updated_at ? $user->updated_at->format('M d, Y') : 'N/A',
             ];
 
             if ($role === 'FrontDesk') {

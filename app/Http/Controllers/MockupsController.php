@@ -95,7 +95,8 @@ class MockupsController extends Controller
         }
 
         foreach ($files as $file) {
-            $path = Storage::put('tickets/mockups', $file);
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $path = Storage::disk($disk)->put('tickets/mockups', $file, $disk === 's3' ? 'public' : []);
 
             TicketFile::create([
                 'ticket_id' => $ticket->id,
@@ -172,7 +173,8 @@ class MockupsController extends Controller
         $file = TicketFile::findOrFail($id);
         $path = $file->getRawOriginal('file_path');
 
-        if (!Storage::exists($path)) {
+        $disk = app()->environment('production') ? 's3' : 'public';
+        if (!Storage::disk($disk)->exists($path)) {
             abort(404);
         }
         return Storage::download($path, $file->file_name);

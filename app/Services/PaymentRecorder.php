@@ -10,6 +10,7 @@ use App\Models\UserActivityLog;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PaymentRecorder
 {
@@ -94,7 +95,8 @@ class PaymentRecorder
                 if (!$file instanceof UploadedFile) {
                     continue;
                 }
-                $storedPath = \Illuminate\Support\Facades\Storage::put('payments', $file);
+                $disk = app()->environment('production') ? 's3' : 'public';
+                $storedPath = Storage::disk($disk)->put('payments', $file, $disk === 's3' ? 'public' : []);
                 PaymentDocument::create([
                     'payment_id' => $payment->id,
                     'uploaded_by' => Auth::id(),
