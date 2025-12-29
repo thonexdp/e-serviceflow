@@ -12,7 +12,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    
+
     protected $productionQueue;
     public function __construct(ProductionQueueController $productionQueue)
     {
@@ -76,7 +76,7 @@ class DashboardController extends Controller
                             $endDate = now()->endOfYear();
                             break;
                         default:
-                            
+
                             if (str_starts_with($dateRange, 'year_')) {
                                 $year = (int) str_replace('year_', '', $dateRange);
                                 $startDate = now()->setYear($year)->startOfYear();
@@ -88,14 +88,14 @@ class DashboardController extends Controller
                             break;
                     }
 
-                    
+
                     $branchFilter = function ($query) use ($user) {
                         if ($user && !$user->isAdmin() && $user->branch_id) {
                             $query->where('order_branch_id', $user->branch_id);
                         }
                     };
 
-                    
+
                     $newOnlineOrders = Ticket::where('status', 'pending')
                         ->where('payment_status', 'awaiting_verification')
                         ->whereBetween('created_at', [$startDate, $endDate])
@@ -177,18 +177,18 @@ class DashboardController extends Controller
                             'customer' => $t->customer->name ?? 'Unknown',
                         ]),
                 ],
-                
+
                 'newOnlineOrders' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'customerFiles', 'payments.documents'])
                         ->where('status', 'pending')
-                        
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
                         ->orderByRaw("CASE WHEN payment_status = 'awaiting_verification' THEN 0 ELSE 1 END")
                         ->orderBy('created_at', 'desc');
 
-                    
+
                     if ($request->has('search') && $request->search) {
                         $search = $request->search;
                         $query->where(function ($q) use ($search) {
@@ -203,7 +203,7 @@ class DashboardController extends Controller
                     }
 
 
-                    
+
                     $orderBy = $request->get('order_by', 'created_at');
                     $orderDir = $request->get('order_dir', 'desc');
                     $query->orderBy($orderBy, $orderDir);
@@ -237,16 +237,16 @@ class DashboardController extends Controller
                         ];
                     });
                 },
-                
+
                 'recentTicketsToday' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'payments.documents'])
                         ->whereDate('created_at', today())
-                        
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         });
 
-                    
+
                     if ($request->has('recent_search') && $request->recent_search) {
                         $search = $request->recent_search;
                         $query->where(function ($q) use ($search) {
@@ -260,7 +260,7 @@ class DashboardController extends Controller
                         });
                     }
 
-                    
+
                     $orderBy = $request->get('recent_order_by', 'created_at');
                     $orderDir = $request->get('recent_order_dir', 'desc');
                     $query->orderBy($orderBy, $orderDir);
@@ -306,7 +306,7 @@ class DashboardController extends Controller
                 },
                 'payments' => Ticket::whereIn('payment_status', ['pending', 'partial'])
                     ->with('customer')
-                    
+
                     ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                         $query->where('order_branch_id', $user->branch_id);
                     })
@@ -356,7 +356,7 @@ class DashboardController extends Controller
                             $endDate = now()->endOfYear();
                             break;
                         default:
-                            
+
                             if (str_starts_with($dateRange, 'year_')) {
                                 $year = (int) str_replace('year_', '', $dateRange);
                                 $startDate = now()->setYear($year)->startOfYear();
@@ -368,7 +368,7 @@ class DashboardController extends Controller
                             break;
                     }
 
-                    
+
                     $branchFilter = function ($query) use ($user) {
                         if ($user && !$user->isAdmin() && $user->branch_id) {
                             $query->where('order_branch_id', $user->branch_id);
@@ -403,7 +403,7 @@ class DashboardController extends Controller
                             $q->whereNull('design_status')
                                 ->orWhere('design_status', 'pending');
                         })
-                        
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
@@ -435,7 +435,7 @@ class DashboardController extends Controller
                 'revisionRequested' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
                         ->where('design_status', 'revision_requested')
-                        
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
@@ -469,7 +469,7 @@ class DashboardController extends Controller
                     $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
                         ->where('design_status', 'mockup_uploaded')
                         ->whereDate('updated_at', today())
-                        
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
@@ -519,8 +519,8 @@ class DashboardController extends Controller
                     return [
                         'todayCollections' => (float) Payment::whereBetween('payment_date', [$today, $tomorrow])
                             ->where('payment_type', 'collection')
-                            ->where('status', 'posted') 
-                            
+                            ->where('status', 'posted')
+
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
                                     $q->where('order_branch_id', $user->branch_id);
@@ -529,8 +529,8 @@ class DashboardController extends Controller
                             ->sum('amount'),
                         'monthCollections' => (float) Payment::whereBetween('payment_date', [$thisMonthStart, $thisMonthEnd])
                             ->where('payment_type', 'collection')
-                            ->where('status', 'posted') 
-                            
+                            ->where('status', 'posted')
+
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
                                     $q->where('order_branch_id', $user->branch_id);
@@ -539,7 +539,7 @@ class DashboardController extends Controller
                             ->sum('amount'),
                         'totalReceivables' => (float) Ticket::whereIn('payment_status', ['pending', 'partial'])
                             ->where('status', '!=', 'cancelled')
-                            
+
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->where('order_branch_id', $user->branch_id);
                             })
@@ -547,14 +547,14 @@ class DashboardController extends Controller
                             ->value('outstanding') ?? 0,
                         'readyForPickupUnpaid' => Ticket::where('status', 'completed')
                             ->whereIn('payment_status', ['pending', 'partial'])
-                            
+
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->where('order_branch_id', $user->branch_id);
                             })
                             ->count(),
                         'todayTransactionsCount' => Payment::whereBetween('payment_date', [$today, $tomorrow])
-                            ->where('status', 'posted') 
-                            
+                            ->where('status', 'posted')
+
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
                                     $q->where('order_branch_id', $user->branch_id);
@@ -562,7 +562,7 @@ class DashboardController extends Controller
                             })
                             ->count(),
                         'pendingChequesAmount' => (float) Payment::where('status', 'pending')
-                            
+
                             ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                                 $query->whereHas('ticket', function ($q) use ($user) {
                                     $q->where('order_branch_id', $user->branch_id);
@@ -577,7 +577,7 @@ class DashboardController extends Controller
                     return Ticket::with(['customer', 'jobType'])
                         ->where('status', 'completed')
                         ->whereIn('payment_status', ['pending', 'partial'])
-                        
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
@@ -597,8 +597,8 @@ class DashboardController extends Controller
                 'latestCollections' => function () use ($user) {
                     return Payment::with(['ticket.customer', 'ticket.jobType', 'recordedBy'])
                         ->where('payment_type', 'collection')
-                        ->where('status', 'posted') 
-                        
+                        ->where('status', 'posted')
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->whereHas('ticket', function ($q) use ($user) {
                                 $q->where('order_branch_id', $user->branch_id);
@@ -624,8 +624,8 @@ class DashboardController extends Controller
 
                     return Payment::whereBetween('payment_date', [$today, $tomorrow])
                         ->where('payment_type', 'collection')
-                        ->where('status', 'posted') 
-                        
+                        ->where('status', 'posted')
+
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->whereHas('ticket', function ($q) use ($user) {
                                 $q->where('order_branch_id', $user->branch_id);
@@ -643,26 +643,39 @@ class DashboardController extends Controller
         };
     }
 
+    public function tvView(Request $request)
+    {
+        // Always render Production dashboard for TV/Monitor view, regardless of user role
+        $data = $this->productionQueue->getData($request);
+
+        return Inertia::render('Dashboard/Production', [
+            'tickets' => $data['tickets'],
+            'stockItems' => $data['stockItems'],
+            'filters' => $request->only(['search', 'status']),
+            'summary' => $data['summary'],
+        ]);
+    }
+
     private function getAdminDashboardData(Request $request)
     {
         $dateRange = $request->input('date_range', 'this_month');
         $year = $request->input('year', now()->year);
         $month = $request->input('month', now()->format('m'));
 
-        
+
         $dates = $this->calculateDateRanges($dateRange, $year, $month);
 
-        
+
         $currentStats = $this->calculatePeriodStats($dates['current_start'], $dates['current_end']);
 
-        
+
         $previousStats = $this->calculatePeriodStats($dates['previous_start'], $dates['previous_end']);
 
-        
+
         $dailyOrders = $this->getDailyOrders($year, $month);
         $dailyRevenue = $this->getDailyRevenue($year, $month);
 
-        
+
         $frontDeskTransactions = $this->getUserTransactions('FrontDesk', $dates['current_start'], $dates['current_end']);
         $designerTransactions = $this->getUserTransactions('Designer', $dates['current_start'], $dates['current_end']);
         $productionTransactions = $this->getUserTransactions('Production', $dates['current_start'], $dates['current_end']);
@@ -723,7 +736,7 @@ class DashboardController extends Controller
                 $previousEnd = now()->subYear()->endOfYear();
                 break;
             default:
-                
+
                 if (str_starts_with($dateRange, 'year_')) {
                     $selectedYear = (int) str_replace('year_', '', $dateRange);
                     $currentStart = now()->setYear($selectedYear)->startOfYear();
@@ -749,44 +762,44 @@ class DashboardController extends Controller
 
     private function calculatePeriodStats($startDate, $endDate)
     {
-        
+
         $totalOrders = Ticket::whereBetween('created_at', [$startDate, $endDate])
             ->where('status', '!=', 'cancelled')
             ->count();
 
-        
+
         $completedOrders = Ticket::whereBetween('updated_at', [$startDate, $endDate])
             ->where('status', 'completed')
             ->count();
 
-        
-        
+
+
         $totalSales = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', [$startDate, $endDate])
             ->sum('amount');
 
-        
+
         $ticketSales = Ticket::whereBetween('created_at', [$startDate, $endDate])
             ->whereNotIn('payment_status', ['pending'])
             ->where('status', '!=', 'cancelled')
             ->sum('amount_paid');
 
-        
+
         $totalSales = max($totalSales, $ticketSales);
 
-        
+
         $receivables = Ticket::whereIn('payment_status', ['pending', 'partial'])
             ->where('status', '!=', 'cancelled')
             ->selectRaw('SUM(total_amount - COALESCE(amount_paid, 0)) as outstanding')
             ->value('outstanding') ?? 0;
 
-        
+
         $discounts = Ticket::whereBetween('created_at', [$startDate, $endDate])
             ->where('status', '!=', 'cancelled')
             ->sum('discount');
 
-        
+
         $actualCOGS = $this->calculateActualCOGS($startDate, $endDate);
 
         $netIncome = $totalSales - $discounts - $actualCOGS;
@@ -804,14 +817,14 @@ class DashboardController extends Controller
 
     private function getDailyOrders($year, $month)
     {
-        
-        
+
+
         $daysInMonth = \Carbon\Carbon::create($year, $month)->daysInMonth;
 
         $startDate = \Carbon\Carbon::create($year, $month, 1)->startOfDay();
         $endDate = \Carbon\Carbon::create($year, $month, $daysInMonth)->endOfDay();
 
-        
+
         $orders = Ticket::whereBetween('created_at', [$startDate, $endDate])
             ->where('status', '!=', 'cancelled')
             ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
@@ -819,7 +832,7 @@ class DashboardController extends Controller
             ->pluck('count', 'date')
             ->toArray();
 
-        
+
         $dailyData = [];
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
@@ -840,7 +853,7 @@ class DashboardController extends Controller
         $startDate = \Carbon\Carbon::create($year, $month, 1)->startOfDay();
         $endDate = \Carbon\Carbon::create($year, $month, $daysInMonth)->endOfDay();
 
-        
+
         $paymentsRevenue = Payment::posted()
             ->collections()
             ->whereBetween('payment_date', [$startDate, $endDate])
@@ -849,7 +862,7 @@ class DashboardController extends Controller
             ->pluck('total', 'date')
             ->toArray();
 
-        
+
         $ticketRevenue = Ticket::whereBetween('updated_at', [$startDate, $endDate])
             ->whereNotIn('payment_status', ['pending'])
             ->where('status', '!=', 'cancelled')
@@ -858,16 +871,16 @@ class DashboardController extends Controller
             ->pluck('total', 'date')
             ->toArray();
 
-        
+
         $dailyCOGS = $this->getDailyCOGS($startDate, $endDate);
 
-        
+
         $dailyData = [];
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
             $sales = max($paymentsRevenue[$date] ?? 0, $ticketRevenue[$date] ?? 0);
             $cogs = $dailyCOGS[$date] ?? 0;
-            $netIncome = $sales - $cogs; 
+            $netIncome = $sales - $cogs;
 
             $dailyData[] = [
                 'day' => $day,
@@ -881,12 +894,12 @@ class DashboardController extends Controller
         return $dailyData;
     }
 
-    
+
     private function calculateActualCOGS($startDate, $endDate)
     {
         try {
-            
-            
+
+
             $cogs = \App\Models\ProductionStockConsumption::whereHas('ticket', function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('created_at', [$startDate, $endDate])
                     ->where('status', '!=', 'cancelled');
@@ -895,18 +908,18 @@ class DashboardController extends Controller
 
             return $cogs ?? 0;
         } catch (\Exception $e) {
-            
+
             return 0;
         }
     }
 
-    
+
     private function getDailyCOGS($startDate, $endDate)
     {
         try {
-            
-            
-            
+
+
+
             $dailyCogs = \App\Models\ProductionStockConsumption::whereHas('ticket', function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('created_at', [$startDate, $endDate])
                     ->where('status', '!=', 'cancelled');
@@ -925,7 +938,7 @@ class DashboardController extends Controller
 
     private function getUserTransactions($role, $startDate, $endDate)
     {
-        
+
         $users = \App\Models\User::where('role', $role)
             ->limit(10)
             ->get();
@@ -937,7 +950,7 @@ class DashboardController extends Controller
             ];
 
             if ($role === 'FrontDesk') {
-                
+
                 $stats['metric_1_label'] = 'Tickets Created';
                 $stats['metric_1_value'] = Ticket::where('created_by', $user->id)
                     ->whereBetween('created_at', [$startDate, $endDate])
@@ -948,7 +961,7 @@ class DashboardController extends Controller
                     ->whereBetween('payment_date', [$startDate, $endDate])
                     ->sum('amount');
             } elseif ($role === 'Production') {
-                
+
                 $stats['metric_1_label'] = 'Tasks Completed';
                 $stats['metric_1_value'] = \App\Models\ProductionRecord::where('user_id', $user->id)
                     ->whereBetween('created_at', [$startDate, $endDate])
@@ -959,8 +972,8 @@ class DashboardController extends Controller
                     ->whereBetween('created_at', [$startDate, $endDate])
                     ->sum('quantity_produced');
             } elseif ($role === 'Designer') {
-                
-                
+
+
                 $stats['metric_1_label'] = 'Assigned';
                 $stats['metric_1_value'] = Ticket::where('assigned_to_user_id', $user->id)
                     ->whereBetween('created_at', [$startDate, $endDate])
@@ -968,11 +981,11 @@ class DashboardController extends Controller
 
                 $stats['metric_2_label'] = 'Completed';
                 $stats['metric_2_value'] = Ticket::where('assigned_to_user_id', $user->id)
-                    ->where('design_status', 'approved') 
+                    ->where('design_status', 'approved')
                     ->whereBetween('updated_at', [$startDate, $endDate])
                     ->count();
             } else {
-                
+
                 $stats['metric_1_label'] = 'Tickets';
                 $stats['metric_1_value'] = 0;
                 $stats['metric_2_label'] = '-';

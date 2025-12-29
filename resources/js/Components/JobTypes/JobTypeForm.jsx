@@ -191,14 +191,14 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
   const addPriceTier = () => {
     setPriceTiers((prev) => [
-    ...prev,
-    {
-      label: "",
-      min_quantity: "",
-      max_quantity: "",
-      price: "",
-      notes: ""
-    }]
+      ...prev,
+      {
+        label: "",
+        min_quantity: "",
+        max_quantity: "",
+        price: "",
+        notes: ""
+      }]
     );
   };
 
@@ -219,19 +219,19 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
   const addSizeRate = () => {
     setSizeRates((prev) => [
-    ...prev,
-    {
-      variant_name: "",
-      description: "",
-      calculation_method: "area",
-      dimension_unit: "ft",
-      rate: "",
-      min_width: "",
-      max_width: "",
-      min_height: "",
-      max_height: "",
-      is_default: prev.length === 0
-    }]
+      ...prev,
+      {
+        variant_name: "",
+        description: "",
+        calculation_method: "area",
+        dimension_unit: "ft",
+        rate: "",
+        min_width: "",
+        max_width: "",
+        min_height: "",
+        max_height: "",
+        is_default: prev.length === 0
+      }]
     );
   };
 
@@ -267,13 +267,13 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
   const addPromoRule = () => {
     setPromoRules((prev) => [
-    ...prev,
-    {
-      buy_quantity: "",
-      free_quantity: "",
-      description: "",
-      is_active: true
-    }]
+      ...prev,
+      {
+        buy_quantity: "",
+        free_quantity: "",
+        description: "",
+        is_active: true
+      }]
     );
   };
 
@@ -326,38 +326,38 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
 
     const formattedPriceTiers = priceTiers.
-    filter((tier) => tier.min_quantity && tier.price).
-    map((tier) => ({
-      label: tier.label || null,
-      min_quantity: Number(tier.min_quantity),
-      max_quantity: tier.max_quantity ? Number(tier.max_quantity) : null,
-      price: Number(tier.price),
-      notes: tier.notes || null
-    }));
+      filter((tier) => tier.min_quantity && tier.price).
+      map((tier) => ({
+        label: tier.label || null,
+        min_quantity: Number(tier.min_quantity),
+        max_quantity: tier.max_quantity ? Number(tier.max_quantity) : null,
+        price: Number(tier.price),
+        notes: tier.notes || null
+      }));
 
     const formattedSizeRates = sizeRates.
-    filter((rate) => rate.rate).
-    map((rate) => ({
-      variant_name: rate.variant_name || null,
-      description: rate.description || null,
-      calculation_method: rate.calculation_method || "area",
-      dimension_unit: rate.dimension_unit || "ft",
-      rate: Number(rate.rate),
-      min_width: rate.min_width ? Number(rate.min_width) : null,
-      max_width: rate.max_width ? Number(rate.max_width) : null,
-      min_height: rate.min_height ? Number(rate.min_height) : null,
-      max_height: rate.max_height ? Number(rate.max_height) : null,
-      is_default: !!rate.is_default
-    }));
+      filter((rate) => rate.rate).
+      map((rate) => ({
+        variant_name: rate.variant_name || null,
+        description: rate.description || null,
+        calculation_method: rate.calculation_method || "area",
+        dimension_unit: rate.dimension_unit || "ft",
+        rate: Number(rate.rate),
+        min_width: rate.min_width ? Number(rate.min_width) : null,
+        max_width: rate.max_width ? Number(rate.max_width) : null,
+        min_height: rate.min_height ? Number(rate.min_height) : null,
+        max_height: rate.max_height ? Number(rate.max_height) : null,
+        is_default: !!rate.is_default
+      }));
 
     const formattedPromoRules = promoRules.
-    filter((rule) => rule.buy_quantity && rule.free_quantity).
-    map((rule) => ({
-      buy_quantity: Number(rule.buy_quantity),
-      free_quantity: Number(rule.free_quantity),
-      description: rule.description || null,
-      is_active: rule.is_active !== undefined ? rule.is_active : true
-    }));
+      filter((rule) => rule.buy_quantity && rule.free_quantity).
+      map((rule) => ({
+        buy_quantity: Number(rule.buy_quantity),
+        free_quantity: Number(rule.free_quantity),
+        description: rule.description || null,
+        is_active: rule.is_active !== undefined ? rule.is_active : true
+      }));
 
     const submitData = {
       ...formData,
@@ -380,9 +380,11 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
   };
 
   const priceByOptions = [
-  { value: "pcs", label: "Per Piece (pcs)" },
-  { value: "sqm", label: "Per Square Meter (sqm)" },
-  { value: "length", label: "Per Length" }];
+    { value: "pcs", label: "Per Piece (pcs)" },
+    { value: "sqm", label: "Per Square Meter (sqm)" },
+    { value: "length", label: "Per Length" },
+    { value: "kg", label: "Per Kilogram (kg)" }
+  ];
 
 
   const categoryOptions = allcategories.map((cat) => ({
@@ -392,40 +394,40 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
   return (
     <form onSubmit={handleSubmit}>
-            <div className="row mt-1 justify-end">
-                <div className="d-flex align-items-center gap-4">
-                    <div className="d-flex align-items-center">
-                        <label className="block text-sm font-medium text-gray-700 mr-2">
-                            Status:
-                        </label>
-                        <input
+      <div className="row mt-1 justify-end">
+        <div className="d-flex align-items-center gap-4">
+          <div className="d-flex align-items-center">
+            <label className="block text-sm font-medium text-gray-700 mr-2">
+              Status:
+            </label>
+            <input
               type="checkbox"
               name="is_active"
               checked={formData.is_active}
               onChange={handleChange}
               className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
 
-                        <label className="ml-2 text-sm text-gray-700">
-                            Active
-                        </label>
-                    </div>
-                    <div className="d-flex align-items-center">
-                        <input
+            <label className="ml-2 text-sm text-gray-700">
+              Active
+            </label>
+          </div>
+          <div className="d-flex align-items-center">
+            <input
               type="checkbox"
               name="show_in_dashboard"
               checked={formData.show_in_dashboard}
               onChange={handleChange}
               className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
 
-                        <label className="ml-2 text-sm text-gray-700">
-                            Show in Dashboard
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div className="row">
-                <div className="col-md-6">
-                    <FormInput
+            <label className="ml-2 text-sm text-gray-700">
+              Show in Dashboard
+            </label>
+          </div>
+        </div>
+      </div>
+      <div className="row">
+        <div className="col-md-6">
+          <FormInput
             label="Category"
             type="select"
             name="category_id"
@@ -435,10 +437,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             options={categoryOptions}
             required />
 
-                </div>
+        </div>
 
-                <div className="col-md-6">
-                    <FormInput
+        <div className="col-md-6">
+          <FormInput
             label="Job Type Name"
             name="name"
             value={formData.name}
@@ -447,12 +449,12 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             placeholder="e.g., MUG,BASKET BALL JERSEY (SET), Tarpaulin"
             required />
 
-                </div>
-            </div>
+        </div>
+      </div>
 
-            <div className="row">
-                <div className="col-md-12">
-                    <FormInput
+      <div className="row">
+        <div className="col-md-12">
+          <FormInput
             label="Description (Optional)"
             type="textarea"
             name="description"
@@ -462,12 +464,12 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             placeholder="Enter description (optional)"
             rows={3} />
 
-                </div>
-            </div>
+        </div>
+      </div>
 
-            <div className="row">
-                <div className="col-md-4">
-                    <FormInput
+      <div className="row">
+        <div className="col-md-4">
+          <FormInput
             label="Base Price"
             type="number"
             name="price"
@@ -479,9 +481,9 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             step="0.01"
             min="0" />
 
-                </div>
-                <div className="col-md-4">
-                    <FormInput
+        </div>
+        <div className="col-md-4">
+          <FormInput
             label="Price By"
             type="select"
             name="price_by"
@@ -491,9 +493,9 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             options={priceByOptions}
             required />
 
-                </div>
-                <div className="col-md-4">
-                    <FormInput
+        </div>
+        <div className="col-md-4">
+          <FormInput
             label="Discount (%)"
             type="number"
             name="discount"
@@ -505,43 +507,43 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             min="0"
             max="100" />
 
-                </div>
-            </div>
+        </div>
+      </div>
 
-            <div className="row">
-                <div className="col-md-12">
-                    <div className="form-group">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Item Image (Optional)
-                        </label>
-                        <div className="d-flex align-items-center gap-3">
-                            <input
+      <div className="row">
+        <div className="col-md-12">
+          <div className="form-group">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Item Image (Optional)
+            </label>
+            <div className="d-flex align-items-center gap-3">
+              <input
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
                 className="form-control form-control-sm" />
 
-                            {imagePreview &&
-              <div className="image-preview" style={{ width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ddd' }}>
-                                    <img
-                  src={imagePreview}
-                  alt="Preview"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => {
+              {imagePreview &&
+                <div className="image-preview" style={{ width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #ddd' }}>
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
 
-                    e.target.onerror = null;
-                    e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E`;
-                  }} />
+                      e.target.onerror = null;
+                      e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E`;
+                    }} />
 
-                                </div>
-              }
-                        </div>
-                        {errors.image && <p className="text-danger text-xs mt-1">{errors.image}</p>}
-                    </div>
                 </div>
+              }
             </div>
+            {errors.image && <p className="text-danger text-xs mt-1">{errors.image}</p>}
+          </div>
+        </div>
+      </div>
 
-            {/* <div className="row">
+      {/* <div className="row">
            <div className="col-md-6">
                <FormInput
                    label="Sort Order"
@@ -556,505 +558,505 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
            </div>
         </div> */}
 
-            <div class="flex space-x-4">
-                <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
-                    <input type="radio" name="role" value="FrontDesk" class="h-4 w-4 text-indigo-600"
-          checked={!sizeBase}
-          onChange={() => setSizeBase(false)} />
+      <div class="flex space-x-4">
+        <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
+          <input type="radio" name="role" value="FrontDesk" class="h-4 w-4 text-indigo-600"
+            checked={!sizeBase}
+            onChange={() => setSizeBase(false)} />
 
-                    <span>Quantity Base</span>
-                </label>
+          <span>Quantity Base</span>
+        </label>
 
-                <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
-                    <input type="radio" name="role" value="Designer" class="h-4 w-4 text-indigo-600"
-          checked={sizeBase}
-          onChange={() => setSizeBase(true)} />
+        <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
+          <input type="radio" name="role" value="Designer" class="h-4 w-4 text-indigo-600"
+            checked={sizeBase}
+            onChange={() => setSizeBase(true)} />
 
-                    <span>Size Base</span>
-                </label>
+          <span>Size Base</span>
+        </label>
+      </div>
+
+
+      {
+        sizeBase ?
+          <div className="mt-4">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h5 className="mb-0">Size Based Pricing (Optional)</h5>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={addSizeRate}>
+
+                <i className="ti-plus"></i> Add Size Rate
+              </button>
             </div>
+            <p className="text-muted text-sm mb-3">
+              Define rates per size or area (useful for Tarpaulins, Panaflex, etc.). If present, ticket pricing will use these rates.
+            </p>
 
+            {sizeRates.length > 0 ?
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered">
+                  <thead>
+                    <tr>
+                      <th>Variant</th>
+                      <th>Method</th>
+                      <th>Unit</th>
+                      <th>Rate</th>
+                      <th>Size Limits (W / H)</th>
+                      <th>Default</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sizeRates.map((rate, index) =>
+                      <tr key={index}>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm mb-2"
+                            value={rate.variant_name}
+                            onChange={(e) => updateSizeRate(index, "variant_name", e.target.value)}
+                            placeholder="e.g., Ready to Print" />
 
-            {
-      sizeBase ?
-      <div className="mt-4">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                            <h5 className="mb-0">Size Based Pricing (Optional)</h5>
-                            <button
-            type="button"
-            className="btn btn-sm btn-outline-primary"
-            onClick={addSizeRate}>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={rate.description}
+                            onChange={(e) => updateSizeRate(index, "description", e.target.value)}
+                            placeholder="Optional description" />
 
-                                <i className="ti-plus"></i> Add Size Rate
-                            </button>
-                        </div>
-                        <p className="text-muted text-sm mb-3">
-                            Define rates per size or area (useful for Tarpaulins, Panaflex, etc.). If present, ticket pricing will use these rates.
-                        </p>
+                        </td>
+                        <td>
+                          <select
+                            className="form-control form-control-sm"
+                            value={rate.calculation_method}
+                            onChange={(e) => updateSizeRate(index, "calculation_method", e.target.value)}>
 
-                        {sizeRates.length > 0 ?
-        <div className="table-responsive">
-                                <table className="table table-sm table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Variant</th>
-                                            <th>Method</th>
-                                            <th>Unit</th>
-                                            <th>Rate</th>
-                                            <th>Size Limits (W / H)</th>
-                                            <th>Default</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {sizeRates.map((rate, index) =>
-              <tr key={index}>
-                                                <td>
-                                                    <input
-                    type="text"
-                    className="form-control form-control-sm mb-2"
-                    value={rate.variant_name}
-                    onChange={(e) => updateSizeRate(index, "variant_name", e.target.value)}
-                    placeholder="e.g., Ready to Print" />
+                            <option value="area">Area (W x H)</option>
+                            <option value="length">Length Only</option>
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            className="form-control form-control-sm"
+                            value={rate.dimension_unit}
+                            onChange={(e) => updateSizeRate(index, "dimension_unit", e.target.value)}>
 
-                                                    <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={rate.description}
-                    onChange={(e) => updateSizeRate(index, "description", e.target.value)}
-                    placeholder="Optional description" />
+                            <option value="ft">Feet</option>
+                            <option value="m">Meters</option>
+                            <option value="cm">Centimeters</option>
+                            <option value="in">Inches</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            value={rate.rate}
+                            onChange={(e) => updateSizeRate(index, "rate", e.target.value)}
+                            min="0"
+                            step="0.01"
+                            placeholder="Rate" />
 
-                                                </td>
-                                                <td>
-                                                    <select
-                    className="form-control form-control-sm"
-                    value={rate.calculation_method}
-                    onChange={(e) => updateSizeRate(index, "calculation_method", e.target.value)}>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              value={rate.min_width}
+                              onChange={(e) => updateSizeRate(index, "min_width", e.target.value)}
+                              min="0"
+                              step="0.01"
+                              placeholder="Min W" />
 
-                                                        <option value="area">Area (W x H)</option>
-                                                        <option value="length">Length Only</option>
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <select
-                    className="form-control form-control-sm"
-                    value={rate.dimension_unit}
-                    onChange={(e) => updateSizeRate(index, "dimension_unit", e.target.value)}>
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              value={rate.min_height}
+                              onChange={(e) => updateSizeRate(index, "min_height", e.target.value)}
+                              min="0"
+                              step="0.01"
+                              placeholder="Min H" />
 
-                                                        <option value="ft">Feet</option>
-                                                        <option value="m">Meters</option>
-                                                        <option value="cm">Centimeters</option>
-                                                        <option value="in">Inches</option>
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={rate.rate}
-                    onChange={(e) => updateSizeRate(index, "rate", e.target.value)}
-                    min="0"
-                    step="0.01"
-                    placeholder="Rate" />
+                          </div>
+                          <div className="d-flex gap-2 mt-2">
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              value={rate.max_width}
+                              onChange={(e) => updateSizeRate(index, "max_width", e.target.value)}
+                              min="0"
+                              step="0.01"
+                              placeholder="Max W" />
 
-                                                </td>
-                                                <td>
-                                                    <div className="d-flex gap-2">
-                                                        <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      value={rate.min_width}
-                      onChange={(e) => updateSizeRate(index, "min_width", e.target.value)}
-                      min="0"
-                      step="0.01"
-                      placeholder="Min W" />
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              value={rate.max_height}
+                              onChange={(e) => updateSizeRate(index, "max_height", e.target.value)}
+                              min="0"
+                              step="0.01"
+                              placeholder="Max H" />
 
-                                                        <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      value={rate.min_height}
-                      onChange={(e) => updateSizeRate(index, "min_height", e.target.value)}
-                      min="0"
-                      step="0.01"
-                      placeholder="Min H" />
+                          </div>
+                        </td>
+                        <td className="text-center">
+                          <div className="form-check">
+                            <input
+                              className="form-check-input"
+                              type="radio"
+                              name="default_rate"
+                              checked={rate.is_default}
+                              onChange={() => updateSizeRate(index, "is_default", true)} />
 
-                                                    </div>
-                                                    <div className="d-flex gap-2 mt-2">
-                                                        <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      value={rate.max_width}
-                      onChange={(e) => updateSizeRate(index, "max_width", e.target.value)}
-                      min="0"
-                      step="0.01"
-                      placeholder="Max W" />
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-link text-danger"
+                            onClick={() => removeSizeRate(index)}>
 
-                                                        <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      value={rate.max_height}
-                      onChange={(e) => updateSizeRate(index, "max_height", e.target.value)}
-                      min="0"
-                      step="0.01"
-                      placeholder="Max H" />
+                            <i className="ti-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div> :
 
-                                                    </div>
-                                                </td>
-                                                <td className="text-center">
-                                                    <div className="form-check">
-                                                        <input
-                      className="form-check-input"
-                      type="radio"
-                      name="default_rate"
-                      checked={rate.is_default}
-                      onChange={() => updateSizeRate(index, "is_default", true)} />
+              <div className="alert text-warning">
+                No size rates configured. Base price will be used.
+              </div>
+            }
+          </div> :
 
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <button
-                    type="button"
-                    className="btn btn-sm btn-link text-danger"
-                    onClick={() => removeSizeRate(index)}>
+          <div className="mt-4">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h5 className="mb-0">Quantity Based Pricing (Optional) </h5>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={addPriceTier}>
 
-                                                        <i className="ti-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-              )}
-                                    </tbody>
-                                </table>
-                            </div> :
+                <i className="ti-plus"></i> Add Tier
+              </button>
+            </div>
+            <p className="text-muted text-sm mb-3">
+              Use tiers to offer bulk discounts. Leave empty to use base price.
+            </p>
+            {priceTiers.length > 0 ?
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered">
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Min Qty</th>
+                      <th>Max Qty</th>
+                      <th>Price (per unit)</th>
+                      <th>Notes</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {priceTiers.map((tier, index) =>
+                      <tr key={index}>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={tier.label}
+                            onChange={(e) => updatePriceTier(index, "label", e.target.value)}
+                            placeholder="e.g., Retail" />
 
-        <div className="alert text-warning">
-                                No size rates configured. Base price will be used.
-                            </div>
-        }
-                    </div> :
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            value={tier.min_quantity}
+                            onChange={(e) => updatePriceTier(index, "min_quantity", e.target.value)}
+                            min="1"
+                            placeholder="1" />
 
-      <div className="mt-4">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                            <h5 className="mb-0">Quantity Based Pricing (Optional) </h5>
-                            <button
-            type="button"
-            className="btn btn-sm btn-outline-primary"
-            onClick={addPriceTier}>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            value={tier.max_quantity}
+                            onChange={(e) => updatePriceTier(index, "max_quantity", e.target.value)}
+                            min="1"
+                            placeholder="Optional" />
 
-                                <i className="ti-plus"></i> Add Tier
-                            </button>
-                        </div>
-                        <p className="text-muted text-sm mb-3">
-                            Use tiers to offer bulk discounts. Leave empty to use base price.
-                        </p>
-                        {priceTiers.length > 0 ?
-        <div className="table-responsive">
-                                <table className="table table-sm table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Label</th>
-                                            <th>Min Qty</th>
-                                            <th>Max Qty</th>
-                                            <th>Price (per unit)</th>
-                                            <th>Notes</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {priceTiers.map((tier, index) =>
-              <tr key={index}>
-                                                <td>
-                                                    <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={tier.label}
-                    onChange={(e) => updatePriceTier(index, "label", e.target.value)}
-                    placeholder="e.g., Retail" />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            value={tier.price}
+                            onChange={(e) => updatePriceTier(index, "price", e.target.value)}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00" />
 
-                                                </td>
-                                                <td>
-                                                    <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={tier.min_quantity}
-                    onChange={(e) => updatePriceTier(index, "min_quantity", e.target.value)}
-                    min="1"
-                    placeholder="1" />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={tier.notes}
+                            onChange={(e) => updatePriceTier(index, "notes", e.target.value)}
+                            placeholder="Optional notes" />
 
-                                                </td>
-                                                <td>
-                                                    <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={tier.max_quantity}
-                    onChange={(e) => updatePriceTier(index, "max_quantity", e.target.value)}
-                    min="1"
-                    placeholder="Optional" />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-link text-danger"
+                            onClick={() => removePriceTier(index)}>
 
-                                                </td>
-                                                <td>
-                                                    <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={tier.price}
-                    onChange={(e) => updatePriceTier(index, "price", e.target.value)}
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00" />
+                            <i className="ti-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div> :
 
-                                                </td>
-                                                <td>
-                                                    <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={tier.notes}
-                    onChange={(e) => updatePriceTier(index, "notes", e.target.value)}
-                    placeholder="Optional notes" />
-
-                                                </td>
-                                                <td>
-                                                    <button
-                    type="button"
-                    className="btn btn-sm btn-link text-danger"
-                    onClick={() => removePriceTier(index)}>
-
-                                                        <i className="ti-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-              )}
-                                    </tbody>
-                                </table>
-                            </div> :
-
-        <div className="alert text-warning">
-                                No quantity tiers added yet.
-                            </div>
-        }
-                    </div>
+              <div className="alert text-warning">
+                No quantity tiers added yet.
+              </div>
+            }
+          </div>
 
       }
 
 
 
 
-            <div className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5 className="mb-0">Promotional Rules (Optional)</h5>
-                    <button
+      <div className="mt-4">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <h5 className="mb-0">Promotional Rules (Optional)</h5>
+          <button
             type="button"
             className="btn btn-sm btn-outline-success"
             onClick={addPromoRule}>
 
-                        <i className="ti-gift"></i> Add Promo
-                    </button>
-                </div>
-                <p className="text-muted text-sm mb-3">
-                    Define promotional offers like "Buy 12, Get 1 Free" for bulk purchases.
-                </p>
+            <i className="ti-gift"></i> Add Promo
+          </button>
+        </div>
+        <p className="text-muted text-sm mb-3">
+          Define promotional offers like "Buy 12, Get 1 Free" for bulk purchases.
+        </p>
 
-                {promoRules.length > 0 ?
-        <div className="table-responsive">
-                        <table className="table table-sm table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Buy Quantity</th>
-                                    <th>Free Quantity</th>
-                                    <th>Description</th>
-                                    <th>Active</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {promoRules.map((rule, index) =>
-              <tr key={index}>
-                                        <td>
-                                            <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={rule.buy_quantity}
-                    onChange={(e) => updatePromoRule(index, "buy_quantity", e.target.value)}
-                    min="1"
-                    placeholder="e.g., 12" />
+        {promoRules.length > 0 ?
+          <div className="table-responsive">
+            <table className="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th>Buy Quantity</th>
+                  <th>Free Quantity</th>
+                  <th>Description</th>
+                  <th>Active</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {promoRules.map((rule, index) =>
+                  <tr key={index}>
+                    <td>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        value={rule.buy_quantity}
+                        onChange={(e) => updatePromoRule(index, "buy_quantity", e.target.value)}
+                        min="1"
+                        placeholder="e.g., 12" />
 
-                                        </td>
-                                        <td>
-                                            <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={rule.free_quantity}
-                    onChange={(e) => updatePromoRule(index, "free_quantity", e.target.value)}
-                    min="1"
-                    placeholder="e.g., 1" />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        value={rule.free_quantity}
+                        onChange={(e) => updatePromoRule(index, "free_quantity", e.target.value)}
+                        min="1"
+                        placeholder="e.g., 1" />
 
-                                        </td>
-                                        <td>
-                                            <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={rule.description}
-                    onChange={(e) => updatePromoRule(index, "description", e.target.value)}
-                    placeholder="e.g., Buy 12, Get 1 Free!" />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={rule.description}
+                        onChange={(e) => updatePromoRule(index, "description", e.target.value)}
+                        placeholder="e.g., Buy 12, Get 1 Free!" />
 
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="form-check">
-                                                <input
-                      className="form-check-input"
-                      type="checkbox"
-                      checked={rule.is_active}
-                      onChange={(e) => updatePromoRule(index, "is_active", e.target.checked)} />
+                    </td>
+                    <td className="text-center">
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          checked={rule.is_active}
+                          onChange={(e) => updatePromoRule(index, "is_active", e.target.checked)} />
 
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <button
-                    type="button"
-                    className="btn btn-sm btn-link text-danger"
-                    onClick={() => removePromoRule(index)}>
+                      </div>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link text-danger"
+                        onClick={() => removePromoRule(index)}>
 
-                                                <i className="ti-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-              )}
-                            </tbody>
-                        </table>
-                    </div> :
+                        <i className="ti-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div> :
 
-        <div className="alert text-warning">
-                        No promotional rules added yet.
-                    </div>
+          <div className="alert text-warning">
+            No promotional rules added yet.
+          </div>
         }
-            </div>
+      </div>
 
-            <hr />
-            <div className="mt-4">
-                <h5 className="mb-3">Production Workflow Template & Incentives</h5>
-                <p className="text-muted text-sm mb-3">
-                    Select the production steps that apply to this job type. For each step, you can specify an incentive price per piece.
-                </p>
-                <div className="row">
-                    {[
-          { key: 'printing', label: 'Printing', icon: 'ti-printer' },
-          { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers' },
-          { key: 'cutting', label: 'Cutting', icon: 'ti-cut' },
-          { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt' },
-          { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' }].
-          map((step) =>
-          <div key={step.key} className="col-md-4 mb-4">
-                            <div className="card h-100 p-3 bg-light border-dashed">
-                                <div className="form-check custom-checkbox">
-                                    <input
-                  type="checkbox"
-                  className="form-check-input"
-                  id={`workflow_${step.key}`}
-                  checked={workflowSteps[step.key].enabled}
-                  onChange={() => handleWorkflowChange(step.key)} />
+      <hr />
+      <div className="mt-4">
+        <h5 className="mb-3">Production Workflow Template & Incentives</h5>
+        <p className="text-muted text-sm mb-3">
+          Select the production steps that apply to this job type. For each step, you can specify an incentive price per piece.
+        </p>
+        <div className="row">
+          {[
+            { key: 'printing', label: 'Printing', icon: 'ti-printer' },
+            { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers' },
+            { key: 'cutting', label: 'Cutting', icon: 'ti-cut' },
+            { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt' },
+            { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' }].
+            map((step) =>
+              <div key={step.key} className="col-md-4 mb-4">
+                <div className="card h-100 p-3 bg-light border-dashed">
+                  <div className="form-check custom-checkbox">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id={`workflow_${step.key}`}
+                      checked={workflowSteps[step.key].enabled}
+                      onChange={() => handleWorkflowChange(step.key)} />
 
-                                    <label className="form-check-label font-weight-bold" htmlFor={`workflow_${step.key}`}>
-                                        <i className={`${step.icon} mr-1`}></i> {step.label}
-                                    </label>
-                                </div>
-                                {workflowSteps[step.key].enabled &&
-              <div className="mt-2">
-                                        <div className="input-group input-group-sm">
-                                            <div className="input-group-prepend">
-                                                <span className="input-group-text">₱</span>
-                                            </div>
-                                            <input
-                    type="number"
-                    className="form-control"
-                    value={workflowSteps[step.key].incentive_price}
-                    onChange={(e) => handleWorkflowIncentiveChange(step.key, e.target.value)}
-                    placeholder="Incentive"
-                    step="0.01"
-                    min="0" />
-
-                                            <div className="input-group-append">
-                                                <span className="input-group-text">/pcs</span>
-                                            </div>
-                                        </div>
-                                    </div>
-              }
-                            </div>
+                    <label className="form-check-label font-weight-bold" htmlFor={`workflow_${step.key}`}>
+                      <i className={`${step.icon} mr-1`}></i> {step.label}
+                    </label>
+                  </div>
+                  {workflowSteps[step.key].enabled &&
+                    <div className="mt-2">
+                      <div className="input-group input-group-sm">
+                        <div className="input-group-prepend">
+                          <span className="input-group-text">₱</span>
                         </div>
-          )}
-                </div>
-            </div>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={workflowSteps[step.key].incentive_price}
+                          onChange={(e) => handleWorkflowIncentiveChange(step.key, e.target.value)}
+                          placeholder="Incentive"
+                          step="0.01"
+                          min="0" />
 
-            <div className="mt-4 p-4 bg-light rounded border">
-                <h6 className="mb-3 font-weight-bold text-dark">Workflow Preview & Incentives</h6>
-                <div className="d-flex flex-wrap align-items-center gap-2">
-                    {Object.entries(workflowSteps).
-          filter(([key, data]) => data.enabled).
-          sort((a, b) => {
-            const order = ['printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
-            return order.indexOf(a[0]) - order.indexOf(b[0]);
-          }).
-          map(([key, data], index, array) =>
-          <React.Fragment key={key}>
-                                <div className="d-flex align-items-center">
-                                    <div className="d-flex flex-column align-items-center">
-                                        <div className="badge badge-primary p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
-                                            {key === 'lamination_heatpress' ? 'Lamination/Heatpress' :
-                  key === 'dtf_press' ? 'DTF Press' :
-                  key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
-                                        </div>
-                                        {data.incentive_price > 0 &&
-                <span className="text-success text-xs font-weight-bold mt-1">
-                                                ₱{data.incentive_price}
-                                            </span>
-                }
-                                    </div>
-                                    {index < array.length - 1 &&
+                        <div className="input-group-append">
+                          <span className="input-group-text">/pcs</span>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            )}
+        </div>
+      </div>
+
+      <div className="mt-4 p-4 bg-light rounded border">
+        <h6 className="mb-3 font-weight-bold text-dark">Workflow Preview & Incentives</h6>
+        <div className="d-flex flex-wrap align-items-center gap-2">
+          {Object.entries(workflowSteps).
+            filter(([key, data]) => data.enabled).
+            sort((a, b) => {
+              const order = ['printing', 'lamination_heatpress', 'cutting', 'sewing', 'dtf_press'];
+              return order.indexOf(a[0]) - order.indexOf(b[0]);
+            }).
+            map(([key, data], index, array) =>
+              <React.Fragment key={key}>
+                <div className="d-flex align-items-center">
+                  <div className="d-flex flex-column align-items-center">
+                    <div className="badge badge-primary p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                      {key === 'lamination_heatpress' ? 'Lamination/Heatpress' :
+                        key === 'dtf_press' ? 'DTF Press' :
+                          key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                    </div>
+                    {data.incentive_price > 0 &&
+                      <span className="text-success text-xs font-weight-bold mt-1">
+                        ₱{data.incentive_price}
+                      </span>
+                    }
+                  </div>
+                  {index < array.length - 1 &&
+                    <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
+                  }
+                </div>
+              </React.Fragment>
+            )}
+
+          {/* Visual connector to Completed if any steps are selected */}
+          {Object.values(workflowSteps).some((v) => v.enabled) &&
+            <>
               <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
-              }
-                                </div>
-                            </React.Fragment>
-          )}
-
-                    {/* Visual connector to Completed if any steps are selected */}
-                    {Object.values(workflowSteps).some((v) => v.enabled) &&
-          <>
-                            <i className="ti-arrow-right mx-2 text-muted font-weight-bold"></i>
-                            <div className="badge badge-success p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
-                                Completed
-                            </div>
-                        </>
+              <div className="badge badge-success p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                Completed
+              </div>
+            </>
           }
 
-                    {!Object.values(workflowSteps).some((v) => v.enabled) &&
-          <span className="text-muted font-italic">Select steps above to see the workflow preview.</span>
+          {!Object.values(workflowSteps).some((v) => v.enabled) &&
+            <span className="text-muted font-italic">Select steps above to see the workflow preview.</span>
           }
-                </div>
-            </div>
+        </div>
+      </div>
 
-            <div className="mt-4 d-flex justify-content-end gap-2">
-                <button
+      <div className="mt-4 d-flex justify-content-end gap-2">
+        <button
           type="button"
           onClick={onCancel}
           className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition">
 
-                    Cancel
-                </button>
-                <button
+          Cancel
+        </button>
+        <button
           type="submit"
           disabled={processing}
           className={`px-4 py-2.5 text-sm font-medium text-white rounded-md transition
                         ${processing ? "bg-orange-400 cursor-not-allowed" : "bg-orange-600 hover:bg-orange-700 focus:ring-2 focus:ring-orange-400"}
                     `}>
 
-                    {processing ?
-          <span className="flex items-center">
-                            <i className="ti-reload mr-2 animate-spin"></i> Saving...
-                        </span> :
+          {processing ?
+            <span className="flex items-center">
+              <i className="ti-reload mr-2 animate-spin"></i> Saving...
+            </span> :
 
-          <span className="flex items-center">
-                            <i className="ti-save mr-2"></i> {jobType ? "Update" : "Save"}
-                        </span>
+            <span className="flex items-center">
+              <i className="ti-save mr-2"></i> {jobType ? "Update" : "Save"}
+            </span>
           }
-                </button>
-            </div>
-        </form>);
+        </button>
+      </div>
+    </form>);
 
 }

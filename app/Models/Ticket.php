@@ -60,7 +60,7 @@ class Ticket extends Model
         'total_quantity',
     ];
 
-    
+
     protected static function boot()
     {
         parent::boot();
@@ -71,22 +71,22 @@ class Ticket extends Model
             }
             $ticket->created_by = auth()->id();
 
-            
+
             if (auth()->user() && auth()->user()->branch_id) {
                 $userBranch = auth()->user()->branch;
-                
-                
+
+
                 if (!$ticket->order_branch_id) {
                     $ticket->order_branch_id = $userBranch->id;
                 }
 
-                
+
                 if (!$ticket->production_branch_id) {
                     if ($userBranch->can_produce) {
-                        
+
                         $ticket->production_branch_id = $userBranch->id;
                     } else {
-                        
+
                         $defaultProductionBranch = \App\Models\Branch::getDefaultProductionBranch();
                         if ($defaultProductionBranch) {
                             $ticket->production_branch_id = $defaultProductionBranch->id;
@@ -101,54 +101,53 @@ class Ticket extends Model
         });
     }
 
-    
+
     protected static function generateTicketNumber(): string
     {
         do {
             $code = 'RC-' . now()->year . '-' . strtoupper(Str::random(4));
         } while (static::where('ticket_number', $code)->exists());
-        
-        return $code;        
-        
+
+        return $code;
     }
 
-    
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);
     }
 
-    
+
     public function jobType()
     {
         return $this->belongsTo(JobType::class, 'job_type_id');
     }
 
-    
+
     public function files()
     {
         return $this->hasMany(TicketFile::class);
     }
 
-    
+
     public function customerFiles()
     {
         return $this->hasMany(TicketFile::class)->where('type', 'customer');
     }
 
-    
+
     public function mockupFiles()
     {
         return $this->hasMany(TicketFile::class)->where('type', 'mockup');
     }
 
-    
+
     public function payments()
     {
         return $this->hasMany(Payment::class)->orderByDesc('payment_date');
     }
 
-    
+
     public function getOutstandingBalanceAttribute(): float
     {
         $total = (float)($this->total_amount ?? 0);
@@ -157,17 +156,17 @@ class Ticket extends Model
         return max($total - $paid, 0);
     }
 
-    
+
     public function refreshPaymentSummary(): void
     {
         if (!$this->exists) {
             return;
         }
 
-        
-        
+
+
         if ($this->payment_status === 'awaiting_verification') {
-            
+
             $paid = (float)$this->payments()->where('status', 'posted')->sum('amount');
             $this->forceFill([
                 'amount_paid' => round($paid, 2),
@@ -193,7 +192,7 @@ class Ticket extends Model
         ])->saveQuietly();
     }
 
-    
+
     public function getFullSizeAttribute(): ?string
     {
         if ($this->size_value && $this->size_unit) {
@@ -202,25 +201,30 @@ class Ticket extends Model
         return null;
     }
 
-    
+
     public function stockConsumptions()
     {
         return $this->hasMany(ProductionStockConsumption::class);
     }
 
-    
+
     public function workflowProgress()
     {
         return $this->hasMany(TicketWorkflowProgress::class);
     }
 
-    
+
     public function assignedToUser()
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
-    
+    public function updatedByUser()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+
     public function assignedUsers()
     {
         return $this->belongsToMany(User::class, 'ticket_production_assignments')
@@ -228,26 +232,26 @@ class Ticket extends Model
             ->withTimestamps();
     }
 
-    
+
     public function productionRecords()
     {
         return $this->hasMany(ProductionRecord::class);
     }
 
-    
+
     public function evidenceFiles()
     {
         return $this->hasMany(WorkflowEvidence::class, 'ticket_id');
     }
 
-    
+
     public function parseSizeDimensions(): array
     {
         if (!$this->size_value) {
             return ['width' => null, 'height' => null];
         }
 
-        
+
         $parts = preg_split('/\s*x\s*/i', $this->size_value);
 
         if (count($parts) >= 2) {
@@ -259,7 +263,7 @@ class Ticket extends Model
             ];
         }
 
-        
+
         $singleValue = (float) preg_replace('/[^\d.]/', '', $this->size_value);
         if ($singleValue > 0) {
             return ['width' => $singleValue, 'height' => null];
@@ -281,9 +285,9 @@ class Ticket extends Model
 
         $areaPerPiece = $width * $height;  #Calculate area per piece
 
-        
-        
-        
+
+
+
         if ($this->size_unit && (stripos($this->size_unit, 'sqm') !== false || stripos($this->size_unit, 'm²') !== false)) {
             return $areaPerPiece * $this->quantity;  # Already in square meters
         } elseif ($this->size_unit && stripos($this->size_unit, 'cm') !== false) {
@@ -320,10 +324,10 @@ class Ticket extends Model
         return (int)($this->quantity ?? 0) + (int)($this->free_quantity ?? 0);
     }
 
-    
+
     public function canUserEdit(?User $user = null): bool
     {
-        
+
         if (!$user) {
             $user = auth()->user();
         }
@@ -332,30 +336,30 @@ class Ticket extends Model
             return false;
         }
 
-        
+
         if ($user->isAdmin()) {
             return true;
         }
 
-        
+
         if ($user->isFrontDesk()) {
             return in_array($this->status, ['pending', 'ready_to_print', 'in_designer']);
         }
 
-        
+
         if ($user->isDesigner()) {
             return $this->status === 'in_designer';
         }
 
-        
+
         if ($user->isProduction()) {
-            
+
             if ($this->status === 'ready_to_print') {
                 $firstStep = $this->getFirstWorkflowStep();
                 return $firstStep && $user->isAssignedToWorkflowStep($firstStep);
             }
 
-            
+
             if ($this->status === 'in_production' && $this->current_workflow_step) {
                 return $user->isAssignedToWorkflowStep($this->current_workflow_step);
             }
@@ -366,7 +370,7 @@ class Ticket extends Model
         return false;
     }
 
-    
+
     public function getCurrentWorkflowStepLabel(): ?string
     {
         if (!$this->current_workflow_step) {
@@ -376,22 +380,22 @@ class Ticket extends Model
         return ucfirst(str_replace('_', ' ', $this->current_workflow_step));
     }
 
-    
+
     public function orderBranch()
     {
         return $this->belongsTo(Branch::class, 'order_branch_id');
     }
 
-    
+
     public function productionBranch()
     {
         return $this->belongsTo(Branch::class, 'production_branch_id');
     }
 
-    
+
     public function canUserViewByBranch(?User $user = null): bool
     {
-        
+
         if (!$user) {
             $user = auth()->user();
         }
@@ -400,27 +404,27 @@ class Ticket extends Model
             return false;
         }
 
-        
+
         if ($user->isAdmin()) {
             return true;
         }
 
-        
+
         if (!$user->branch_id) {
             return false;
         }
 
-        
+
         if ($user->isFrontDesk() || $user->isCashier()) {
             return $this->order_branch_id === $user->branch_id;
         }
 
-        
+
         if ($user->isProduction()) {
             return $this->production_branch_id === $user->branch_id;
         }
 
-        
+
         if ($user->isDesigner()) {
             return true;
         }
@@ -428,10 +432,10 @@ class Ticket extends Model
         return false;
     }
 
-    
+
     public function canUserEditByBranch(?User $user = null): bool
     {
-        
+
         if (!$user) {
             $user = auth()->user();
         }
@@ -440,22 +444,22 @@ class Ticket extends Model
             return false;
         }
 
-        
+
         if ($user->isAdmin()) {
             return true;
         }
 
-        
+
         if (!$user->branch_id) {
             return false;
         }
 
-        
+
         if ($user->isFrontDesk() || $user->isCashier()) {
             return $this->order_branch_id === $user->branch_id;
         }
 
-        
+
         if ($user->isProduction()) {
             return $this->production_branch_id === $user->branch_id;
         }

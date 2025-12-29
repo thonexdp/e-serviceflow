@@ -2,248 +2,329 @@ import React from "react";
 import { formatPeso } from "@/Utils/currency";
 
 export default function OfficialReceipt({ payment }) {
-  if (!payment) return null;
+    if (!payment) return null;
 
+    const formatDate = (dateString) => {
+        if (!dateString) return "";
+        return new Date(dateString).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric"
+        });
+    };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    });
-  };
+    const ticket = payment.ticket || {};
+    const items = ticket.items || [];
+    const hasItems = items.length > 0;
 
-  const ticket = payment.ticket || {};
-  const hasItems = ticket.items && ticket.items.length > 0;
+    const currentPaymentAmount = parseFloat(payment.amount || 0);
+    const subTotal = parseFloat(ticket.subtotal || ticket.total_amount || 0);
+    const totalPaidSoFar = (ticket.payments || [])
+        .filter(p => p.status !== 'rejected' && p.status !== 'pending')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
+    // If the current payment is already in the list, don't add it again
+    const isCurrentInList = (ticket.payments || []).some(p => p.id === payment.id);
+    const totalPaidIncludingCurrent = isCurrentInList ? totalPaidSoFar : totalPaidSoFar + currentPaymentAmount;
 
-  const grandTotal = parseFloat(ticket.total_amount || payment.amount || 0);
-  const subTotal = parseFloat(ticket.subtotal || grandTotal);
-  const discountAmount = Math.max(0, subTotal - grandTotal);
-  const discountPercent = parseFloat(ticket.discount || 0);
+    const balanceRemaining = Math.max(0, parseFloat(ticket.total_amount || 0) - totalPaidIncludingCurrent);
+    const partialPayment = isCurrentInList ? totalPaidSoFar - currentPaymentAmount : totalPaidSoFar;
 
-  const currentPaymentAmount = parseFloat(payment.amount || 0);
+    const paymentMethod = payment.payment_method?.toLowerCase() || '';
+    const capitalizeName = (name = '') => name.replace(/\b\w/g, char => char.toUpperCase());
 
+    return (
+        <div className="official-receipt-container bg-white text-black" style={{
+            fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif",
+            fontSize: '9pt',
+            lineHeight: '1.2',
+            width: '100%',
+            minHeight: 'auto',
+            padding: '15mm 15mm', // Matched to reference photo spacing
+            margin: '0',
+            boxSizing: 'border-box',
+            position: 'relative'
+        }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Dancing+Script:wght@700&display=swap');
+                
+                .receipt-table th {
+                    background-color: #e9ecef;
+                    border: 1px solid #000;
+                    padding: 4px 8px;
+                    font-size: 8pt;
+                    font-weight: 900;
+                    text-transform: capitalize;
+                }
+                .receipt-table td {
+                    border-bottom: 1px solid #000;
+                    padding: 8px 4px;
+                    vertical-align: middle;
+                }
+                .row-number {
+                    width: 20px;
+                    height: 20px;
+                    border: 1px solid #000;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 7pt;
+                    font-weight: bold;
+                    margin-right: 10px;
+                }
+                .dot-separator {
+                    display: flex;
+                    gap: 2px;
+                    margin: 4px 0;
+                    width: 100%;
+                    overflow: hidden;
+                }
+                .dot {
+                    width: 4px;
+                    height: 4px;
+                    background-color: #000;
+                    flex-shrink: 0;
+                }
+            `}</style>
 
-  const successfulPayments = (ticket.payments || []).filter((p) =>
-  p.status !== 'rejected' && p.status !== 'pending'
-  );
-
-
-  const isCurrentPaymentInList = successfulPayments.some((p) => p.id === payment.id);
-
-  const totalPaidSoFar = successfulPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0) + (
-  isCurrentPaymentInList ? 0 : currentPaymentAmount);
-
-  const previousPayments = Math.max(0, totalPaidSoFar - currentPaymentAmount);
-
-
-  const balanceRemaining = ticket.payment_status === 'paid' ? 0 : Math.max(0, grandTotal - totalPaidSoFar);
-
-  return (
-    <div className="official-receipt-container font-sans text-sm p-4 max-w-full mx-auto bg-white text-black">
-
-            {/* Header */}
-            <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                    {/* Logo Area */}
-                    <div className="w-12 h-12 bg-gray-100 flex items-center justify-center rounded-sm border border-gray-300 overflow-hidden">
+            {/* Header Section */}
+            <div style={{ width: '100%', padding: '0 2mm' }}>
+                <div className="flex justify-between items-start mb-2" style={{ width: '100%' }}>
+                    <div className="flex items-center gap-2" style={{ maxWidth: '65%' }}>
                         <img
-              src="/images/logo.jpg"
-              alt="Logo"
-              className="w-full h-full object-cover"
-              onError={(e) => e.target.style.display = "none"} />
-
+                            src="/images/logo.jpg"
+                            alt="Logo"
+                            style={{ width: '18mm', height: '18mm', objectFit: 'contain', borderRadius: '50%' }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                            <span style={{ fontSize: '6.5pt', fontStyle: 'italic', fontWeight: 'bold', whiteSpace: 'nowrap' }}>"We PRINT what you think"</span>
+                            <div className="dot-separator">
+                                {[...Array(60)].map((_, i) => <div key={i} className="dot"></div>)}
+                            </div>
+                            <h2 style={{ fontSize: '11pt', fontWeight: '900', margin: '0', padding: '0', whiteSpace: 'nowrap' }}>RC PRINTSHOPPE & GENERAL MERCHANDISE</h2>
+                            <span style={{ fontSize: '7pt', fontStyle: 'italic', whiteSpace: 'nowrap' }}>Zone V, Sogod, Southern Leyte (Infront of Gaisano Sogod)</span>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-base font-extrabold tracking-tight text-gray-900 uppercase leading-tight">
-                            RC PrintShoppe
-                        </h1>
-                        <div className="text-[10px] text-gray-600 leading-tight">
-                            <p>123 Business St., City Name</p>
-                            <p>Tel: (02) 1234-5678</p>
-                            <p>VAT Reg. TIN: 000-000-000-000</p>
+                    <div className="text-right" style={{ maxWidth: '35%' }}>
+                        <h1 style={{ fontSize: '15pt', fontWeight: '900', margin: '0', lineHeight: '1' }}>Acknowledgement receipt</h1>
+                        <div className="flex items-end justify-end mt-2">
+                            <span style={{ fontWeight: 'bold', marginRight: '5px', fontSize: '8pt' }}>TICKET NO:</span>
+                            <div style={{ borderBottom: '1px solid #000', minWidth: '30mm', textAlign: 'center', fontWeight: 'bold', fontSize: '10pt' }}>
+                                {ticket.ticket_number || "---"}
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div className="text-right">
-                    <h2 className="text-lg font-bold text-gray-800 uppercase tracking-wide leading-tight">
-                        Official Receipt
-                    </h2>
-                    <div className="text-red-600 text-sm font-mono font-bold mt-0.5">
-                        NO. {payment.official_receipt_number || "_______"}
+
+                <div style={{ borderTop: '4px solid #000', margin: '1mm 0' }}></div>
+
+                {/* Sold To / Date Section */}
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center">
+                            <span style={{ fontWeight: 'bold', width: '20mm', fontSize: '9pt' }}>SOLD TO:</span>
+                            <div
+                                style={{
+                                    borderBottom: '1px solid #000',
+                                    flexGrow: 1,
+                                    paddingLeft: '2mm',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {capitalizeName(
+                                    payment.payer_name ||
+                                    payment.customer?.full_name ||
+                                    'Walk-in Customer'
+                                )}
+                            </div>
+
+                        </div>
+                        <div className="flex items-center">
+                            <span style={{ fontWeight: 'bold', width: '20mm', fontSize: '9pt' }}>CONTACT NO.</span>
+                            <div style={{ borderBottom: '1px solid #000', flexGrow: 1, paddingLeft: '2mm' }}>
+                                {payment.customer?.phone || ""}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-start justify-end">
+                        <span style={{ fontWeight: 'bold', marginRight: '5px' }}>DATE:</span>
+                        <div style={{ borderBottom: '1px solid #000', minWidth: '40mm', textAlign: 'center' }}>
+                            {formatDate(payment.payment_date)}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Customer & Info */}
-            <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div className="flex">
-                    <span className="font-bold w-24">Date:</span>
-                    <span className="border-b border-gray-300 flex-1 px-2">
-                        {formatDate(payment.payment_date)}
-                    </span>
-                </div>
-                <div className="flex">
-                    <span className="font-bold w-24">Ticket #:</span>
-                    <span className="border-b border-gray-300 flex-1 px-2 font-semibold">
-                        {ticket.ticket_number || payment.ticket?.ticket_number || "—"}
-                    </span>
-                </div>
-                <div className="flex">
-                    <span className="font-bold w-24">TIN:</span>
-                    <span className="border-b border-gray-300 flex-1 px-2">
-                        {payment.customer?.tin || ""}
-                    </span>
-                </div>
-                <div className="flex col-span-2">
-                    <span className="font-bold w-24">Received From:</span>
-                    <span className="border-b border-gray-300 flex-1 px-2 font-semibold uppercase">
-                        {payment.payer_name || payment.customer?.full_name || "Walk-in Customer"}
-                    </span>
-                </div>
-                <div className="flex col-span-2">
-                    <span className="font-bold w-24">Address:</span>
-                    <span className="border-b border-gray-300 flex-1 px-2">
-                        {payment.customer?.address || ""}
-                    </span>
-                </div>
-            </div>
-
-            {/* Items Table */}
-            <div className="border border-gray-800 mb-3">
-                <table className="w-full text-xs" style={{ pageBreakInside: 'avoid' }}>
-                    <thead className="bg-gray-100 border-b border-gray-800">
+                {/* Items Table */}
+                <table className="receipt-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3mm' }}>
+                    <thead>
                         <tr>
-                            <th className="py-1 px-1 text-center border-r border-gray-400" style={{ width: '8%' }}>#</th>
-                            <th className="py-1 px-1 text-left border-r border-gray-400" style={{ width: '40%' }}>Description</th>
-                            <th className="py-1 px-1 text-right border-r border-gray-400" style={{ width: '20%' }}>Unit Price</th>
-                            <th className="py-1 px-1 text-center border-r border-gray-400" style={{ width: '12%' }}>Qty</th>
-                            <th className="py-1 px-1 text-right" style={{ width: '20%' }}>Line Total</th>
+                            <th style={{ textAlign: 'left', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px' }}>Item Description</th>
+                            <th style={{ width: '12mm', textAlign: 'center', borderRadius: '10px' }}>Qty</th>
+                            <th style={{ width: '22mm', textAlign: 'center', borderRadius: '10px' }}>Unit Price</th>
+                            <th style={{ width: '28mm', textAlign: 'center', borderTopRightRadius: '10px', borderBottomRightRadius: '10px' }}>Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {hasItems ?
-            ticket.items.map((item, index) =>
-            <tr key={index} className="border-b border-gray-200">
-                                    <td className="py-1 px-1 text-center border-r border-gray-300">{index + 1}</td>
-                                    <td className="py-1 px-1 border-r border-gray-300">
-                                        <div className="font-medium text-[9px] leading-tight">{item.description}</div>
-                                        {/* Optional details if any */}
+                        {[...Array(5)].map((_, i) => {
+                            const item = items[i];
+                            return (
+                                <tr key={i} style={{ height: '9mm' }}>
+                                    <td>
+                                        <div className="flex items-center">
+                                            <div className="row-number">{i + 1}</div>
+                                            <div style={{ fontWeight: item ? 'bold' : 'normal', fontSize: '8.5pt' }}>
+                                                {item ? item.description : ''}
+                                                {i === 0 && !hasItems && (ticket.job_type?.name || ticket.description || "Service")}
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td className="py-1 px-1 text-right border-r border-gray-300 text-[9px]">
-                                        {formatPeso(item.unit_price)}
+                                    <td style={{ textAlign: 'center', fontSize: '8.5pt' }}>
+                                        {item ? item.quantity : (i === 0 && !hasItems ? (ticket.quantity || 1) : '')}
                                     </td>
-                                    <td className="py-1 px-1 text-center border-r border-gray-300 text-[9px]">
-                                        {item.quantity}
+                                    <td style={{ textAlign: 'center', fontSize: '8.5pt' }}>
+                                        {item ? formatPeso(item.unit_price) : ''}
                                     </td>
-                                    <td className="py-1 px-1 text-right text-[9px]">
-                                        {formatPeso(item.unit_price * item.quantity)}
+                                    <td style={{ textAlign: 'right', paddingRight: '5px', fontWeight: 'bold', fontSize: '8.5pt' }}>
+                                        {item ? formatPeso(item.total) : (i === 0 && !hasItems ? formatPeso(ticket.total_amount) : '')}
                                     </td>
                                 </tr>
-            ) :
-
-            <tr className="border-b border-gray-200">
-                                <td className="py-1 px-1 text-center border-r border-gray-300">1</td>
-                                <td className="py-1 px-1 border-r border-gray-300">
-                                    <div className="font-medium text-[9px] leading-tight">
-                                        {ticket.job_type?.name || ticket.job_type || payment.notes || ticket.description || "Service Rendered"}
-                                    </div>
-                                    {ticket.ticket_number && (
-                                        <div className="text-[8px] text-gray-500 mt-0.5">
-                                            Ticket #: {ticket.ticket_number}
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="py-1 px-1 text-right border-r border-gray-300 text-[9px]">
-                                    {(() => {
-                                        const ticketQty = ticket.total_quantity || ticket.quantity || 1;
-                                        const unitPrice = ticketQty > 0 ? (grandTotal / ticketQty) : grandTotal;
-                                        return formatPeso(unitPrice);
-                                    })()}
-                                </td>
-                                <td className="py-1 px-1 text-center border-r border-gray-300 text-[9px]">
-                                    {ticket.total_quantity || ticket.quantity || 1}
-                                </td>
-                                <td className="py-1 px-1 text-right text-[9px]">{formatPeso(grandTotal)}</td>
-                            </tr>
-            }
-
-                        {/* Minimum height filler if needed, or just let it collapse */}
+                            );
+                        })}
                     </tbody>
-                    <tfoot className="bg-gray-50 font-bold">
-                        {/* Subtotal */}
-                        <tr className="border-b border-gray-300">
-                            <td colSpan="3" className="border-r border-gray-300"></td>
-                            <td className="py-1 px-3 text-right border-r border-gray-300">Subtotal:</td>
-                            <td className="py-1 px-3 text-right">{formatPeso(subTotal)}</td>
-                        </tr>
-                        {/* Discount */}
-                        {discountAmount > 0 &&
-            <tr className="border-b border-gray-300 text-red-600">
-                                <td colSpan="3" className="border-r border-gray-300"></td>
-                                <td className="py-1 px-3 text-right border-r border-gray-300">Discount:</td>
-                                <td className="py-1 px-3 text-right">-{formatPeso(discountAmount)}</td>
-                            </tr>
-            }
-                        {/* Grand Total */}
-                        <tr className="bg-gray-200 border-t-2 border-gray-800">
-                            <td colSpan="3" className="border-r border-gray-400 bg-white"></td>
-                            <td className="py-2 px-3 text-right border-r border-gray-400 uppercase text-[10px]">Grand Total:</td>
-                            <td className="py-2 px-3 text-right text-sm">{formatPeso(grandTotal)}</td>
-                        </tr>
-                    </tfoot>
                 </table>
-            </div>
 
-            {/* Payment Breakdown Section */}
-            <div className="flex justify-end mb-3" style={{ pageBreakInside: 'avoid' }}>
-                <div className="w-full border border-gray-800">
-                    <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs uppercase tracking-wider">
-                        Payment Breakdown
-                    </div>
-                    <div className="p-3 bg-gray-50 text-xs">
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="font-semibold text-gray-600 uppercase">Grand Total Due</span>
-                            <span className="font-bold">{formatPeso(grandTotal)}</span>
-                        </div>
-                        <div className="flex justify-between items-center mb-1 text-gray-500">
-                            <span>Less: Previous Payments</span>
-                            <span>{previousPayments > 0 ? `-${formatPeso(previousPayments)}` : formatPeso(0)}</span>
-                        </div>
-                        <div className="flex justify-between items-center mb-2 pt-2 border-t border-gray-300 text-orange-900">
-                            <span className="font-bold uppercase">Less: Amount Paid (Current)</span>
-                            <span className="font-bold text-sm">-{formatPeso(payment.amount)}</span>
-                        </div>
-
-                        <div className="ml-4 pl-4 border-l-2 border-gray-300 mb-2 italic text-gray-500 text-[10px]">
-                            <div>Method: <span className="font-semibold text-black">{payment.payment_method?.replace("_", " ")}</span></div>
-                            {payment.payment_reference &&
-              <div>Ref: {payment.payment_reference}</div>
-              }
-                        </div>
-
-                        <div className="flex justify-between items-center pt-2 border-t-2 border-gray-400 text-red-600">
-                            <span className="font-bold uppercase text-[11px]">Balance Remaining</span>
-                            <span className="font-bold text-base">{formatPeso(balanceRemaining)}</span>
+                {/* Payment Method Section */}
+                <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2" style={{ fontSize: '8pt' }}>
+                        <span style={{ fontWeight: 'bold' }}>PAYMENT METHOD:</span>
+                        <div className="flex items-center gap-2">
+                            <input type="checkbox" checked={paymentMethod === 'cash'} readOnly /> <span>CASH</span>
+                            <input type="checkbox" checked={paymentMethod === 'check'} readOnly /> <span>CHECK</span>
+                            <input type="checkbox" checked={paymentMethod === 'bank_transfer'} readOnly /> <span>BANK TRANSFER</span>
+                            <input type="checkbox" checked={paymentMethod === 'gcash'} readOnly /> <span>GCASH</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Footer / Signature */}
-            <div className="grid grid-cols-2 gap-6 mt-3 text-xs" style={{ pageBreakInside: 'avoid' }}>
-                <div className="pt-8">
-                    <div className="border-b border-black mb-1 p-2"></div>
-                    <div className="font-bold uppercase text-center">Received By</div>
-                    <div className="text-center italic text-[10px] text-gray-500">Signature Over Printed Name</div>
+                <div className="flex" style={{ width: '100%' }}>
+                    {/* Left Footer: QR Code and Branding */}
+                    <div style={{ width: '45%', display: 'flex', flexDirection: 'column' }}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                gap: '10px',
+                                border: '2px solid #f26522',
+                                borderRadius: '10px',
+                                padding: '10px',
+                                width: 'fit-content',
+                                backgroundColor: '#fff'
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: '26mm',      // ⬅️ bigger box
+                                    height: '26mm',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                }}
+                            >
+                                <div style={{ position: 'absolute', top: -12, fontSize: '12pt' }}>↓</div>
+
+                                <img
+                                    src="/images/qr/rcshoppe.png"
+                                    alt="QR Code"
+                                    style={{
+                                        width: '22mm',    // ⬅️ bigger QR
+                                        height: '22mm',
+                                        objectFit: 'contain',
+                                        border: '1px solid #ccc'
+                                    }}
+                                />
+
+                                <div style={{ position: 'absolute', bottom: -12, fontSize: '12pt' }}>↑</div>
+                            </div>
+
+                            <div
+                                style={{
+                                    fontSize: '6pt',
+                                    color: '#000',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <span style={{ color: '#f26522', fontStyle: 'italic' }}>
+                                    Use the QR code to
+                                </span>
+                                <span style={{ color: '#f26522', fontStyle: 'italic' }}>
+                                    make a <strong style={{ textDecoration: 'underline' }}>ONLINE ORDER</strong> and
+                                </span>
+                                <strong style={{ color: '#f26522' }}>TRACK YOUR ORDER</strong>
+                            </div>
+                        </div>
+
+                        <div style={{ fontSize: '6.5pt', marginTop: '3px' }}>
+                            or visit this site : <strong>www.rcprintshoppe.com</strong>
+                        </div>
+                    </div>
+
+
+
+                    {/* Center Footer: Quote */}
+                    <div style={{ width: '30%', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <h3 style={{ margin: '0', fontSize: '10pt', fontWeight: '900' }}>THANK FOR YOUR ORDER.</h3>
+                        <p style={{
+                            fontFamily: "'Dancing Script', cursive",
+                            fontSize: '9pt',
+                            margin: '0',
+                            color: '#555'
+                        }}>"God is good all the time"</p>
+                    </div>
+
+                    {/* Right Footer: Calculations */}
+                    <div style={{ width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <div style={{ width: '100%' }}>
+                            <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
+                                <span>Subtotal</span>
+                                <span>: {formatPeso(subTotal)}</span>
+                            </div>
+                            <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
+                                <span>PARTIAL PAYMENT</span>
+                                <span>: {formatPeso(partialPayment)}</span>
+                            </div>
+                            <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
+                                <span>BALANCE</span>
+                                <span>: {formatPeso(balanceRemaining)}</span>
+                            </div>
+                            <div style={{ borderTop: '1.5px solid #000', margin: '1px 0' }}></div>
+                            <div className="flex justify-between font-bold" style={{ fontSize: '9pt' }}>
+                                <span>Total</span>
+                                <span>: {formatPeso(currentPaymentAmount)}</span>
+                            </div>
+                            <div style={{ borderTop: '1.5px solid #000', margin: '1px 0' }}></div>
+                        </div>
+                    </div>
                 </div>
-                <div className="pt-8 text-center text-[10px] text-gray-400 flex flex-col justify-end">
-                    <p>“Thank you for your business!”</p>
-                    <p className="uppercase tracking-wider mt-1">System Generated Receipt</p>
+
+                {/* Bottom Most: Socials */}
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '5mm', gap: '15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #000', borderRadius: '5px', overflow: 'hidden' }}>
+                        <div style={{ backgroundColor: '#000', color: '#fff', padding: '1px 8px', fontWeight: 'bold', fontSize: '7pt' }}>More Information</div>
+                        <div style={{ padding: '1px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ backgroundColor: '#1877f2', color: '#fff', width: '12px', height: '12px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px' }}>f</div>
+                            <span style={{ fontWeight: 'bold', fontSize: '7.5pt' }}>RC Printshoppe</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" style={{ width: '12px' }} alt="Gmail" />
+                        <span style={{ fontSize: '7.5pt' }}>rcprintshoppe18@gmail.com</span>
+                    </div>
                 </div>
             </div>
-        </div>);
-
+        </div>
+    );
 }

@@ -132,7 +132,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/mock-ups/{id}/approve', [MockupsController::class, 'approve'])->name('mockups.approve');
     Route::post('/mock-ups/{id}/revision', [MockupsController::class, 'requestRevision'])->name('mockups.revision');
     Route::get('/mock-ups/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('mockups.download');
-
+    Route::post('/mock-ups/{id}/claim', [MockupsController::class, 'claimTicket'])->name('mockups.claim');
+    Route::post('/mock-ups/{id}/release', [MockupsController::class, 'releaseTicket'])->name('mockups.release');
     // Production Queue (Admin can access - Legacy routes)
     Route::get('/production', [ProductionQueueController::class, 'index'])->name('production.index');
     Route::post('/production/{id}/start', [ProductionQueueController::class, 'startProduction'])->name('production.start');
@@ -148,6 +149,21 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
         ->name('production.workflow.view');
     Route::get('/production/completed', [ProductionQueueController::class, 'completedTickets'])->name('production.completed');
+    Route::get('/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.view');
+
+    Route::post('/workflow/{workflowStep}/start/{ticket}', [ProductionQueueController::class, 'startWorkflow'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.start');
+
+    Route::post('/workflow/{workflowStep}/update/{ticket}', [ProductionQueueController::class, 'updateWorkflow'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.update');
+
+    Route::post('/workflow/{workflowStep}/complete/{ticket}', [ProductionQueueController::class, 'completeWorkflow'])
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->name('workflow.complete');
 
     // Reports & Analytics
     Route::get('/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('reports');
@@ -188,6 +204,14 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Production Queue Management (Legacy - kept for backward compatibility)
+    Route::get('/queue', [ProductionQueueController::class, 'index'])->name('queue.index');
+    Route::post('/queue/{id}/start', [ProductionQueueController::class, 'startProduction'])->name('queue.start');
+    Route::post('/queue/{id}/update', [ProductionQueueController::class, 'updateProgress'])->name('queue.update');
+    Route::post('/queue/{id}/complete', [ProductionQueueController::class, 'markCompleted'])->name('queue.complete');
+    Route::post('/queue/{id}/record-stock', [ProductionQueueController::class, 'recordStockConsumption'])->name('queue.record-stock');
+    Route::post('/queue/{id}/assign-users', [ProductionQueueController::class, 'assignUsers'])->name('queue.assign-users');
 });
 
 Route::middleware('auth')->group(function () {
@@ -241,6 +265,15 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+
+    // Mock-ups Management
+    Route::get('/mock-ups', [MockupsController::class, 'index'])->name('mockups.index');
+    Route::get('/mock-ups/{id}', [MockupsController::class, 'show'])->name('mockups.show');
+    Route::post('/mock-ups/{id}/upload', [MockupsController::class, 'uploadMockup'])->name('mockups.upload');
+    Route::post('/mock-ups/{id}/approve', [MockupsController::class, 'approve'])->name('mockups.approve');
+    Route::post('/mock-ups/{id}/revision', [MockupsController::class, 'requestRevision'])->name('mockups.revision');
+    Route::get('/mock-ups/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('mockups.download');
 });
 
 Route::prefix('designer')->middleware(['auth', 'role:admin,Designer'])->name('designer.')->group(function () {
@@ -277,6 +310,9 @@ Route::prefix('designer')->middleware(['auth', 'role:admin,Designer'])->name('de
 Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name('production.')->group(function () {
     // Production Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    // TV/Monitor View (same as dashboard but with dedicated route)
+    Route::get('/tvview', [DashboardController::class, 'tvView'])->name('tvview');
 
     // Production Queue Management (Legacy - kept for backward compatibility)
     Route::get('/queue', [ProductionQueueController::class, 'index'])->name('queue.index');
@@ -418,11 +454,11 @@ Route::get('/debug-storage', function () {
     ];
 
     // Get configuration - use helper if available, otherwise determine from env
-    $diskName = function_exists('storage_disk') 
-        ? storage_disk() 
+    $diskName = function_exists('storage_disk')
+        ? storage_disk()
         : (app()->environment('production') ? 's3' : 'public');
     $config = config('filesystems.disks.' . $diskName);
-    
+
     $results['config'] = [
         'active_disk' => $diskName,
         'default_disk' => config('filesystems.default'),
@@ -436,8 +472,8 @@ Route::get('/debug-storage', function () {
 
     try {
         // Test 1: Check if we can connect and list files (or at least access the disk)
-        $storage = function_exists('storage') 
-            ? storage() 
+        $storage = function_exists('storage')
+            ? storage()
             : Storage::disk($diskName);
         $results['connection_test'] = [
             'status' => 'success',
@@ -458,9 +494,9 @@ Route::get('/debug-storage', function () {
         $testContent = 'Storage connection test - ' . now()->toDateTimeString() . PHP_EOL;
         $testContent .= 'Environment: ' . app()->environment() . PHP_EOL;
         $testContent .= 'Disk: ' . $diskName . PHP_EOL;
-        
+
         $uploaded = $storage->put($testFilename, $testContent);
-        
+
         $results['upload_test'] = [
             'status' => 'success',
             'filename' => $testFilename,
@@ -547,8 +583,10 @@ Route::get('/debug-storage', function () {
 
     // Determine overall status
     $overallStatus = 'success';
-    if ($results['connection_test']['status'] === 'error' || 
-        $results['upload_test']['status'] === 'error') {
+    if (
+        $results['connection_test']['status'] === 'error' ||
+        $results['upload_test']['status'] === 'error'
+    ) {
         $overallStatus = 'error';
     }
 
