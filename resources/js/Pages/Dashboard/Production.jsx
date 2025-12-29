@@ -800,16 +800,6 @@ export default function Productions({
 
 
   const ticketColumns = [
-
-
-
-
-
-
-
-
-
-
     {
       label: "Ticket ID",
       key: "ticket_number",

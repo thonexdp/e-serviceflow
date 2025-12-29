@@ -7,25 +7,25 @@ import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function Login({ status, canResetPassword }) {
-  const { data, setData, post, processing, errors, reset } = useForm({
-    email: '',
-    password: '',
-    remember: false
-  });
+    const { data, setData, post, processing, errors, reset } = useForm({
+        email: '',
+        password: '',
+        remember: false
+    });
 
-  useEffect(() => {
-    return () => {
-      reset('password');
+    useEffect(() => {
+        return () => {
+            reset('password');
+        };
+    }, []);
+
+    const submit = (e) => {
+        e.preventDefault();
+        post(route('login'));
     };
-  }, []);
 
-  const submit = (e) => {
-    e.preventDefault();
-    post(route('login'));
-  };
-
-  return (
-    <>
+    return (
+        <>
             <Head title="Log in" />
             <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-8">
                 <div className="w-full max-w-md">
@@ -46,47 +46,47 @@ export default function Login({ status, canResetPassword }) {
                         </div>
 
                         {status &&
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                                 <p className="text-sm text-green-700 font-medium">{status}</p>
                             </div>
-            }
+                        }
 
                         <form onSubmit={submit} className="space-y-5">
                             <div>
                                 <InputLabel
-                  htmlFor="email"
-                  value="Username"
-                  className="text-gray-700 font-medium mb-2" />
+                                    htmlFor="email"
+                                    value="Username"
+                                    className="text-gray-700 font-medium mb-2" />
 
                                 <TextInput
-                  id="email"
-                  type="text"
-                  name="email"
-                  value={data.email}
-                  className="mt-1 block w-full px-4 py-2.5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm"
-                  autoComplete="username"
-                  isFocused={true}
-                  onChange={(e) => setData('email', e.target.value)}
-                  placeholder="Enter your username" />
+                                    id="email"
+                                    type="text"
+                                    name="email"
+                                    value={data.email}
+                                    className="mt-1 block w-full px-4 py-2.5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm"
+                                    autoComplete="username"
+                                    isFocused={true}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                    placeholder="Enter your username" />
 
                                 <InputError message={errors.email} className="mt-2" />
                             </div>
 
                             <div>
                                 <InputLabel
-                  htmlFor="password"
-                  value="Password"
-                  className="text-gray-700 font-medium mb-2" />
+                                    htmlFor="password"
+                                    value="Password"
+                                    className="text-gray-700 font-medium mb-2" />
 
                                 <TextInput
-                  id="password"
-                  type="password"
-                  name="password"
-                  value={data.password}
-                  className="mt-1 block w-full px-4 py-2.5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm"
-                  autoComplete="current-password"
-                  onChange={(e) => setData('password', e.target.value)}
-                  placeholder="Enter your password" />
+                                    id="password"
+                                    type="password"
+                                    name="password"
+                                    value={data.password}
+                                    className="mt-1 block w-full px-4 py-2.5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm"
+                                    autoComplete="current-password"
+                                    onChange={(e) => setData('password', e.target.value)}
+                                    placeholder="Enter your password" />
 
                                 <InputError message={errors.password} className="mt-2" />
                             </div>
@@ -94,10 +94,10 @@ export default function Login({ status, canResetPassword }) {
                             <div className="flex items-center justify-between pt-1">
                                 <label className="flex items-center cursor-pointer">
                                     <Checkbox
-                    name="remember"
-                    checked={data.remember}
-                    onChange={(e) => setData('remember', e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                        name="remember"
+                                        checked={data.remember}
+                                        onChange={(e) => setData('remember', e.target.checked)}
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
 
                                     <span className="ml-2 text-sm text-gray-700">Remember me</span>
                                 </label>
@@ -113,8 +113,8 @@ export default function Login({ status, canResetPassword }) {
                             </div>
 
                             <PrimaryButton
-                className="w-full justify-center py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-150"
-                disabled={processing}>
+                                className="w-full justify-center py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-150"
+                                disabled={processing}>
 
                                 {processing ? 'Signing in...' : 'Sign In'}
                             </PrimaryButton>

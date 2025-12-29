@@ -12,14 +12,14 @@ use Illuminate\Support\Facades\Log;
 
 class MockupsController extends Controller
 {
-    
+
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser'])
+        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser', 'updatedByUser'])
             ->where('payment_status', '!=', 'awaiting_verification')
             ->whereNotNull('design_status');
 
-        
+
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('ticket_number', 'like', '%' . $request->search . '%')
@@ -31,17 +31,17 @@ class MockupsController extends Controller
             });
         }
 
-        
+
         if ($request->has('design_status') && $request->design_status && $request->design_status !== 'all') {
             $query->where('design_status', $request->design_status);
         }
 
-        
+
         $dateRange = $request->get('date_range');
         $startDate = $request->get('start_date');
         $endDate = $request->get('end_date');
 
-        
+
         if ($dateRange !== '' && $dateRange !== null) {
             if ($startDate) {
                 $query->whereDate('created_at', '>=', $startDate);
@@ -66,7 +66,7 @@ class MockupsController extends Controller
         ]);
     }
 
-    
+
     public function show($id)
     {
         $ticket = Ticket::with(['customer', 'jobType.category', 'files'])
@@ -75,7 +75,7 @@ class MockupsController extends Controller
         return response()->json($ticket);
     }
 
-    
+
     public function uploadMockup(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -88,7 +88,7 @@ class MockupsController extends Controller
 
         $uploadedFiles = [];
 
-        
+
         $files = [];
         if ($request->hasFile('files')) {
             $files = is_array($request->file('files')) ? $request->file('files') : [$request->file('files')];
@@ -111,7 +111,7 @@ class MockupsController extends Controller
             ];
         }
 
-        
+
         $ticket->update([
             'design_status' => 'mockup_uploaded',
             'design_notes' => $request->notes,
@@ -120,7 +120,7 @@ class MockupsController extends Controller
         return redirect()->back()->with('success', 'Mock-up files uploaded successfully.');
     }
 
-    
+
     public function approve(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -133,19 +133,19 @@ class MockupsController extends Controller
         $ticket->update([
             'design_status' => 'approved',
             'design_notes' => $request->notes,
-            'status' => 'ready_to_print', 
+            'status' => 'ready_to_print',
         ]);
 
-        
+
         $ticket->refresh();
 
-        
+
         $this->notifyStatusChange($ticket, $oldStatus, 'ready_to_print');
 
         return redirect()->back()->with('success', 'Design approved successfully.');
     }
 
-    
+
     public function requestRevision(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -158,16 +158,16 @@ class MockupsController extends Controller
         $ticket->update([
             'design_status' => 'revision_requested',
             'design_notes' => $request->notes,
-            'status' => 'rejected', 
+            'status' => 'rejected',
         ]);
 
-        
+
         $this->notifyStatusChange($ticket, $oldStatus, 'rejected');
 
         return redirect()->back()->with('success', 'Revision requested successfully.');
     }
 
-    
+
     public function downloadFile($id)
     {
         $file = TicketFile::findOrFail($id);
@@ -180,7 +180,7 @@ class MockupsController extends Controller
         return Storage::download($path, $file->file_name);
     }
 
-    
+
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
         $triggeredBy = Auth::user();
@@ -195,11 +195,11 @@ class MockupsController extends Controller
         $title = '';
         $message = '';
 
-        
+
         switch ($newStatus) {
             case 'approved':
             case 'ready_to_print':
-                
+
                 $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
                     ->when($ticket->order_branch_id, function ($query) use ($ticket) {
                         $query->where('branch_id', $ticket->order_branch_id);
@@ -219,7 +219,7 @@ class MockupsController extends Controller
 
             case 'rejected':
             case 'cancelled':
-                
+
                 $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
                     ->when($ticket->order_branch_id, function ($query) use ($ticket) {
                         $query->where('branch_id', $ticket->order_branch_id);
@@ -242,7 +242,7 @@ class MockupsController extends Controller
             'type' => $notificationType
         ]);
 
-        
+
         $users = \App\Models\User::whereIn('id', $recipientIds)->get();
         foreach ($users as $user) {
             try {
@@ -265,10 +265,10 @@ class MockupsController extends Controller
             }
         }
 
-        
+
         try {
             event(new \App\Events\TicketStatusChanged(
-                $ticket->fresh(), 
+                $ticket->fresh(),
                 $oldStatus,
                 $newStatus,
                 $triggeredBy,
@@ -283,13 +283,13 @@ class MockupsController extends Controller
         }
     }
 
-    
+
     public function claimTicket($id)
     {
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        
+
         if ($ticket->assigned_to_user_id && $ticket->assigned_to_user_id !== $user->id) {
             $assignedUser = \App\Models\User::find($ticket->assigned_to_user_id);
             return redirect()->back()->with('error', 'This ticket is already assigned to ' . ($assignedUser->name ?? 'another user') . '.');
@@ -302,13 +302,13 @@ class MockupsController extends Controller
         return redirect()->back()->with('success', 'Ticket claimed successfully.');
     }
 
-    
+
     public function releaseTicket($id)
     {
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        
+
         if ($ticket->assigned_to_user_id !== $user->id && $user->role !== \App\Models\User::ROLE_ADMIN) {
             return redirect()->back()->with('error', 'You can only release tickets assigned to you.');
         }
