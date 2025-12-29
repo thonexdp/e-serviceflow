@@ -755,7 +755,7 @@ class ProductionQueueController extends Controller
 
             $stepLabel = ucfirst(str_replace('_', ' ', $workflowStep));
             $maxQuantity = $ticket->total_quantity ?? (($ticket->quantity ?? 0) + ($ticket->free_quantity ?? 0));
-            
+
             $message = "Ticket #{$ticket->ticket_number} - {$stepLabel} progress updated: {$newQuantity}/{$maxQuantity} by {$triggeredBy->name}";
             $notificationType = 'ticket_workflow_progress_updated';
             $title = "{$stepLabel} Progress Updated";
@@ -824,13 +824,13 @@ class ProductionQueueController extends Controller
             }
 
             $stepLabel = ucfirst(str_replace('_', ' ', $workflowStep));
-            
+
             if ($isFullyCompleted) {
                 $message = "Ticket #{$ticket->ticket_number} - All workflow steps completed! Production finished by {$triggeredBy->name}";
                 $title = "Production Completed";
                 $notificationType = 'ticket_production_completed';
             } else {
-                $message = "Ticket #{$ticket->ticket_number} - {$stepLabel} step completed by {$triggeredBy->name}";
+                $message = "Ticket #{$ticket->ticket_number} - {$stepLabel} step completed";
                 $title = "{$stepLabel} Completed";
                 $notificationType = 'ticket_workflow_step_completed';
             }
@@ -1318,7 +1318,9 @@ class ProductionQueueController extends Controller
             if ($request->hasFile('evidence_files')) {
                 foreach ($request->file('evidence_files') as $file) {
                     $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, \storage_disk());
+                    $disk = app()->environment('production') ? 's3' : 'public';
+                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, $disk);
+                    $fileUrl = Storage::disk($disk)->url($path);
 
                     \App\Models\WorkflowEvidence::create([
                         'ticket_id' => $ticket->id,
@@ -1326,7 +1328,7 @@ class ProductionQueueController extends Controller
                         'user_id' => $user->id,
                         'workflow_log_id' => $workflowLog?->id,
                         'file_name' => $filename,
-                        'file_path' => asset('storage/' . $path),
+                        'file_path' => $fileUrl,
                         'file_size' => $file->getSize(),
                         'mime_type' => $file->getMimeType(),
                         'uploaded_at' => now(),
@@ -1338,7 +1340,7 @@ class ProductionQueueController extends Controller
             $totalProduced = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
                 ->where('workflow_step', $workflowStep)
                 ->sum('quantity_produced');
-            
+
             $oldProducedQuantity = $ticket->produced_quantity;
             $ticket->update(['produced_quantity' => $totalProduced]);
 
@@ -1427,7 +1429,9 @@ class ProductionQueueController extends Controller
                 if ($request->hasFile('evidence_files')) {
                     foreach ($request->file('evidence_files') as $file) {
                         $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, \storage_disk());
+                        $disk = app()->environment('production') ? 's3' : 'public';
+                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, $disk);
+                        $fileUrl = Storage::disk($disk)->url($path);
 
                         \App\Models\WorkflowEvidence::create([
                             'ticket_id' => $ticket->id,
@@ -1435,7 +1439,7 @@ class ProductionQueueController extends Controller
                             'user_id' => $selectedUserId,
                             'workflow_log_id' => null,
                             'file_name' => $filename,
-                            'file_path' => asset('storage/' . $path),
+                            'file_path' => $fileUrl,
                             'file_size' => $file->getSize(),
                             'mime_type' => $file->getMimeType(),
                             'uploaded_at' => now(),
@@ -1487,7 +1491,7 @@ class ProductionQueueController extends Controller
 
 
                 $this->notifyNextWorkflowStepUsers($ticket, $nextStep);
-                
+
                 // Also notify all production users that the current step was completed
                 $this->notifyWorkflowStepCompleted($ticket, $workflowStep, $user);
             } else {
@@ -1502,7 +1506,7 @@ class ProductionQueueController extends Controller
 
 
                 $this->stockService->autoConsumeStockForProduction($ticket);
-                
+
                 // Notify all production users that the workflow is fully completed
                 $this->notifyWorkflowStepCompleted($ticket, $workflowStep, $user, true);
             }
@@ -1526,6 +1530,7 @@ class ProductionQueueController extends Controller
             'mockupFiles',
             'workflowProgress',
             'productionRecords.user',
+            'evidenceFiles.user',
         ])
             ->where('status', 'completed')
             ->where(function ($q) {

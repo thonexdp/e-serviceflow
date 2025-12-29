@@ -34,8 +34,10 @@ export default function WorkflowView({
   const [openUpdateModal, setUpdateModalOpen] = useState(false);
   const [openTimelineModal, setTimelineModalOpen] = useState(false);
   const [openStartConfirmModal, setStartConfirmModalOpen] = useState(false);
+  const [openProceedConfirmModal, setProceedConfirmModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [ticketToStart, setTicketToStart] = useState(null);
+  const [ticketToProceed, setTicketToProceed] = useState(null);
   const [producedQuantity, setProducedQuantity] = useState(0);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -59,17 +61,17 @@ export default function WorkflowView({
 
     const channel = window.Echo.private(`user.${auth.user.id}`);
     const handleTicketUpdate = (data) => {
-      
+
       // Extract ticket ID and ticket_number from the broadcast data
       // The event broadcasts with structure: { ticket: { id, ticket_number, ... }, notification: { ... } }
       const ticketId = data?.ticket?.id;
       const ticketNumber = data?.ticket?.ticket_number;
-      
+
       if (ticketId || ticketNumber) {
         const identifier = ticketId || ticketNumber;
         console.log('✅ Adding ticket to blink list:', identifier);
         setUpdatedTicketIds(prev => new Set([...prev, identifier]));
-        
+
         // Remove blinking effect after 3 seconds (6 blinks at 0.5s each)
         setTimeout(() => {
           setUpdatedTicketIds(prev => {
@@ -161,6 +163,7 @@ export default function WorkflowView({
   };
 
   const handleViewTimeline = (ticket) => {
+    console.log(ticket);
     setSelectedTicket(ticket);
     setTimelineModalOpen(true);
   };
@@ -222,6 +225,28 @@ export default function WorkflowView({
       onFinish: () => {
         setLoading(false);
         setTicketToStart(null);
+      }
+    });
+  };
+
+  const handleProceedToNext = (ticket) => {
+    setTicketToProceed(ticket);
+    setProceedConfirmModalOpen(true);
+  };
+
+  const handleConfirmProceed = () => {
+    if (!ticketToProceed) return;
+    setLoading(true);
+    setProceedConfirmModalOpen(false);
+    router.post(buildUrl(`/workflow/${workflowStep}/complete/${ticketToProceed.id}`), {}, {
+      preserveScroll: true,
+      preserveState: false,
+      onSuccess: () => {
+        router.reload({ only: ['tickets'], preserveScroll: true });
+      },
+      onFinish: () => {
+        setLoading(false);
+        setTicketToProceed(null);
       }
     });
   };
@@ -316,15 +341,20 @@ export default function WorkflowView({
                 text: `${workflowInfo.label} completed and moved to next step!`
               });
               setLoading(false);
+              // Close modal and reload to show ticket has moved to next workflow
               setTimeout(() => {
                 handleCloseModals();
+                router.reload({ only: ['tickets'], preserveScroll: true });
               }, 1500);
             },
             onError: (errors) => {
               setUpdateModalMessage({ type: 'error', text: errors?.message || 'Failed to complete workflow.' });
               setLoading(false);
             },
-            onFinish: () => setLoading(false)
+            onFinish: () => {
+              handleCloseModals();
+              setLoading(false)
+            }
           });
         } else {
           setUpdateModalMessage({
@@ -333,6 +363,7 @@ export default function WorkflowView({
           });
           setTimeout(() => {
             handleCloseModals();
+            router.reload({ only: ['tickets'], preserveScroll: true });
           }, 1500);
           setLoading(false);
         }
@@ -370,7 +401,10 @@ export default function WorkflowView({
           setUpdateModalMessage({ type: 'error', text: errors?.message || `Failed to update progress for ${user.name}.` });
           setLoading(false);
         },
-        onFinish: () => setLoading(false)
+        onFinish: () => {
+          handleCloseModals();
+          setLoading(false);
+        }
       });
     };
 
@@ -398,8 +432,10 @@ export default function WorkflowView({
     setUpdateModalOpen(false);
     setTimelineModalOpen(false);
     setStartConfirmModalOpen(false);
+    setProceedConfirmModalOpen(false);
     setSelectedTicket(null);
     setTicketToStart(null);
+    setTicketToProceed(null);
     setProducedQuantity(0);
     setEvidenceFiles([]);
     setUpdateModalMessage(null);
@@ -443,8 +479,8 @@ export default function WorkflowView({
     };
     return (
       <div className={`badge ${classes[status] || "badge-secondary"}`}>
-                {labels[status] || status?.toUpperCase() || "PENDING"}
-            </div>);
+        {labels[status] || status?.toUpperCase() || "PENDING"}
+      </div>);
 
   };
 
@@ -465,182 +501,192 @@ export default function WorkflowView({
 
 
   const ticketColumns = [
-  {
-    label: "#",
-    key: "index",
-    render: (row, index) =>
-    (tickets.current_page - 1) * tickets.per_page + index + 1
-  },
-  {
-    label: "Ticket / Preview",
-    key: "ticket_number",
-    render: (row) =>
-    <div className="d-flex align-items-center">
-                    {row.mockup_files && row.mockup_files.length > 0 &&
-      <img
-        src={row.mockup_files[0].file_path}
-        alt="Preview"
-        className="img-thumbnail mr-2"
-        style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
-        onClick={() => handleView(row)} />
+    {
+      label: "#",
+      key: "index",
+      render: (row, index) =>
+        (tickets.current_page - 1) * tickets.per_page + index + 1
+    },
+    {
+      label: "Ticket / Preview",
+      key: "ticket_number",
+      render: (row) =>
+        <div className="d-flex align-items-center">
+          {row.mockup_files && row.mockup_files.length > 0 &&
+            <img
+              src={row.mockup_files[0].file_path}
+              alt="Preview"
+              className="img-thumbnail mr-2"
+              style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
+              onClick={() => handleView(row)} />
 
-      }
-                    <div>
-                        <strong>{row.ticket_number}</strong>
-                        <div className="text-muted small">{row.description}</div>
-                    </div>
-                </div>
+          }
+          <div>
+            <strong>{row.ticket_number}</strong>
+            <div className="text-muted small">{row.description}</div>
+          </div>
+        </div>
 
-  },
-  {
-    label: "Quantity",
-    key: "quantity",
-    render: (row) => {
-      const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
-      let stepQuantity = 0;
+    },
+    {
+      label: "Quantity",
+      key: "quantity",
+      render: (row) => {
+        const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
+        let stepQuantity = 0;
 
-      if (row.workflow_progress) {
-        const stepProgress = row.workflow_progress.find((wp) => wp.workflow_step === workflowStep);
-        stepQuantity = stepProgress?.completed_quantity || 0;
-      }
+        if (row.workflow_progress) {
+          const stepProgress = row.workflow_progress.find((wp) => wp.workflow_step === workflowStep);
+          stepQuantity = stepProgress?.completed_quantity || 0;
+        }
 
-      const percentage = totalQty > 0 ? Math.round(stepQuantity / totalQty * 100) : 0;
+        const percentage = totalQty > 0 ? Math.round(stepQuantity / totalQty * 100) : 0;
 
-      return (
-        <div>
-                        <span className="font-weight-bold">
-                            <span className={stepQuantity >= totalQty ? "text-success" : "text-warning"}>
-                                {stepQuantity}
-                            </span>
-                            {" / "}
-                            {totalQty}
-                        </span>
-                        <div className="progress mt-1" style={{ height: '6px' }}>
-                            <div
-              className={`progress-bar ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
-              style={{ width: `${percentage}%` }}>
+        return (
+          <div>
+            <span className="font-weight-bold">
+              <span className={stepQuantity >= totalQty ? "text-success" : "text-warning"}>
+                {stepQuantity}
+              </span>
+              {" / "}
+              {totalQty}
+            </span>
+            <div className="progress mt-1" style={{ height: '6px' }}>
+              <div
+                className={`progress-bar ${stepQuantity >= totalQty ? 'bg-success' : 'bg-warning'}`}
+                style={{ width: `${percentage}%` }}>
+              </div>
             </div>
-                        </div>
-                        <small className="text-muted">{percentage}%</small>
-                    </div>);
+            <small className="text-muted">{percentage}%</small>
+          </div>);
 
-    }
-  },
-  {
-    label: "Workflow Status",
-    key: "workflow_status",
-    render: (row) => {
-      const status = getWorkflowStatus(row);
-      return (
-        <span className={`badge badge-${status.color}`}>
-                        {status.status}
-                    </span>);
+      }
+    },
+    {
+      label: "Workflow Status",
+      key: "workflow_status",
+      render: (row) => {
+        const status = getWorkflowStatus(row);
+        return (
+          <span className={`badge badge-${status.color}`}>
+            {status.status}
+          </span>);
 
-    }
-  },
-  {
-    label: "Assigned To",
-    key: "assigned_to",
-    render: (row) =>
-    <TicketAssigner
-      ticket={row}
-      productionUsers={productionUsers}
-      isProductionHead={isProductionHead}
-      isAdmin={isAdmin}
-      canOnlyPrint={canOnlyPrint}
-      auth={auth}
-      onAssign={handleAssignUsers} />
-
-
-  },
-  {
-    label: "Due Date",
-    key: "due_date",
-    render: (row) => {
-      const dueDate = new Date(row.due_date);
-      const today = new Date();
-      const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-
-      return (
-        <div>
-                        <div>{formatDate(row.due_date)}</div>
-                        {diffDays < 0 &&
-          <small className="text-danger font-weight-bold">{Math.abs(diffDays)}d overdue</small>
-          }
-                        {diffDays >= 0 && diffDays <= 2 &&
-          <small className="text-warning">{diffDays}d left</small>
-          }
-                    </div>);
-
-    }
-  },
-  {
-    label: "Actions",
-    key: "actions",
-    render: (row) => {
-      const status = getWorkflowStatus(row);
-      const isProductionHead = auth?.user?.is_head || auth?.user?.role === 'admin';
+      }
+    },
+    {
+      label: "Assigned To",
+      key: "assigned_to",
+      render: (row) =>
+        <TicketAssigner
+          ticket={row}
+          productionUsers={productionUsers}
+          isProductionHead={isProductionHead}
+          isAdmin={isAdmin}
+          canOnlyPrint={canOnlyPrint}
+          auth={auth}
+          onAssign={handleAssignUsers} />
 
 
-      const userWorkflowSteps = auth?.user?.workflow_steps || [];
-      const hasWorkflowStepAccess = auth?.user?.role === 'admin' || userWorkflowSteps.includes(workflowStep);
+    },
+    {
+      label: "Due Date",
+      key: "due_date",
+      render: (row) => {
+        const dueDate = new Date(row.due_date);
+        const today = new Date();
+        const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+
+        return (
+          <div>
+            <div>{formatDate(row.due_date)}</div>
+            {diffDays < 0 &&
+              <small className="text-danger font-weight-bold">{Math.abs(diffDays)}d overdue</small>
+            }
+            {diffDays >= 0 && diffDays <= 2 &&
+              <small className="text-warning">{diffDays}d left</small>
+            }
+          </div>);
+
+      }
+    },
+    {
+      label: "Actions",
+      key: "actions",
+      render: (row) => {
+        const status = getWorkflowStatus(row);
+        const isProductionHead = auth?.user?.is_head || auth?.user?.role === 'admin';
 
 
-      const assignedUsers = row.assigned_users || (row.assigned_to_user ? [row.assigned_to_user] : []);
-      const isUserAssigned = assignedUsers.some((u) => u.id === auth?.user?.id);
+        const userWorkflowSteps = auth?.user?.workflow_steps || [];
+        const hasWorkflowStepAccess = auth?.user?.role === 'admin' || userWorkflowSteps.includes(workflowStep);
 
 
-      const isPrintingWorkflow = workflowStep === 'printing';
-      const canAccessForCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (row.status === 'ready_to_print' || row.status === 'in_production');
+        const assignedUsers = row.assigned_users || (row.assigned_to_user ? [row.assigned_to_user] : []);
+        const isUserAssigned = assignedUsers.some((u) => u.id === auth?.user?.id);
 
 
-      const userHasAccess = hasWorkflowStepAccess || canAccessForCanOnlyPrint;
-      const canStart = isProductionHead || isUserAssigned && userHasAccess;
+        const isPrintingWorkflow = workflowStep === 'printing';
+        const canAccessForCanOnlyPrint = canOnlyPrint && isPrintingWorkflow && (row.status === 'ready_to_print' || row.status === 'in_production');
 
 
-      const canUpdate = (isUserAssigned || isProductionHead) && (
-      status.status === 'In Progress' || status.status === 'Pending' || status.status === 'Completed' ||
-      canAccessForCanOnlyPrint && row.status === 'ready_to_print');
+        const userHasAccess = hasWorkflowStepAccess || canAccessForCanOnlyPrint;
+        const canStart = isProductionHead || isUserAssigned && userHasAccess;
 
-      return (
-        <div className="btn-group-vertical btn-group-sm">
-                        {status.status === 'Not Started' && canStart ?
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-green-500"
-            onClick={() => handleStartWork(row)}
-            disabled={loading}>
 
-                                <i className="ti-control-play"></i> Start
-                            </button> :
+        const canUpdate = (isUserAssigned || isProductionHead) && (
+          status.status === 'In Progress' || status.status === 'Pending' || status.status === 'Completed' ||
+          canAccessForCanOnlyPrint && row.status === 'ready_to_print');
 
-          canUpdate &&
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-orange-500"
-            onClick={() => handleUpdate(row)}>
+        return (
+          <div className="btn-group-vertical btn-group-sm">
+            {status.status === 'Completed' && (isProductionHead || isAdmin) &&
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-success"
+                onClick={() => handleProceedToNext(row)}
+                disabled={loading}>
 
-                                    <i className="ti-pencil"></i> Update
-                                </button>
-          }
-                        <button
-            type="button"
-            className="btn btn-link btn-sm text-purple-500"
-            onClick={() => handleViewTimeline(row)}>
+                <i className="ti-arrow-right"></i> Proceed to Next
+              </button>
+            }
+            {status.status === 'Not Started' && canStart ?
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-green-500"
+                onClick={() => handleStartWork(row)}
+                disabled={loading}>
 
-                            <i className="ti-time"></i> Timeline
-                        </button>
-                        <button
-            type="button"
-            className="btn btn-link btn-sm text-muted"
-            onClick={() => handleView(row)}>
+                <i className="ti-control-play"></i> Start
+              </button> :
 
-                            <i className="ti-eye"></i> View
-                        </button>
-                    </div>);
+              canUpdate &&
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-orange-500"
+                onClick={() => handleUpdate(row)}>
 
-    }
-  }];
+                <i className="ti-pencil"></i> Update
+              </button>
+            }
+            <button
+              type="button"
+              className="btn btn-link btn-sm text-purple-500"
+              onClick={() => handleViewTimeline(row)}>
+
+              <i className="ti-time"></i> Timeline
+            </button>
+            <button
+              type="button"
+              className="btn btn-link btn-sm text-muted"
+              onClick={() => handleView(row)}>
+
+              <i className="ti-eye"></i> View
+            </button>
+          </div>);
+
+      }
+    }];
 
 
   const mockupFiles = selectedTicket?.mockup_files || [];
@@ -651,116 +697,116 @@ export default function WorkflowView({
       notifications={notifications}
       messages={messages}>
 
-            <Head title={`${workflowInfo.label} - Production Workflow`} />
+      <Head title={`${workflowInfo.label} - Production Workflow`} />
 
-            {/* Flash Messages */}
-            {flash?.success &&
-      <FlashMessage type="success" message={flash.success} />
+      {/* Flash Messages */}
+      {flash?.success &&
+        <FlashMessage type="success" message={flash.success} />
       }
-            {flash?.error &&
-      <FlashMessage type="error" message={flash.error} />
+      {flash?.error &&
+        <FlashMessage type="error" message={flash.error} />
       }
 
-            <div className="row">
-                <div className="col-lg-8 p-r-0 title-margin-right">
-                    <div className="page-header">
-                        <div className="page-title">
-                            <h1 style={{ color: workflowInfo.color }}>
-                                <i className={`${workflowInfo.icon} mr-2`}></i>
-                                {workflowInfo.label} <span>Workflow</span>
-                            </h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-4 p-l-0 title-margin-left">
-                    <div className="page-header">
-                        <div className="page-title">
-                            <ol className="breadcrumb">
-                                <li className="breadcrumb-item">
-                                    <a href="/production/">Dashboard</a>
-                                </li>
-                                <li className="breadcrumb-item active">{workflowInfo.label}</li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
+      <div className="row">
+        <div className="col-lg-8 p-r-0 title-margin-right">
+          <div className="page-header">
+            <div className="page-title">
+              <h1 style={{ color: workflowInfo.color }}>
+                <i className={`${workflowInfo.icon} mr-2`}></i>
+                {workflowInfo.label} <span>Workflow</span>
+              </h1>
             </div>
+          </div>
+        </div>
+        <div className="col-lg-4 p-l-0 title-margin-left">
+          <div className="page-header">
+            <div className="page-title">
+              <ol className="breadcrumb">
+                <li className="breadcrumb-item">
+                  <a href="/production/">Dashboard</a>
+                </li>
+                <li className="breadcrumb-item active">{workflowInfo.label}</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            {/* View Modal */}
-            <Modal
+      {/* View Modal */}
+      <Modal
         title={`Ticket Details - #${selectedTicket?.ticket_number}`}
         isOpen={openViewModal}
         onClose={handleCloseModals}
         size="6xl">
 
-                {selectedTicket &&
-        <div>
-                        {/* Ticket Info - Compact */}
-                        <div className="row mb-3">
-                            <div className="col-md-4">
-                                <p className="mb-1"><strong>Customer:</strong> {selectedTicket.customer?.firstname} {selectedTicket.customer?.lastname}</p>
-                                <p className="mb-1"><strong>Description:</strong> {selectedTicket.description}</p>
-                            </div>
-                            <div className="col-md-4">
-                                <p className="mb-1"><strong>Quantity:</strong> {selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)}</p>
-                                <p className="mb-1"><strong>Due Date:</strong> {formatDate(selectedTicket.due_date)}</p>
-                            </div>
-                            <div className="col-md-4">
-                                <p className="mb-1"><strong>Status:</strong> {getStatusBadge(selectedTicket.status)}</p>
-                            </div>
+        {selectedTicket &&
+          <div>
+            {/* Ticket Info - Compact */}
+            <div className="row mb-3">
+              <div className="col-md-4">
+                <p className="mb-1"><strong>Customer:</strong> {selectedTicket.customer?.firstname} {selectedTicket.customer?.lastname}</p>
+                <p className="mb-1"><strong>Description:</strong> {selectedTicket.description}</p>
+              </div>
+              <div className="col-md-4">
+                <p className="mb-1"><strong>Quantity:</strong> {selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0)}</p>
+                <p className="mb-1"><strong>Due Date:</strong> {formatDate(selectedTicket.due_date)}</p>
+              </div>
+              <div className="col-md-4">
+                <p className="mb-1"><strong>Status:</strong> {getStatusBadge(selectedTicket.status)}</p>
+              </div>
+            </div>
+
+            <hr className="my-2" />
+
+            {/* Design Files - Maximized Space */}
+            <div className="mb-4">
+              <h5 className="mb-3"><i className="ti-image mr-2"></i>Design Files</h5>
+              {mockupFiles.length > 0 ?
+                <div className="row">
+                  {mockupFiles.map((file) =>
+                    <div key={file.id} className="col-md-12 col-lg-12 mb-3">
+                      <div className="card h-100 shadow-sm">
+                        <img
+                          src={file.file_path}
+                          alt={file.file_name}
+                          className="card-img-top"
+                          style={{ height: '100%', objectFit: 'cover' }} />
+
+                        <div className="card-body p-2">
+                          <small className="text-muted d-block text-truncate mb-2" title={file.file_name}>
+                            {file.file_name}
+                          </small>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-block btn-primary"
+                            onClick={() => handleDownload(file.id, file.file_name)}>
+
+                            <i className="ti-download"></i> Download
+                          </button>
                         </div>
-
-                        <hr className="my-2" />
-
-                        {/* Design Files - Maximized Space */}
-                        <div className="mb-4">
-                            <h5 className="mb-3"><i className="ti-image mr-2"></i>Design Files</h5>
-                            {mockupFiles.length > 0 ?
-            <div className="row">
-                                    {mockupFiles.map((file) =>
-              <div key={file.id} className="col-md-12 col-lg-12 mb-3">
-                                            <div className="card h-100 shadow-sm">
-                                                <img
-                    src={file.file_path}
-                    alt={file.file_name}
-                    className="card-img-top"
-                    style={{ height: '100%', objectFit: 'cover' }} />
-
-                                                <div className="card-body p-2">
-                                                    <small className="text-muted d-block text-truncate mb-2" title={file.file_name}>
-                                                        {file.file_name}
-                                                    </small>
-                                                    <button
-                      type="button"
-                      className="btn btn-sm btn-block btn-primary"
-                      onClick={() => handleDownload(file.id, file.file_name)}>
-
-                                                        <i className="ti-download"></i> Download
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-              )}
-                                </div> :
-
-            <div className="alert alert-info">
-                                    <i className="ti-info-alt mr-2"></i>No design files available
-                                </div>
-            }
-                        </div>
-
+                      </div>
                     </div>
-        }
-            </Modal>
+                  )}
+                </div> :
 
-            {/* Update Progress Modal */}
-            <Modal
+                <div className="alert alert-info">
+                  <i className="ti-info-alt mr-2"></i>No design files available
+                </div>
+              }
+            </div>
+
+          </div>
+        }
+      </Modal>
+
+      {/* Update Progress Modal */}
+      <Modal
         title={`Update ${workflowInfo.label} - Ticket #${selectedTicket?.ticket_number}`}
         isOpen={openUpdateModal}
         onClose={handleCloseModals}
         size="5xl">
 
-                {selectedTicket && (() => {
+        {selectedTicket && (() => {
           const assignedUsers = selectedTicket.assigned_users || [];
           const maxQuantity = selectedTicket.total_quantity || (selectedTicket.quantity || 0) + (selectedTicket.free_quantity || 0);
           const totalProgress = calculateTotalProgress();
@@ -768,300 +814,321 @@ export default function WorkflowView({
 
           return (
             <div>
-                            <div className="mb-4">
-                                <h4>{selectedTicket.description}</h4>
-                                <p className="text-muted">Update production progress for {workflowInfo.label}</p>
-                            </div>
+              <div className="mb-4">
+                <h4>{selectedTicket.description}</h4>
+                <p className="text-muted">Update production progress for {workflowInfo.label}</p>
+              </div>
 
-                            {/* Alert Message */}
-                            {updateModalMessage &&
-              <div className={`alert alert-${updateModalMessage.type === 'success' ? 'success' : 'danger'}`}>
-                                    {updateModalMessage.text}
-                                </div>
+              {/* Alert Message */}
+              {updateModalMessage &&
+                <div className={`alert alert-${updateModalMessage.type === 'success' ? 'success' : 'danger'}`}>
+                  {updateModalMessage.text}
+                </div>
               }
 
-                            {/* Total Progress Summary */}
-                            <div className="card mb-4" style={{ backgroundColor: '#f8f9fa' }}>
-                                <div className="card-body">
-                                    <div className="row align-items-center">
-                                        <div className="col-md-6">
-                                            <h5 className="mb-2">
-                                                <i className="ti-bar-chart mr-2"></i>Total Progress
-                                            </h5>
-                                            <div className="d-flex align-items-baseline">
-                                                <span className="h3 mb-0 mr-2" style={{ color: totalProgress >= maxQuantity ? '#28a745' : '#ffc107' }}>
-                                                    {totalProgress}
-                                                </span>
-                                                <span className="text-muted">/ {maxQuantity} pcs</span>
-                                            </div>
-                                        </div>
-                                        <div className="col-md-6">
-                                            <div className="progress" style={{ height: "30px" }}>
-                                                <div
+              {/* Total Progress Summary */}
+              <div className="card mb-4" style={{ backgroundColor: '#f8f9fa' }}>
+                <div className="card-body">
+                  <div className="row align-items-center">
+                    <div className="col-md-6">
+                      <h5 className="mb-2">
+                        <i className="ti-bar-chart mr-2"></i>Total Progress
+                      </h5>
+                      <div className="d-flex align-items-baseline">
+                        <span className="h3 mb-0 mr-2" style={{ color: totalProgress >= maxQuantity ? '#28a745' : '#ffc107' }}>
+                          {totalProgress}
+                        </span>
+                        <span className="text-muted">/ {maxQuantity} pcs</span>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="progress" style={{ height: "30px" }}>
+                        <div
                           className={`progress-bar ${totalProgress >= maxQuantity ? "bg-success" : "bg-warning"}`}
                           style={{ width: `${Math.min(progressPercentage, 100)}%` }}
                           role="progressbar">
 
-                                                    <strong>{progressPercentage}%</strong>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                          <strong>{progressPercentage}%</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <hr />
+
+              {/* Per-User Production Inputs */}
+              <div className="mb-4">
+                <h5 className="mb-3">
+                  <i className="ti-user mr-2"></i>Production by User
+                </h5>
+                <p className="text-muted small mb-3">
+                  Each assigned user can input their own produced quantity and upload evidence.
+                </p>
+
+                {assignedUsers.length === 0 ?
+                  <div className="alert alert-warning">
+                    <i className="ti-alert mr-2"></i>No users assigned to this ticket.
+                  </div> :
+
+                  <div className="row">
+                    {assignedUsers.map((user) => {
+                      const userQty = parseInt(userQuantities[user.id]) || 0;
+                      const userEvidence = userEvidenceFiles[user.id] || [];
+                      const isCurrentUser = user.id === auth?.user?.id;
+                      const userRecord = selectedTicket.production_records?.find(
+                        (r) => r.user_id === user.id && r.workflow_step === workflowStep
+                      );
+                      const previousQty = userRecord?.quantity_produced || 0;
+
+                      return (
+                        <div key={user.id} className="col-md-6 mb-4">
+                          <div className="card h-100" style={{ borderLeft: `4px solid ${isCurrentUser ? '#28a745' : '#fb8c00'}` }}>
+                            <div className="card-header" style={{ backgroundColor: isCurrentUser ? '#e8f5e9' : '#f8f9fa' }}>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <div>
+                                  <strong>{user.name}</strong>
+                                  {isCurrentUser &&
+                                    <span className="badge badge-success ml-2">You</span>
+                                  }
                                 </div>
-                            </div>
-
-                            <hr />
-
-                            {/* Per-User Production Inputs */}
-                            <div className="mb-4">
-                                <h5 className="mb-3">
-                                    <i className="ti-user mr-2"></i>Production by User
-                                </h5>
-                                <p className="text-muted small mb-3">
-                                    Each assigned user can input their own produced quantity and upload evidence.
-                                </p>
-
-                                {assignedUsers.length === 0 ?
-                <div className="alert alert-warning">
-                                        <i className="ti-alert mr-2"></i>No users assigned to this ticket.
-                                    </div> :
-
-                <div className="row">
-                                        {assignedUsers.map((user) => {
-                    const userQty = parseInt(userQuantities[user.id]) || 0;
-                    const userEvidence = userEvidenceFiles[user.id] || [];
-                    const isCurrentUser = user.id === auth?.user?.id;
-                    const userRecord = selectedTicket.production_records?.find(
-                      (r) => r.user_id === user.id && r.workflow_step === workflowStep
-                    );
-                    const previousQty = userRecord?.quantity_produced || 0;
-
-                    return (
-                      <div key={user.id} className="col-md-6 mb-4">
-                                                    <div className="card h-100" style={{ borderLeft: `4px solid ${isCurrentUser ? '#28a745' : '#fb8c00'}` }}>
-                                                        <div className="card-header" style={{ backgroundColor: isCurrentUser ? '#e8f5e9' : '#f8f9fa' }}>
-                                                            <div className="d-flex justify-content-between align-items-center">
-                                                                <div>
-                                                                    <strong>{user.name}</strong>
-                                                                    {isCurrentUser &&
-                                <span className="badge badge-success ml-2">You</span>
+                                {previousQty > 0 &&
+                                  <small className="text-muted">
+                                    Previous: <strong>{previousQty}</strong> pcs
+                                  </small>
                                 }
-                                                                </div>
-                                                                {previousQty > 0 &&
-                              <small className="text-muted">
-                                                                        Previous: <strong>{previousQty}</strong> pcs
-                                                                    </small>
-                              }
-                                                            </div>
-                                                        </div>
-                                                        <div className="card-body">
-                                                            {/* Quantity Input */}
-                                                            <div className="mb-3">
-                                                                <label className="font-weight-bold mb-2">
-                                                                    Produced Quantity
-                                                                </label>
-                                                                <div className="row align-items-center">
-                                                                    <div className="col-6">
-                                                                        <FormInput
-                                    type="number"
-                                    name={`quantity_${user.id}`}
-                                    value={userQty}
-                                    onChange={(e) => handleUpdateUserQuantity(user.id, e.target.value)}
-                                    placeholder="0"
-                                    min="0"
-                                    max={maxQuantity} />
-
-                                                                    </div>
-                                                                    <div className="col-6">
-                                                                        <div className="d-flex flex-wrap gap-1">
-                                                                            <button
-                                      type="button"
-                                      className="btn btn-outline-primary btn-sm"
-                                      onClick={() => handleQuickAdd(user.id, 1)}
-                                      title="Add 1">
-
-                                                                                +1
-                                                                            </button>
-                                                                            <button
-                                      type="button"
-                                      className="btn btn-outline-primary btn-sm"
-                                      onClick={() => handleQuickAdd(user.id, 5)}
-                                      title="Add 5">
-
-                                                                                +5
-                                                                            </button>
-                                                                            <button
-                                      type="button"
-                                      className="btn btn-outline-primary btn-sm"
-                                      onClick={() => handleQuickAdd(user.id, 10)}
-                                      title="Add 10">
-
-                                                                                +10
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                {userQty > 0 &&
-                              <div className="mt-2">
-                                                                        <small className="text-muted">
-                                                                            {userQty} pcs produced by {user.name}
-                                                                        </small>
-                                                                    </div>
-                              }
-                                                            </div>
-
-                                                            {/* Evidence Upload for this user */}
-                                                            <div className="mb-2">
-                                                                <label className="font-weight-bold mb-2 small">
-                                                                    <i className="ti-image mr-1"></i>Evidence Photos
-                                                                </label>
-                                                                <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                className="form-control form-control-sm"
-                                onChange={(e) => handleAddUserEvidence(user.id, e.target.files)} />
-
-                                                                <small className="text-muted">Upload photos as proof of work</small>
-                                                            </div>
-
-                                                            {/* Evidence Preview */}
-                                                            {userEvidence.length > 0 &&
-                            <div className="mt-2">
-                                                                    <div className="row">
-                                                                        {userEvidence.map((file, index) =>
-                                <div key={index} className="col-6 mb-2">
-                                                                                <div className="position-relative">
-                                                                                    <img
-                                      src={URL.createObjectURL(file)}
-                                      alt={`Evidence ${index + 1}`}
-                                      className="img-thumbnail"
-                                      style={{ width: '100%', height: '80px', objectFit: 'cover', cursor: 'pointer' }}
-                                      onClick={() => {
-                                        const preview = window.open();
-                                        preview.document.write(`<img src="${URL.createObjectURL(file)}" style="max-width:100%;height:auto;"/>`);
-                                      }} />
-
-                                                                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-danger position-absolute"
-                                      style={{ top: '2px', right: '2px', padding: '2px 6px' }}
-                                      onClick={() => handleRemoveUserEvidence(user.id, index)}
-                                      title="Remove">
-
-                                                                                        <i className="ti-close" style={{ fontSize: '12px' }}></i>
-                                                                                    </button>
-                                                                                </div>
-                                                                            </div>
-                                )}
-                                                                    </div>
-                                                                </div>
-                            }
-                                                        </div>
-                                                    </div>
-                                                </div>);
-
-                  })}
-                                    </div>
-                }
+                              </div>
                             </div>
+                            <div className="card-body">
+                              {/* Quantity Input */}
+                              <div className="mb-3">
+                                <label className="font-weight-bold mb-2">
+                                  Produced Quantity
+                                </label>
+                                <div className="row align-items-center">
+                                  <div className="col-6">
+                                    <FormInput
+                                      type="number"
+                                      name={`quantity_${user.id}`}
+                                      value={userQty}
+                                      onChange={(e) => handleUpdateUserQuantity(user.id, e.target.value)}
+                                      placeholder="0"
+                                      min="0"
+                                      max={maxQuantity} />
 
-                            <hr />
+                                  </div>
+                                  <div className="col-6">
+                                    <div className="d-flex flex-wrap gap-1">
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-primary btn-sm"
+                                        onClick={() => handleQuickAdd(user.id, 1)}
+                                        title="Add 1">
 
-                            {/* Action Buttons */}
-                            <div className="d-flex justify-content-between">
-                                <button
+                                        +1
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-primary btn-sm"
+                                        onClick={() => handleQuickAdd(user.id, 5)}
+                                        title="Add 5">
+
+                                        +5
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-primary btn-sm"
+                                        onClick={() => handleQuickAdd(user.id, 10)}
+                                        title="Add 10">
+
+                                        +10
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                {userQty > 0 &&
+                                  <div className="mt-2">
+                                    <small className="text-muted">
+                                      {userQty} pcs produced by {user.name}
+                                    </small>
+                                  </div>
+                                }
+                              </div>
+
+                              {/* Evidence Upload for this user */}
+                              <div className="mb-2">
+                                <label className="font-weight-bold mb-2 small">
+                                  <i className="ti-image mr-1"></i>Evidence Photos
+                                </label>
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  className="form-control form-control-sm"
+                                  onChange={(e) => handleAddUserEvidence(user.id, e.target.files)} />
+
+                                <small className="text-muted">Upload photos as proof of work</small>
+                              </div>
+
+                              {/* Evidence Preview */}
+                              {userEvidence.length > 0 &&
+                                <div className="mt-2">
+                                  <div className="row">
+                                    {userEvidence.map((file, index) =>
+                                      <div key={index} className="col-6 mb-2">
+                                        <div className="position-relative">
+                                          <img
+                                            src={URL.createObjectURL(file)}
+                                            alt={`Evidence ${index + 1}`}
+                                            className="img-thumbnail"
+                                            style={{ width: '100%', height: '80px', objectFit: 'cover', cursor: 'pointer' }}
+                                            onClick={() => {
+                                              const preview = window.open();
+                                              preview.document.write(`<img src="${URL.createObjectURL(file)}" style="max-width:100%;height:auto;"/>`);
+                                            }} />
+
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-danger position-absolute"
+                                            style={{ top: '2px', right: '2px', padding: '2px 6px' }}
+                                            onClick={() => handleRemoveUserEvidence(user.id, index)}
+                                            title="Remove">
+
+                                            <i className="ti-close" style={{ fontSize: '12px' }}></i>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              }
+                            </div>
+                          </div>
+                        </div>);
+
+                    })}
+                  </div>
+                }
+              </div>
+
+              <hr />
+
+              {/* Action Buttons */}
+              <div className="d-flex justify-content-between">
+                <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={handleCloseModals}
                   disabled={loading}>
 
-                                    Cancel
-                                </button>
-                                <div className="d-flex gap-2">
-                                    <button
+                  Close
+                </button>
+                <div className="d-flex gap-2">
+                  <button
                     type="button"
                     className="btn btn-primary"
                     onClick={handleUpdateProgress}
                     disabled={loading}>
 
-                                        {loading ?
-                    <>
-                                                <span className="spinner-border spinner-border-sm mr-2" role="status"></span>
-                                                Saving...
-                                            </> :
+                    {loading ?
+                      <>
+                        <span className="spinner-border spinner-border-sm mr-2" role="status"></span>
+                        Saving...
+                      </> :
 
-                    <>
-                                                <i className="ti-save mr-2"></i>
-                                                {totalProgress >= maxQuantity ? 'Save & Complete' : 'Save Progress'}
-                                            </>
+                      <>
+                        <i className="ti-save mr-2"></i>
+                        {totalProgress >= maxQuantity ? 'Save & Complete' : 'Save Progress'}
+                      </>
                     }
-                                    </button>
-                                </div>
-                            </div>
-                        </div>);
+                  </button>
+                </div>
+              </div>
+            </div>);
 
         })()}
-            </Modal>
+      </Modal>
 
-            {/* Timeline Modal */}
-            <Modal
+      {/* Timeline Modal */}
+      <Modal
         title={`Workflow Timeline - Ticket #${selectedTicket?.ticket_number}`}
         isOpen={openTimelineModal}
         onClose={handleCloseModals}
         size="5xl">
 
-                {selectedTicket &&
-        <WorkflowTimeline ticket={selectedTicket} />
+        {selectedTicket &&
+          <WorkflowTimeline ticket={selectedTicket} />
         }
-            </Modal>
+      </Modal>
 
-            {/* Start Work Confirmation Modal */}
-            <Modal
+      {/* Start Work Confirmation Modal */}
+      <Modal
         title={`Start ${workflowInfo.label} Workflow`}
         isOpen={openStartConfirmModal}
         onClose={handleCloseModals}
         size="md">
 
-                {ticketToStart &&
-        <Confirmation
-          label="Start Work"
-          description={`Start ${workflowInfo.label} workflow for Ticket #${ticketToStart.ticket_number}?`}
-          subtitle={`This will change the ticket status to "In Progress" and begin the ${workflowInfo.label} workflow step.`}
-          color="success"
-          icon="ti-control-play"
-          loading={loading}
-          onCancel={handleCloseModals}
-          onSubmit={handleConfirmStart} />
+        {ticketToStart &&
+          <Confirmation
+            label="Start Work"
+            description={`Start ${workflowInfo.label} workflow for Ticket #${ticketToStart.ticket_number}?`}
+            subtitle={`This will change the ticket status to "In Progress" and begin the ${workflowInfo.label} workflow step.`}
+            color="success"
+            icon="ti-control-play"
+            loading={loading}
+            onCancel={handleCloseModals}
+            onSubmit={handleConfirmStart} />
 
         }
-            </Modal>
+      </Modal>
 
-            <section id="main-content">
-                <div className="content-wrap">
-                    <div className="main">
-                        <div className="container-fluid">
-                            <div className="row">
-                                <div className="col-lg-12">
-                                    <div className="card">
-                                        <div className="card-title mt-3">
-                                            <h4 style={{ color: workflowInfo.color }}>
-                                                <i className={`${workflowInfo.icon} mr-2`}></i>
-                                                {workflowInfo.label} Queue
-                                            </h4>
-                                            <p className="text-muted">Tickets currently assigned to {workflowInfo.label}</p>
-                                        </div>
-                                        <div className="card-body">
-                                            <div className="row mt-4 align-items-center">
-                                                <div className="col-md-8">
-                                                    <SearchBox
+      {/* Proceed to Next Step Confirmation Modal */}
+      <Modal
+        title={`Proceed to Next Workflow Step`}
+        isOpen={openProceedConfirmModal}
+        onClose={handleCloseModals}
+        size="md">
+
+        {ticketToProceed &&
+          <Confirmation
+            label="Proceed"
+            description={`Move Ticket #${ticketToProceed.ticket_number} to the next workflow step?`}
+            subtitle={`This will complete the ${workflowInfo.label} step and move the ticket to the next stage in the workflow.`}
+            color="success"
+            icon="ti-arrow-right"
+            loading={loading}
+            onCancel={handleCloseModals}
+            onSubmit={handleConfirmProceed} />
+
+        }
+      </Modal>
+
+      <section id="main-content">
+        <div className="content-wrap">
+          <div className="main">
+            <div className="container-fluid">
+              <div className="row">
+                <div className="col-lg-12">
+                  <div className="card">
+                    <div className="card-title mt-3">
+                      <h4 style={{ color: workflowInfo.color }}>
+                        <i className={`${workflowInfo.icon} mr-2`}></i>
+                        {workflowInfo.label} Queue
+                      </h4>
+                      <p className="text-muted">Tickets currently assigned to {workflowInfo.label}</p>
+                    </div>
+                    <div className="card-body">
+                      <div className="row mt-4 align-items-center">
+                        <div className="col-md-8">
+                          <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
                             route={`/workflow/${workflowStep}`} />
 
-                                                </div>
-                                                <div className="col-md-4 text-right">
-                                                    <button
+                        </div>
+                        <div className="col-md-4 text-right">
+                          <button
                             onClick={() => router.visit(buildUrl(`/workflow/${workflowStep}`), {
                               preserveState: false,
                               preserveScroll: true
@@ -1071,34 +1138,34 @@ export default function WorkflowView({
                             title="Refresh Data"
                             style={{ borderColor: workflowInfo.color, color: workflowInfo.color }}>
 
-                                                        <i className="ti-reload mr-2"></i> Refresh
-                                                    </button>
-                                                </div>
-                                            </div>
+                            <i className="ti-reload mr-2"></i> Refresh
+                          </button>
+                        </div>
+                      </div>
 
-                                            <div className="mt-4">
-                                                <DataTable
+                      <div className="mt-4">
+                        <DataTable
                           columns={ticketColumns}
                           data={tickets.data}
                           pagination={tickets}
                           emptyMessage={`No tickets in ${workflowInfo.label} queue.`}
                           getRowClassName={(row) => {
-                            const isUpdated = updatedTicketIds.has(row.id) || 
-                                              (row.ticket_number && updatedTicketIds.has(row.ticket_number));
+                            const isUpdated = updatedTicketIds.has(row.id) ||
+                              (row.ticket_number && updatedTicketIds.has(row.ticket_number));
                             return isUpdated ? 'row-updated-blink' : '';
                           }} />
 
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                      </div>
                     </div>
+                  </div>
                 </div>
-            </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            <style>{`
+      <style>{`
                 @keyframes blink {
                     0%, 100% {
                         background-color: transparent;
@@ -1111,6 +1178,6 @@ export default function WorkflowView({
                     animation: blink 0.5s ease-in-out 6;
                 }
             `}</style>
-        </AdminLayout>);
+    </AdminLayout>);
 
 }
