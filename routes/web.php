@@ -40,7 +40,7 @@ Route::post('/api/public/orders/customer/find-or-create', [PublicOrderController
     ->name('public.orders.customer.find-or-create');
 
 Route::post('/api/public/orders', [PublicOrderController::class, 'storeOrder'])
-    ->middleware('throttle:api')
+    ->middleware('throttle:1,1')
     ->name('public.orders.store');
 
 Route::get('/csrf-token', function () {

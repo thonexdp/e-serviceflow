@@ -1240,7 +1240,7 @@ class ProductionQueueController extends Controller
 
         $user = Auth::user();
 
-
+        // Validate can_only_print permissions
         if ($user->can_only_print && $workflowStep !== 'printing') {
             return redirect()->back()->with('error', 'You can only update printing workflow tickets.');
         }
@@ -1255,38 +1255,58 @@ class ProductionQueueController extends Controller
             }
         }
 
+        // Validate the request - now accepting batch updates
         $request->validate([
-            'produced_quantity' => 'required|integer|min:0',
-            'evidence_files.*' => 'nullable|file|image|max:10240',
-            'selected_user_id' => 'nullable|exists:users,id',
+            'user_updates' => 'required|json',
+            'evidence_files' => 'nullable|array',
+            'evidence_files.*.file' => 'nullable|file|image|max:10240',
+            'evidence_files.*.user_id' => 'required|exists:users,id',
+            'workflow_step' => 'required|string',
         ]);
 
-        $producedQuantity = $request->input('produced_quantity');
-        $selectedUserId = $request->input('selected_user_id', $user->id);
+        // Decode user updates
+        $userUpdates = json_decode($request->input('user_updates'), true);
+
+        if (empty($userUpdates) || !is_array($userUpdates)) {
+            return redirect()->back()->with('error', 'No user updates provided.');
+        }
 
         DB::beginTransaction();
         try {
+            $oldProducedQuantity = $ticket->produced_quantity;
+            $totalCompletedQuantity = 0;
 
-            $productionRecord = \App\Models\ProductionRecord::updateOrCreate(
-                [
-                    'ticket_id' => $ticket->id,
-                    'user_id' => $selectedUserId,
-                    'workflow_step' => $workflowStep,
-                ],
-                [
-                    'quantity_produced' => $producedQuantity,
-                    'job_type_id' => $ticket->job_type_id,
-                    'incentive_amount' => $producedQuantity * ($ticket->jobType ? $ticket->jobType->getIncentivePriceForStep($workflowStep) : 0),
-                    'recorded_at' => now(),
-                ]
-            );
+            // Process each user's update
+            foreach ($userUpdates as $userUpdate) {
+                $userId = $userUpdate['user_id'] ?? null;
+                $producedQuantity = $userUpdate['quantity_produced'] ?? 0;
 
+                if (!$userId || $producedQuantity <= 0) {
+                    continue;
+                }
 
+                // Update or create production record for this user
+                $productionRecord = \App\Models\ProductionRecord::updateOrCreate(
+                    [
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $userId,
+                        'workflow_step' => $workflowStep,
+                    ],
+                    [
+                        'quantity_produced' => $producedQuantity,
+                        'job_type_id' => $ticket->job_type_id,
+                        'incentive_amount' => $producedQuantity * ($ticket->jobType ? $ticket->jobType->getIncentivePriceForStep($workflowStep) : 0),
+                        'recorded_at' => now(),
+                    ]
+                );
+            }
+
+            // Calculate total completed quantity for this workflow step
             $totalCompletedQuantity = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
                 ->where('workflow_step', $workflowStep)
                 ->sum('quantity_produced');
 
-
+            // Update workflow progress
             $workflowProgress = \App\Models\TicketWorkflowProgress::updateOrCreate(
                 [
                     'ticket_id' => $ticket->id,
@@ -1300,48 +1320,49 @@ class ProductionQueueController extends Controller
                 ]
             );
 
+            // Handle evidence files
+            if ($request->has('evidence_files')) {
+                $evidenceFiles = $request->input('evidence_files');
 
-            $workflowLog = \App\Models\WorkflowLog::where('ticket_id', $ticket->id)
-                ->where('workflow_step', $workflowStep)
-                ->where('user_id', $selectedUserId)
-                ->latest()
-                ->first();
+                foreach ($evidenceFiles as $index => $evidenceData) {
+                    $fileKey = "evidence_files.{$index}.file";
 
-            if ($workflowLog) {
-                $workflowLog->update([
-                    'quantity_produced' => $producedQuantity,
-                    'status' => $producedQuantity >= ($ticket->total_quantity ?? $ticket->quantity) ? 'completed' : 'in_progress',
-                ]);
-            }
+                    if ($request->hasFile($fileKey)) {
+                        $file = $request->file($fileKey);
+                        $userId = $evidenceData['user_id'] ?? $user->id;
 
+                        $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                        $disk = app()->environment('production') ? 's3' : 'public';
+                        $path = $file->storeAs('evidence/' . $ticket->id, $filename, $disk);
+                        $fileUrl = Storage::disk($disk)->url($path);
 
-            if ($request->hasFile('evidence_files')) {
-                foreach ($request->file('evidence_files') as $file) {
-                    $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
-                    $disk = app()->environment('production') ? 's3' : 'public';
-                    $path = $file->storeAs('evidence/' . $ticket->id, $filename, $disk);
-                    $fileUrl = Storage::disk($disk)->url($path);
+                        // Find the workflow log for this user
+                        $workflowLog = \App\Models\WorkflowLog::where('ticket_id', $ticket->id)
+                            ->where('workflow_step', $workflowStep)
+                            ->where('user_id', $userId)
+                            ->latest()
+                            ->first();
 
-                    \App\Models\WorkflowEvidence::create([
-                        'ticket_id' => $ticket->id,
-                        'workflow_step' => $workflowStep,
-                        'user_id' => $user->id,
-                        'workflow_log_id' => $workflowLog?->id,
-                        'file_name' => $filename,
-                        'file_path' => $fileUrl,
-                        'file_size' => $file->getSize(),
-                        'mime_type' => $file->getMimeType(),
-                        'uploaded_at' => now(),
-                    ]);
+                        \App\Models\WorkflowEvidence::create([
+                            'ticket_id' => $ticket->id,
+                            'workflow_step' => $workflowStep,
+                            'user_id' => $userId,
+                            'workflow_log_id' => $workflowLog?->id,
+                            'file_name' => $filename,
+                            'file_path' => $fileUrl,
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'uploaded_at' => now(),
+                        ]);
+                    }
                 }
             }
 
-
+            // Update ticket's total produced quantity
             $totalProduced = \App\Models\ProductionRecord::where('ticket_id', $ticket->id)
                 ->where('workflow_step', $workflowStep)
                 ->sum('quantity_produced');
 
-            $oldProducedQuantity = $ticket->produced_quantity;
             $ticket->update(['produced_quantity' => $totalProduced]);
 
             DB::commit();
@@ -1353,7 +1374,8 @@ class ProductionQueueController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Workflow update failed: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update progress. Please try again.');
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return redirect()->back()->with('error', 'Failed to update progress: ' . $e->getMessage());
         }
     }
 

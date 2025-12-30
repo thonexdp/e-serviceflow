@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class PublicTicketController extends Controller
 {
-    
+
     public function search(Request $request)
     {
         $request->validate([
@@ -17,7 +17,7 @@ class PublicTicketController extends Controller
 
         $ticketNumber = $request->input('ticket_number');
 
-        
+
         $ticket = Ticket::where('ticket_number', $ticketNumber)
             ->with([
                 'customer:id,firstname,lastname,email,phone',
@@ -37,7 +37,7 @@ class PublicTicketController extends Controller
             ], 404);
         }
 
-        
+
         $orderData = $this->transformTicketData($ticket);
 
         return response()->json([
@@ -46,15 +46,15 @@ class PublicTicketController extends Controller
         ]);
     }
 
-    
+
     private function transformTicketData(Ticket $ticket): array
     {
-        
+
         $totalAmount = (float) $ticket->total_amount;
         $amountPaid = (float) $ticket->amount_paid;
         $balance = max($totalAmount - $amountPaid, 0);
 
-        
+
         $paymentStatusLabel = 'Pending';
         if ($ticket->payment_status === 'paid') {
             $paymentStatusLabel = 'Paid';
@@ -62,10 +62,10 @@ class PublicTicketController extends Controller
             $paymentStatusLabel = 'Partially Paid';
         }
 
-        
+
         $timeline = $this->buildTimeline($ticket);
 
-        
+
         $items = [];
         if ($ticket->jobType) {
             $specifications = [];
@@ -118,32 +118,43 @@ class PublicTicketController extends Controller
         ];
     }
 
-    
+
     private function buildTimeline(Ticket $ticket): array
     {
         $currentStatus = $ticket->status;
 
-        
+
+        // Define stages for the public timeline
         $stages = [
             'pending' => 'Ticket Created',
-            'designing' => 'Design In Progress',
-            'approved' => 'Design Approved',
+            'designing' => 'Design in Progress',
+            'approved' => 'Design is approved',
             'in_production' => 'In Production',
             'ready' => 'Ready for Pickup',
             'completed' => 'Completed',
         ];
 
-        
+        // Map ticket statuses to timeline stage indices
         $statusOrder = [
             'pending' => 0,
-            'designing' => 1,
-            'approved' => 2,
+            'in_designer' => 1,
+            'ready_to_print' => 2,
             'in_production' => 3,
             'ready' => 4,
             'completed' => 5,
+            // Aliases for backward compatibility or other status keys
+            'designing' => 1,
+            'approved' => 2,
         ];
 
         $currentOrder = $statusOrder[$currentStatus] ?? 0;
+
+        // Pull progress forward based on design_status
+        if ($ticket->design_status === 'pending' && $currentOrder < 1) {
+            $currentOrder = 1;
+        } elseif ($ticket->design_status === 'approved' && $currentOrder < 2) {
+            $currentOrder = 2;
+        }
 
         $timeline = [];
         $index = 0;
@@ -156,8 +167,8 @@ class PublicTicketController extends Controller
 
             if ($stageOrder < $currentOrder) {
                 $status = 'completed';
-                
-                $date = ''; 
+
+                $date = '';
             } elseif ($stageOrder === $currentOrder) {
                 $status = 'current';
                 $date = $ticket->updated_at->format('M d, g:i A');
@@ -175,19 +186,21 @@ class PublicTicketController extends Controller
         return $timeline;
     }
 
-    
+
     private function getStatusLabel(string $status): string
     {
         $labels = [
             'pending' => 'Pending',
-            'designing' => 'Design In Progress',
-            'approved' => 'Design Approved',
+            'in_designer' => 'Design in Progress',
+            'designing' => 'Design in Progress',
+            'ready_to_print' => 'Design is approved',
+            'approved' => 'Design is approved',
             'in_production' => 'In Production',
             'ready' => 'Ready for Pickup',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];
 
-        return $labels[$status] ?? ucfirst($status);
+        return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
     }
 }

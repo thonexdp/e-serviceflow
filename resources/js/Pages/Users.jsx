@@ -45,6 +45,8 @@ export default function Users({ users, availableRoles, availablePermissions, ava
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedUserForHistory, setSelectedUserForHistory] = useState(null);
+  const [historyMonth, setHistoryMonth] = useState(new Date().getMonth() + 1);
+  const [historyYear, setHistoryYear] = useState(new Date().getFullYear());
 
   const hasPermission = (module, feature) => {
     if (auth.user.role === "admin") return true;
@@ -160,6 +162,8 @@ export default function Users({ users, availableRoles, availablePermissions, ava
 
   const openModal = (user = null) => {
     clearErrors();
+    setActivityLogs([]);
+    setSelectedUserForHistory(null);
     if (user) {
       setEditingUser(user);
 
@@ -216,6 +220,10 @@ export default function Users({ users, availableRoles, availablePermissions, ava
     setDeleteModalOpen(false);
     setIsModalOpen(false);
     setEditingUser(null);
+    setActivityLogs([]);
+    setSelectedUserForHistory(null);
+    setHistoryMonth(new Date().getMonth() + 1);
+    setHistoryYear(new Date().getFullYear());
     reset();
   };
 
@@ -332,11 +340,11 @@ export default function Users({ users, availableRoles, availablePermissions, ava
     openModal(user);
   };
 
-  const loadActivityLogs = async (userId) => {
+  const loadActivityLogs = async (userId, month = historyMonth, year = historyYear) => {
     setLoadingLogs(true);
     setSelectedUserForHistory(userId);
     try {
-      const response = await fetch(`/admin/users/${userId}/activity-logs`);
+      const response = await fetch(`/admin/users/${userId}/activity-logs?month=${month}&year=${year}`);
       const result = await response.json();
       setActivityLogs(result.data || []);
       setLoadingLogs(false);
@@ -451,7 +459,7 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                   type="button"
                   onClick={() => {
                     setActiveTab("history");
-                    loadActivityLogs(editingUser.id);
+                    loadActivityLogs(editingUser.id, historyMonth, historyYear);
                   }}
                   className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "history" ?
                     "border-indigo-500 text-indigo-600" :
@@ -929,9 +937,68 @@ export default function Users({ users, availableRoles, availablePermissions, ava
             {/* Activity History Tab */}
             {activeTab === "history" && editingUser &&
               <div>
+                <div className="mb-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Month</label>
+                        <select
+                          value={historyMonth}
+                          onChange={(e) => {
+                            const newMonth = e.target.value;
+                            setHistoryMonth(newMonth);
+                            loadActivityLogs(editingUser.id, newMonth, historyYear);
+                          }}
+                          className="form-control form-control-sm !h-9 !py-1 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+                          <option value="all">All Months</option>
+                          <option value="1">January</option>
+                          <option value="2">February</option>
+                          <option value="3">March</option>
+                          <option value="4">April</option>
+                          <option value="5">May</option>
+                          <option value="6">June</option>
+                          <option value="7">July</option>
+                          <option value="8">August</option>
+                          <option value="9">September</option>
+                          <option value="10">October</option>
+                          <option value="11">November</option>
+                          <option value="12">December</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Year</label>
+                        <select
+                          value={historyYear}
+                          onChange={(e) => {
+                            const newYear = e.target.value;
+                            setHistoryYear(newYear);
+                            loadActivityLogs(editingUser.id, historyMonth, newYear);
+                          }}
+                          className="form-control form-control-sm !h-9 !py-1 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+                          <option value="all">All Years</option>
+                          {[...Array(5)].map((_, i) => {
+                            const year = new Date().getFullYear() - i;
+                            return <option key={year} value={year}>{year}</option>;
+                          })}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => loadActivityLogs(editingUser.id, historyMonth, historyYear)}
+                        disabled={loadingLogs}
+                        className="btn btn-outline-secondary btn-sm flex items-center gap-1 !h-9">
+                        <i className={`ti-reload ${loadingLogs ? 'animate-spin' : ''}`}></i>
+                        Reload
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mb-3">
-                  <h5 className="font-semibold">Activity History for {editingUser.name}</h5>
-                  <p className="text-sm text-gray-500">View all actions performed by this user</p>
+                  <h5 className="font-semibold text-lg">Activity History for {editingUser.name}</h5>
+                  <p className="text-sm text-gray-500">Showing recent actions performed by this user</p>
                 </div>
                 {loadingLogs ?
                   <div className="text-center py-8">

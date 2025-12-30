@@ -23,42 +23,63 @@ class PublicOrderController extends Controller
     public function findOrCreateCustomer(Request $request)
     {
         $validated = $request->validate([
-            'email' => 'required|email|max:255',
-            'customer_name' => 'required|string|max:255',
-            'customer_phone' => 'nullable|string|max:20',
-            'customer_facebook' => 'nullable|string|max:255',
+            'customer_firstname' => 'required|string|max:255',
+            'customer_lastname' => 'required|string|max:255',
+            'customer_phone' => 'required|string|max:20',
+            'normalized_phone' => 'required|string|max:20',
+            'customer_facebook' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'customer_address' => 'nullable|string|max:500',
         ]);
 
-        
-        $nameParts = explode(' ', trim($validated['customer_name']), 2);
-        $firstname = $nameParts[0] ?? '';
-        $lastname = $nameParts[1] ?? '';
+        $customer = null;
 
-        
-        $customer = Customer::where('email', $validated['email'])->first();
+        // Priority 1: Match by normalized phone (highest priority)
+        if (!empty($validated['normalized_phone'])) {
+            $customer = Customer::where('normalized_phone', $validated['normalized_phone'])->first();
+        }
+
+        // Priority 2: Match by Facebook if no phone match
+        if (!$customer && !empty($validated['customer_facebook'])) {
+            $customer = Customer::where('facebook', $validated['customer_facebook'])->first();
+        }
+
+        // Priority 3: Match by email if provided and no previous match
+        if (!$customer && !empty($validated['email'])) {
+            $customer = Customer::where('email', $validated['email'])->first();
+        }
 
         if ($customer) {
-            
-            $updateData = [];
-            if ($firstname) $updateData['firstname'] = $firstname;
-            if ($lastname) $updateData['lastname'] = $lastname;
-            if (isset($validated['customer_phone']) && $validated['customer_phone']) {
-                $updateData['phone'] = $validated['customer_phone'];
+            // Update existing customer with latest information
+            $updateData = [
+                'firstname' => $validated['customer_firstname'],
+                'lastname' => $validated['customer_lastname'],
+                'phone' => $validated['customer_phone'],
+                'normalized_phone' => $validated['normalized_phone'],
+                'facebook' => $validated['customer_facebook'],
+            ];
+
+            // Only update email if provided
+            if (!empty($validated['email'])) {
+                $updateData['email'] = $validated['email'];
             }
-            if (isset($validated['customer_facebook']) && $validated['customer_facebook']) {
-                $updateData['facebook'] = $validated['customer_facebook'];
+
+            // Only update address if provided
+            if (!empty($validated['customer_address'])) {
+                $updateData['address'] = $validated['customer_address'];
             }
-            if (!empty($updateData)) {
-                $customer->update($updateData);
-            }
+
+            $customer->update($updateData);
         } else {
-            
+            // Create new customer
             $customer = Customer::create([
-                'firstname' => $firstname,
-                'lastname' => $lastname,
-                'email' => $validated['email'],
-                'phone' => $validated['customer_phone'] ?? null,
-                'facebook' => $validated['customer_facebook'] ?? '',
+                'firstname' => $validated['customer_firstname'],
+                'lastname' => $validated['customer_lastname'],
+                'phone' => $validated['customer_phone'],
+                'normalized_phone' => $validated['normalized_phone'],
+                'email' => $validated['email'] ?? null,
+                'facebook' => $validated['customer_facebook'],
+                'address' => $validated['customer_address'] ?? null,
             ]);
         }
 
