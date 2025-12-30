@@ -16,6 +16,8 @@ class Branch extends Model
         'address',
         'phone',
         'email',
+        'facebook',
+        'business_hours',
         'can_accept_orders',
         'can_produce',
         'is_default_production',
@@ -30,6 +32,7 @@ class Branch extends Model
         'is_default_production' => 'boolean',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'business_hours' => 'array',
     ];
 
     

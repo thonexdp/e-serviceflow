@@ -14,6 +14,7 @@ class Customer extends Model
         'firstname',
         'lastname',
         'phone',
+        'normalized_phone',
         'email',
         'facebook',
         'address',
@@ -25,6 +26,30 @@ class Customer extends Model
     public function getFullNameAttribute(): string
     {
         return "{$this->firstname} {$this->lastname}";
+    }
+
+    /**
+     * Normalize phone number to consistent format (639XXXXXXXXX)
+     */
+    public static function normalizePhone(?string $phone): ?string
+    {
+        if (!$phone) {
+            return null;
+        }
+
+        // Remove all non-digit characters
+        $cleaned = preg_replace('/\D/', '', $phone);
+
+        // Convert to 639XXXXXXXXX format
+        if (str_starts_with($cleaned, '0') && strlen($cleaned) === 11) {
+            // 09XX XXX XXXX -> 639XXXXXXXXX
+            $cleaned = '63' . substr($cleaned, 1);
+        } elseif (str_starts_with($cleaned, '9') && strlen($cleaned) === 10) {
+            // 9XX XXX XXXX -> 639XXXXXXXXX
+            $cleaned = '63' . $cleaned;
+        }
+
+        return $cleaned;
     }
 
     

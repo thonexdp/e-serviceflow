@@ -321,15 +321,44 @@ export default function WorkflowView({
       return;
     }
 
+    // Batch all user updates into a single request
+    const formData = new FormData();
+    formData.append('workflow_step', workflowStep);
 
+    // Build user updates array
+    const userUpdates = [];
+    usersToUpdate.forEach((user) => {
+      const userQty = parseInt(userQuantities[user.id]) || 0;
+      userUpdates.push({
+        user_id: user.id,
+        quantity_produced: userQty
+      });
+    });
 
+    // Append user updates as JSON
+    formData.append('user_updates', JSON.stringify(userUpdates));
 
+    // Append evidence files for each user
+    let evidenceFileIndex = 0;
+    usersToUpdate.forEach((user) => {
+      const userEvidence = userEvidenceFiles[user.id] || [];
+      userEvidence.forEach((file) => {
+        if (file instanceof File) {
+          formData.append(`evidence_files[${evidenceFileIndex}][file]`, file);
+          formData.append(`evidence_files[${evidenceFileIndex}][user_id]`, user.id);
+          evidenceFileIndex++;
+        }
+      });
+    });
 
+    const endpoint = buildUrl(`/workflow/${workflowStep}/update/${selectedTicket.id}`);
 
-    let currentIndex = 0;
-    const updateNextUser = () => {
-      if (currentIndex >= usersToUpdate.length) {
-
+    router.post(endpoint, formData, {
+      preserveScroll: true,
+      preserveState: false,
+      forceFormData: true,
+      onSuccess: () => {
+        // Check if workflow should auto-complete
         const shouldAutoComplete = totalProgress >= maxQuantity;
         if (shouldAutoComplete) {
           router.post(buildUrl(`/workflow/${workflowStep}/complete/${selectedTicket.id}`), {}, {
@@ -352,8 +381,7 @@ export default function WorkflowView({
               setLoading(false);
             },
             onFinish: () => {
-              handleCloseModals();
-              setLoading(false)
+              setLoading(false);
             }
           });
         } else {
@@ -367,48 +395,16 @@ export default function WorkflowView({
           }, 1500);
           setLoading(false);
         }
-        return;
+      },
+      onError: (errors) => {
+        setUpdateModalMessage({ type: 'error', text: errors?.message || 'Failed to update progress.' });
+        setLoading(false);
+      },
+      onFinish: () => {
+        handleCloseModals();
+        setLoading(false);
       }
-
-      const user = usersToUpdate[currentIndex];
-      const userQty = parseInt(userQuantities[user.id]) || 0;
-      const userEvidence = userEvidenceFiles[user.id] || [];
-
-      const formData = new FormData();
-      formData.append('produced_quantity', userQty);
-      formData.append('workflow_step', workflowStep);
-      formData.append('selected_user_id', user.id);
-
-
-      userEvidence.forEach((file, index) => {
-        if (file instanceof File) {
-          formData.append(`evidence_files[${index}]`, file);
-        }
-      });
-
-      const endpoint = buildUrl(`/workflow/${workflowStep}/update/${selectedTicket.id}`);
-
-      router.post(endpoint, formData, {
-        preserveScroll: true,
-        preserveState: false,
-        forceFormData: true,
-        onSuccess: () => {
-          currentIndex++;
-          updateNextUser();
-          setLoading(false);
-        },
-        onError: (errors) => {
-          setUpdateModalMessage({ type: 'error', text: errors?.message || `Failed to update progress for ${user.name}.` });
-          setLoading(false);
-        },
-        onFinish: () => {
-          handleCloseModals();
-          setLoading(false);
-        }
-      });
-    };
-
-    updateNextUser();
+    });
   };
 
   const handleCompleteWorkflow = () => {

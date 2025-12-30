@@ -32,24 +32,12 @@ export default function AllTickets({
   const [openTimelineModal, setTimelineModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
   const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
   const isAdmin = auth?.user?.role === 'admin';
   const canOnlyPrint = auth?.user?.can_only_print || false;
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
-      }
-    }
-  };
 
   const handleView = (ticket) => {
     setSelectedTicket(ticket);
@@ -492,7 +480,7 @@ export default function AllTickets({
                           <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
-                            route="/tickets/all" />
+                            route={isAdmin ? `/production/tickets/all` : `/tickets/all`} />
 
                         </div>
                         <div className="col-md-3">
@@ -502,7 +490,7 @@ export default function AllTickets({
                             name="status"
                             value={filters.status || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/tickets/all"), {
+                              router.get(buildUrl(isAdmin ? `/production/tickets/all` : `/tickets/all`), {
                                 ...filters,
                                 status: e.target.value === "all" ? null : e.target.value
                               }, {
@@ -524,7 +512,7 @@ export default function AllTickets({
                             name="workflow_step"
                             value={filters.workflow_step || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/tickets/all"), {
+                              router.get(buildUrl(isAdmin ? `/production/tickets/all` : `/tickets/all`), {
                                 ...filters,
                                 workflow_step: e.target.value === "all" ? null : e.target.value
                               }, {
@@ -548,14 +536,6 @@ export default function AllTickets({
                             title="Refresh Data">
 
                             <i className="ti-reload mr-2"></i> Refresh
-                          </button>
-                          <button
-                            onClick={toggleFullscreen}
-                            className="btn btn-outline-secondary"
-                            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
-
-                            <i className={`ti-${isFullscreen ? 'close' : 'fullscreen'} mr-2`}></i>
-                            {isFullscreen ? 'Exit' : 'Fullscreen'}
                           </button>
                         </div>
                       </div>

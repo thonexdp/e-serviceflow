@@ -12,14 +12,14 @@ use Inertia\Inertia;
 
 class UserController extends Controller
 {
-    
+
     public function index()
     {
         $users = User::with(['permissions', 'workflowSteps', 'branch'])->orderBy('created_at', 'desc')->get();
 
-        
+
         $availableWorkflowSteps = [
-            
+
             'printing' => 'Printing',
             'lamination_heatpress' => 'Lamination/Heatpress',
             'cutting' => 'Cutting',
@@ -31,7 +31,7 @@ class UserController extends Controller
         return Inertia::render('Users', [
             'users' => $users,
             'availableRoles' => [
-                
+
                 User::ROLE_FRONTDESK,
                 User::ROLE_DESIGNER,
                 User::ROLE_PRODUCTION,
@@ -43,18 +43,27 @@ class UserController extends Controller
         ]);
     }
 
-    
-    public function getActivityLogs(User $user)
+
+    public function getActivityLogs(User $user, Request $request)
     {
+        $month = $request->input('month');
+        $year = $request->input('year');
+
         $logs = $user->activityLogs()
+            ->when($month && $month !== 'all', function ($query) use ($month) {
+                return $query->whereMonth('created_at', $month);
+            })
+            ->when($year && $year !== 'all', function ($query) use ($year) {
+                return $query->whereYear('created_at', $year);
+            })
             ->orderBy('created_at', 'desc')
-            ->limit(100)
+            ->limit(200)
             ->get();
 
         return response()->json(['data' => $logs]);
     }
 
-    
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -83,21 +92,21 @@ class UserController extends Controller
             'can_only_print' => ($validated['role'] === 'Production' && isset($validated['can_only_print'])) ? $validated['can_only_print'] : false,
         ]);
 
-        
+
         if (isset($validated['permissions'])) {
             $this->syncUserPermissions($user, $validated['permissions']);
         }
 
-        
+
         if (($user->isProduction() || $user->is_head) && isset($validated['workflow_steps'])) {
-            
+
             if ($user->can_only_print) {
                 $validated['workflow_steps'] = ['printing'];
             }
             $user->syncWorkflowSteps($validated['workflow_steps']);
         }
 
-        
+
         UserActivityLog::log(
             auth()->id(),
             'created_user',
@@ -108,14 +117,14 @@ class UserController extends Controller
         return redirect()->back()->with('success', 'User created successfully.');
     }
 
-    
+
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|max:255|unique:users,email,' . $user->id,
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
-            'update_password' => 'nullable|boolean', 
+            'update_password' => 'nullable|boolean',
             'role' => 'required|in:admin,FrontDesk,Designer,Production,Cashier',
             'branch_id' => 'nullable|exists:branches,id',
             'permissions' => 'nullable|array',
@@ -147,13 +156,13 @@ class UserController extends Controller
             'can_only_print' => ($validated['role'] === 'Production' && isset($validated['can_only_print'])) ? $validated['can_only_print'] : false,
         ]);
 
-        
+
         if (!empty($validated['update_password']) && !empty($validated['password'])) {
             $user->update([
                 'password' => Hash::make($validated['password']),
             ]);
 
-            
+
             UserActivityLog::log(
                 auth()->id(),
                 'updated_user_password',
@@ -162,7 +171,7 @@ class UserController extends Controller
             );
         }
 
-        
+
         $changes = [];
         foreach ($oldData as $key => $oldValue) {
             if (isset($validated[$key]) && $validated[$key] != $oldValue) {
@@ -180,30 +189,30 @@ class UserController extends Controller
             );
         }
 
-        
+
         if (isset($validated['permissions'])) {
             $this->syncUserPermissions($user, $validated['permissions']);
         }
 
-        
+
         if (($user->isProduction() || $user->is_head) && isset($validated['workflow_steps'])) {
-            
+
             if ($user->can_only_print) {
                 $validated['workflow_steps'] = ['printing'];
             }
             $user->syncWorkflowSteps($validated['workflow_steps']);
         } elseif (!$user->isProduction() && !$user->is_head) {
-            
+
             $user->workflowSteps()->delete();
         }
 
         return redirect()->back()->with('success', 'User updated successfully.');
     }
 
-    
+
     public function destroy(User $user)
     {
-        
+
         if ($user->id === auth()->id()) {
             return redirect()->back()->withErrors(['error' => 'You cannot delete your own account.']);
         }
@@ -211,7 +220,7 @@ class UserController extends Controller
         $userName = $user->name;
         $userEmail = $user->email;
 
-        
+
         UserActivityLog::log(
             auth()->id(),
             'deleted_user',
@@ -224,12 +233,12 @@ class UserController extends Controller
         return redirect()->back()->with('success', 'User deleted successfully.');
     }
 
-    
+
     public function getPermissions()
     {
         $permissions = Permission::orderBy('module')->orderBy('feature')->get();
 
-        
+
         $grouped = $permissions->groupBy('module')->map(function ($perms) {
             return $perms->map(function ($perm) {
                 return [
@@ -244,7 +253,7 @@ class UserController extends Controller
         return response()->json($grouped);
     }
 
-    
+
     public function getUserPermissions(User $user)
     {
         $permissions = $user->permissions()->get()->pluck('id')->toArray();
@@ -252,14 +261,14 @@ class UserController extends Controller
         return response()->json($permissions);
     }
 
-    
+
     private function syncUserPermissions(User $user, array $permissions)
     {
         $sync = [];
         $role = $user->role;
 
-        
-        
+
+
         $allowedPermissionIds = Permission::all()->filter(function ($p) use ($role) {
             if (empty($p->role)) {
                 return true;
