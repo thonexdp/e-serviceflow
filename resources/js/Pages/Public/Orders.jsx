@@ -2011,35 +2011,26 @@ export default function CustomerPOSOrder() {
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     Size Options
                   </label>
-                  <select
-                    value={formData.size_rate_id}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        size_rate_id: e.target.value,
-                      }))
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                  >
+                  <div className="flex flex-wrap gap-2">
                     {sizeRates.map((rate) => (
-                      <option
+                      <button
                         key={rate.id}
-                        value={rate.id}
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            size_rate_id: rate.id.toString(),
+                          }))
+                        }
+                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
+                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
+                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
+                          }`}
                       >
-                        {rate.variant_name} -{" "}
-                        {formatPeso(
-                          parseFloat(
-                            rate.rate
-                          ).toFixed(2)
-                        )}
-                        /
-                        {rate.calculation_method ===
-                          "length"
-                          ? rate.dimension_unit
-                          : `${rate.dimension_unit}²`}
-                      </option>
+                        {rate.variant_name}
+                      </button>
                     ))}
-                  </select>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>
@@ -2092,7 +2083,7 @@ export default function CustomerPOSOrder() {
                         </div>
                       )}
                   </div>
-                  {selectedSizeRate && (
+                  {/* {selectedSizeRate && (
                     <p className="text-xs text-gray-500 mt-2">
                       Rate:{" "}
                       {formatPeso(
@@ -2106,7 +2097,7 @@ export default function CustomerPOSOrder() {
                         ? selectedSizeRate.dimension_unit
                         : `${selectedSizeRate.dimension_unit}²`}
                     </p>
-                  )}
+                  )} */}
                 </div>
               )}
 
