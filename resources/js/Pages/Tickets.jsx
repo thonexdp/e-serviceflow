@@ -443,9 +443,9 @@ export default function Tickets({
 
   const getStatusBadge = (status) => {
     const classes = {
-      pending: "badge-primary",
-      in_designer: "badge-warning",
-      in_production: "badge-info",
+      pending: "badge-warning",
+      in_designer: "badge-info",
+      in_production: "badge-primary",
       completed: "badge-success",
       rejected: "badge-danger",
       cancelled: "badge-danger",

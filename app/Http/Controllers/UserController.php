@@ -19,12 +19,15 @@ class UserController extends Controller
 
 
         $availableWorkflowSteps = [
-
+            // Workflow steps in order
             'printing' => 'Printing',
             'lamination_heatpress' => 'Lamination/Heatpress',
             'cutting' => 'Cutting',
             'sewing' => 'Sewing',
             'dtf_press' => 'DTF Press',
+            'embroidery' => 'Embroidery',
+            'knitting' => 'Knitting',
+            'lasser_cutting' => 'Laser Cutting',
             'qa' => 'Quality Assurance',
         ];
 
@@ -75,7 +78,7 @@ class UserController extends Controller
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
             'workflow_steps' => 'nullable|array',
-            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press,qa',
+            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press,embroidery,knitting,lasser_cutting,qa',
             'is_active' => 'nullable|boolean',
             'is_head' => 'nullable|boolean',
             'can_only_print' => 'nullable|boolean',
@@ -130,7 +133,7 @@ class UserController extends Controller
             'permissions' => 'nullable|array',
             'permissions.*' => 'boolean',
             'workflow_steps' => 'nullable|array',
-            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press,qa',
+            'workflow_steps.*' => 'string|in:design,printing,lamination_heatpress,cutting,sewing,dtf_press,embroidery,knitting,lasser_cutting,qa',
             'is_active' => 'nullable|boolean',
             'is_head' => 'nullable|boolean',
             'can_only_print' => 'nullable|boolean',

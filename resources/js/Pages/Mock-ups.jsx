@@ -325,7 +325,20 @@ export default function Mockups({
           `${row.customer.firstname} ${row.customer.lastname}` :
           "N/A"
     },
-    { label: "Description", key: "description" },
+    {
+      label: "Description",
+      key: "description",
+      render: (row) => (
+        <div>
+          {row.job_type && (
+            <div className="text-muted small mb-1">
+              <strong>Type:</strong> {row.job_type.name}
+            </div>
+          )}
+          <div>{row.description}</div>
+        </div>
+      )
+    },
     {
       label: "Assigned To",
       key: "assigned_to",

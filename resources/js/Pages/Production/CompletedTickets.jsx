@@ -212,19 +212,26 @@ export default function CompletedTickets({
         <div className="d-flex align-items-center">
           {row.mockup_files && row.mockup_files.length > 0 &&
             <img
-              src={row.mockup_files[0].file_path}
+              src={row.mockup_files[row.mockup_files.length - 1].file_path}
               alt="Preview"
               className="img-thumbnail mr-2"
               style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
               onClick={() => handleView(row)} />
 
           }
-          <div>
-            <strong>{row.ticket_number}</strong>
-            <div className="text-muted small">{row.description}</div>
-            <div className="text-success small">
-              <i className="ti-check"></i> Completed
-            </div>
+          <div className="flex flex-col leading-tight">
+            <strong className="leading-tight">{row.ticket_number}</strong>
+
+            {row.job_type && (
+              <span className="text-muted text-xs">
+                <strong>Type:</strong> {row.job_type.name}
+              </span>
+            )}
+
+
+            <span className="text-muted text-xs leading-tight">
+              {row.description}
+            </span>
           </div>
         </div>
 
@@ -246,7 +253,7 @@ export default function CompletedTickets({
         const totalQty = row.total_quantity || (row.quantity || 0) + (row.free_quantity || 0);
         return (
           <div>
-            <span className="badge badge-success" style={{ fontSize: '1rem' }}>
+            <span className="badge badge-success">
               {totalQty} pcs
             </span>
             <div className="progress mt-1" style={{ height: '5px' }}>

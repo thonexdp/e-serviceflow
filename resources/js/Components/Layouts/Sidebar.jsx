@@ -153,6 +153,9 @@ export default function Sidebar({ isCollapsed }) {
                                             { key: 'cutting', path: '/production/workflow/cutting', icon: 'ti-cut', label: 'Cutting' },
                                             { key: 'sewing', path: '/production/workflow/sewing', icon: 'ti-pin-alt', label: 'Sewing' },
                                             { key: 'dtf_press', path: '/production/workflow/dtf_press', icon: 'ti-stamp', label: 'DTF Press' },
+                                            { key: 'embroidery', path: '/production/workflow/embroidery', icon: 'ti-pencil-alt', label: 'Embroidery' },
+                                            { key: 'knitting', path: '/production/workflow/knitting', icon: 'ti-layout-grid2', label: 'Knitting' },
+                                            { key: 'lasser_cutting', path: '/production/workflow/lasser_cutting', icon: 'ti-bolt', label: 'Laser Cutting' },
                                             { key: 'qa', path: '/production/workflow/qa', icon: 'ti-check-box', label: 'Quality Assurance' }];
 
 
@@ -319,6 +322,21 @@ export default function Sidebar({ isCollapsed }) {
                                                 <li className={isActive("/production/workflow/dtf_press") ? "active" : ""} style={{ paddingLeft: '30px' }}>
                                                     <Link href="/production/workflow/dtf_press">
                                                         <i className="ti-stamp"></i> DTF Press
+                                                    </Link>
+                                                </li>
+                                                <li className={isActive("/production/workflow/embroidery") ? "active" : ""} style={{ paddingLeft: '30px' }}>
+                                                    <Link href="/production/workflow/embroidery">
+                                                        <i className="ti-pencil-alt"></i> Embroidery
+                                                    </Link>
+                                                </li>
+                                                <li className={isActive("/production/workflow/knitting") ? "active" : ""} style={{ paddingLeft: '30px' }}>
+                                                    <Link href="/production/workflow/knitting">
+                                                        <i className="ti-layout-grid2"></i> Knitting
+                                                    </Link>
+                                                </li>
+                                                <li className={isActive("/production/workflow/lasser_cutting") ? "active" : ""} style={{ paddingLeft: '30px' }}>
+                                                    <Link href="/production/workflow/lasser_cutting">
+                                                        <i className="ti-bolt"></i> Laser Cutting
                                                     </Link>
                                                 </li>
                                                 <li className={isActive("/production/workflow/qa") ? "active" : ""} style={{ paddingLeft: '30px' }}>

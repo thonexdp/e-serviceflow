@@ -463,9 +463,9 @@ export default function WorkflowView({
   const getStatusBadge = (status) => {
     const classes = {
       ready_to_print: "badge-info",
-      in_production: "badge-warning",
+      in_production: "badge-primary",
       completed: "badge-success",
-      pending: "badge-secondary"
+      pending: "badge-warning"
     };
     const labels = {
       ready_to_print: "Ready to Print",
@@ -489,9 +489,9 @@ export default function WorkflowView({
     if (stepProgress.is_completed) {
       return { status: 'Completed', color: 'success' };
     } else if (stepProgress.completed_quantity > 0) {
-      return { status: 'In Progress', color: 'warning' };
+      return { status: 'In Progress', color: 'info' };
     } else {
-      return { status: 'Pending', color: 'info' };
+      return { status: 'Pending', color: 'warning' };
     }
   };
 
@@ -510,17 +510,28 @@ export default function WorkflowView({
         <div className="d-flex align-items-center">
           {row.mockup_files && row.mockup_files.length > 0 &&
             <img
-              src={row.mockup_files[0].file_path}
+              src={row.mockup_files[row.mockup_files.length - 1].file_path}
               alt="Preview"
               className="img-thumbnail mr-2"
               style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
               onClick={() => handleView(row)} />
 
           }
-          <div>
-            <strong>{row.ticket_number}</strong>
-            <div className="text-muted small">{row.description}</div>
+          <div className="flex flex-col leading-tight">
+            <strong className="leading-tight">{row.ticket_number}</strong>
+
+            {row.job_type && (
+              <span className="text-muted text-xs">
+                <strong>Type:</strong> {row.job_type.name}
+              </span>
+            )}
+
+
+            <span className="text-muted text-xs leading-tight">
+              {row.description}
+            </span>
           </div>
+
         </div>
 
     },
@@ -757,38 +768,39 @@ export default function WorkflowView({
             {/* Design Files - Maximized Space */}
             <div className="mb-4">
               <h5 className="mb-3"><i className="ti-image mr-2"></i>Design Files</h5>
-              {mockupFiles.length > 0 ?
+              {mockupFiles.length > 0 ? (
                 <div className="row">
-                  {mockupFiles.map((file) =>
-                    <div key={file.id} className="col-md-12 col-lg-12 mb-3">
-                      <div className="card h-100 shadow-sm">
-                        <img
-                          src={file.file_path}
-                          alt={file.file_name}
-                          className="card-img-top"
-                          style={{ height: '100%', objectFit: 'cover' }} />
+                  {(() => {
+                    const file = mockupFiles[mockupFiles.length - 1];
 
-                        <div className="card-body p-2">
-                          <small className="text-muted d-block text-truncate mb-2" title={file.file_name}>
-                            {file.file_name}
-                          </small>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-block btn-primary"
-                            onClick={() => handleDownload(file.id, file.file_name)}>
+                    return (
+                      <div key={file.id} className="col-md-12 col-lg-12 mb-2">
+                        <div className="card">
+                          <img
+                            src={file.file_path}
+                            alt={file.file_name}
+                            className="card-img-top"
+                            style={{ height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => setSelectedPreviewFile(file)}
+                          />
 
-                            <i className="ti-download"></i> Download
-                          </button>
+                          <div className="card-body p-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-block btn-primary"
+                              onClick={() => handleDownload(file.id, file.file_name)}
+                            >
+                              <i className="ti-download"></i>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div> :
-
-                <div className="alert alert-info">
-                  <i className="ti-info-alt mr-2"></i>No design files available
+                    );
+                  })()}
                 </div>
-              }
+              ) : (
+                <p className="text-muted">No design files available</p>
+              )}
             </div>
 
           </div>
@@ -1116,13 +1128,14 @@ export default function WorkflowView({
                     </div>
                     <div className="card-body">
                       <div className="row mt-4 align-items-center">
-                        <div className="col-md-8">
+                        <div className="col-md-4">
                           <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
                             route={`/workflow/${workflowStep}`} />
 
                         </div>
+                        <div className="col-md-4"></div>
                         <div className="col-md-4 text-right">
                           <button
                             onClick={() => router.visit(buildUrl(`/workflow/${workflowStep}`), {
