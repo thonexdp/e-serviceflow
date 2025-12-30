@@ -13,6 +13,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     incentive_price: "",
     is_active: true,
     show_in_dashboard: true,
+    show_in_customer_view: true,
     sort_order: 0
   });
 
@@ -44,6 +45,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         discount: jobType.discount || "",
         is_active: jobType.is_active !== undefined ? jobType.is_active : true,
         show_in_dashboard: jobType.show_in_dashboard !== undefined ? jobType.show_in_dashboard : true,
+        show_in_customer_view: jobType.show_in_customer_view !== undefined ? jobType.show_in_customer_view : true,
         sort_order: jobType.sort_order || 0
       });
       setPriceTiers(
@@ -421,6 +423,18 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
             <label className="ml-2 text-sm text-gray-700">
               Show in Dashboard
+            </label>
+          </div>
+          <div className="d-flex align-items-center">
+            <input
+              type="checkbox"
+              name="show_in_customer_view"
+              checked={formData.show_in_customer_view}
+              onChange={handleChange}
+              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
+
+            <label className="ml-2 text-sm text-gray-700">
+              Show in Customer View
             </label>
           </div>
         </div>

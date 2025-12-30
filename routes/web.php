@@ -50,6 +50,7 @@ Route::get('/csrf-token', function () {
 Route::get('/orders', function () {
     $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
         $query->where('is_active', true)
+            ->where('show_in_customer_view', true)
             ->with(['priceTiers', 'sizeRates', 'promoRules'])
             ->orderBy('sort_order')
             ->orderBy('name');
