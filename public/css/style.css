@@ -171,7 +171,7 @@
   font-size: 11px;
 }
 .badge-primary {
-  background: #fb8c00;
+  background: #0d6efd;
   color: #ffffff;
 }
 .badge-success {
@@ -179,11 +179,11 @@
   color: #ffffff;
 }
 .badge-info {
-  background: #339993;
+  background: #0dcaf0;
   color: #ffffff;
 }
 .badge-warning {
-  background: #e7b63a;
+  background: #fb8c00;
   color: #ffffff;
 }
 .badge-danger {

@@ -147,28 +147,29 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::get('/production/tickets/all', [ProductionQueueController::class, 'allTickets'])->name('production.tickets.all');
     Route::post('/production/tickets/{ticket}/assign-workflow', [ProductionQueueController::class, 'assignWorkflow'])->name('production.tickets.assign-workflow');
     Route::get('/production/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('production.workflow.view');
     Route::get('/production/completed', [ProductionQueueController::class, 'completedTickets'])->name('production.completed');
     Route::get('/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.view');
 
     Route::post('/workflow/{workflowStep}/start/{ticket}', [ProductionQueueController::class, 'startWorkflow'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.start');
 
     Route::post('/workflow/{workflowStep}/update/{ticket}', [ProductionQueueController::class, 'updateWorkflow'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.update');
 
     Route::post('/workflow/{workflowStep}/complete/{ticket}', [ProductionQueueController::class, 'completeWorkflow'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.complete');
 
     // Reports & Analytics
     Route::get('/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('reports');
     Route::post('/reports/export-pdf', [App\Http\Controllers\ReportsController::class, 'exportPdf'])->name('reports.export-pdf');
+    Route::get('/files/{id}/download', [MockupsController::class, 'downloadFile'])->name('files.download');
 
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
@@ -332,19 +333,19 @@ Route::prefix('production')->middleware(['auth', 'role:admin,Production'])->name
         ->name('tickets.assign-workflow');
 
     Route::get('/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.view');
 
     Route::post('/workflow/{workflowStep}/start/{ticket}', [ProductionQueueController::class, 'startWorkflow'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.start');
 
     Route::post('/workflow/{workflowStep}/update/{ticket}', [ProductionQueueController::class, 'updateWorkflow'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.update');
 
     Route::post('/workflow/{workflowStep}/complete/{ticket}', [ProductionQueueController::class, 'completeWorkflow'])
-        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|qa)')
+        ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.complete');
 
     Route::get('/completed', [ProductionQueueController::class, 'completedTickets'])->name('completed');

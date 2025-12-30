@@ -8,6 +8,9 @@ const WORKFLOW_STEPS = {
     cutting: { label: 'Cutting', icon: 'ti-cut', color: '#F44336' },
     sewing: { label: 'Sewing', icon: 'ti-pin-alt', color: '#E91E63' },
     dtf_press: { label: 'DTF Press', icon: 'ti-stamp', color: '#673AB7' },
+    embroidery: { label: 'Embroidery', icon: 'ti-pencil-alt', color: '#009688' },
+    knitting: { label: 'Knitting', icon: 'ti-layout-grid2', color: '#795548' },
+    lasser_cutting: { label: 'Laser Cutting', icon: 'ti-bolt', color: '#FF5722' },
     qa: { label: 'Quality Assurance', icon: 'ti-check-box', color: '#4CAF50' }
 };
 
