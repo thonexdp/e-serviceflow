@@ -40,6 +40,9 @@ export default function WorkflowView({
   const [ticketToProceed, setTicketToProceed] = useState(null);
   const [producedQuantity, setProducedQuantity] = useState(0);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
+  const [ticketsToBatchUpdate, setTicketsToBatchUpdate] = useState(new Set());
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+  const [selectedEvidenceImage, setSelectedEvidenceImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [updateModalMessage, setUpdateModalMessage] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -439,6 +442,8 @@ export default function WorkflowView({
     setSelectedUserId(null);
     setUserQuantities({});
     setUserEvidenceFiles({});
+    setSelectedPreviewFile(null);
+    setSelectedEvidenceImage(null);
   };
 
   const handleDownload = (fileId, filename) => {
@@ -1067,6 +1072,62 @@ export default function WorkflowView({
 
         {selectedTicket &&
           <WorkflowTimeline ticket={selectedTicket} />
+        }
+      </Modal>
+
+      {/* Image Preview Modal */}
+      <Modal
+        title="Design File Preview"
+        isOpen={!!selectedPreviewFile}
+        onClose={() => setSelectedPreviewFile(null)}
+        zIndex="z-[60]"
+        size="4xl">
+        {selectedPreviewFile &&
+          <div className="text-center">
+            <img
+              src={selectedPreviewFile.file_path}
+              alt={selectedPreviewFile.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }} />
+          </div>
+        }
+      </Modal>
+
+      {/* Evidence Image Preview Modal */}
+      <Modal
+        title="Evidence Photo"
+        isOpen={!!selectedEvidenceImage}
+        onClose={() => setSelectedEvidenceImage(null)}
+        zIndex="z-[60]"
+        size="4xl">
+        {selectedEvidenceImage &&
+          <div className="modal-body text-center">
+            <img
+              src={selectedEvidenceImage.file_path}
+              alt={selectedEvidenceImage.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }} />
+
+            <div className="mt-3 text-left">
+              <p className="mb-1"><strong>Uploaded by:</strong> {selectedEvidenceImage.user?.name || 'Unknown'}</p>
+              <p className="mb-0"><strong>Date:</strong> {selectedEvidenceImage.uploaded_at ? formatDate(selectedEvidenceImage.uploaded_at) : 'N/A'}</p>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedEvidenceImage(null)}>
+                Close
+              </button>
+              <a
+                href={selectedEvidenceImage.file_path}
+                download={selectedEvidenceImage.file_name}
+                className="btn btn-primary btn-sm">
+                <i className="ti-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
         }
       </Modal>
 
