@@ -125,4 +125,101 @@ class StockItem extends Model
             return $productionQuantity;
         }
     }
+
+    /**
+     * Check if this stock item can be safely deleted
+     */
+    public function canBeDeleted(): array
+    {
+        $dependencies = $this->getDeletionDependencies();
+        
+        return [
+            'can_delete' => $dependencies['blocking_count'] === 0,
+            'dependencies' => $dependencies,
+            'warnings' => $this->getDeletionWarnings(),
+        ];
+    }
+
+    /**
+     * Get all dependencies that prevent deletion
+     */
+    public function getDeletionDependencies(): array
+    {
+        $movements = $this->movements()->count();
+        $recentMovements = $this->movements()
+            ->where('created_at', '>=', now()->subDays(30))
+            ->count();
+        
+        $consumptions = $this->productionConsumptions()->count();
+        $recentConsumptions = $this->productionConsumptions()
+            ->where('created_at', '>=', now()->subDays(30))
+            ->count();
+        
+        $purchaseOrderItems = $this->purchaseOrderItems()->count();
+        $pendingPurchaseOrders = $this->purchaseOrderItems()
+            ->whereHas('purchaseOrder', function ($query) {
+                $query->whereIn('status', ['draft', 'pending', 'approved', 'ordered']);
+            })
+            ->count();
+        
+        $jobTypeLinks = $this->jobTypes()->count();
+
+        return [
+            'movements' => [
+                'total' => $movements,
+                'recent' => $recentMovements,
+                'message' => $movements > 0 ? "{$movements} stock movement(s) on record ({$recentMovements} in last 30 days)" : null,
+            ],
+            'consumptions' => [
+                'total' => $consumptions,
+                'recent' => $recentConsumptions,
+                'message' => $consumptions > 0 ? "{$consumptions} production consumption(s) recorded ({$recentConsumptions} in last 30 days)" : null,
+            ],
+            'purchase_orders' => [
+                'total' => $purchaseOrderItems,
+                'pending' => $pendingPurchaseOrders,
+                'message' => $purchaseOrderItems > 0 ? "{$purchaseOrderItems} purchase order item(s) ({$pendingPurchaseOrders} pending)" : null,
+            ],
+            'job_types' => [
+                'count' => $jobTypeLinks,
+                'message' => $jobTypeLinks > 0 ? "Linked to {$jobTypeLinks} job type(s)" : null,
+            ],
+            'total_count' => $movements + $consumptions + $purchaseOrderItems + $jobTypeLinks,
+            'blocking_count' => $pendingPurchaseOrders,
+        ];
+    }
+
+    /**
+     * Get warnings about deletion
+     */
+    private function getDeletionWarnings(): array
+    {
+        $warnings = [];
+
+        $pendingPurchaseOrders = $this->purchaseOrderItems()
+            ->whereHas('purchaseOrder', function ($query) {
+                $query->whereIn('status', ['draft', 'pending', 'approved', 'ordered']);
+            })
+            ->count();
+
+        if ($pendingPurchaseOrders > 0) {
+            $warnings[] = "Stock item has {$pendingPurchaseOrders} pending purchase order(s). Cannot delete until orders are completed or cancelled.";
+        }
+
+        if ($this->current_stock > 0) {
+            $warnings[] = "Stock item has current stock of {$this->current_stock} {$this->base_unit_of_measure}. Consider adjusting to zero before deletion.";
+        }
+
+        $consumptions = $this->productionConsumptions()->count();
+        if ($consumptions > 0) {
+            $warnings[] = "Stock item has {$consumptions} production consumption record(s). Deleting will remove consumption history.";
+        }
+
+        $movements = $this->movements()->count();
+        if ($movements > 0) {
+            $warnings[] = "Stock item has {$movements} stock movement(s). Deleting will remove movement history.";
+        }
+
+        return $warnings;
+    }
 }

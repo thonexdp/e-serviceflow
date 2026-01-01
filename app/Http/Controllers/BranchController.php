@@ -131,11 +131,32 @@ class BranchController extends Controller
     }
 
 
+    /**
+     * Check if branch can be deleted and get dependencies
+     */
+    public function checkDeletion(Branch $branch)
+    {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Unauthorized access to branch management.');
+        }
+
+        $result = $branch->canBeDeleted();
+        return response()->json($result);
+    }
+
     public function destroy(Branch $branch)
     {
 
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
+        }
+
+        // Check if can be deleted
+        $check = $branch->canBeDeleted();
+        
+        if (!$check['can_delete']) {
+            return redirect()->route('admin.branches.index')
+                ->with('error', 'Cannot delete branch. It has active users, orders, or production tickets.');
         }
 
 

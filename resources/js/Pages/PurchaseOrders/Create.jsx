@@ -6,73 +6,81 @@ import FormInput from "@/Components/Common/FormInput";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function PurchaseOrdersCreate({
-  user = {},
-  notifications = [],
-  messages = [],
-  stockItems = []
+    user = {},
+    notifications = [],
+    messages = [],
+    stockItems = []
 }) {
-  const [items, setItems] = useState([{ stock_item_id: "", quantity: 0, unit_cost: 0, notes: "" }]);
-  const [formData, setFormData] = useState({
-    supplier: "",
-    supplier_contact: "",
-    supplier_email: "",
-    order_date: new Date().toISOString().split("T")[0],
-    expected_delivery_date: "",
-    tax: 0,
-    shipping_cost: 0,
-    notes: "",
-    internal_notes: ""
-  });
-  const { flash } = usePage().props;
-  const { buildUrl } = useRoleApi();
-
-  const handleAddItem = () => {
-    setItems([...items, { stock_item_id: "", quantity: 0, unit_cost: 0, notes: "" }]);
-  };
-
-  const handleRemoveItem = (index) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...items];
-    newItems[index][field] = value;
-
-
-    if (field === "stock_item_id") {
-      const stockItem = stockItems.find((si) => si.id === parseInt(value));
-      if (stockItem) {
-        newItems[index].unit_cost = stockItem.unit_cost || 0;
-      }
-    }
-
-    setItems(newItems);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-
-    const validItems = items.filter(
-      (item) => item.stock_item_id && item.quantity > 0 && item.unit_cost >= 0
-    );
-
-    if (validItems.length === 0) {
-      alert("Please add at least one valid item.");
-      return;
-    }
-
-    router.post(buildUrl("/purchase-orders"), {
-      ...formData,
-      items: validItems
-    }, {
-      preserveState: false,
-      preserveScroll: true
+    const [items, setItems] = useState([{ stock_item_id: "", quantity: 0, unit_cost: 0, notes: "" }]);
+    const [formData, setFormData] = useState({
+        supplier: "",
+        supplier_contact: "",
+        supplier_email: "",
+        order_date: new Date().toISOString().split("T")[0],
+        expected_delivery_date: "",
+        tax: 0,
+        shipping_cost: 0,
+        notes: "",
+        internal_notes: ""
     });
-  };
+    const { flash } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
-  return (
-    <AdminLayout user={user} notifications={notifications} messages={messages}>
+    const handleAddItem = () => {
+        setItems([...items, { stock_item_id: "", quantity: 0, unit_cost: 0, notes: "" }]);
+    };
+
+    const handleRemoveItem = (index) => {
+        setItems(items.filter((_, i) => i !== index));
+    };
+
+    const handleItemChange = (index, field, value) => {
+        const newItems = [...items];
+        newItems[index][field] = value;
+
+
+        if (field === "stock_item_id") {
+            const stockItem = stockItems.find((si) => si.id === parseInt(value));
+            if (stockItem) {
+                newItems[index].unit_cost = stockItem.unit_cost || 0;
+            }
+        }
+
+        setItems(newItems);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        // Convert strings to numbers for validation and submission
+        const formattedItems = items.map(item => ({
+            ...item,
+            quantity: parseFloat(item.quantity) || 0,
+            unit_cost: parseFloat(item.unit_cost) || 0
+        }));
+
+        const validItems = formattedItems.filter(
+            (item) => item.stock_item_id && item.quantity > 0 && item.unit_cost >= 0
+        );
+
+        if (validItems.length === 0) {
+            alert("Please add at least one valid item.");
+            return;
+        }
+
+        router.post(buildUrl("/purchase-orders"), {
+            ...formData,
+            tax: parseFloat(formData.tax) || 0,
+            shipping_cost: parseFloat(formData.shipping_cost) || 0,
+            items: validItems
+        }, {
+            preserveState: false,
+            preserveScroll: true
+        });
+    };
+
+    return (
+        <AdminLayout user={user} notifications={notifications} messages={messages}>
             <Head title="Create Purchase Order" />
 
             {flash?.success && <FlashMessage type="success" message={flash.success} />}
@@ -120,105 +128,105 @@ export default function PurchaseOrdersCreate({
                                                 <div className="row">
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Supplier"
-                              type="text"
-                              name="supplier"
-                              value={formData.supplier}
-                              onChange={(e) =>
-                              setFormData({ ...formData, supplier: e.target.value })
-                              } />
+                                                            label="Supplier"
+                                                            type="text"
+                                                            name="supplier"
+                                                            value={formData.supplier}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, supplier: e.target.value })
+                                                            } />
 
                                                     </div>
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Supplier Contact"
-                              type="text"
-                              name="supplier_contact"
-                              value={formData.supplier_contact}
-                              onChange={(e) =>
-                              setFormData({ ...formData, supplier_contact: e.target.value })
-                              } />
+                                                            label="Supplier Contact"
+                                                            type="text"
+                                                            name="supplier_contact"
+                                                            value={formData.supplier_contact}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, supplier_contact: e.target.value })
+                                                            } />
 
                                                     </div>
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Supplier Email"
-                              type="email"
-                              name="supplier_email"
-                              value={formData.supplier_email}
-                              onChange={(e) =>
-                              setFormData({ ...formData, supplier_email: e.target.value })
-                              } />
+                                                            label="Supplier Email"
+                                                            type="email"
+                                                            name="supplier_email"
+                                                            value={formData.supplier_email}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, supplier_email: e.target.value })
+                                                            } />
 
                                                     </div>
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Order Date"
-                              type="date"
-                              name="order_date"
-                              value={formData.order_date}
-                              onChange={(e) =>
-                              setFormData({ ...formData, order_date: e.target.value })
-                              } />
+                                                            label="Order Date"
+                                                            type="date"
+                                                            name="order_date"
+                                                            value={formData.order_date}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, order_date: e.target.value })
+                                                            } />
 
                                                     </div>
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Expected Delivery Date"
-                              type="date"
-                              name="expected_delivery_date"
-                              value={formData.expected_delivery_date}
-                              onChange={(e) =>
-                              setFormData({ ...formData, expected_delivery_date: e.target.value })
-                              } />
+                                                            label="Expected Delivery Date"
+                                                            type="date"
+                                                            name="expected_delivery_date"
+                                                            value={formData.expected_delivery_date}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, expected_delivery_date: e.target.value })
+                                                            } />
 
                                                     </div>
                                                     <div className="col-md-3">
                                                         <FormInput
-                              label="Tax"
-                              type="number"
-                              name="tax"
-                              value={formData.tax}
-                              onChange={(e) =>
-                              setFormData({ ...formData, tax: parseFloat(e.target.value) || 0 })
-                              }
-                              step="0.01"
-                              min="0" />
+                                                            label="Tax"
+                                                            type="number"
+                                                            name="tax"
+                                                            value={formData.tax}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, tax: e.target.value })
+                                                            }
+                                                            step="0.01"
+                                                            min="0" />
 
                                                     </div>
                                                     <div className="col-md-3">
                                                         <FormInput
-                              label="Shipping Cost"
-                              type="number"
-                              name="shipping_cost"
-                              value={formData.shipping_cost}
-                              onChange={(e) =>
-                              setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })
-                              }
-                              step="0.01"
-                              min="0" />
+                                                            label="Shipping Cost"
+                                                            type="number"
+                                                            name="shipping_cost"
+                                                            value={formData.shipping_cost}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, shipping_cost: e.target.value })
+                                                            }
+                                                            step="0.01"
+                                                            min="0" />
 
                                                     </div>
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Notes"
-                              type="textarea"
-                              name="notes"
-                              value={formData.notes}
-                              onChange={(e) =>
-                              setFormData({ ...formData, notes: e.target.value })
-                              } />
+                                                            label="Notes"
+                                                            type="textarea"
+                                                            name="notes"
+                                                            value={formData.notes}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, notes: e.target.value })
+                                                            } />
 
                                                     </div>
                                                     <div className="col-md-6">
                                                         <FormInput
-                              label="Internal Notes"
-                              type="textarea"
-                              name="internal_notes"
-                              value={formData.internal_notes}
-                              onChange={(e) =>
-                              setFormData({ ...formData, internal_notes: e.target.value })
-                              } />
+                                                            label="Internal Notes"
+                                                            type="textarea"
+                                                            name="internal_notes"
+                                                            value={formData.internal_notes}
+                                                            onChange={(e) =>
+                                                                setFormData({ ...formData, internal_notes: e.target.value })
+                                                            } />
 
                                                     </div>
                                                 </div>
@@ -228,9 +236,9 @@ export default function PurchaseOrdersCreate({
                                                 <div className="d-flex justify-content-between align-items-center mb-3">
                                                     <h5>Items</h5>
                                                     <button
-                            type="button"
-                            className="btn btn-sm btn-primary"
-                            onClick={handleAddItem}>
+                                                        type="button"
+                                                        className="btn btn-sm btn-primary"
+                                                        onClick={handleAddItem}>
 
                                                         <i className="ti-plus"></i> Add Item
                                                     </button>
@@ -250,48 +258,48 @@ export default function PurchaseOrdersCreate({
                                                         </thead>
                                                         <tbody>
                                                             {items.map((item, index) =>
-                              <tr key={index}>
+                                                                <tr key={index}>
                                                                     <td>
                                                                         <select
-                                    className="form-control"
-                                    value={item.stock_item_id}
-                                    onChange={(e) =>
-                                    handleItemChange(index, "stock_item_id", e.target.value)
-                                    }
-                                    required>
+                                                                            className="form-control"
+                                                                            value={item.stock_item_id}
+                                                                            onChange={(e) =>
+                                                                                handleItemChange(index, "stock_item_id", e.target.value)
+                                                                            }
+                                                                            required>
 
                                                                             <option value="">Select Item</option>
                                                                             {stockItems.map((si) =>
-                                    <option key={si.id} value={si.id}>
+                                                                                <option key={si.id} value={si.id}>
                                                                                     {si.name} ({si.sku})
                                                                                 </option>
-                                    )}
+                                                                            )}
                                                                         </select>
                                                                     </td>
                                                                     <td>
                                                                         <input
-                                    type="number"
-                                    className="form-control"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                    handleItemChange(index, "quantity", parseFloat(e.target.value) || 0)
-                                    }
-                                    required />
+                                                                            type="number"
+                                                                            className="form-control"
+                                                                            step="0.01"
+                                                                            min="0.01"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) =>
+                                                                                handleItemChange(index, "quantity", e.target.value)
+                                                                            }
+                                                                            required />
 
                                                                     </td>
                                                                     <td>
                                                                         <input
-                                    type="number"
-                                    className="form-control"
-                                    step="0.01"
-                                    min="0"
-                                    value={item.unit_cost}
-                                    onChange={(e) =>
-                                    handleItemChange(index, "unit_cost", parseFloat(e.target.value) || 0)
-                                    }
-                                    required />
+                                                                            type="number"
+                                                                            className="form-control"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={item.unit_cost}
+                                                                            onChange={(e) =>
+                                                                                handleItemChange(index, "unit_cost", e.target.value)
+                                                                            }
+                                                                            required />
 
                                                                     </td>
                                                                     <td>
@@ -299,36 +307,36 @@ export default function PurchaseOrdersCreate({
                                                                     </td>
                                                                     <td>
                                                                         <input
-                                    type="text"
-                                    className="form-control"
-                                    value={item.notes}
-                                    onChange={(e) =>
-                                    handleItemChange(index, "notes", e.target.value)
-                                    } />
+                                                                            type="text"
+                                                                            className="form-control"
+                                                                            value={item.notes}
+                                                                            onChange={(e) =>
+                                                                                handleItemChange(index, "notes", e.target.value)
+                                                                            } />
 
                                                                     </td>
                                                                     <td>
                                                                         {items.length > 1 &&
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-danger"
-                                    onClick={() => handleRemoveItem(index)}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-danger"
+                                                                                onClick={() => handleRemoveItem(index)}>
 
                                                                                 <i className="ti-trash"></i>
                                                                             </button>
-                                  }
+                                                                        }
                                                                     </td>
                                                                 </tr>
-                              )}
+                                                            )}
                                                         </tbody>
                                                     </table>
                                                 </div>
 
                                                 <div className="d-flex justify-content-end gap-2 mt-4">
                                                     <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => router.get(buildUrl("/purchase-orders"))}>
+                                                        type="button"
+                                                        className="btn btn-secondary"
+                                                        onClick={() => router.get(buildUrl("/purchase-orders"))}>
 
                                                         Cancel
                                                     </button>

@@ -34,31 +34,29 @@ class TicketController extends BaseCrudController
         parent::__construct();
     }
 
-    
+
     public function index(Request $request)
     {
-        
+
         $user = Auth::user();
         $query = Ticket::with(['customer', 'customerFiles', 'payments.documents', 'mockupFiles', 'assignedToUser', 'orderBranch', 'productionBranch']);
 
-        
+
         if ($user && !$user->isAdmin()) {
             if ($user->branch_id) {
-                
+
                 if ($user->isFrontDesk() || $user->isCashier()) {
                     $query->where('order_branch_id', $user->branch_id);
-                }
-                
-                elseif ($user->isProduction()) {
+                } elseif ($user->isProduction()) {
                     $query->where('production_branch_id', $user->branch_id);
                 }
             } else {
-                
+
                 $query->whereRaw('1 = 0');
             }
         }
 
-        
+
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('ticket_number', 'like', '%' . $request->search . '%')
@@ -70,32 +68,32 @@ class TicketController extends BaseCrudController
             });
         }
 
-        
+
         if ($request->has('status') && $request->status) {
             $query->where('status', $request->status);
         }
 
-        
+
         if ($request->has('payment_status') && $request->payment_status) {
             $query->where('payment_status', $request->payment_status);
         }
 
-        
+
         if ($request->has('customer_id') && $request->customer_id) {
             $query->where('customer_id', $request->customer_id);
         }
 
-        
+
         if ($user->isAdmin() && $request->has('branch_id') && $request->branch_id) {
             $query->where('order_branch_id', $request->branch_id);
         }
 
-        
+
         $dateRange = $request->get('date_range');
         $startDate = $request->get('start_date');
         $endDate = $request->get('end_date');
 
-        
+
         if (!$request->has('date_range')) {
             $dateRange = 'last_30_days';
             $thirtyDaysAgo = now()->subDays(30)->format('Y-m-d');
@@ -104,7 +102,7 @@ class TicketController extends BaseCrudController
             $endDate = $today;
         }
 
-        
+
         if ($dateRange !== '') {
             if ($startDate) {
                 $query->whereDate('created_at', '>=', $startDate);
@@ -115,17 +113,17 @@ class TicketController extends BaseCrudController
             }
         }
 
-        
+
         $orderBy = $request->get('order_by', 'due_date');
         $orderDir = $request->get('order_dir', 'asc');
-        
-        
+
+
         $allowedOrderBy = ['due_date', 'created_at', 'ticket_number', 'status', 'payment_status', 'total_amount'];
         if (!in_array($orderBy, $allowedOrderBy)) {
             $orderBy = 'due_date';
         }
-        
-        
+
+
         $orderDir = strtolower($orderDir) === 'desc' ? 'desc' : 'asc';
 
         $tickets = $query->with('jobType.category')
@@ -142,10 +140,10 @@ class TicketController extends BaseCrudController
             ->orderBy($orderBy, $orderDir)
             ->paginate($request->get('per_page', 15));
 
-        
+
         $customers = \App\Models\Customer::latest()->limit(10)->get();
 
-        
+
         $jobCategories = JobCategory::with(['jobTypes' => function ($query) {
             $query->where('is_active', true)
                 ->with(['priceTiers', 'sizeRates', 'promoRules'])
@@ -173,7 +171,7 @@ class TicketController extends BaseCrudController
         ]);
     }
 
-    
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -193,7 +191,7 @@ class TicketController extends BaseCrudController
             'subtotal' => 'nullable|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
+            'payment_method' => 'nullable|string|in:cash,gcash,bank_transfer,credit_card,check,government_ar',
             'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -204,11 +202,19 @@ class TicketController extends BaseCrudController
             'initial_payment_or' => 'nullable|string|max:100',
             'order_branch_id' => 'nullable|exists:branches,id',
             'production_branch_id' => 'nullable|exists:branches,id',
+            // Custom job type fields for "Others" category
+            'custom_job_type_description' => 'nullable|string|max:255',
+            'custom_price_mode' => 'nullable|string|in:per_item,fixed_total',
+            'custom_price_per_item' => 'nullable|numeric|min:0',
+            'custom_fixed_total' => 'nullable|numeric|min:0',
+            'is_size_based' => 'nullable|boolean',
+            'custom_width' => 'nullable|numeric|min:0',
+            'custom_height' => 'nullable|numeric|min:0',
         ]);
 
         $ticketData = $validated;
 
-        
+
         $transientKeys = [
             'attachments',
             'payment_proofs',
@@ -220,7 +226,7 @@ class TicketController extends BaseCrudController
             unset($ticketData[$key]);
         }
 
-        
+
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $disk = app()->environment('production') ? 's3' : 'public';
@@ -251,7 +257,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        
+
         foreach ($request->file('attachments', []) as $attachment) {
             if (!$attachment) {
                 continue;
@@ -266,7 +272,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        
+
         $downpaymentAmount = (float)($ticketData['downpayment'] ?? 0);
         if ($downpaymentAmount > 0) {
             $this->paymentRecorder->record(
@@ -285,8 +291,8 @@ class TicketController extends BaseCrudController
             );
         }
 
-        
-        
+
+
         if ($ticket->status === 'in_designer') {
             $this->notifyTicketCreated($ticket);
         }
@@ -299,30 +305,28 @@ class TicketController extends BaseCrudController
             ->with('success', 'Ticket created successfully.');
     }
 
-    
+
     public function update(Request $request, $id)
     {
-        
+
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        
+
         if ($user && !$user->isAdmin()) {
             if ($user->branch_id) {
-                
+
                 if ($user->isFrontDesk() || $user->isCashier()) {
                     if ($ticket->order_branch_id !== $user->branch_id) {
                         abort(403, 'You do not have permission to edit this ticket. It belongs to a different branch.');
                     }
-                }
-                
-                elseif ($user->isProduction()) {
+                } elseif ($user->isProduction()) {
                     if ($ticket->production_branch_id !== $user->branch_id) {
                         abort(403, 'You do not have permission to edit this ticket. Production is handled by a different branch.');
                     }
                 }
             } else {
-                
+
                 abort(403, 'You do not have permission to edit tickets.');
             }
         }
@@ -344,7 +348,7 @@ class TicketController extends BaseCrudController
             'subtotal' => 'nullable|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'downpayment' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|string|in:cash,gcash,bank_account',
+            'payment_method' => 'nullable|string|in:cash,gcash,bank_transfer,credit_card,check,government_ar',
             'status' => 'nullable|string|in:pending,ready_to_print,in_designer,in_production,completed,cancelled',
             'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -355,6 +359,14 @@ class TicketController extends BaseCrudController
             'initial_payment_or' => 'nullable|string|max:100',
             'order_branch_id' => 'nullable|exists:branches,id',
             'production_branch_id' => 'nullable|exists:branches,id',
+            // Custom job type fields for "Others" category
+            'custom_job_type_description' => 'nullable|string|max:255',
+            'custom_price_mode' => 'nullable|string|in:per_item,fixed_total',
+            'custom_price_per_item' => 'nullable|numeric|min:0',
+            'custom_fixed_total' => 'nullable|numeric|min:0',
+            'is_size_based' => 'nullable|boolean',
+            'custom_width' => 'nullable|numeric|min:0',
+            'custom_height' => 'nullable|numeric|min:0',
         ]);
 
         $ticketData = $validated;
@@ -369,7 +381,7 @@ class TicketController extends BaseCrudController
             unset($ticketData[$key]);
         }
 
-        
+
         if ($request->hasFile('file')) {
             if ($ticket->file_path) {
                 $disk = app()->environment('production') ? 's3' : 'public';
@@ -419,32 +431,48 @@ class TicketController extends BaseCrudController
             ->with('success', 'Ticket updated successfully.');
     }
 
-    
+
+    /**
+     * Check if ticket can be deleted and get dependencies
+     */
+    public function checkDeletion($id)
+    {
+        $ticket = Ticket::findOrFail($id);
+        $result = $ticket->canBeDeleted();
+        return response()->json($result);
+    }
+
     public function destroy($id)
     {
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
-        
+
         if ($user && !$user->isAdmin()) {
             if ($user->branch_id) {
-                
+
                 if ($user->isFrontDesk() || $user->isCashier()) {
                     if ($ticket->order_branch_id !== $user->branch_id) {
                         abort(403, 'You do not have permission to delete this ticket. It belongs to a different branch.');
                     }
-                }
-                
-                elseif ($user->isProduction()) {
+                } elseif ($user->isProduction()) {
                     abort(403, 'Production users do not have permission to delete tickets.');
                 }
             } else {
-                
+
                 abort(403, 'You do not have permission to delete tickets.');
             }
         }
 
-        
+        // Check if can be deleted
+        $check = $ticket->canBeDeleted();
+
+        if (!$check['can_delete']) {
+            return $this->redirectToRoleRoute('tickets.index')
+                ->with('error', 'Cannot delete ticket. It is currently in progress or has active dependencies.');
+        }
+
+
         if ($ticket->file_path) {
             Storage::disk('s3')->delete($ticket->file_path);
         }
@@ -470,7 +498,23 @@ class TicketController extends BaseCrudController
 
         $subtotal = 0;
 
-        if ($jobTypeId) {
+        // Handle custom job types (Others category)
+        if (!$jobTypeId && isset($validated['custom_job_type_description'])) {
+            // This is a custom job type from "Others" category
+            $customPriceMode = $validated['custom_price_mode'] ?? 'per_item';
+
+            if ($customPriceMode === 'per_item') {
+                $pricePerItem = (float)($validated['custom_price_per_item'] ?? 0);
+                $subtotal = $pricePerItem * $quantity;
+            } elseif ($customPriceMode === 'fixed_total') {
+                $subtotal = (float)($validated['custom_fixed_total'] ?? 0);
+            }
+
+            // Store the custom job type description in the job_type field for display
+            if (!empty($validated['custom_job_type_description'])) {
+                $validated['job_type'] = $validated['custom_job_type_description'];
+            }
+        } elseif ($jobTypeId) {
             $jobType = JobType::with(['priceTiers', 'sizeRates'])->find($jobTypeId);
 
             if ($jobType) {
@@ -523,7 +567,7 @@ class TicketController extends BaseCrudController
     }
 
 
-    
+
     public function updateStatus(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -535,11 +579,11 @@ class TicketController extends BaseCrudController
             'design_status' => 'nullable|in:pending,in_designer,cancelled',
         ]);
 
-        
+
         $ticket->status = $validated['status'];
         $ticket->design_status = $validated['status'] === 'in_designer' ? 'pending' : null;
 
-        
+
         if (!empty($validated['notes'])) {
             $ticket->status_notes = $validated['notes'];
         }
@@ -554,7 +598,7 @@ class TicketController extends BaseCrudController
             ['old_status' => $oldStatus, 'new_status' => $ticket->status, 'notes' => $validated['notes'] ?? null]
         );
 
-        
+
         if ($oldStatus !== $ticket->status) {
             $this->notifyStatusChange($ticket, $oldStatus, $ticket->status);
         }
@@ -566,16 +610,16 @@ class TicketController extends BaseCrudController
         ]);
     }
 
-    
+
     public function updatePayment(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
 
         $validated = $request->validate([
             'amount_paid' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|string|in:' . implode(',', Payment::METHODS),
+            'payment_method' => 'required|string|in:cash,gcash,bank_transfer,credit_card,check,government_ar',
             'payment_date' => 'required|date',
-            'allocation' => 'nullable|string|in:' . implode(',', Payment::ALLOCATIONS),
+            'allocation' => 'nullable|string|in:downpayment,balance,full,government_charge',
             'payment_reference' => 'nullable|string|max:150',
             'official_receipt_number' => 'nullable|string|max:100',
             'payment_notes' => 'nullable|string|max:500',
@@ -608,16 +652,17 @@ class TicketController extends BaseCrudController
         ]);
     }
 
-    
+
     public function verifyPayment(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
 
         $validated = $request->validate([
             'notes' => 'nullable|string|max:500',
+            'total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        
+
         $unverifiedPayment = $ticket->payments()->where('amount', 0)->first();
         if ($unverifiedPayment) {
             $unverifiedPayment->update([
@@ -626,12 +671,18 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        
-        
+
+
+
+        if (isset($validated['total_amount']) && $validated['total_amount'] > 0) {
+            $ticket->subtotal = $validated['total_amount'];
+            $ticket->total_amount = $validated['total_amount'];
+        }
+
         $ticket->payment_status = 'pending';
         $ticket->save();
 
-        
+
         $ticket->refreshPaymentSummary();
 
         return response()->json([
@@ -665,13 +716,21 @@ class TicketController extends BaseCrudController
             'payment_status' => 'nullable|string|in:pending,partial,paid,awaiting_verification',
             'order_branch_id' => 'nullable|exists:branches,id',
             'production_branch_id' => 'nullable|exists:branches,id',
+            // Custom job type fields for "Others" category
+            'custom_job_type_description' => 'nullable|string|max:255',
+            'custom_price_mode' => 'nullable|string|in:per_item,fixed_total',
+            'custom_price_per_item' => 'nullable|numeric|min:0',
+            'custom_fixed_total' => 'nullable|numeric|min:0',
+            'is_size_based' => 'nullable|boolean',
+            'custom_width' => 'nullable|numeric|min:0',
+            'custom_height' => 'nullable|numeric|min:0',
         ];
     }
 
-    
+
     protected function notifyTicketCreated(Ticket $ticket): void
     {
-        
+
         $designers = User::where('role', User::ROLE_DESIGNER)
             ->when($ticket->production_branch_id, function ($query) use ($ticket) {
                 $query->where('branch_id', $ticket->production_branch_id);
@@ -703,11 +762,11 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        
+
         event(new TicketStatusChanged(
             $ticket,
             'new',
-            
+
             'in_designer',
             Auth::user(),
             $recipientIds,
@@ -717,7 +776,7 @@ class TicketController extends BaseCrudController
         ));
     }
 
-    
+
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
         $triggeredBy = Auth::user();
@@ -726,10 +785,10 @@ class TicketController extends BaseCrudController
         $title = '';
         $message = '';
 
-        
+
         switch ($newStatus) {
             case 'approved':
-                
+
                 $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
                     ->when($ticket->order_branch_id, function ($query) use ($ticket) {
                         $query->where('branch_id', $ticket->order_branch_id);
@@ -798,7 +857,7 @@ class TicketController extends BaseCrudController
             return;
         }
 
-        
+
         $users = User::whereIn('id', $recipientIds)->get();
         foreach ($users as $user) {
             Notification::create([
@@ -819,7 +878,7 @@ class TicketController extends BaseCrudController
             ]);
         }
 
-        
+
         event(new TicketStatusChanged(
             $ticket,
             $oldStatus,
@@ -832,10 +891,10 @@ class TicketController extends BaseCrudController
         ));
     }
 
-    
+
     protected function notifyCashierNewTicket(Ticket $ticket): void
     {
-        
+
         $cashiers = User::where('role', User::ROLE_CASHIER)
             ->when($ticket->order_branch_id, function ($query) use ($ticket) {
                 $query->where('branch_id', $ticket->order_branch_id);
@@ -865,7 +924,5 @@ class TicketController extends BaseCrudController
                 ],
             ]);
         }
-
-        
     }
 }

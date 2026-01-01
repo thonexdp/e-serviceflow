@@ -180,10 +180,27 @@ class InventoryController extends Controller
         return redirect()->back()->with('success', 'Stock item updated successfully.');
     }
 
+    /**
+     * Check if stock item can be deleted and get dependencies
+     */
+    public function checkDeletion($id)
+    {
+        $stockItem = StockItem::findOrFail($id);
+        $result = $stockItem->canBeDeleted();
+        return response()->json($result);
+    }
     
     public function destroy($id)
     {
         $stockItem = StockItem::findOrFail($id);
+        
+        // Check if can be deleted
+        $check = $stockItem->canBeDeleted();
+        
+        if (!$check['can_delete']) {
+            return redirect()->back()->with('error', 'Cannot delete stock item. It has pending purchase orders or active dependencies.');
+        }
+
         $stockItem->delete();
 
         return redirect()->back()->with('success', 'Stock item deleted successfully.');

@@ -80,7 +80,15 @@ export default function TicketForm({
     status: "pending",
     file: null,
     order_branch_id: "",
-    production_branch_id: ""
+    production_branch_id: "",
+    // Others category fields
+    custom_job_type_description: "",
+    custom_price_mode: "per_item", // 'per_item' or 'fixed_total'
+    custom_price_per_item: "",
+    custom_fixed_total: "",
+    is_size_based: false,
+    custom_width: "",
+    custom_height: ""
   });
 
   const [errors, setErrors] = useState({});
@@ -98,6 +106,7 @@ export default function TicketForm({
   const [activeProofTab, setActiveProofTab] = useState(0);
   const [enableDiscount, setEnableDiscount] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [isOthersCategory, setIsOthersCategory] = useState(false);
 
 
   const availableJobTypes = useMemo(() => {
@@ -113,24 +122,93 @@ export default function TicketForm({
     if (ticket) {
 
       const jobTypeId = ticket.job_type_id?.toString() || "";
+      
+      // Check if it's a custom ticket:
+      // 1. If job_type is a string (not an object), it's custom
+      // 2. If job_type_id is null/empty and job_type exists as string
+      // 3. If custom_job_type_description exists (for newer records)
+      const isJobTypeString = typeof ticket.job_type === 'string';
+      const isCustomTicket = isJobTypeString || 
+                            (!ticket.job_type_id && ticket.job_type) ||
+                            ticket.custom_job_type_description ||
+                            (!ticket.job_type_id && !ticket.job_type?.id);
 
       let categoryId = "";
-      if (ticket.job_type?.category_id) {
+      if (isCustomTicket) {
+        categoryId = "others";
+      } else if (ticket.job_type && typeof ticket.job_type === 'object' && ticket.job_type.category_id) {
         categoryId = ticket.job_type.category_id.toString();
+        setIsOthersCategory(false);
       } else if (jobTypeId) {
-
         for (const cat of jobCategories) {
           const found = cat.job_types?.find(
             (jt) => jt.id.toString() === jobTypeId
           );
           if (found) {
             categoryId = cat.id.toString();
+            setIsOthersCategory(false);
             break;
           }
         }
       }
 
       const parsedSize = parseSizeValue(ticket.size_value);
+      
+      // Parse custom size if it's a custom ticket with size
+      let customWidth = "";
+      let customHeight = "";
+      let isSizeBased = false;
+      if (isCustomTicket && ticket.size_value) {
+        const customSize = parseSizeValue(ticket.size_value);
+        customWidth = customSize.width;
+        customHeight = customSize.height;
+        isSizeBased = !!(customWidth || customHeight);
+      }
+
+      // Determine custom price mode - try to preserve existing mode if possible
+      let customPriceMode = "per_item";
+      let customPricePerItem = "";
+      let customFixedTotal = "";
+      
+      if (isCustomTicket && ticket.total_amount) {
+        const totalAmount = parseFloat(ticket.total_amount);
+        const quantity = parseFloat(ticket.quantity) || 1;
+        
+        // If we have subtotal, use it to determine mode
+        if (ticket.subtotal && parseFloat(ticket.subtotal) > 0) {
+          const subtotal = parseFloat(ticket.subtotal);
+          const pricePerItem = subtotal / quantity;
+          
+          // Check if it's a round number (likely per_item) or not (likely fixed_total)
+          if (pricePerItem === Math.round(pricePerItem * 100) / 100 && pricePerItem > 0) {
+            customPriceMode = "per_item";
+            customPricePerItem = pricePerItem.toFixed(2);
+          } else {
+            customPriceMode = "fixed_total";
+            customFixedTotal = subtotal.toFixed(2);
+          }
+        } else {
+          // Fallback: use total_amount
+          const pricePerItem = totalAmount / quantity;
+          if (pricePerItem === Math.round(pricePerItem * 100) / 100 && pricePerItem > 0) {
+            customPriceMode = "per_item";
+            customPricePerItem = pricePerItem.toFixed(2);
+          } else {
+            customPriceMode = "fixed_total";
+            customFixedTotal = totalAmount.toFixed(2);
+          }
+        }
+      }
+
+      // Get custom job type description - could be from job_type string or custom_job_type_description
+      const customJobTypeDesc = ticket.custom_job_type_description || 
+                                (isJobTypeString ? ticket.job_type : "") || 
+                                "";
+
+      // Ensure isOthersCategory is set before formData to avoid race conditions
+      if (isCustomTicket) {
+        setIsOthersCategory(true);
+      }
 
       setFormData({
         customer_id: ticket.customer_id || customerId || "",
@@ -163,7 +241,15 @@ export default function TicketForm({
         initial_payment_notes: "",
         initial_payment_or: "",
         order_branch_id: ticket.order_branch_id || "",
-        production_branch_id: ticket.production_branch_id || ""
+        production_branch_id: ticket.production_branch_id || "",
+        // Custom fields
+        custom_job_type_description: customJobTypeDesc,
+        custom_price_mode: customPriceMode,
+        custom_price_per_item: customPricePerItem,
+        custom_fixed_total: customFixedTotal,
+        is_size_based: isSizeBased,
+        custom_width: customWidth,
+        custom_height: customHeight
       });
       setSizeDimensions(parsedSize);
       setEnableDiscount(parseFloat(ticket.discount) > 0);
@@ -173,9 +259,20 @@ export default function TicketForm({
         customer_id: customerId
       }));
       setSizeDimensions({ width: "", height: "" });
+      setIsOthersCategory(false);
     }
   }, [ticket, customerId, jobCategories]);
 
+
+  // Sync isOthersCategory with category_id - but only if category_id is set and not already synced
+  useEffect(() => {
+    // Only sync if category_id is explicitly set and different from current state
+    if (formData.category_id === "others" && !isOthersCategory) {
+      setIsOthersCategory(true);
+    } else if (formData.category_id && formData.category_id !== "others" && isOthersCategory) {
+      setIsOthersCategory(false);
+    }
+  }, [formData.category_id, isOthersCategory]);
 
   useEffect(() => {
     if (formData.job_type_id) {
@@ -464,6 +561,45 @@ export default function TicketForm({
     sizeDimensions.height]
   );
 
+  // Subtotal calculation for 'Others' category
+  useEffect(() => {
+    if (!isOthersCategory) {
+      return;
+    }
+
+    const quantity = parseFloat(formData.quantity) || 0;
+    if (quantity <= 0) {
+      return;
+    }
+
+    let subtotal = 0;
+
+    if (formData.custom_price_mode === "per_item") {
+      const pricePerItem = parseFloat(formData.custom_price_per_item) || 0;
+      subtotal = pricePerItem * quantity;
+    } else if (formData.custom_price_mode === "fixed_total") {
+      subtotal = parseFloat(formData.custom_fixed_total) || 0;
+    }
+
+    const subtotalFormatted = subtotal ? subtotal.toFixed(2) : "0.00";
+
+    setFormData((prev) => {
+      if (prev.subtotal !== subtotalFormatted) {
+        return { ...prev, subtotal: subtotalFormatted };
+      }
+      return prev;
+    });
+  }, [
+    isOthersCategory,
+    formData.quantity,
+    formData.custom_price_mode,
+    formData.custom_price_per_item,
+    formData.custom_fixed_total,
+    formData.is_size_based,
+    formData.custom_width,
+    formData.custom_height
+  ]);
+
   const clearError = (field) => {
     if (errors[field]) {
       setErrors((prev) => {
@@ -483,10 +619,29 @@ export default function TicketForm({
     }));
 
     if (name === "category_id") {
-      setFormData((prev) => ({
-        ...prev,
-        job_type_id: ""
-      }));
+      const isOthers = value === "others";
+      setIsOthersCategory(isOthers);
+      // Only reset custom fields if switching FROM others TO another category
+      // Don't reset if we're loading existing data or staying in others category
+      if (!isOthers) {
+        setFormData((prev) => ({
+          ...prev,
+          job_type_id: "",
+          custom_job_type_description: "",
+          custom_price_mode: "per_item",
+          custom_price_per_item: "",
+          custom_fixed_total: "",
+          is_size_based: false,
+          custom_width: "",
+          custom_height: ""
+        }));
+      } else {
+        // If switching TO others, only clear job_type_id
+        setFormData((prev) => ({
+          ...prev,
+          job_type_id: ""
+        }));
+      }
       setSelectedJobType(null);
       setSelectedSizeRateId(null);
       setSizeDimensions({ width: "", height: "" });
@@ -639,6 +794,34 @@ export default function TicketForm({
       }
     }
 
+    // Validation for 'Others' category
+    if (isOthersCategory) {
+      if (!formData.custom_job_type_description?.trim()) {
+        newErrors.custom_job_type_description = "Job type description is required";
+      }
+
+      if (formData.custom_price_mode === "per_item") {
+        const pricePerItem = parseFloat(formData.custom_price_per_item);
+        if (!pricePerItem || pricePerItem <= 0) {
+          newErrors.custom_price_per_item = "Price per item must be greater than 0";
+        }
+      } else if (formData.custom_price_mode === "fixed_total") {
+        const fixedTotal = parseFloat(formData.custom_fixed_total);
+        if (!fixedTotal || fixedTotal <= 0) {
+          newErrors.custom_fixed_total = "Fixed total price must be greater than 0";
+        }
+      }
+
+      if (formData.is_size_based) {
+        if (!parseFloat(formData.custom_width) || parseFloat(formData.custom_width) <= 0) {
+          newErrors.custom_width = "Width is required";
+        }
+        if (!parseFloat(formData.custom_height) || parseFloat(formData.custom_height) <= 0) {
+          newErrors.custom_height = "Height is required";
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -655,18 +838,44 @@ export default function TicketForm({
 
     const submitData = {
       ...formData,
+      job_type_id: isOthersCategory ? null : formData.job_type_id,
       quantity: parseInt(formData.quantity),
       free_quantity: parseInt(formData.free_quantity),
       subtotal: parseFloat(formData.subtotal) || 0,
       discount: enableDiscount ? parseFloat(formData.discount) || 0 : 0,
       total_amount: parseFloat(formData.total_amount) || 0,
       size_rate_id: selectedSizeRateId,
-      size_width: sizeDimensions.width,
-      size_height: sizeDimensions.height,
+      size_width: isOthersCategory && formData.is_size_based ? formData.custom_width : sizeDimensions.width,
+      size_height: isOthersCategory && formData.is_size_based ? formData.custom_height : sizeDimensions.height,
+      // Convert is_size_based to proper boolean (0 or 1 for Laravel)
+      is_size_based: isOthersCategory ? (formData.is_size_based ? 1 : 0) : 0,
       ticketAttachments: ticketAttachments.
         filter((attachment) => !attachment.existing && attachment.file).
         map((attachment) => attachment.file)
     };
+
+    // For custom tickets with size, format the size_value
+    if (isOthersCategory && formData.is_size_based) {
+      const width = parseFloat(formData.custom_width);
+      const height = parseFloat(formData.custom_height);
+      if (width > 0 && height > 0) {
+        submitData.size_value = `${width} x ${height}`;
+        submitData.size_unit = "custom";
+      } else if (width > 0) {
+        submitData.size_value = `${width}`;
+        submitData.size_unit = "custom";
+      }
+    }
+
+    // Clean up custom fields if not Others category
+    if (!isOthersCategory) {
+      delete submitData.custom_job_type_description;
+      delete submitData.custom_price_mode;
+      delete submitData.custom_price_per_item;
+      delete submitData.custom_fixed_total;
+      delete submitData.custom_width;
+      delete submitData.custom_height;
+    }
 
 
     if (isFrontDesk && !ticket) {
@@ -720,10 +929,13 @@ export default function TicketForm({
     { value: "bank_account", label: "Bank Account" }];
 
 
-  const categoryOptions = jobCategories.map((cat) => ({
-    value: cat.id.toString(),
-    label: cat.name
-  }));
+  const categoryOptions = [
+    ...jobCategories.map((cat) => ({
+      value: cat.id.toString(),
+      label: cat.name
+    })),
+    { value: "others", label: "Others (Custom)" }
+  ];
 
   const jobTypeOptions = availableJobTypes.map((jt) => {
     let label = jt.name;
@@ -890,22 +1102,33 @@ export default function TicketForm({
               </div>
 
               <div className="col-md-5">
-                <FormInput
-                  label="Job Type"
-                  type="select"
-                  name="job_type_id"
-                  value={formData.job_type_id}
-                  onChange={handleChange}
-                  error={errors.job_type_id}
-                  options={jobTypeOptions}
-                  placeholder={
-                    formData.category_id ?
-                      "Select Job Type" :
-                      "Select category first"
-                  }
-                  disabled={!formData.category_id}
-                  required />
-
+                {isOthersCategory ? (
+                  <FormInput
+                    label="Job Type (Custom)"
+                    type="text"
+                    name="custom_job_type_description"
+                    value={formData.custom_job_type_description}
+                    onChange={handleChange}
+                    error={errors.custom_job_type_description}
+                    placeholder="Enter custom job type"
+                    required />
+                ) : (
+                  <FormInput
+                    label="Job Type"
+                    type="select"
+                    name="job_type_id"
+                    value={formData.job_type_id}
+                    onChange={handleChange}
+                    error={errors.job_type_id}
+                    options={jobTypeOptions}
+                    placeholder={
+                      formData.category_id ?
+                        "Select Job Type" :
+                        "Select category first"
+                    }
+                    disabled={!formData.category_id}
+                    required />
+                )}
               </div>
               <div className="col-md-2">
                 <FormInput
@@ -922,6 +1145,136 @@ export default function TicketForm({
 
               </div>
             </div>
+
+            {/* Others Category Custom Fields */}
+            {isOthersCategory && (
+              <>
+                <div className="row mt-2">
+                  <div className="col-md-12">
+                    <div className="form-check form-switch">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="is_size_based"
+                        name="is_size_based"
+                        checked={formData.is_size_based}
+                        onChange={(e) => setFormData(prev => ({ ...prev, is_size_based: e.target.checked }))}
+                      />
+                      <label className="form-check-label" htmlFor="is_size_based">
+                        Size-Based Item
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {formData.is_size_based && (
+                  <div className="row mt-3">
+                    <div className="col-md-6">
+                      <FormInput
+                        label="Width"
+                        type="number"
+                        name="custom_width"
+                        value={formData.custom_width}
+                        onChange={handleChange}
+                        error={errors.custom_width}
+                        placeholder="Width"
+                        required
+                        step="0.01" />
+                    </div>
+                    <div className="col-md-6">
+                      <FormInput
+                        label="Height"
+                        type="number"
+                        name="custom_height"
+                        value={formData.custom_height}
+                        onChange={handleChange}
+                        error={errors.custom_height}
+                        placeholder="Height"
+                        required
+                        step="0.01" />
+                    </div>
+                  </div>
+                )}
+
+                <div className="row mt-3">
+                  <div className="col-md-12">
+                    <label className="form-label">Pricing Mode</label>
+                    <div className="d-flex gap-3">
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="custom_price_mode"
+                          id="price_mode_per_item"
+                          value="per_item"
+                          checked={formData.custom_price_mode === "per_item"}
+                          onChange={handleChange}
+                        />
+                        <label className="form-check-label" htmlFor="price_mode_per_item">
+                          Price Per Item
+                        </label>
+                      </div>
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="custom_price_mode"
+                          id="price_mode_fixed_total"
+                          value="fixed_total"
+                          checked={formData.custom_price_mode === "fixed_total"}
+                          onChange={handleChange}
+                        />
+                        <label className="form-check-label" htmlFor="price_mode_fixed_total">
+                          Fixed Total Price
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row mt-3">
+                  {formData.custom_price_mode === "per_item" ? (
+                    <div className="col-md-6">
+                      <FormInput
+                        label="Price Per Item (₱)"
+                        type="number"
+                        name="custom_price_per_item"
+                        value={formData.custom_price_per_item}
+                        onChange={handleChange}
+                        error={errors.custom_price_per_item}
+                        placeholder="0.00"
+                        required
+                        min="0"
+                        step="0.01" />
+                      {formData.custom_price_per_item && formData.quantity && (
+                        <small className="text-muted">
+                          Total: ₱{(parseFloat(formData.custom_price_per_item) * parseFloat(formData.quantity)).toFixed(2)}
+                        </small>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="col-md-6">
+                      <FormInput
+                        label="Fixed Total Price (₱)"
+                        type="number"
+                        name="custom_fixed_total"
+                        value={formData.custom_fixed_total}
+                        onChange={handleChange}
+                        error={errors.custom_fixed_total}
+                        placeholder="0.00"
+                        required
+                        min="0"
+                        step="0.01" />
+                      {formData.custom_fixed_total && formData.quantity && (
+                        <small className="text-muted">
+                          Price per item: ₱{(parseFloat(formData.custom_fixed_total) / parseFloat(formData.quantity)).toFixed(2)}
+                        </small>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Promo Display */}
             {(selectedJobType?.promo_rules?.length > 0 || selectedJobType?.promo_text) &&

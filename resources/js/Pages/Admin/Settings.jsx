@@ -91,6 +91,7 @@ export default function Settings({ settings: initialSettings, branches: initialB
                     account_name: "",
                     account_number: "",
                     qrcode: "",
+                    active_for_print: false,
                 },
             ],
         }));
@@ -120,8 +121,12 @@ export default function Settings({ settings: initialSettings, branches: initialB
         setSettings((prev) => ({
             ...prev,
             payment_bank_accounts: prev.payment_bank_accounts.map(
-                (account, i) =>
-                    i === index ? { ...account, [field]: value } : account
+                (account, i) => {
+                    if (field === "active_for_print" && value === true) {
+                        return i === index ? { ...account, [field]: value } : { ...account, active_for_print: false };
+                    }
+                    return i === index ? { ...account, [field]: value } : account;
+                }
             ),
         }));
     };
@@ -449,6 +454,23 @@ export default function Settings({ settings: initialSettings, branches: initialB
                                                                     }
                                                                     placeholder="1234 5678 9012"
                                                                 />
+                                                            </div>
+                                                            <div className="col-md-12 mb-3">
+                                                                <div className="form-check form-switch">
+                                                                    <input
+                                                                        className="form-check-input"
+                                                                        type="checkbox"
+                                                                        id={`activeForPrint_${index}`}
+                                                                        checked={account.active_for_print || false}
+                                                                        onChange={(e) => updateBankAccount(index, "active_for_print", e.target.checked)}
+                                                                    />
+                                                                    <label className="form-check-label font-bold text-primary" htmlFor={`activeForPrint_${index}`}>
+                                                                        Active for Printing (Billing Statements & Receipts)
+                                                                    </label>
+                                                                </div>
+                                                                <p className="text-muted small">
+                                                                    When enabled, this bank account will be displayed as the primary payment method on printed billing statements. Only one account can be active for print at a time.
+                                                                </p>
                                                             </div>
                                                             <div className="col-md-12 mb-3">
                                                                 <label className="form-label">

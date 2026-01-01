@@ -111,9 +111,24 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer updated successfully!');
     }
 
+    /**
+     * Check if customer can be deleted and get dependencies
+     */
+    public function checkDeletion(Customer $customer)
+    {
+        $result = $customer->canBeDeleted();
+        return response()->json($result);
+    }
     
     public function destroy(Customer $customer)
     {
+        // Check if can be deleted
+        $check = $customer->canBeDeleted();
+        
+        if (!$check['can_delete']) {
+            return redirect()->back()->with('error', 'Cannot delete customer. They have active tickets or orders.');
+        }
+
         try {
             $customer->delete();
             return redirect()->back()->with('success', 'Customer deleted successfully!');

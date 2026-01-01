@@ -11,6 +11,7 @@ use App\Models\Notification;
 use App\Events\TicketStatusChanged;
 use App\Services\PaymentRecorder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +20,7 @@ class PublicOrderController extends Controller
 {
     public function __construct(protected PaymentRecorder $paymentRecorder) {}
 
-    
+
     public function findOrCreateCustomer(Request $request)
     {
         $validated = $request->validate([
@@ -89,15 +90,18 @@ class PublicOrderController extends Controller
         ]);
     }
 
-    
+
     public function storeOrder(Request $request)
     {
+        // First validate category_id if present to determine conditional rules
+        $isOthersCategory = $request->input('category_id') === 'others';
 
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'branch_id' => 'required|exists:branches,id',
             'description' => 'required|string',
-            'job_type_id' => 'required|exists:job_types,id',
+            'category_id' => 'nullable|string',
+            'job_type_id' => $isOthersCategory ? 'nullable|exists:job_types,id' : 'required|exists:job_types,id',
             'quantity' => 'required|integer|min:1',
             'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
@@ -108,18 +112,24 @@ class PublicOrderController extends Controller
             'due_date' => 'required|date|after_or_equal:today',
             'subtotal' => 'nullable|numeric|min:0',
             'total_amount' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|string|in:walkin,gcash,bank',
+            'payment_method' => 'nullable|string|in:cash,gcash,bank_transfer,check,government_ar',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            // Custom job type fields for 'others' category
+            // Prices are optional for customer orders - will be set by frontdesk
+            'custom_job_type_description' => $isOthersCategory ? 'required|string|max:500' : 'nullable|string|max:500',
+            'custom_price_mode' => 'nullable|in:per_item,fixed_total',
+            'custom_price_per_item' => 'nullable|numeric|min:0',
+            'custom_fixed_total' => 'nullable|numeric|min:0',
         ]);
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
 
-        
+
         $selectedBranch = \App\Models\Branch::find($validated['branch_id']);
 
-        
+
         if (!$selectedBranch || !$selectedBranch->can_accept_orders || !$selectedBranch->is_active) {
             return response()->json([
                 'success' => false,
@@ -127,16 +137,16 @@ class PublicOrderController extends Controller
             ], 422);
         }
 
-        
-        
+
+
         $productionBranchId = $selectedBranch->can_produce
             ? $selectedBranch->id
             : \App\Models\Branch::where('is_default_production', true)->value('id');
 
-        
-        
-        
-        
+
+
+
+
         $paymentStatus = 'awaiting_verification';
 
         $ticketData = [
@@ -144,7 +154,6 @@ class PublicOrderController extends Controller
             'order_branch_id' => $validated['branch_id'],
             'production_branch_id' => $productionBranchId,
             'description' => $validated['description'],
-            'job_type_id' => $validated['job_type_id'],
             'quantity' => $validated['quantity'],
             'free_quantity' => $validated['free_quantity'] ?? 0,
             'due_date' => $validated['due_date'],
@@ -155,7 +164,18 @@ class PublicOrderController extends Controller
             'status' => 'pending',
         ];
 
-        
+        // Handle job type based on category
+        if ($isOthersCategory) {
+            // For 'others' category, store custom description in 'job_type' field
+            $ticketData['job_type'] = $validated['custom_job_type_description'] ?? 'Custom Job';
+            $ticketData['job_type_id'] = null;
+        } else {
+            // Regular job type with ID
+            $ticketData['job_type_id'] = $validated['job_type_id'];
+        }
+
+
+
         if (isset($validated['size_value'])) {
             $ticketData['size_value'] = $validated['size_value'];
         }
@@ -163,7 +183,7 @@ class PublicOrderController extends Controller
             $ticketData['size_unit'] = $validated['size_unit'];
         }
 
-        
+
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $disk = app()->environment('production') ? 's3' : 'public';
@@ -171,15 +191,14 @@ class PublicOrderController extends Controller
             $ticketData['file_path'] = $path;
         }
 
-        
+
         $this->applyPricing($ticketData, $request);
 
-        
+
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 
         $ticket = Ticket::create($ticketData);
 
-        
         if ($request->hasFile('file') && isset($path)) {
             TicketFile::create([
                 'ticket_id' => $ticket->id,
@@ -189,7 +208,7 @@ class PublicOrderController extends Controller
             ]);
         }
 
-        
+
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments', []) as $attachment) {
                 if (!$attachment) {
@@ -206,28 +225,29 @@ class PublicOrderController extends Controller
             }
         }
 
-        
+
         if ($request->hasFile('payment_proofs') && ($paymentMethod === 'gcash' || $paymentMethod === 'bank')) {
             $this->paymentRecorder->record(
                 [
                     'ticket_id' => $ticket->id,
                     'payment_method' => $paymentMethod,
-                    'amount' => 0, 
+                    'amount' => 0,
                     'payment_date' => now()->toDateString(),
                     'allocation' => 'downpayment',
                     'notes' => 'Payment proof uploaded during order submission.',
                     'payment_type' => 'collection',
                 ],
-                $request->file('payment_proofs', [])
+                $request->file('payment_proofs', []),
+                false
             );
         }
 
-        
+
         try {
-            
+
             $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
                 ->where('is_active', true)
-                ->where('branch_id', $validated['branch_id']) 
+                ->where('branch_id', $validated['branch_id'])
                 ->get();
 
             if ($frontDeskUsers->isNotEmpty()) {
@@ -235,11 +255,11 @@ class PublicOrderController extends Controller
                 $ticketNumber = $ticket->ticket_number;
                 $branchName = $selectedBranch->name ?? 'Branch';
 
-                
+
                 $notificationTitle = 'New Order from Customer';
                 $notificationMessage = "{$customerName} has created a new order ({$ticketNumber}) for {$branchName}";
 
-                
+
                 foreach ($frontDeskUsers as $user) {
                     Notification::create([
                         'user_id' => $user->id,
@@ -260,8 +280,8 @@ class PublicOrderController extends Controller
                     ]);
                 }
 
-                
-                
+
+
                 $systemUser = $frontDeskUsers->first();
                 $userIds = $frontDeskUsers->pluck('id')->toArray();
 
@@ -269,7 +289,7 @@ class PublicOrderController extends Controller
                     $ticket,
                     'new',
                     'pending',
-                    $systemUser, 
+                    $systemUser,
                     $userIds,
                     'order_created',
                     $notificationTitle,
@@ -282,7 +302,7 @@ class PublicOrderController extends Controller
                 ]);
             }
         } catch (\Exception $e) {
-            
+
             Log::error('Failed to send notification to frontdesk users', [
                 'ticket_id' => $ticket->id,
                 'error' => $e->getMessage(),
@@ -297,7 +317,7 @@ class PublicOrderController extends Controller
         ]);
     }
 
-    
+
     protected function applyPricing(array &$ticketData, Request $request): void
     {
         $jobTypeId = $ticketData['job_type_id'] ?? null;

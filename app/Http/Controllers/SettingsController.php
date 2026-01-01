@@ -75,6 +75,9 @@ class SettingsController extends Controller
             })(),
             'payment_bank_accounts' => $bankAccountsWithUrls,
             'customer_order_qrcode' => Setting::get('customer_order_qrcode', ''),
+            'print_settings' => [
+                'bank_account' => collect($bankAccountsWithUrls)->firstWhere('active_for_print', true)
+            ]
         ];
 
         // Get branches from database

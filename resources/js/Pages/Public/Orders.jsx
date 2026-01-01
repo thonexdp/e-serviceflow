@@ -25,6 +25,11 @@ export default function CustomerPOSOrder() {
     size_rate_id: "",
     due_date: "",
     file: null,
+    // Others category fields
+    custom_job_type_description: "",
+    custom_price_mode: "per_item", // 'per_item' or 'fixed_total'
+    custom_price_per_item: "",
+    custom_fixed_total: ""
   });
 
   const [designFiles, setDesignFiles] = useState([]);
@@ -54,7 +59,7 @@ export default function CustomerPOSOrder() {
   const designFileInputRef = useRef(null);
   const paymentProofInputRef = useRef(null);
 
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 1;
 
   // Phone normalization helper
   const normalizePhone = (phone) => {
@@ -411,6 +416,34 @@ export default function CustomerPOSOrder() {
     formData.quantity,
     formData.size_width,
     formData.size_height,
+  ]);
+
+  // Subtotal for 'Others' category
+  useEffect(() => {
+    if (formData.category_id !== "others") return;
+
+    const quantity = parseFloat(formData.quantity) || 0;
+    if (quantity <= 0) {
+      setSubtotal(0);
+      return;
+    }
+
+    let calculated = 0;
+    if (formData.custom_price_mode === "per_item") {
+      calculated =
+        (parseFloat(formData.custom_price_per_item) || 0) * quantity;
+    } else {
+      calculated = parseFloat(formData.custom_fixed_total) || 0;
+    }
+
+    setSubtotal(calculated);
+    setFormData((prev) => ({ ...prev, free_quantity: 0 }));
+  }, [
+    formData.category_id,
+    formData.quantity,
+    formData.custom_price_mode,
+    formData.custom_price_per_item,
+    formData.custom_fixed_total,
   ]);
 
   const handleImageUpload = async (event) => {
@@ -797,12 +830,35 @@ export default function CustomerPOSOrder() {
       orderData.append("customer_id", customerId);
       orderData.append("branch_id", formData.branch_id);
       orderData.append("description", formData.description);
-      orderData.append("job_type_id", formData.job_type_id);
+      if (formData.category_id !== "others") {
+        orderData.append("job_type_id", formData.job_type_id);
+      }
       orderData.append("quantity", formData.quantity);
       orderData.append("free_quantity", formData.free_quantity || 0);
       orderData.append("due_date", formData.due_date);
       orderData.append("subtotal", subtotal.toFixed(2));
       orderData.append("total_amount", subtotal.toFixed(2));
+
+      // Append Others category fields
+      if (formData.category_id === "others") {
+        orderData.append("category_id", "others");
+        orderData.append(
+          "custom_job_type_description",
+          formData.custom_job_type_description
+        );
+        orderData.append("custom_price_mode", formData.custom_price_mode);
+        if (formData.custom_price_mode === "per_item") {
+          orderData.append(
+            "custom_price_per_item",
+            formData.custom_price_per_item
+          );
+        } else {
+          orderData.append(
+            "custom_fixed_total",
+            formData.custom_fixed_total
+          );
+        }
+      }
 
       if (formData.size_rate_id) {
         orderData.append("size_rate_id", formData.size_rate_id);
@@ -1233,7 +1289,9 @@ export default function CustomerPOSOrder() {
     formData.branch_id;
   const canProceedStep2 =
     formData.category_id &&
-    formData.job_type_id &&
+    (formData.category_id === "others"
+      ? formData.custom_job_type_description
+      : formData.job_type_id) &&
     parseInt(formData.quantity) > 0;
   const hasInvalidDesignFiles = designFiles.some((f) => f.invalid);
   const canProceedStep3 =
@@ -1798,6 +1856,31 @@ export default function CustomerPOSOrder() {
                       </button>
                     );
                   })}
+                  <button
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        category_id: "others",
+                        job_type_id: "",
+                        // Reset other custom fields when switching to others
+                        custom_job_type_description: "",
+                        custom_price_mode: "per_item",
+                        custom_price_per_item: "",
+                        custom_fixed_total: ""
+                      }))
+                    }
+                    className={`p-4 rounded-lg border-2 transition-all ${formData.category_id === "others"
+                      ? "border-orange-600 bg-orange-50"
+                      : "border-gray-200 hover:border-orange-300"
+                      }`}
+                  >
+                    <p className="font-semibold text-gray-900">
+                      Others (Custom)
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Manual Pricing
+                    </p>
+                  </button>
                 </div>
               </div>
 
@@ -1910,16 +1993,20 @@ export default function CustomerPOSOrder() {
                                 {(hasSizeRates ||
                                   hasPriceTiers) && (
                                     <span className="text-orange-600 text-xs mt-1 italic">
-                                      Starts
+                                      Price Starts
                                       at{" "}
-                                      {formatPeso(
-                                        parseFloat(
-                                          jobType.price ||
-                                          0
-                                        ).toFixed(
-                                          2
-                                        )
-                                      )}
+                                      <div className="text-lg font-bold">
+                                        {formatPeso(
+                                          parseFloat(
+                                            jobType.price ||
+                                            0
+                                          ).toFixed(
+                                            2
+                                          )
+                                        )}
+
+                                      </div>
+
                                     </span>
                                   )}
                               </div>
@@ -1929,6 +2016,34 @@ export default function CustomerPOSOrder() {
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {formData.category_id === "others" && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Job Type Description *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.custom_job_type_description}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          custom_job_type_description:
+                            e.target.value,
+                        }))
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="e.g., Custom Banner, Special Stickers"
+                      required
+                    />
+                  </div>
+
+                  <p className="text-sm text-gray-500 italic mt-2">
+                    Note: Our team will verify this request and provide you with a final price shortly.
+                  </p>
                 </div>
               )}
 
@@ -2496,8 +2611,15 @@ export default function CustomerPOSOrder() {
                     Service
                   </p>
                   <p className="font-semibold text-gray-900">
-                    {selectedJobType?.name}
+                    {formData.category_id === "others"
+                      ? formData.custom_job_type_description
+                      : selectedJobType?.name}
                   </p>
+                  {formData.category_id === "others" && (
+                    <p className="text-xs text-gray-500 italic mb-1">
+                      Mode: {formData.custom_price_mode === "per_item" ? "Price Per Item" : "Fixed Total"}
+                    </p>
+                  )}
                   <p className="text-sm text-gray-600">
                     Quantity: {formData.quantity}
                   </p>
@@ -2542,8 +2664,8 @@ export default function CustomerPOSOrder() {
                     <span className="text-lg font-semibold text-gray-900">
                       Total Amount:
                     </span>
-                    <span className="text-3xl font-bold text-orange-600">
-                      {formatPeso(subtotal.toFixed(2))}
+                    <span className="text-sm font-bold text-orange-600">
+                      {subtotal > 0 ? formatPeso(subtotal.toFixed(2)) : "To be confirmed"}
                     </span>
                   </div>
                 </div>

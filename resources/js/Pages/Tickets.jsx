@@ -11,7 +11,7 @@ import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 import axios from "axios";
 import PreviewModal from "@/Components/Main/PreviewModal";
-import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
+import DeletionConfirmationModal from "@/Components/Common/DeletionConfirmationModal";
 import { formatPeso } from "@/Utils/currency";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
@@ -37,6 +37,7 @@ export default function Tickets({
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedID, setSelectedID] = useState(null);
   const [openDeleteModal, setDeleteModalOpen] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState(null);
   const [loading, setLoading] = useState(false);
   const { api, buildUrl } = useRoleApi();
   const { flash, auth } = usePage().props;
@@ -46,6 +47,7 @@ export default function Tickets({
   });
   const [revisionNotes, setRevisionNotes] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState(false);
+  const [verifyErrors, setVerifyErrors] = useState({});
 
 
   useEffect(() => {
@@ -308,6 +310,8 @@ export default function Tickets({
   };
 
   const handleEditTicket = (ticket) => {
+
+    console.log(ticket);
     setSelectedCustomer(ticket?.customer);
     setEditingTicket(ticket);
     setTicketModalOpen(true);
@@ -341,11 +345,15 @@ export default function Tickets({
 
   const handleCloseModal = () => {
     setDeleteModalOpen(false);
+    setTicketToDelete(null);
+    setSelectedID(null);
     setCustomerModalOpen(false);
     setEditingCustomer(null);
   };
 
   const handleDeleteTicket = (ticketId) => {
+    const ticket = tickets.data.find(t => t.id === ticketId);
+    setTicketToDelete(ticket);
     setSelectedID(ticketId);
     setDeleteModalOpen(true);
   };
@@ -385,18 +393,35 @@ export default function Tickets({
   const handleOpenVerifyModal = (ticket) => {
     setSelectedTicket(ticket);
     setVerifyFormData({
-      notes: ""
+      notes: "",
+      total_amount: ticket.total_amount || ""
     });
+    setVerifyErrors({});
     setVerifyModalOpen(true);
   };
 
   const closeVerifyModal = () => {
     setVerifyModalOpen(false);
     setSelectedTicket(null);
+    setVerifyErrors({});
+    setVerifyFormData({ notes: "" });
   };
 
   const handleVerifyPayment = async () => {
     setIsUpdating(true);
+    setVerifyErrors({});
+
+    // Validate that custom orders have a price set
+    const errors = {};
+    if (selectedTicket && (!selectedTicket.job_type_id || selectedTicket.custom_job_type_description)) {
+      if (!verifyFormData.total_amount || parseFloat(verifyFormData.total_amount) <= 0) {
+        errors.total_amount = "Please enter the total price for this custom order before confirming.";
+        setVerifyErrors(errors);
+        setIsUpdating(false);
+        return;
+      }
+    }
+
     try {
       await api.patch(`/tickets/${selectedTicket.id}/verify-payment`, verifyFormData);
 
@@ -404,7 +429,8 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Verification failed", error);
-      alert(error.response?.data?.message || "Failed to verify payment. Please check your data.");
+      const errorMessage = error.response?.data?.message || "Failed to verify payment. Please check your data.";
+      setVerifyErrors({ general: errorMessage });
     } finally {
       setIsUpdating(false);
     }
@@ -554,6 +580,14 @@ export default function Tickets({
       render: (row) =>
         <div>
           <div className="font-weight-bold">{row.ticket_number}</div>
+          {
+            row.job_type?.name && (
+              <i className="text-xs">
+                Type: {row.job_type?.name}
+            </i>
+            )
+          }
+         
           {row.payments?.some((p) => p.status === 'rejected') &&
             <div className="text-danger font-bold text-[9px] uppercase">
               <i className="ti-alert mr-1"></i> Bounced Payment
@@ -786,21 +820,17 @@ export default function Tickets({
           branches={branches} />
 
       </Modal>
-      <Modal
-        title={"Delete Tickets"}
+      
+      {/* Deletion Confirmation Modal with Dependency Checking */}
+      <DeletionConfirmationModal
         isOpen={openDeleteModal}
         onClose={handleCloseModal}
-        size="md"
-        submitButtonText={null}
-        staticBackdrop={true}>
-
-        <DeleteConfirmation
-          label=" ticket"
-          loading={loading}
-          onSubmit={handleConfirmDeleteTicket}
-          onCancel={handleCloseModal} />
-
-      </Modal>
+        onConfirm={handleConfirmDeleteTicket}
+        itemType="ticket"
+        item={ticketToDelete}
+        checkUrl={ticketToDelete ? buildUrl(`tickets/${ticketToDelete.id}/check-deletion`) : null}
+        title="Delete Ticket"
+      />
       <AdminLayout
         user={user}
         notifications={notifications}
@@ -993,9 +1023,9 @@ export default function Tickets({
                   <div className="col-md-6">
                     <p className="m-b-5">
                       <strong>Subtotal:</strong>{" "}
-                      {formatPeso(
-                        selectedTicket.subtotal || selectedTicket.total_amount
-                      )}
+                      {parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0) > 0
+                        ? formatPeso(selectedTicket.subtotal || selectedTicket.total_amount)
+                        : "To be confirmed"}
                     </p>
                     {parseFloat(selectedTicket.discount || 0) > 0 &&
                       <p className="m-b-5 text-success">
@@ -1005,9 +1035,9 @@ export default function Tickets({
                     }
                     <p className="m-b-5">
                       <strong>Total Amount:</strong>{" "}
-                      {formatPeso(
-                        selectedTicket.total_amount
-                      )}
+                      {parseFloat(selectedTicket.total_amount || 0) > 0
+                        ? formatPeso(selectedTicket.total_amount)
+                        : "To be confirmed"}
                     </p>
                     <p className="m-b-5">
                       <strong>Amount Paid:</strong>{" "}
@@ -1017,9 +1047,11 @@ export default function Tickets({
                     </p>
                     <p className="m-b-0 text-danger font-bold border-t pt-1">
                       <strong>Balance:</strong>{" "}
-                      {formatPeso(
-                        Math.max(0, parseFloat(selectedTicket.total_amount || 0) - parseFloat(selectedTicket.amount_paid || 0))
-                      )}
+                      {parseFloat(selectedTicket.total_amount || 0) > 0
+                        ? formatPeso(
+                          Math.max(0, parseFloat(selectedTicket.total_amount || 0) - parseFloat(selectedTicket.amount_paid || 0))
+                        )
+                        : "To be confirmed"}
                     </p>
                   </div>
                 </div>
@@ -1122,6 +1154,13 @@ export default function Tickets({
           submitButtonText={null}>
 
           <div className="modal-body">
+            {verifyErrors.general &&
+              <div className="alert alert-danger mb-4">
+                <i className="ti-alert mr-2"></i>
+                {verifyErrors.general}
+              </div>
+            }
+
             {selectedTicket &&
               <div className={`alert ${selectedTicket.payment_method === 'cash' ? 'alert-info' : 'alert-warning'} mb-4`}>
                 <h6 className="alert-heading f-s-14">
@@ -1132,13 +1171,48 @@ export default function Tickets({
                 </h6>
                 <p className="mb-0 small">
                   Ticket: <strong>{selectedTicket.ticket_number}</strong><br />
-                  Total Amount: <strong>{formatPeso(selectedTicket.total_amount)}</strong>
+                  Total Amount: <strong>{parseFloat(selectedTicket.total_amount || 0) > 0 ? formatPeso(selectedTicket.total_amount) : "To be confirmed"}</strong>
                   {selectedTicket.payment_method === 'cash' &&
                     <><br />Confirm this order once the customer arrives at the branch.</>
                   }
                 </p>
               </div>
             }
+
+            {(selectedTicket && (!selectedTicket.job_type_id || selectedTicket.custom_job_type_description)) && (
+              <div className="form-group mb-4">
+                <label className="form-label f-s-13 font-weight-bold">
+                  Update Total Price (Manual) <span className="text-danger">*</span>
+                </label>
+                <div className="input-group">
+                  <div className="input-group-prepend">
+                    <span className="input-group-text">₱</span>
+                  </div>
+                  <input
+                    type="number"
+                    className={`form-control ${verifyErrors.total_amount ? 'is-invalid' : ''}`}
+                    value={verifyFormData.total_amount}
+                    onChange={(e) => {
+                      setVerifyFormData({ ...verifyFormData, total_amount: e.target.value });
+                      if (verifyErrors.total_amount) {
+                        setVerifyErrors({ ...verifyErrors, total_amount: null });
+                      }
+                    }}
+                    placeholder="0.00"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                {verifyErrors.total_amount &&
+                  <div className="invalid-feedback d-block">
+                    {verifyErrors.total_amount}
+                  </div>
+                }
+                <p className="text-xs text-muted mt-1">
+                  Since this is a custom order, you must set the final price before confirming.
+                </p>
+              </div>
+            )}
 
             <div className="form-group mb-4">
               <label className="form-label f-s-13">Verification Notes (Optional)</label>
@@ -1468,6 +1542,8 @@ export default function Tickets({
                     pagination={tickets}
                     onEdit={handleEditTicket}
                     onDelete={handleDeleteTicket}
+                    currentUser={auth.user}
+                    showDeleteForInProgress={true}
                     emptyMessage="No tickets found." />
 
                 </div>
