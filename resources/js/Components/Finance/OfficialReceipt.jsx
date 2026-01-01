@@ -36,7 +36,7 @@ export default function OfficialReceipt({ payment }) {
     return (
         <div className="official-receipt-container bg-white text-black" style={{
             fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif",
-            fontSize: '9pt',
+            fontSize: '12px',
             lineHeight: '1.2',
             width: '100%',
             minHeight: 'auto',
@@ -52,7 +52,7 @@ export default function OfficialReceipt({ payment }) {
                     background-color: #e9ecef;
                     border: 1px solid #000;
                     padding: 4px 8px;
-                    font-size: 8pt;
+                    font-size: 12px;
                     font-weight: 900;
                     text-transform: capitalize;
                 }
@@ -69,7 +69,7 @@ export default function OfficialReceipt({ payment }) {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 7pt;
+                    font-size: 12px;
                     font-weight: bold;
                     margin-right: 10px;
                 }
@@ -89,8 +89,8 @@ export default function OfficialReceipt({ payment }) {
             `}</style>
 
             {/* Header Section */}
-            <div style={{ width: '100%', padding: '0 8mm 0 2mm', marginBottom: '2mm' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', direction: 'ltr' }}>
+            <div style={{ width: '100%', marginBottom: '2mm' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', direction: 'ltr', padding: '0 8mm 0 2mm' }}>
                     {/* Logo */}
                     <img
                         src="/images/logo.jpg"
@@ -128,7 +128,7 @@ export default function OfficialReceipt({ payment }) {
                 </div>
 
                 {/* Thick Solid Line */}
-                <div style={{ borderTop: '5px solid #000', marginTop: '1mm' }}></div>
+                <div style={{ borderTop: '5px solid #000', marginTop: '2mm' }}></div>
             </div>
 
             {/* Sold To / Date Section */}
@@ -138,9 +138,7 @@ export default function OfficialReceipt({ payment }) {
                         <span style={{ fontWeight: 'bold', width: '20mm', fontSize: '9pt' }}>SOLD TO:</span>
                         <div
                             style={{
-                                borderBottom: '1px solid #000',
                                 flexGrow: 1,
-                                paddingLeft: '2mm',
                                 fontWeight: 'bold'
                             }}
                         >
@@ -153,15 +151,15 @@ export default function OfficialReceipt({ payment }) {
 
                     </div>
                     <div className="flex items-center">
-                        <span style={{ fontWeight: 'bold', width: '20mm', fontSize: '9pt' }}>CONTACT NO.</span>
-                        <div style={{ borderBottom: '1px solid #000', flexGrow: 1, paddingLeft: '2mm' }}>
+                        <span style={{ fontWeight: 'bold', width: '30mm', fontSize: '9pt' }}>CONTACT NO.</span>
+                        <div style={{ flexGrow: 1 }}>
                             {payment.customer?.phone || ""}
                         </div>
                     </div>
                 </div>
                 <div className="flex items-start justify-end">
                     <span style={{ fontWeight: 'bold', marginRight: '5px' }}>DATE:</span>
-                    <div style={{ borderBottom: '1px solid #000', minWidth: '40mm', textAlign: 'center' }}>
+                    <div style={{ minWidth: '40mm' }}>
                         {formatDate(payment.payment_date)}
                     </div>
                 </div>
@@ -323,7 +321,7 @@ export default function OfficialReceipt({ payment }) {
             </div>
 
             {/* Bottom Most: Socials */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '5mm', gap: '15px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-10mm', gap: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #000', borderRadius: '5px', overflow: 'hidden' }}>
                     <div style={{ backgroundColor: '#000', color: '#fff', padding: '1px 8px', fontWeight: 'bold', fontSize: '7pt' }}>More Information</div>
                     <div style={{ padding: '1px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>

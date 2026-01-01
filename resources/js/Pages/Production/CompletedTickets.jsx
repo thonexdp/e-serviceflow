@@ -569,88 +569,60 @@ export default function CompletedTickets({
       </Modal>
 
       {/* Image Preview Modal */}
-      {selectedPreviewFile &&
-        <div
-          className="modal fade show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
-          onClick={() => setSelectedPreviewFile(null)}>
-
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Preview</h5>
-                <button
-                  type="button"
-                  className="close"
-                  onClick={() => setSelectedPreviewFile(null)}>
-
-                  <span>&times;</span>
-                </button>
-              </div>
-              <div className="modal-body text-center">
-                <img
-                  src={selectedPreviewFile.file_path}
-                  alt={selectedPreviewFile.file_name}
-                  className="img-fluid"
-                  style={{ maxHeight: '70vh' }} />
-
-              </div>
-            </div>
+      <Modal
+        title="Design File Preview"
+        isOpen={!!selectedPreviewFile}
+        onClose={() => setSelectedPreviewFile(null)}
+        zIndex="z-[60]"
+        size="4xl">
+        {selectedPreviewFile &&
+          <div className="text-center">
+            <img
+              src={selectedPreviewFile.file_path}
+              alt={selectedPreviewFile.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }} />
           </div>
-        </div>
-      }
+        }
+      </Modal>
 
       {/* Evidence Image Preview Modal */}
-      {selectedEvidenceImage &&
-        <div
-          className="modal fade show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
-          onClick={() => setSelectedEvidenceImage(null)}>
+      <Modal
+        title="Evidence Photo"
+        isOpen={!!selectedEvidenceImage}
+        onClose={() => setSelectedEvidenceImage(null)}
+        zIndex="z-[60]"
+        size="4xl">
+        {selectedEvidenceImage &&
+          <div className="modal-body text-center">
+            <img
+              src={selectedEvidenceImage.file_path}
+              alt={selectedEvidenceImage.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }} />
 
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Evidence Photo</h5>
-                <button
-                  type="button"
-                  className="close"
-                  onClick={() => setSelectedEvidenceImage(null)}>
+            <div className="mt-3 text-left">
+              <p className="mb-1"><strong>Uploaded by:</strong> {selectedEvidenceImage.user?.name || 'Unknown'}</p>
+              <p className="mb-0"><strong>Date:</strong> {selectedEvidenceImage.uploaded_at ? formatDate(selectedEvidenceImage.uploaded_at) : 'N/A'}</p>
+            </div>
 
-                  <span>&times;</span>
-                </button>
-              </div>
-              <div className="modal-body text-center">
-                <img
-                  src={selectedEvidenceImage.file_path}
-                  alt={selectedEvidenceImage.file_name}
-                  className="img-fluid"
-                  style={{ maxHeight: '70vh' }} />
-
-                <div className="mt-3">
-                  <p><strong>Uploaded by:</strong> {selectedEvidenceImage.user?.name || 'Unknown'}</p>
-                  <p><strong>Date:</strong> {selectedEvidenceImage.uploaded_at ? formatDate(selectedEvidenceImage.uploaded_at) : 'N/A'}</p>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setSelectedEvidenceImage(null)}>
-
-                  Close
-                </button>
-                <a
-                  href={selectedEvidenceImage.file_path}
-                  download={selectedEvidenceImage.file_name}
-                  className="btn btn-primary">
-
-                  <i className="ti-download mr-2"></i>Download
-                </a>
-              </div>
+            <div className="mt-4 flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedEvidenceImage(null)}>
+                Close
+              </button>
+              <a
+                href={selectedEvidenceImage.file_path}
+                download={selectedEvidenceImage.file_name}
+                className="btn btn-primary btn-sm">
+                <i className="ti-download mr-2"></i>Download
+              </a>
             </div>
           </div>
-        </div>
-      }
+        }
+      </Modal>
 
 
       <section id="main-content">

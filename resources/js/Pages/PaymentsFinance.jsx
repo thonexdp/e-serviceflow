@@ -1924,7 +1924,7 @@ export default function PaymentsFinance({
             <span className="text-danger small">{expenseErrors.amount}</span>
           }
         </div>
-        <div className="md:col-span-2">
+        {/* <div className="md:col-span-2">
           <label className="form-label">Related Ticket (optional)</label>
           <select
             className="form-control"
@@ -1943,7 +1943,7 @@ export default function PaymentsFinance({
               </option>
             )}
           </select>
-        </div>
+        </div> */}
         <div className="md:col-span-2">
           <label className="form-label">Notes</label>
           <textarea

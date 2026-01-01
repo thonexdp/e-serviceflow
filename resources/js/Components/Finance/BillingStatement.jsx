@@ -1,5 +1,6 @@
 import React from "react";
 import { formatPeso } from "@/Utils/currency";
+import { formatDate } from "@/Utils/formatDate";
 
 export default function BillingStatement({ data }) {
     if (!data) return null;
@@ -133,6 +134,7 @@ export default function BillingStatement({ data }) {
                     display: flex;
                     flex-direction: column;
                     justify-content: center;
+                    margin-left: 20px;
                 }
                 .summary-box {
                     width: 35%;
@@ -252,11 +254,11 @@ export default function BillingStatement({ data }) {
                 <div className="date-ticket-box">
                     <div className="info-row">
                         <span className="info-label" style={{ width: '60px' }}>Date :</span>
-                        <span className="info-value">{date}</span>
+                        <span>{formatDate(date)}</span>
                     </div>
                     <div className="info-row">
                         <span className="info-label" style={{ width: '60px' }}>Ticket no. :</span>
-                        <span className="info-value">{ticketNumbers}</span>
+                        <span>{ticketNumbers}</span>
                     </div>
                 </div>
 
