@@ -47,8 +47,7 @@ class SettingsController extends Controller
                         $bucket = config('filesystems.disks.gcs.bucket');
                         $account['qrcode'] = "https://storage.googleapis.com/{$bucket}/{$account['qrcode']}";
                     } else {
-
-                        $account['qrcode'] = "/storage/{$account['qrcode']}";
+                        $account['qrcode'] = \Illuminate\Support\Facades\Storage::url($account['qrcode']);
                     }
                 }
             } else {
@@ -329,8 +328,7 @@ class SettingsController extends Controller
                         $bucket = config('filesystems.disks.gcs.bucket');
                         $account['qrcode'] = "https://storage.googleapis.com/{$bucket}/{$account['qrcode']}";
                     } else {
-
-                        $account['qrcode'] = "/storage/{$account['qrcode']}";
+                        $account['qrcode'] = \Illuminate\Support\Facades\Storage::url($account['qrcode']);
                     }
                 }
             } else {

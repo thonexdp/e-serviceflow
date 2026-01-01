@@ -311,7 +311,11 @@ export default function PaymentsFinance({
       bankName: capitalizeName(printSettings?.bank_account?.bank_name),
       accountName: capitalizeName(printSettings?.bank_account?.account_name),
       accountNo: printSettings?.bank_account?.account_number,
-      qrCodeUrl: printSettings?.bank_account?.qrcode ? (printSettings.bank_account.qrcode.startsWith('/') ? printSettings.bank_account.qrcode : `/storage/${printSettings.bank_account.qrcode}`) : null
+      qrCodeUrl: printSettings?.bank_account?.qrcode
+        ? (printSettings.bank_account.qrcode.startsWith('http')
+          ? printSettings.bank_account.qrcode
+          : (printSettings.bank_account.qrcode.startsWith('/') ? printSettings.bank_account.qrcode : `/storage/${printSettings.bank_account.qrcode}`))
+        : null,
     };
 
     setBillingToPrint(billingData);
@@ -569,7 +573,7 @@ export default function PaymentsFinance({
 
     // Calculate the actual amount to record (cap at balance if ticket exists)
     let actualAmount = parseFloat(String(paymentForm.amount || 0).replace(/,/g, ''));
-    
+
     if (paymentForm.ticket_id) {
       const selectedTicket = openTickets.find((t) => t.id === paymentForm.ticket_id);
       if (selectedTicket) {
@@ -579,7 +583,7 @@ export default function PaymentsFinance({
         const ticketTotal = subtotal - discountAmount;
         const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
         const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
-        
+
         // Only cap if there's a balance and payment exceeds it (to avoid inflating sales)
         if (balanceBeforePayment > 0 && actualAmount > balanceBeforePayment) {
           actualAmount = balanceBeforePayment;

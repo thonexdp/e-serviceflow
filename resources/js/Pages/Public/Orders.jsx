@@ -1877,9 +1877,6 @@ export default function CustomerPOSOrder() {
                     <p className="font-semibold text-gray-900">
                       Others (Custom)
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Manual Pricing
-                    </p>
                   </button>
                 </div>
               </div>

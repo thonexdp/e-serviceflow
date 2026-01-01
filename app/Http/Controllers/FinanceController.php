@@ -145,6 +145,14 @@ class FinanceController extends Controller
             'customers' => $recentCustomers,
             'printSettings' => [
                 'bank_account' => collect(\App\Models\Setting::get('payment_bank_accounts', []))
+                    ->map(function ($acc) {
+                        if (!empty($acc['qrcode'])) {
+                            if (strpos($acc['qrcode'], 'http') !== 0 && strpos($acc['qrcode'], '/storage/') !== 0) {
+                                $acc['qrcode'] = \Illuminate\Support\Facades\Storage::url($acc['qrcode']);
+                            }
+                        }
+                        return $acc;
+                    })
                     ->firstWhere('active_for_print', true)
             ]
         ]);
