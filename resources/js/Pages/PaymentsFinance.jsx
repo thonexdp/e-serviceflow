@@ -9,6 +9,93 @@ import PreviewModal from "@/Components/Main/PreviewModal";
 import OfficialReceipt from "@/Components/Finance/OfficialReceipt";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 import Confirmation from "@/Components/Common/Confirmation";
+import BillingStatement from "@/Components/Finance/BillingStatement";
+
+const SearchableCustomerFilter = ({ customers, selectedId, onSelect }) => {
+  const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  const selectedCustomer = customers.find(c => c.id == selectedId);
+
+  const filtered = customers.filter(c =>
+    `${c.firstname} ${c.lastname}`.toLowerCase().includes(search.toLowerCase())
+  ).slice(0, 100);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef} style={{ width: "200px" }}>
+      <div
+        className="form-control form-control-sm flex justify-between items-center cursor-pointer bg-white"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          borderRadius: "5px",
+          height: "32px",
+          border: isOpen ? "1px solid #7367f0" : "1px solid #d8d6de",
+          padding: "0 10px",
+          boxShadow: isOpen ? "0 3px 10px 0 rgba(34, 41, 47, 0.1)" : "none",
+          transition: "all 0.2s ease"
+        }}
+      >
+        <span className="truncate text-xs font-medium" style={{ color: selectedCustomer ? "#5e5873" : "#b9b9c3" }}>
+          {selectedCustomer ? `${selectedCustomer.firstname} ${selectedCustomer.lastname}` : "Filter by Customer..."}
+        </span>
+        <i className={`ti-angle-down text-xs transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          style={{ color: "#d8d6de" }}></i>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
+          style={{ border: "1px solid #ebe9f1" }}>
+          <div className="p-2 bg-light/50 border-bottom">
+            <div className="relative">
+              <input
+                autoFocus
+                type="text"
+                className="form-control form-control-sm border-gray-200"
+                placeholder="Type to search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ fontSize: "12px", borderRadius: "15px", paddingLeft: "15px" }}
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            <div
+              className={`px-3 py-2 text-xs cursor-pointer hover:bg-primary/5 transition-colors ${!selectedId ? 'bg-primary/10 text-primary font-bold' : 'text-muted'}`}
+              onClick={() => { onSelect(""); setIsOpen(false); setSearch(""); }}
+            >
+              All Customers
+            </div>
+            {filtered.map(c => (
+              <div
+                key={c.id}
+                className={`px-3 py-2 text-xs cursor-pointer hover:bg-primary/5 transition-colors border-top border-gray-50 ${selectedId == c.id ? 'bg-primary/10 text-primary font-bold' : 'text-gray-700'}`}
+                onClick={() => { onSelect(c.id); setIsOpen(false); setSearch(""); }}
+              >
+                {c.firstname} {c.lastname}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-4 text-xs text-muted text-center italic">
+                No customers found matching "{search}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function PaymentsFinance({
   ledger,
@@ -25,7 +112,8 @@ export default function PaymentsFinance({
 
   user = {},
   notifications = [],
-  messages = []
+  messages = [],
+  printSettings = {}
 }) {
   const [activeTab, setActiveTab] = useState(filters.tab || "receivables");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +149,15 @@ export default function PaymentsFinance({
   const [filepath, setFilepath] = useState("");
   const [receiptToPrint, setReceiptToPrint] = useState(null);
   const [selectedReceivable, setSelectedReceivable] = useState(null);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [billingForm, setBillingForm] = useState({
+    name: "",
+    company_name: "",
+    address: ""
+  });
+  const [billingToPrint, setBillingToPrint] = useState(null);
+  const [selectionWarning, setSelectionWarning] = useState(null);
 
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false,
@@ -76,6 +173,8 @@ export default function PaymentsFinance({
     if (auth.user.role === 'admin') return true;
     return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
   };
+  const capitalizeName = (name = '') => name.replace(/\b\w/g, char => char.toUpperCase());
+
 
   const [expenseForm, setExpenseForm] = useState({
     category: expenseCategories[0] || "supplies",
@@ -106,10 +205,125 @@ export default function PaymentsFinance({
 
   const handleTabChange = (key) => {
     setActiveTab(key);
+    setSelectedItems([]); // Clear selection when switching tabs
 
     const url = new URL(window.location.href);
     url.searchParams.set('tab', key);
     window.history.replaceState({}, '', url);
+  };
+
+  const toggleSelection = (row) => {
+    const id = row.id || row.ticket_id;
+    const customerId = row.customer_id || 'walk-in';
+
+    setSelectedItems(prev => {
+      // If unselecting
+      if (prev.includes(id)) {
+        return prev.filter(item => item !== id);
+      }
+
+      // If selecting a new item, check if it matches existing selections' customer
+      if (prev.length > 0) {
+        // Find one already selected item to get its customer_id
+        let referenceItem = null;
+        if (activeTab === 'receivables') {
+          referenceItem = filteredReceivables.find(r => r.id === prev[0] || r.ticket_id === prev[0]);
+        } else if (activeTab === 'pending_payments') {
+          referenceItem = pendingPayments.find(p => p.id === prev[0]);
+        }
+
+        const refCustomerId = referenceItem?.customer_id || 'walk-in';
+
+        if (refCustomerId !== customerId) {
+          setSelectionWarning(`Limited to one customer per statement (${referenceItem?.name || referenceItem?.payer_name || 'Current'}).`);
+          setTimeout(() => setSelectionWarning(null), 5000);
+          return prev;
+        }
+      }
+      setSelectionWarning(null);
+
+      return [...prev, id];
+    });
+  };
+
+  const handleGenerateStatement = () => {
+    if (selectedItems.length === 0) return;
+
+    // Get selected data objects
+    let selectedData = [];
+    if (activeTab === 'receivables') {
+      selectedData = filteredReceivables.filter(r => selectedItems.includes(r.id) || selectedItems.includes(r.ticket_id));
+    } else if (activeTab === 'pending_payments') {
+      selectedData = pendingPayments.filter(p => selectedItems.includes(p.id));
+    }
+
+    // Validate: All selected items must belong to the same customer
+    const customerIds = [...new Set(selectedData.map(item => item.customer_id || 'walk-in'))];
+    if (customerIds.length > 1) {
+      setConfirmConfig({
+        isOpen: true,
+        title: "Inconsistent Selection",
+        description: "You have selected items belonging to multiple different customers.",
+        subtitle: "A billing statement is designed for a single customer. Please select only items related to one client (e.g., tickets for the same person or company).",
+        color: "warning",
+        label: "Got it, I'll reselect",
+        onConfirm: () => setConfirmConfig({ isOpen: false })
+      });
+      return;
+    }
+
+    const firstItem = selectedData[0];
+
+    if (firstItem) {
+      // For more specific address/name if available from customer object
+      const customerObj = firstItem.customer || {};
+      const fullName = customerObj.full_name || firstItem.name || firstItem.payer_name || (customerObj.firstname ? `${customerObj.firstname} ${customerObj.lastname}` : "");
+
+      setBillingForm({
+        name: fullName,
+        company_name: "", // Manual input as requested
+        address: customerObj.address || ""
+      });
+      setBillingModalOpen(true);
+    }
+  };
+
+  const handlePrintBillingStatement = () => {
+    // Collect all selected items data
+    let selectedData = [];
+    if (activeTab === 'receivables') {
+      selectedData = filteredReceivables.filter(r => selectedItems.includes(r.id) || selectedItems.includes(r.ticket_id));
+    } else if (activeTab === 'pending_payments') {
+      selectedData = pendingPayments.filter(p => selectedItems.includes(p.id));
+    }
+
+    const billingData = {
+      customerName: capitalizeName(billingForm.name),
+      companyName: capitalizeName(billingForm.company_name),
+      address: billingForm.address,
+      date: new Date().toLocaleDateString(),
+      tickets: selectedData,
+      summary: {
+        totalBalanceDue: selectedData.reduce((sum, item) => sum + parseFloat(item.balance || item.amount || 0), 0),
+        credits: 0, // Could be calculated if needed
+        previousBalance: 0,
+      },
+      bankName: capitalizeName(printSettings?.bank_account?.bank_name),
+      accountName: capitalizeName(printSettings?.bank_account?.account_name),
+      accountNo: printSettings?.bank_account?.account_number,
+      qrCodeUrl: printSettings?.bank_account?.qrcode ? (printSettings.bank_account.qrcode.startsWith('/') ? printSettings.bank_account.qrcode : `/storage/${printSettings.bank_account.qrcode}`) : null
+    };
+
+    setBillingToPrint(billingData);
+    setBillingModalOpen(false);
+
+    document.body.classList.add("printing-billing");
+
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove("printing-billing");
+      setBillingToPrint(null);
+    }, 500);
   };
 
 
@@ -138,6 +352,36 @@ export default function PaymentsFinance({
 
   const renderTableControls = () =>
     <div className="flex items-center gap-2">
+      {selectionWarning && (
+        <div className="alert alert-warning py-1 m-0 flex items-center gap-2 animate-in fade-in slide-in-from-right-2" style={{ borderRadius: '5px', paddingLeft: '12px', paddingRight: '12px', border: '1px solid #ffd591', backgroundColor: '#fffbe6', color: '#856404', fontSize: '11px', fontWeight: 'bold' }}>
+          <i className="ti-alert"></i>
+          {selectionWarning}
+          <button type="button" className="close p-0 m-0 ml-2" onClick={() => setSelectionWarning(null)} style={{ fontSize: '16px', lineHeight: '1', color: 'inherit', float: 'none', opacity: '0.5' }}>&times;</button>
+        </div>
+      )}
+      {selectedItems.length > 0 && (activeTab === 'receivables' || activeTab === 'pending_payments') && (
+        <div className="flex items-center gap-1 bg-info/10 p-1 px-2 rounded-md border border-info/20">
+          <span className="text-xs font-bold text-info uppercase mr-2 tracking-tighter">
+            {selectedItems.length} Selected
+          </span>
+          <button
+            className="btn btn-sm btn-info btn-rounded-md"
+            onClick={handleGenerateStatement}
+            style={{ padding: "0 15px", height: "32px", display: "flex", alignItems: "center", gap: "5px" }}
+          >
+            <i className="ti-printer"></i>
+            Generate
+          </button>
+          <button
+            className="btn btn-sm btn-light btn-outline btn-rounded"
+            onClick={() => setSelectedItems([])}
+            title="Clear Selection"
+            style={{ width: "32px", height: "32px", padding: "0" }}
+          >
+            <i className="ti-close"></i>
+          </button>
+        </div>
+      )}
       {activeTab === "ledger" &&
         <select
           className="form-control form-control-sm"
@@ -153,6 +397,13 @@ export default function PaymentsFinance({
           <option value="rejected">Rejected</option>
         </select>
       }
+      <SearchableCustomerFilter
+        customers={customers}
+        selectedId={filters.customer_id}
+        onSelect={(id) => {
+          router.get(buildUrl("finance"), { ...filters, customer_id: id, receivables_page: 1, ledger_page: 1 }, { preserveState: true });
+        }}
+      />
       <div className="relative">
         <input
           type="text"
@@ -161,7 +412,7 @@ export default function PaymentsFinance({
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          style={{ width: "200px", borderRadius: "5px", paddingRight: "30px" }} />
+          style={{ width: "200px", borderRadius: "5px", paddingRight: "30px", height: "32px" }} />
 
         <i
           className="ti-search absolute text-muted cursor-pointer"
@@ -183,7 +434,7 @@ export default function PaymentsFinance({
 
   const tabs = [
     { key: "receivables", label: "Receivables" },
-    { key: "pending_payments", label: `Pending Payments (${summary?.pending_cheques_count || 0})` },
+    { key: "pending_payments", label: `Pending Payments (${(summary?.pending_cheques_count || 0) + (summary?.pending_government_count || 0)})` },
     { key: "ledger", label: "Payment Ledger" },
     { key: "expenses", label: "Expenses" }];
 
@@ -208,6 +459,33 @@ export default function PaymentsFinance({
       cheque_date: ""
     }));
     setPaymentErrors({});
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    setPaymentForm(prev => {
+      const updates = { ...prev, payment_method: method };
+
+      // Auto-fill amount and allocation for pending methods
+      if ((method === 'check' || method === 'government_ar') && prev.ticket_id) {
+        const ticket = openTickets.find(t => t.id === prev.ticket_id);
+        if (ticket) {
+          const subtotal = parseFloat(ticket.subtotal || ticket.total_amount || 0);
+          const disc = parseFloat(prev.discount || 0);
+          const total = subtotal - (subtotal * (disc / 100));
+          const paid = parseFloat(ticket.amount_paid || 0);
+          const balance = Math.max(0, total - paid);
+
+          if (balance > 0) {
+            updates.amount = balance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          }
+
+          if (method === 'government_ar') {
+            updates.allocation = 'government_charge';
+          }
+        }
+      }
+      return updates;
+    });
   };
 
   const resetExpenseForm = () => {
@@ -267,16 +545,17 @@ export default function PaymentsFinance({
       return;
     }
 
-    const isCheck = paymentForm.payment_method === 'check';
+    const isPending = ['check', 'government_ar'].includes(paymentForm.payment_method);
+    const methodLabel = paymentForm.payment_method === 'government_ar' ? 'Government AR' : paymentForm.payment_method.toUpperCase();
     const selectedTicket = openTickets.find((t) => t.id === paymentForm.ticket_id);
     const payerName = paymentForm.payer_name || (selectedTicket?.customer ? `${selectedTicket.customer.firstname} ${selectedTicket.customer.lastname}` : "Customer");
 
     setConfirmConfig({
       isOpen: true,
       title: "Confirm Payment Recording",
-      description: `Record ${paymentForm.payment_method.toUpperCase()} payment?`,
-      subtitle: isCheck ?
-        `You are about to record a PENDING cheque payment of ${formatPeso(paymentForm.amount)} for ${payerName}. This will not update the ticket balance until cleared.` :
+      description: `Record ${methodLabel} payment?`,
+      subtitle: isPending ?
+        `You are about to record a PENDING ${methodLabel} payment of ${formatPeso(paymentForm.amount)} for ${payerName}. This will not update the ticket balance until cleared/collected.` :
         `You are about to record a payment of ${formatPeso(paymentForm.amount)} for ${payerName}.`,
       color: "success",
       label: "Save Payment",
@@ -288,9 +567,28 @@ export default function PaymentsFinance({
   const processPaymentSubmit = async () => {
     const formData = new FormData();
 
+    // Calculate the actual amount to record (cap at balance if ticket exists)
+    let actualAmount = parseFloat(String(paymentForm.amount || 0).replace(/,/g, ''));
+    
+    if (paymentForm.ticket_id) {
+      const selectedTicket = openTickets.find((t) => t.id === paymentForm.ticket_id);
+      if (selectedTicket) {
+        const subtotal = parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0);
+        const discountPercent = parseFloat(paymentForm.discount || 0);
+        const discountAmount = subtotal * (discountPercent / 100);
+        const ticketTotal = subtotal - discountAmount;
+        const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
+        const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
+        
+        // Only cap if there's a balance and payment exceeds it (to avoid inflating sales)
+        if (balanceBeforePayment > 0 && actualAmount > balanceBeforePayment) {
+          actualAmount = balanceBeforePayment;
+        }
+      }
+    }
 
     let finalMetadata = {};
-    if (paymentForm.payment_method === 'check') {
+    if (['check', 'government_ar'].includes(paymentForm.payment_method)) {
       finalMetadata = {
         bank_name: paymentForm.bank_name,
         cheque_number: paymentForm.cheque_number,
@@ -302,8 +600,10 @@ export default function PaymentsFinance({
     Object.entries(paymentForm).forEach(([key, value]) => {
       if (key === "attachments") {
         value.forEach((file) => formData.append("attachments[]", file));
-      } else if (key === "amount" || key === "discount") {
-
+      } else if (key === "amount") {
+        // Use the calculated actual amount (capped at balance) instead of raw input
+        formData.append(key, actualAmount.toString());
+      } else if (key === "discount") {
         formData.append(key, String(value).replace(/,/g, ''));
       } else if (['bank_name', 'cheque_number', 'cheque_date'].includes(key)) {
 
@@ -491,7 +791,36 @@ export default function PaymentsFinance({
     });
   };
 
+  const handleQuickUpload = async (paymentId, file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('attachments[]', file);
+
+    try {
+      await api.post(`/payments/${paymentId}/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      router.reload({ preserveScroll: true });
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Failed to upload evidence.");
+    }
+  };
+
   const ledgerColumns = [
+    {
+      label: (activeTab === 'pending_payments') ? "Select" : "",
+      render: (row) => (activeTab === 'pending_payments') ? (
+        <input
+          type="checkbox"
+          checked={selectedItems.includes(row.id)}
+          onChange={() => toggleSelection(row)}
+          style={{ width: '18px', height: '18px' }}
+        />
+      ) : null,
+      hide: activeTab !== 'pending_payments'
+    },
     {
       label: "Date",
       render: (row) =>
@@ -519,12 +848,21 @@ export default function PaymentsFinance({
     {
       label: "Method",
       render: (row) =>
-        <div>
-          <div>{row.payment_method ? row.payment_method.replace("_", " ") : "—"}</div>
+        <div className="flex flex-col">
+          <div className="flex items-center">
+            {row.payment_method === 'check' && <i className="ti-wallet text-primary mr-1" title="Cheque"></i>}
+            {row.payment_method === 'government_ar' && <i className="ti-layout-grid2 text-info mr-1" title="Government AR"></i>}
+            <span className="font-medium">
+              {row.payment_method === 'government_ar' ? "Govt (On Account)" : (row.payment_method ? row.payment_method.replace("_", " ") : "—")}
+            </span>
+          </div>
           {row.payment_method === 'check' && row.metadata &&
-            <div className="text-xs text-muted">
+            <div className="text-[10px] text-muted leading-tight">
               {row.metadata.bank_name} | {row.metadata.cheque_number}
             </div>
+          }
+          {row.payment_method === 'government_ar' &&
+            <span className="text-[10px] text-info font-bold uppercase tracking-tighter">DELAYED PAYMENT</span>
           }
         </div>
 
@@ -564,8 +902,19 @@ export default function PaymentsFinance({
             </button>
           </> :
 
-
-          <span className="badge badge-light text-muted">None</span>
+          <div className="flex items-center gap-1">
+            <span className="badge badge-light text-muted">None</span>
+            {row.status === 'pending' && (
+              <label className="mb-0 cursor-pointer text-primary" title="Upload Proof">
+                <i className="ti-upload"></i>
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => handleQuickUpload(row.id, e.target.files[0])}
+                />
+              </label>
+            )}
+          </div>
 
     },
     {
@@ -604,6 +953,17 @@ export default function PaymentsFinance({
 
 
   const receivablesColumns = [
+    {
+      label: "Select",
+      render: (row) => (
+        <input
+          type="checkbox"
+          checked={selectedItems.includes(row.id || row.ticket_id)}
+          onChange={() => toggleSelection(row)}
+          style={{ width: '18px', height: '18px' }}
+        />
+      )
+    },
     {
       label: "Ticket #",
       render: (row) =>
@@ -701,25 +1061,25 @@ export default function PaymentsFinance({
 
   const renderSummaryCards = () =>
     <div className="row">
-      <div className="col-lg-3 col-md-6">
+      <div className="col-lg-2 col-md-6">
         <div className="card">
           <div className="card-body">
-            <h5>Collections (This Month)</h5>
+            <h5>Collections (Month)</h5>
             <h2 className="m-b-0">{formatPeso(summary.collections_month)}</h2>
           </div>
         </div>
       </div>
-      <div className="col-lg-3 col-md-6">
+      <div className="col-lg-2 col-md-6">
         <div className="card">
           <div className="card-body">
-            <h5>Expenses (This Month)</h5>
+            <h5>Expenses (Month)</h5>
             <h2 className="m-b-0 text-danger">
               {formatPeso(summary.expenses_month)}
             </h2>
           </div>
         </div>
       </div>
-      <div className="col-lg-3 col-md-6">
+      <div className="col-lg-2 col-md-4">
         <div className="card">
           <div className="card-body">
             <h5>Net Cash Flow</h5>
@@ -734,7 +1094,21 @@ export default function PaymentsFinance({
           </div>
         </div>
       </div>
-      <div className="col-lg-3 col-md-6">
+      <div className="col-lg-3 col-md-4">
+        <div className="card">
+          <div className="card-body">
+            <h5>Collectable (Pending)</h5>
+            <h2 className="m-b-0 text-warning">
+              {formatPeso(summary.collectable_total || 0)}
+            </h2>
+            <div className="text-xs uppercase mt-1 opacity-75">
+              CQ: {formatPeso(summary.pending_cheques_total || 0)} |
+              GOVT: {formatPeso(summary.pending_government_total || 0)}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="col-lg-3 col-md-4">
         <div className="card">
           <div className="card-body">
             <h5>Receivables</h5>
@@ -760,7 +1134,7 @@ export default function PaymentsFinance({
             </div>
             <div className="card-body">
               <DataTable
-                columns={ledgerColumns}
+                columns={ledgerColumns.filter(c => !c.hide)}
                 data={ledger?.data || []}
                 pagination={ledger}
                 emptyMessage="No payments recorded yet." />
@@ -770,16 +1144,45 @@ export default function PaymentsFinance({
 
       case "pending_payments":
         return (
-          <div className="card">
-            <div className="card-title">
-              <h4>Pending Payments (Cheques)</h4>
+          <div className="space-y-4">
+            <div className="row">
+              <div className="col-md-6">
+                <div className="card bg-light border">
+                  <div className="card-body py-3">
+                    <h6 className="text-muted uppercase text-xs font-bold mb-2">Pending Cheques</h6>
+                    <div className="flex justify-between items-end">
+                      <h3 className="mb-0 text-primary">{formatPeso(summary.pending_cheques_total || 0)}</h3>
+                      <span className="badge badge-primary">{summary.pending_cheques_count || 0} items</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="card bg-light border">
+                  <div className="card-body py-3">
+                    <h6 className="text-muted uppercase text-xs font-bold mb-2">Government AR (Delayed)</h6>
+                    <div className="flex justify-between items-end">
+                      <h3 className="mb-0 text-info">{formatPeso(summary.pending_government_total || 0)}</h3>
+                      <span className="badge badge-info">{summary.pending_government_count || 0} items</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="card-body">
-              <DataTable
-                columns={ledgerColumns}
-                data={pendingPayments}
-                emptyMessage="No pending cheque payments." />
 
+            <div className="card">
+              <div className="card-title p-3 border-bottom flex justify-between items-center">
+                <h4 className="mb-0">All Pending Items</h4>
+                <div className="text-sm font-bold border-l pl-3">
+                  TOTAL COLLECTABLE: <span className="text-primary">{formatPeso(summary.collectable_total || 0)}</span>
+                </div>
+              </div>
+              <div className="card-body">
+                <DataTable
+                  columns={ledgerColumns.filter(c => !c.hide)}
+                  data={pendingPayments}
+                  emptyMessage="No pending payments found." />
+              </div>
             </div>
           </div>);
 
@@ -846,466 +1249,542 @@ export default function PaymentsFinance({
     }));
   };
 
-  const renderPaymentModal = () =>
+  const renderBillingModal = () => (
     <Modal
-      title="Record Payment"
-      isOpen={paymentModalOpen}
-      onClose={() => {
-        setPaymentModalOpen(false);
-        resetPaymentForm();
-      }}
-      size="6xl"
-      staticBackdrop={true}>
-
-      {/* Header - Customer and Ticket Info */}
-      <div className="mb-4 pb-3 border-bottom">
-        <label className="form-label text-gray-500 uppercase text-xs font-bold">Process Payment For</label>
-        <div className="text-xl font-bold text-primary mb-2">
-          {paymentForm.payer_name || "Selected Customer"}
-        </div>
-        {paymentForm.ticket_id &&
-          <div className="text-sm text-gray-600 mb-2">
-            <i className="ti-ticket mr-1"></i>
-            Ticket: {openTickets.find((t) => t.id === paymentForm.ticket_id)?.ticket_number || `#${paymentForm.ticket_id}`}
-          </div>
-        }
-      </div>
-
+      title="Prepare Billing Statement"
+      isOpen={billingModalOpen}
+      onClose={() => setBillingModalOpen(false)}
+      size="lg"
+    >
       <div className="row">
-        {/* LEFT COLUMN - Payment Summary  */}
-        <div className="col-md-5">
-          {selectedReceivable?.has_rejected_payment &&
-            <div className="alert alert-danger mb-4">
-              <h6 className="font-bold">
-                <i className="ti-alert mr-2"></i>
-                PREVIOUS PAYMENT REJECTED
-              </h6>
-              <div className="text-xs uppercase mt-1">
-                <strong>Date:</strong> {new Date(selectedReceivable.last_rejected_payment.payment_date).toLocaleDateString()} <br />
-                <strong>Method:</strong> {selectedReceivable.last_rejected_payment.payment_method} <br />
-                {selectedReceivable.last_rejected_payment.metadata &&
-                  <>
-                    <strong>Bank/Cheque #:</strong> {selectedReceivable.last_rejected_payment.metadata.bank_name} | {selectedReceivable.last_rejected_payment.metadata.cheque_number} <br />
-                  </>
-                }
-                <strong>Reason:</strong> {selectedReceivable.last_rejected_payment.notes || "No reason provided"}
-              </div>
-            </div>
-          }
-          {paymentForm.ticket_id && (() => {
-            const selectedTicket = openTickets.find((t) => t.id === paymentForm.ticket_id);
-            if (!selectedTicket) return null;
-
-            const isCheck = paymentForm.payment_method === 'check';
-
-
-            const subtotal = parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0);
-            const discountPercent = parseFloat(paymentForm.discount || 0);
-            const discountAmount = subtotal * (discountPercent / 100);
-            const ticketTotal = subtotal - discountAmount;
-
-            const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
-
-            const currentPayment = parseFloat(String(paymentForm.amount || 0).replace(/,/g, ''));
-            const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
-            const balanceAfterPayment = Math.max(balanceBeforePayment - currentPayment, 0);
-            const change = currentPayment > balanceBeforePayment ? currentPayment - balanceBeforePayment : 0;
-
-            return (
-              <div className="card border-2 border-primary shadow-sm" style={{ position: 'sticky', top: '0' }}>
-                <div className="card-body bg-light p-0">
-                  <div className="p-3 bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 className="card-title text-white mb-0">
-                      <i className="ti-receipt mr-2"></i>
-                      Payment Summary
-                    </h5>
-                    {/* <span className="badge badge-light text-primary">POS MODE</span> */}
-                  </div>
-
-                  <div className="p-3 space-y-2">
-                    {/* Ticket Description */}
-                    {selectedTicket.description &&
-                      <div className="pb-2 mb-2 border-bottom">
-                        <small className="text-muted uppercase text-xs font-bold">Item/Description:</small>
-                        <div className="font-weight-bold text-dark">{selectedTicket.description}</div>
-                      </div>
-                    }
-
-                    {/* Subtotal */}
-                    <div className="d-flex justify-content-between align-items-center py-1">
-                      <span className="text-muted">Subtotal:</span>
-                      <span className="font-weight-bold">
-                        {formatPeso(subtotal)}
-                      </span>
-                    </div>
-
-                    {/* Discount */}
-                    {discountPercent > 0 &&
-                      <div className="d-flex justify-content-between align-items-center py-1 text-success">
-                        <span>
-                          <i className="ti-tag mr-1"></i>
-                          Discount ({discountPercent}%):
-                        </span>
-                        <span className="font-weight-bold">
-                          -{formatPeso(discountAmount)}
-                        </span>
-                      </div>
-                    }
-
-                    {/* Ticket Total (After Discount) */}
-                    <div className="d-flex justify-content-between align-items-center py-2 border-top mt-2">
-                      <span className="font-bold">Net Amount:</span>
-                      <span className="font-bold">
-                        {formatPeso(ticketTotal)}
-                      </span>
-                    </div>
-
-                    {/* Previous Payments */}
-                    {previousPayments > 0 &&
-                      <div className="d-flex justify-content-between align-items-center py-1">
-                        <span className="text-muted">Less: Paid:</span>
-                        <span className="text-info">
-                          -{formatPeso(previousPayments)}
-                        </span>
-                      </div>
-                    }
-
-                    {/* Balance Before Payment */}
-                    <div className="d-flex justify-content-between align-items-center py-3 border-top border-bottom my-2 bg-white px-3 rounded-lg shadow-sm">
-                      <span className="font-weight-bold text-uppercase text-xs tracking-wider">Balance Due:</span>
-                      <span className="font-weight-bold text-danger" style={{ fontSize: '1.4rem' }}>
-                        {formatPeso(balanceBeforePayment)}
-                      </span>
-                    </div>
-
-                    {/* Current Payment */}
-                    {currentPayment > 0 &&
-                      <>
-                        <div className="d-flex justify-content-between align-items-center py-2 bg-primary px-3 rounded text-white shadow-sm">
-                          <span className="font-weight-bold">
-                            <i className="ti-wallet mr-1"></i>
-                            Paying Now:
-                          </span>
-                          <span className="font-weight-bold" style={{ fontSize: '1.2rem' }}>
-                            {formatPeso(currentPayment)}
-                          </span>
-                        </div>
-
-                        {/* Balance After Payment */}
-                        <div className="d-flex justify-content-between align-items-center py-2 mt-2 px-3">
-                          <span className="text-muted small text-uppercase font-bold">
-                            Remaining:
-                          </span>
-                          <div className="text-right">
-                            <span className={`font-weight-bold ${balanceAfterPayment === 0 ? 'text-success' : 'text-warning'}`}>
-                              {formatPeso(balanceAfterPayment)}
-                            </span>
-                            {isCheck &&
-                              <div className="text-danger font-bold text-[10px] uppercase">
-                                (Pending Clearance)
-                              </div>
-                            }
-                          </div>
-                        </div>
-
-                        {/* Change */}
-                        {change > 0 &&
-                          <div className="mt-3 p-3 bg-success text-white rounded-lg shadow-sm">
-                            <div className="d-flex justify-content-between align-items-center">
-                              <span className="font-weight-bold text-uppercase text-xs">
-                                Change:
-                              </span>
-                              <span className="font-weight-bold" style={{ fontSize: '1.5rem' }}>
-                                {formatPeso(change)}
-                              </span>
-                            </div>
-                          </div>
-                        }
-
-                        {balanceAfterPayment === 0 && change === 0 &&
-                          <div className="mt-3 p-2 bg-success text-white rounded text-center font-bold text-uppercase text-sm shadow-sm">
-                            <i className="ti-check-box mr-2"></i>
-                            Paid In Full
-                          </div>
-                        }
-                      </>
-                    }
-                  </div>
-                </div>
-              </div>);
-
-          })()}
-        </div>
-        {/* RIGHT COLUMN - Form Fields  */}
-        <div className="col-md-7">
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label">Payment Date</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={paymentForm.payment_date}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      payment_date: e.target.value
-                    })
-                  } />
-
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label">Payment Method</label>
-                <select
-                  className="form-control"
-                  value={paymentForm.payment_method}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      payment_method: e.target.value
-                    })
-                  }>
-
-                  {paymentMethods.map((method) =>
-                    <option key={method} value={method}>
-                      {method.replace("_", " ")}
-                    </option>
-                  )}
-                </select>
-              </div>
-            </div>
-
-            {paymentForm.payment_method === 'check' &&
-              <>
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label className="form-label font-bold text-primary">Bank Name</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. BDO, BPI, MBTC"
-                      value={paymentForm.bank_name}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, bank_name: e.target.value })} />
-
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label className="form-label font-bold text-primary">Cheque #</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={paymentForm.cheque_number}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, cheque_number: e.target.value })} />
-
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label className="form-label font-bold text-primary">Cheque Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={paymentForm.cheque_date}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, cheque_date: e.target.value })} />
-
-                  </div>
-                </div>
-              </>
-            }
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label font-bold text-success">Discount (%)</label>
-                <div className="input-group">
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={paymentForm.discount}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, discount: e.target.value })}
-                    disabled={!hasPermission('tickets', 'price_edit')} />
-
-                  <div className="input-group-append">
-                    <span className="input-group-text bg-success text-white">%</span>
-                  </div>
-                </div>
-                {!hasPermission('tickets', 'price_edit') &&
-                  <small className="text-muted">No permission to edit discount.</small>
-                }
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label font-bold text-primary">Amount Received (₱)</label>
-                <div className="input-group">
-                  <div className="input-group-prepend">
-                    <span className="input-group-text bg-primary text-white">₱</span>
-                  </div>
-                  <input
-                    type="text"
-                    className={`form-control form-control-lg font-bold ${paymentErrors.amount ? "border-danger" : ""}`}
-                    placeholder="0.00"
-                    value={paymentForm.amount}
-                    onChange={(e) => {
-                      handleCurrencyInputChange(setPaymentForm, paymentForm, 'amount', e.target.value);
-                      if (paymentErrors.amount) {
-                        setPaymentErrors({ ...paymentErrors, amount: "" });
-                      }
-                    }} />
-
-                </div>
-                {paymentErrors.amount &&
-                  <span className="text-danger small">{paymentErrors.amount}</span>
-                }
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label">Allocation</label>
-                <select
-                  className="form-control"
-                  value={paymentForm.allocation}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      allocation: e.target.value
-                    })
-                  }>
-
-                  <option value="downpayment">Downpayment</option>
-                  <option value="balance">Balance</option>
-                  <option value="full">Full Payment</option>
-                </select>
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label">Official Receipt #</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={paymentForm.official_receipt_number}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      official_receipt_number: e.target.value
-                    })
-                  } />
-
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group">
-                <label className="form-label">Reference # / GCash Trace</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={paymentForm.payment_reference}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      payment_reference: e.target.value
-                    })
-                  } />
-
-              </div>
-            </div>
-            <div className="col-md-12">
-              <div className="form-group">
-                <label className="form-label">Invoice # (optional)</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={paymentForm.invoice_number}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      invoice_number: e.target.value
-                    })
-                  } />
-
-              </div>
-            </div>
-            <div className="col-md-12">
-              <div className="form-group">
-                <label className="form-label">Notes</label>
-                <textarea
-                  className="form-control"
-                  rows="3"
-                  placeholder="Add context – downpayment collected, GCash details, etc."
-                  value={paymentForm.notes}
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      notes: e.target.value
-                    })
-                  }>
-                </textarea>
-              </div>
-            </div>
-            <div className="col-md-12">
-              <div className="form-group">
-                <label className="form-label">Attachments (GCash / Bank proof)</label>
-                <input
-                  type="file"
-                  className="form-control"
-                  multiple
-                  onChange={(e) =>
-                    setPaymentForm({
-                      ...paymentForm,
-                      attachments: Array.from(e.target.files)
-                    })
-                  } />
-
-              </div>
-            </div>
+        <div className="col-md-12">
+          <div className="alert alert-info py-2">
+            <i className="ti-info-alt mr-2"></i>
+            Customizing these fields will only affect the printed billing statement.
           </div>
         </div>
-
-
-
-      </div>
-      {
-        paymentErrors.submit &&
-        <div className="alert alert-danger mt-3">
-          <i className="ti-alert mr-2"></i>
-          {paymentErrors.submit}
+        <div className="col-md-12 mb-3">
+          <label className="form-label">Customer Name</label>
+          <input
+            type="text"
+            className="form-control"
+            value={billingForm.name}
+            onChange={(e) => setBillingForm({ ...billingForm, name: e.target.value })}
+          />
+        </div>
+        <div className="col-md-12 mb-3">
+          <label className="form-label">Company Name (Optional)</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder=""
+            value={billingForm.company_name}
+            onChange={(e) => setBillingForm({ ...billingForm, company_name: e.target.value })}
+          />
+        </div>
+        <div className="col-md-12 mb-3">
+          <label className="form-label">Address</label>
+          <textarea
+            className="form-control"
+            rows="3"
+            value={billingForm.address}
+            onChange={(e) => setBillingForm({ ...billingForm, address: e.target.value })}
+          ></textarea>
         </div>
 
-      }
-      <div className="flex justify-end gap-3 mt-6 border-t pt-4">
-        <button
-          className="btn btn-secondary"
-          onClick={() => {
-            setPaymentModalOpen(false);
-            resetPaymentForm();
-          }}
-          disabled={isSubmitting}>
+        <div className="col-md-12 mt-3 p-3 bg-light rounded">
+          <h6 className="font-bold border-bottom pb-2 mb-2 uppercase text-xs">Summary of Selection</h6>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-muted">Selected Items:</span>
+            <span className="font-bold">{selectedItems.length}</span>
+          </div>
+          <div className="flex justify-between items-center text-primary font-bold">
+            <span>Total Statement Amount:</span>
+            <span>
+              {formatPeso(
+                (activeTab === 'receivables' ? filteredReceivables : pendingPayments)
+                  .filter(item => selectedItems.includes(item.id) || selectedItems.includes(item.ticket_id))
+                  .reduce((sum, item) => sum + parseFloat(item.balance || item.amount || 0), 0)
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
 
+      <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+        <button className="btn btn-secondary" onClick={() => setBillingModalOpen(false)}>
           Cancel
         </button>
-        <button
-          className="btn btn-primary"
-          onClick={handlePaymentSubmit}
-          disabled={isSubmitting}>
-
-          {isSubmitting ?
-            <>
-              <i className="fa fa-spinner fa-spin m-r-5"></i> Saving...
-            </> :
-
-            <>
-              <i className="ti-check m-r-5"></i> Save Payment
-            </>
-          }
+        <button className="btn btn-primary" onClick={handlePrintBillingStatement}>
+          <i className="ti-printer mr-2"></i>
+          Print Billing Statement
         </button>
       </div>
-    </Modal>;
+    </Modal>
+  );
+
+  const renderPaymentModal = () => {
+    const isCheck = paymentForm.payment_method === 'check';
+    const isGovernment = paymentForm.payment_method === 'government_ar';
+    const isPending = isCheck || isGovernment;
+
+    return (
+      <Modal
+        title="Record Payment"
+        isOpen={paymentModalOpen}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          resetPaymentForm();
+        }}
+        size="6xl"
+        staticBackdrop={true}>
+
+        {/* Header - Customer and Ticket Info */}
+        <div className="mb-4 pb-3 border-bottom">
+          <label className="form-label text-gray-500 uppercase text-xs font-bold">Process Payment For</label>
+          <div className="text-xl font-bold text-primary mb-2">
+            {paymentForm.payer_name || "Selected Customer"}
+          </div>
+          {paymentForm.ticket_id &&
+            <div className="text-sm text-gray-600 mb-2">
+              <i className="ti-ticket mr-1"></i>
+              Ticket: {openTickets.find((t) => t.id === paymentForm.ticket_id)?.ticket_number || `#${paymentForm.ticket_id}`}
+            </div>
+          }
+        </div>
+
+        <div className="row">
+          {/* LEFT COLUMN - Payment Summary  */}
+          <div className="col-md-5">
+            {selectedReceivable?.has_rejected_payment &&
+              <div className="alert alert-danger mb-4">
+                <h6 className="font-bold">
+                  <i className="ti-alert mr-2"></i>
+                  PREVIOUS PAYMENT REJECTED
+                </h6>
+                <div className="text-xs uppercase mt-1">
+                  <strong>Date:</strong> {new Date(selectedReceivable.last_rejected_payment.payment_date).toLocaleDateString()} <br />
+                  <strong>Method:</strong> {selectedReceivable.last_rejected_payment.payment_method} <br />
+                  {selectedReceivable.last_rejected_payment.metadata &&
+                    <>
+                      <strong>Bank/Cheque #:</strong> {selectedReceivable.last_rejected_payment.metadata.bank_name} | {selectedReceivable.last_rejected_payment.metadata.cheque_number} <br />
+                    </>
+                  }
+                  <strong>Reason:</strong> {selectedReceivable.last_rejected_payment.notes || "No reason provided"}
+                </div>
+              </div>
+            }
+            {paymentForm.ticket_id && (() => {
+              const selectedTicket = openTickets.find((t) => t.id === paymentForm.ticket_id);
+              if (!selectedTicket) return null;
+
+              const isCheckSummary = paymentForm.payment_method === 'check';
+              const isGovSummary = paymentForm.payment_method === 'government_ar';
+              const isPendingSummary = isCheckSummary || isGovSummary;
+
+
+              const subtotal = parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0);
+              const discountPercent = parseFloat(paymentForm.discount || 0);
+              const discountAmount = subtotal * (discountPercent / 100);
+              const ticketTotal = subtotal - discountAmount;
+
+              const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
+
+              const currentPayment = parseFloat(String(paymentForm.amount || 0).replace(/,/g, ''));
+              const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
+              const balanceAfterPayment = Math.max(balanceBeforePayment - currentPayment, 0);
+              const change = currentPayment > balanceBeforePayment ? currentPayment - balanceBeforePayment : 0;
+
+              return (
+                <div className="card border-2 border-primary shadow-sm" style={{ position: 'sticky', top: '0' }}>
+                  <div className="card-body bg-light p-0">
+                    <div className="p-3 bg-primary text-white d-flex justify-content-between align-items-center">
+                      <h5 className="card-title text-white mb-0">
+                        <i className="ti-receipt mr-2"></i>
+                        Payment Summary
+                      </h5>
+                      {/* <span className="badge badge-light text-primary">POS MODE</span> */}
+                    </div>
+
+                    <div className="p-3 space-y-2">
+                      {/* Ticket Description */}
+                      {selectedTicket.description &&
+                        <div className="pb-2 mb-2 border-bottom">
+                          <small className="text-muted uppercase text-xs font-bold">Item/Description:</small>
+                          <div className="font-weight-bold text-dark">{selectedTicket.description}</div>
+                        </div>
+                      }
+
+                      {/* Subtotal */}
+                      <div className="d-flex justify-content-between align-items-center py-1">
+                        <span className="text-muted">Subtotal:</span>
+                        <span className="font-weight-bold">
+                          {formatPeso(subtotal)}
+                        </span>
+                      </div>
+
+                      {/* Discount */}
+                      {discountPercent > 0 &&
+                        <div className="d-flex justify-content-between align-items-center py-1 text-success">
+                          <span>
+                            <i className="ti-tag mr-1"></i>
+                            Discount ({discountPercent}%):
+                          </span>
+                          <span className="font-weight-bold">
+                            -{formatPeso(discountAmount)}
+                          </span>
+                        </div>
+                      }
+
+                      {/* Ticket Total (After Discount) */}
+                      <div className="d-flex justify-content-between align-items-center py-2 border-top mt-2">
+                        <span className="font-bold">Net Amount:</span>
+                        <span className="font-bold">
+                          {formatPeso(ticketTotal)}
+                        </span>
+                      </div>
+
+                      {/* Previous Payments */}
+                      {previousPayments > 0 &&
+                        <div className="d-flex justify-content-between align-items-center py-1">
+                          <span className="text-muted">Less: Paid:</span>
+                          <span className="text-info">
+                            -{formatPeso(previousPayments)}
+                          </span>
+                        </div>
+                      }
+
+                      {/* Balance Before Payment */}
+                      <div className="d-flex justify-content-between align-items-center py-3 border-top border-bottom my-2 bg-white px-3 rounded-lg shadow-sm">
+                        <span className="font-weight-bold text-uppercase text-xs tracking-wider">Balance Due:</span>
+                        <span className="font-weight-bold text-danger" style={{ fontSize: '1.4rem' }}>
+                          {formatPeso(balanceBeforePayment)}
+                        </span>
+                      </div>
+
+                      {/* Current Payment */}
+                      {currentPayment > 0 &&
+                        <>
+                          <div className="d-flex justify-content-between align-items-center py-2 bg-primary px-3 rounded text-white shadow-sm">
+                            <span className="font-weight-bold">
+                              <i className="ti-wallet mr-1"></i>
+                              Paying Now:
+                            </span>
+                            <span className="font-weight-bold" style={{ fontSize: '1.2rem' }}>
+                              {formatPeso(currentPayment)}
+                            </span>
+                          </div>
+
+                          {/* Balance After Payment */}
+                          <div className="d-flex justify-content-between align-items-center py-2 mt-2 px-3">
+                            <span className="text-muted small text-uppercase font-bold">
+                              Remaining:
+                            </span>
+                            <div className="text-right">
+                              <span className={`font-weight-bold ${balanceAfterPayment === 0 ? 'text-success' : 'text-warning'}`}>
+                                {formatPeso(balanceAfterPayment)}
+                              </span>
+                              {isPendingSummary &&
+                                <div className="text-danger font-bold text-[10px] uppercase">
+                                  {isGovSummary ? "(Delayed Payment/AR)" : "(Pending Clearance)"}
+                                </div>
+                              }
+                            </div>
+                          </div>
+
+                          {/* Change */}
+                          {change > 0 &&
+                            <div className="mt-3 p-3 bg-success text-white rounded-lg shadow-sm">
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span className="font-weight-bold text-uppercase text-xs">
+                                  Change:
+                                </span>
+                                <span className="font-weight-bold" style={{ fontSize: '1.5rem' }}>
+                                  {formatPeso(change)}
+                                </span>
+                              </div>
+                            </div>
+                          }
+
+                          {balanceAfterPayment === 0 && change === 0 &&
+                            <div className="mt-3 p-2 bg-success text-white rounded text-center font-bold text-uppercase text-sm shadow-sm">
+                              <i className="ti-check-box mr-2"></i>
+                              {isPendingSummary ? (isGovSummary ? "Charged to Account" : "Settled (Pending)") : "Paid In Full"}
+                            </div>
+                          }
+                        </>
+                      }
+                    </div>
+                  </div>
+                </div>);
+
+            })()}
+          </div>
+          {/* RIGHT COLUMN - Form Fields  */}
+          <div className="col-md-7">
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label">Payment Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={paymentForm.payment_date}
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        payment_date: e.target.value
+                      })
+                    } />
+
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label">Payment Method</label>
+                  <select
+                    className="form-control"
+                    value={paymentForm.payment_method}
+                    onChange={(e) => handlePaymentMethodChange(e.target.value)}>
+                    {paymentMethods.map((method) =>
+                      <option key={method} value={method}>
+                        {method === 'government_ar' ? "Government (Delayed Payment)" : method.replace("_", " ")}
+                      </option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {paymentForm.payment_method === 'check' &&
+                <>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label className="form-label font-bold text-primary">Bank Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. BDO, BPI, MBTC"
+                        value={paymentForm.bank_name}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, bank_name: e.target.value })} />
+
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="form-group">
+                      <label className="form-label font-bold text-primary">Cheque #</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={paymentForm.cheque_number}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, cheque_number: e.target.value })} />
+
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="form-group">
+                      <label className="form-label font-bold text-primary">Cheque Date</label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={paymentForm.cheque_date}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, cheque_date: e.target.value })} />
+
+                    </div>
+                  </div>
+                </>
+              }
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label font-bold text-success">Discount (%)</label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      placeholder="0"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={paymentForm.discount}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, discount: e.target.value })}
+                      disabled={!hasPermission('tickets', 'price_edit')} />
+
+                    <div className="input-group-append">
+                      <span className="input-group-text bg-success text-white">%</span>
+                    </div>
+                  </div>
+                  {!hasPermission('tickets', 'price_edit') &&
+                    <small className="text-muted">No permission to edit discount.</small>
+                  }
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label font-bold text-primary">
+                    {isCheck ? "Cheque Amount (₱)" : isGovernment ? "Charge Amount (₱)" : "Amount Received (₱)"}
+                  </label>
+                  <div className="input-group">
+                    <div className="input-group-prepend">
+                      <span className="input-group-text bg-primary text-white">₱</span>
+                    </div>
+                    <input
+                      type="text"
+                      readOnly={isGovernment}
+                      className={`form-control form-control-lg font-bold ${isGovernment ? "bg-light" : ""} ${paymentErrors.amount ? "border-danger" : ""}`}
+                      placeholder="0.00"
+                      value={paymentForm.amount}
+                      onChange={(e) => {
+                        handleCurrencyInputChange(setPaymentForm, paymentForm, 'amount', e.target.value);
+                        if (paymentErrors.amount) {
+                          setPaymentErrors({ ...paymentErrors, amount: "" });
+                        }
+                      }} />
+
+                  </div>
+                  {paymentErrors.amount &&
+                    <span className="text-danger small">{paymentErrors.amount}</span>
+                  }
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label">Allocation</label>
+                  <select
+                    className="form-control"
+                    value={paymentForm.allocation}
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        allocation: e.target.value
+                      })
+                    }>
+
+                    <option value="downpayment">Downpayment</option>
+                    <option value="balance">Balance</option>
+                    <option value="full">Full Payment</option>
+                    <option value="government_charge">Government Charge (On Account)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label">Official Receipt #</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={paymentForm.official_receipt_number}
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        official_receipt_number: e.target.value
+                      })
+                    } />
+
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label">Reference # / GCash Trace</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={paymentForm.payment_reference}
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        payment_reference: e.target.value
+                      })
+                    } />
+
+                </div>
+              </div>
+              <div className="col-md-12">
+                <div className="form-group">
+                  <label className="form-label">Invoice # (optional)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={paymentForm.invoice_number}
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        invoice_number: e.target.value
+                      })
+                    } />
+
+                </div>
+              </div>
+              <div className="col-md-12">
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    placeholder="Add context – downpayment collected, GCash details, etc."
+                    value={paymentForm.notes}
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        notes: e.target.value
+                      })
+                    }>
+                  </textarea>
+                </div>
+              </div>
+              <div className="col-md-12">
+                <div className="form-group">
+                  <label className="form-label">Attachments (GCash / Bank proof)</label>
+                  <input
+                    type="file"
+                    className="form-control"
+                    multiple
+                    onChange={(e) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        attachments: Array.from(e.target.files)
+                      })
+                    } />
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+
+        </div>
+        {paymentErrors.submit &&
+          <div className="alert alert-danger mt-3">
+            <i className="ti-alert mr-2"></i>
+            {paymentErrors.submit}
+          </div>
+        }
+        <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setPaymentModalOpen(false);
+              resetPaymentForm();
+            }}
+            disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handlePaymentSubmit}
+            disabled={isSubmitting}>
+            {isSubmitting ?
+              <>
+                <i className="fa fa-spinner fa-spin m-r-5"></i> Saving...
+              </> :
+              <>
+                <i className="ti-check m-r-5"></i> Save Payment
+              </>
+            }
+          </button>
+        </div>
+      </Modal>
+    );
+  };
 
 
   const renderExpenseModal = () =>
@@ -1569,6 +2048,7 @@ export default function PaymentsFinance({
         </section>
 
         {renderPaymentModal()}
+        {renderBillingModal()}
         {renderExpenseModal()}
 
         <Modal
@@ -1600,12 +2080,13 @@ export default function PaymentsFinance({
                             size: portrait;
                             margin: 0;
                         }
-                        body.printing-receipt {
+                        body.printing-receipt, body.printing-billing {
                             visibility: hidden;
                             margin: 0;
                             padding: 0;
                         }
-                        body.printing-receipt .official-receipt-print-wrapper {
+                        body.printing-receipt .official-receipt-print-wrapper,
+                        body.printing-billing .billing-statement-print-wrapper {
                             visibility: visible;
                             position: absolute;
                             top: 0;
@@ -1620,11 +2101,9 @@ export default function PaymentsFinance({
                             display: block !important;
                         }
 
-                        body.printing-receipt .official-receipt-container {
+                        body.printing-receipt .official-receipt-container,
+                        body.printing-billing .billing-statement-container {
                             font-family: inherit !important;
-                            margin: 0 !important;
-                            width: 100% !important;
-                            max-width: none !important;
                             height: auto !important;
                             min-height: auto !important;
                             box-sizing: border-box !important;
@@ -1633,7 +2112,8 @@ export default function PaymentsFinance({
                             color-adjust: exact;
                         }
                         
-                        body.printing-receipt .official-receipt-print-wrapper * {
+                        body.printing-receipt .official-receipt-print-wrapper *,
+                        body.printing-billing .billing-statement-print-wrapper * {
                             visibility: visible;
                         }
                         /* Hide everything else explicitly */
@@ -1641,7 +2121,12 @@ export default function PaymentsFinance({
                         body.printing-receipt .modal,
                         body.printing-receipt nav,
                         body.printing-receipt header,
-                        body.printing-receipt aside {
+                        body.printing-receipt aside,
+                        body.printing-billing #main-content,
+                        body.printing-billing .modal,
+                        body.printing-billing nav,
+                        body.printing-billing header,
+                        body.printing-billing aside {
                             display: none !important;
                         }
                     }
@@ -1660,6 +2145,13 @@ export default function PaymentsFinance({
         <div className="official-receipt-print-wrapper" style={{ display: receiptToPrint ? 'block' : 'none' }}>
           <div className="hidden print:block">
             <OfficialReceipt payment={receiptToPrint} />
+          </div>
+        </div>
+
+        {/* Hidden Printable Billing Statement */}
+        <div className="billing-statement-print-wrapper" style={{ display: billingToPrint ? 'block' : 'none' }}>
+          <div className="hidden print:block">
+            <BillingStatement data={billingToPrint} />
           </div>
         </div>
       </AdminLayout>

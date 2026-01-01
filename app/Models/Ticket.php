@@ -42,6 +42,14 @@ class Ticket extends Model
         'is_workflow_completed',
         'workflow_started_at',
         'workflow_completed_at',
+        // Custom job type fields for "Others" category
+        'custom_job_type_description',
+        'custom_price_mode',
+        'custom_price_per_item',
+        'custom_fixed_total',
+        'is_size_based',
+        'custom_width',
+        'custom_height',
     ];
 
     protected $casts = [
@@ -465,5 +473,88 @@ class Ticket extends Model
         }
 
         return false;
+    }
+
+    /**
+     * Check if this ticket can be safely deleted
+     */
+    public function canBeDeleted(): array
+    {
+        $dependencies = $this->getDeletionDependencies();
+        
+        return [
+            'can_delete' => $dependencies['blocking_count'] === 0,
+            'dependencies' => $dependencies,
+            'warnings' => $this->getDeletionWarnings(),
+        ];
+    }
+
+    /**
+     * Get all dependencies that prevent deletion
+     */
+    public function getDeletionDependencies(): array
+    {
+        $payments = $this->payments()->count();
+        $postedPayments = $this->payments()->where('status', 'posted')->count();
+        $totalPaid = $this->payments()->where('status', 'posted')->sum('amount');
+        
+        $files = $this->files()->count();
+        $productionRecords = $this->productionRecords()->count();
+        $workflowProgress = $this->workflowProgress()->count();
+        $stockConsumptions = $this->stockConsumptions()->count();
+        $evidenceFiles = $this->evidenceFiles()->count();
+
+        $isInProgress = in_array($this->status, ['in_designer', 'ready_to_print', 'in_production']);
+        $hasOutstandingBalance = $this->outstanding_balance > 0;
+
+        return [
+            'status' => [
+                'current' => $this->status,
+                'in_progress' => $isInProgress,
+                'message' => $isInProgress ? "Ticket is currently {$this->status}" : null,
+            ],
+            'payments' => [
+                'count' => $payments,
+                'posted' => $postedPayments,
+                'total_paid' => $totalPaid,
+                'outstanding_balance' => $this->outstanding_balance,
+                'message' => $postedPayments > 0 ? "{$postedPayments} payment(s) recorded (₱" . number_format($totalPaid, 2) . " paid)" : null,
+            ],
+            'files' => [
+                'count' => $files,
+                'message' => $files > 0 ? "{$files} file(s) attached" : null,
+            ],
+            'production' => [
+                'records' => $productionRecords,
+                'workflow_progress' => $workflowProgress,
+                'stock_consumptions' => $stockConsumptions,
+                'evidence_files' => $evidenceFiles,
+                'message' => $productionRecords > 0 ? "{$productionRecords} production record(s) exist" : null,
+            ],
+            'total_count' => $payments + $files + $productionRecords + $workflowProgress,
+            'blocking_count' => $isInProgress ? 1 : 0,
+        ];
+    }
+
+    /**
+     * Get warnings about deletion
+     */
+    private function getDeletionWarnings(): array
+    {
+        $warnings = [];
+
+        if ($this->status === 'completed') {
+            $warnings[] = 'This ticket is completed. Deleting will remove all production history.';
+        }
+
+        if ($this->payments()->where('status', 'posted')->count() > 0) {
+            $warnings[] = 'This ticket has posted payments. Deleting will affect financial records.';
+        }
+
+        if ($this->productionRecords()->count() > 0) {
+            $warnings[] = 'This ticket has production records. Stock consumption data will be lost.';
+        }
+
+        return $warnings;
     }
 }

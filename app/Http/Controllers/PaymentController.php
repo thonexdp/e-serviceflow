@@ -16,16 +16,16 @@ class PaymentController extends Controller
 {
     public function __construct(protected PaymentRecorder $recorder) {}
 
-    
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'ticket_id' => 'nullable|exists:tickets,id',
             'customer_id' => 'nullable|exists:customers,id',
             'payer_name' => 'nullable|string|max:255',
-            'payment_type' => 'required|string|in:' . implode(',', Payment::TYPES),
-            'allocation' => 'nullable|string|in:' . implode(',', Payment::ALLOCATIONS),
-            'payment_method' => 'required|string|in:' . implode(',', Payment::METHODS),
+            'payment_type' => 'required|string|in:collection,refund,adjustment',
+            'allocation' => 'nullable|string|in:downpayment,balance,full,government_charge',
+            'payment_method' => 'required|string|in:cash,gcash,bank_transfer,credit_card,check,government_ar',
             'payment_date' => 'required|date',
             'amount' => 'required|numeric|min:0.01',
             'invoice_number' => 'nullable|string|max:100',
@@ -68,7 +68,7 @@ class PaymentController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
-    
+
     public function clear(Payment $payment)
     {
         if ($payment->status !== 'pending') {
@@ -86,12 +86,12 @@ class PaymentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Cheque cleared successfully.',
+            'message' => 'Payment cleared successfully.',
             'payment' => $payment->load('ticket')
         ]);
     }
 
-    
+
     public function reject(Request $request, Payment $payment)
     {
         if ($payment->status !== 'pending') {
@@ -119,23 +119,49 @@ class PaymentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Cheque rejected/bounced.',
+            'message' => 'Payment rejected/returned.',
             'payment' => $payment->load('ticket')
         ]);
     }
 
-    
+
     public function downloadDocument(PaymentDocument $document)
     {
         return \storage()->download($document->file_path, $document->original_name);
     }
 
-    
+    public function uploadAttachment(Request $request, Payment $payment)
+    {
+        $request->validate([
+            'attachments.*' => 'required|file|mimes:jpg,jpeg,png,pdf|max:8192',
+        ]);
+
+        foreach ($request->file('attachments', []) as $file) {
+            $disk = app()->environment('production') ? 's3' : 'public';
+            $storedPath = Storage::disk($disk)->put('payments', $file, $disk === 's3' ? 'public' : []);
+
+            $payment->documents()->create([
+                'uploaded_by' => auth()->id() ?? null,
+                'original_name' => $file->getClientOriginalName(),
+                'file_path' => $storedPath,
+                'mime_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Evidence uploaded successfully.',
+            'payment' => $payment->load('documents')
+        ]);
+    }
+
+
     protected function notifyFrontDeskPayment(Payment $payment, string $statusType): void
     {
         $ticket = $payment->ticket;
 
-        
+
         $frontDeskUsers = User::where('role', User::ROLE_FRONTDESK)
             ->when($ticket && $ticket->order_branch_id, function ($query) use ($ticket) {
                 $query->where('branch_id', $ticket->order_branch_id);

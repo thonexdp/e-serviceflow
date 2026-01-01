@@ -40,7 +40,7 @@ Route::post('/api/public/orders/customer/find-or-create', [PublicOrderController
     ->name('public.orders.customer.find-or-create');
 
 Route::post('/api/public/orders', [PublicOrderController::class, 'storeOrder'])
-    ->middleware('throttle:3,1')
+    ->middleware('throttle:5,1')
     ->name('public.orders.store');
 
 Route::get('/csrf-token', function () {
@@ -86,22 +86,26 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::patch('/tickets/{ticket}/update-status', [TicketController::class, 'updateStatus'])->name('tickets.update-status');
     Route::patch('/tickets/{ticket}/update-payment', [TicketController::class, 'updatePayment'])->name('tickets.update-payment');
     Route::patch('/tickets/{ticket}/verify-payment', [TicketController::class, 'verifyPayment'])->name('tickets.verify-payment');
+    Route::get('/tickets/{ticket}/check-deletion', [TicketController::class, 'checkDeletion'])->name('tickets.check-deletion');
 
     // Customer Management
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
+    Route::get('/customers/{customer}/check-deletion', [CustomerController::class, 'checkDeletion'])->name('customers.check-deletion');
 
     // Job Categories Management
     Route::resource('job-categories', JobCategoryController::class)->except(['create', 'show', 'edit']);
 
     // Job Types Management
     Route::resource('job-types', JobTypeController::class)->except(['create', 'show', 'edit']);
+    Route::get('/job-types/{jobType}/check-deletion', [JobTypeController::class, 'checkDeletion'])->name('job-types.check-deletion');
 
     // Finance Hub
     Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
     Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    Route::post('/payments/{payment}/upload', [PaymentController::class, 'uploadAttachment'])->name('payments.upload');
     Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
 
@@ -110,6 +114,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
     Route::put('/inventory/{id}', [InventoryController::class, 'update'])->name('inventory.update');
     Route::delete('/inventory/{id}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
+    Route::get('/inventory/{id}/check-deletion', [InventoryController::class, 'checkDeletion'])->name('inventory.check-deletion');
     Route::post('/inventory/{id}/adjust', [InventoryController::class, 'adjustStock'])->name('inventory.adjust');
     Route::get('/inventory/{id}/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
     Route::get('/inventory/low-stock', [InventoryController::class, 'lowStock'])->name('inventory.low-stock');
@@ -195,6 +200,7 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
     Route::post('/branches', [App\Http\Controllers\BranchController::class, 'store'])->name('branches.store');
     Route::put('/branches/{branch}', [App\Http\Controllers\BranchController::class, 'update'])->name('branches.update');
     Route::delete('/branches/{branch}', [App\Http\Controllers\BranchController::class, 'destroy'])->name('branches.destroy');
+    Route::get('/branches/{branch}/check-deletion', [App\Http\Controllers\BranchController::class, 'checkDeletion'])->name('branches.check-deletion');
 
     // Branch API endpoints
     Route::get('/api/branches/active', [App\Http\Controllers\BranchController::class, 'getActiveBranches'])->name('api.branches.active');
@@ -231,6 +237,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
     Route::put('/tickets/{ticket}', [TicketController::class, 'update'])->name('tickets.update');
     Route::delete('/tickets/{ticket}', [TicketController::class, 'destroy'])->name('tickets.destroy');
+    Route::get('/tickets/{ticket}/check-deletion', [TicketController::class, 'checkDeletion'])->name('tickets.check-deletion');
     Route::patch('/tickets/{ticket}/update-status', [TicketController::class, 'updateStatus'])->name('tickets.update-status');
     Route::patch('/tickets/{ticket}/update-payment', [TicketController::class, 'updatePayment'])->name('tickets.update-payment');
     Route::patch('/tickets/{ticket}/verify-payment', [TicketController::class, 'verifyPayment'])->name('tickets.verify-payment');
@@ -238,6 +245,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     // Customer Management
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit']);
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
+    Route::get('/customers/{customer}/check-deletion', [CustomerController::class, 'checkDeletion'])->name('customers.check-deletion');
 
 
     // Finance Hub
@@ -245,6 +253,7 @@ Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
     Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    Route::post('/payments/{payment}/upload', [PaymentController::class, 'uploadAttachment'])->name('payments.upload');
     Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
 
@@ -395,9 +404,10 @@ Route::prefix('cashier')->middleware(['auth', 'role:admin,Cashier'])->name('cash
     Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::post('/payments/{payment}/clear', [PaymentController::class, 'clear'])->name('payments.clear');
-    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    // Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::get('/payments/documents/{document}', [PaymentController::class, 'downloadDocument'])->name('payments.documents.download');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::post('/payments/{payment}/upload', [PaymentController::class, 'uploadAttachment'])->name('payments.upload');
 
     Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
     Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');

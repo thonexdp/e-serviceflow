@@ -142,4 +142,63 @@ class JobType extends Model
 
         return (float) ($this->incentive_price ?? 0);
     }
+
+    /**
+     * Check if this job type can be safely deleted
+     */
+    public function canBeDeleted(): array
+    {
+        $dependencies = $this->getDeletionDependencies();
+        
+        return [
+            'can_delete' => $dependencies['total_count'] === 0,
+            'dependencies' => $dependencies,
+        ];
+    }
+
+    /**
+     * Get all dependencies that prevent deletion
+     */
+    public function getDeletionDependencies(): array
+    {
+        $tickets = Ticket::where('job_type_id', $this->id)->count();
+        $activeTickets = Ticket::where('job_type_id', $this->id)
+            ->whereIn('status', ['pending', 'in_designer', 'ready_to_print', 'in_production'])
+            ->count();
+        $completedTickets = Ticket::where('job_type_id', $this->id)
+            ->where('status', 'completed')
+            ->count();
+        
+        $stockRequirements = $this->stockRequirements()->count();
+        $priceTiers = $this->priceTiers()->count();
+        $sizeRates = $this->sizeRates()->count();
+        $promoRules = $this->promoRules()->count();
+
+        return [
+            'tickets' => [
+                'total' => $tickets,
+                'active' => $activeTickets,
+                'completed' => $completedTickets,
+                'message' => $tickets > 0 ? "{$tickets} ticket(s) are using this job type" : null,
+            ],
+            'stock_requirements' => [
+                'count' => $stockRequirements,
+                'message' => $stockRequirements > 0 ? "{$stockRequirements} stock requirement(s) configured" : null,
+            ],
+            'price_tiers' => [
+                'count' => $priceTiers,
+                'message' => $priceTiers > 0 ? "{$priceTiers} price tier(s) configured" : null,
+            ],
+            'size_rates' => [
+                'count' => $sizeRates,
+                'message' => $sizeRates > 0 ? "{$sizeRates} size rate(s) configured" : null,
+            ],
+            'promo_rules' => [
+                'count' => $promoRules,
+                'message' => $promoRules > 0 ? "{$promoRules} promo rule(s) configured" : null,
+            ],
+            'total_count' => $tickets,
+            'blocking_count' => $activeTickets,
+        ];
+    }
 }
