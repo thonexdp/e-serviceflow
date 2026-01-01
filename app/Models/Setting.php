@@ -13,30 +13,31 @@ class Setting extends Model
 
     protected $fillable = ['key', 'value', 'type'];
 
-    
+
     protected function value(): Attribute
     {
+
         return Attribute::make(
             get: function ($value) {
-                
+
                 if ($this->type !== 'image' || !$value) {
                     return $value;
                 }
 
                 $disk = config('filesystems.default');
 
-                
+
                 if ($disk === 'gcs') {
                     $bucket = config('filesystems.disks.gcs.bucket');
                     return "https://storage.googleapis.com/{$bucket}/{$value}";
                 }
 
-                
+
                 if ($disk === 'public' || $disk === 'local') {
                     return "/storage/{$value}";
                 }
 
-                
+
                 try {
                     if ($disk === 's3') {
                         // Use Storage::disk() directly to avoid helper function issues
@@ -51,7 +52,7 @@ class Setting extends Model
         );
     }
 
-    
+
     public static function get($key, $default = null)
     {
         $setting = self::where('key', $key)->first();
@@ -60,13 +61,13 @@ class Setting extends Model
             return $default;
         }
 
-        
+
         if ($setting->type === 'json') {
             $rawValue = $setting->getRawOriginal('value');
             return json_decode($rawValue, true) ?? $default;
         }
 
-        
+
         if ($setting->type === 'image') {
             return $setting->value ?? $default;
         }
@@ -74,10 +75,10 @@ class Setting extends Model
         return $setting->value ?? $default;
     }
 
-    
+
     public static function set($key, $value, $type = 'string')
     {
-        
+
         if ($type === 'json' && is_array($value)) {
             $value = json_encode($value);
         }
@@ -88,7 +89,7 @@ class Setting extends Model
         );
     }
 
-    
+
     public static function getAll()
     {
         $settings = self::all();
@@ -96,11 +97,11 @@ class Setting extends Model
 
         foreach ($settings as $setting) {
             if ($setting->type === 'json') {
-                
+
                 $rawValue = $setting->getRawOriginal('value');
                 $result[$setting->key] = json_decode($rawValue, true);
             } elseif ($setting->type === 'image') {
-                
+
                 $result[$setting->key] = $setting->value;
             } else {
                 $result[$setting->key] = $setting->value;
