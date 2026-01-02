@@ -118,7 +118,7 @@ class PublicOrderController extends Controller
             'due_date' => 'required|date|after_or_equal:today',
             'subtotal' => 'nullable|numeric|min:0',
             'total_amount' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|string|in:cash,gcash,bank_transfer,check,government_ar',
+            'payment_method' => 'nullable|string|in:walkin,cash,gcash,bank_transfer,check,government_ar',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -232,7 +232,7 @@ class PublicOrderController extends Controller
         }
 
 
-        if ($request->hasFile('payment_proofs') && ($paymentMethod === 'gcash' || $paymentMethod === 'bank')) {
+        if ($request->hasFile('payment_proofs') && ($paymentMethod === 'gcash' || $paymentMethod === 'bank_transfer')) {
             $this->paymentRecorder->record(
                 [
                     'ticket_id' => $ticket->id,
