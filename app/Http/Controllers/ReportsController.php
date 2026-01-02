@@ -553,7 +553,7 @@ class ReportsController extends Controller
 
     private function getStaffPerformanceReport($dates)
     {
-        $users = User::whereIn('role', ['FrontDesk', 'Designer', 'Production'])
+        $users = User::whereIn('role', ['FrontDesk', 'Designer', 'Production', 'admin'])
             ->withCount('activityLogs')
             ->get()
             ->map(function ($user) use ($dates) {

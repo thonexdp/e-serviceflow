@@ -21,34 +21,62 @@ class PurchaseOrderController extends Controller
         $this->stockService = $stockService;
     }
 
-    
+
     public function index(Request $request)
     {
         $query = PurchaseOrder::with(['creator', 'approver', 'items.stockItem']);
 
-        
-        if ($request->has('search') && $request->search) {
+        if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('po_number', 'like', '%' . $request->search . '%')
                     ->orWhere('supplier', 'like', '%' . $request->search . '%');
             });
         }
 
-        
-        if ($request->has('status') && $request->status && $request->status !== 'all') {
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
+        $dateRange = $request->input('date_range');
+
+        if ($dateRange) {
+            if ($dateRange === 'custom' && $request->filled('start_date') && $request->filled('end_date')) {
+                $query->whereBetween('created_at', [
+                    $request->start_date . ' 00:00:00',
+                    $request->end_date . ' 23:59:59'
+                ]);
+            } elseif ($dateRange === 'last_30_days') {
+                $query->whereBetween('created_at', [
+                    now()->subDays(30)->startOfDay(),
+                    now()->endOfDay()
+                ]);
+            } elseif ($dateRange === 'today') {
+                $query->whereDate('created_at', today());
+            } elseif ($dateRange === 'this_week') {
+                $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
+            } elseif ($dateRange === 'this_month') {
+                $query->whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year);
+            } elseif ($dateRange === 'last_month') {
+                $query->whereMonth('created_at', now()->subMonth()->month)
+                    ->whereYear('created_at', now()->subMonth()->year);
+            } elseif (is_numeric($dateRange) && strlen($dateRange) === 4) {
+                $query->whereYear('created_at', $dateRange);
+            }
+        }
+
         $purchaseOrders = $query->orderBy('created_at', 'desc')
-            ->paginate($request->get('per_page', 15));
+            ->paginate($request->get('per_page', 15))
+            ->withQueryString();
 
         return Inertia::render('PurchaseOrders/Index', [
             'purchaseOrders' => $purchaseOrders,
-            'filters' => $request->only(['search', 'status']),
+            'filters' => $request->only(['search', 'status', 'date_range', 'start_date', 'end_date', 'branch_id']),
+            'branches' => \App\Models\Branch::all(['id', 'name']),
         ]);
     }
 
-    
+
     public function create()
     {
         $stockItems = StockItem::where('is_active', true)
@@ -60,7 +88,7 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -112,7 +140,7 @@ class PurchaseOrderController extends Controller
         });
     }
 
-    
+
     public function show($id)
     {
         $purchaseOrder = PurchaseOrder::with([
@@ -126,12 +154,12 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    
+
     public function update(Request $request, $id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
 
-        
+
         if ($purchaseOrder->status !== 'draft') {
             return redirect()->back()->with('error', 'Cannot update purchase order that is not in draft status.');
         }
@@ -154,7 +182,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order updated successfully.');
     }
 
-    
+
     public function approve($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -172,7 +200,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order approved successfully.');
     }
 
-    
+
     public function markOrdered($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -188,7 +216,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order marked as ordered.');
     }
 
-    
+
     public function receive(Request $request, $id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -212,7 +240,7 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    
+
     public function cancel($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);
@@ -228,7 +256,7 @@ class PurchaseOrderController extends Controller
         return redirect()->back()->with('success', 'Purchase order cancelled successfully.');
     }
 
-    
+
     public function destroy($id)
     {
         $purchaseOrder = PurchaseOrder::findOrFail($id);

@@ -14,7 +14,8 @@ export default function Mockups({
   notifications = [],
   messages = [],
   tickets = { data: [] },
-  filters = {}
+  filters = {},
+  branches = []
 }) {
   const [openReviewModal, setReviewModalOpen] = useState(false);
   const [openUploadModal, setUploadModalOpen] = useState(false);
@@ -795,14 +796,14 @@ export default function Mockups({
                         <p className="mb-2 text-sm text-gray-500">
                           <span className="font-semibold">Click to upload Design</span> or drag and drop
                         </p>
-                        <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
+                        <p className="text-xs text-gray-500">PNG, JPG, up to 10MB</p>
                       </div>
                       <input
                         id="dropzone-file"
                         type="file"
                         className="hidden"
                         multiple
-                        accept="image/*,.pdf"
+                        accept="image/*"
                         onChange={handleFileSelect} />
 
                     </label>
@@ -897,17 +898,16 @@ export default function Mockups({
                           <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
-                            route="/mock-ups" />
-
+                            route="mock-ups" />
                         </div>
-                        <div className="col-md-4">
+                        <div className="col-md-3">
                           <FormInput
                             label=""
                             type="select"
                             name="design_status"
                             value={filters.design_status || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/mock-ups"), {
+                              router.get(buildUrl("mock-ups"), {
                                 ...filters,
                                 design_status: e.target.value === "all" ? null : e.target.value
                               }, {
@@ -921,20 +921,70 @@ export default function Mockups({
                               { value: "in_review", label: "In Review" },
                               { value: "revision_requested", label: "Revision Requested" },
                               { value: "mockup_uploaded", label: "Mock-up Uploaded" },
-                              { value: "approved", label: "Approved" }]
-                            } />
-
+                              { value: "approved", label: "Approved" }
+                            ]}
+                          />
                         </div>
-                        <div className="col-md-5 text-right">
+                        <div className="col-md-4 mb-4">
+                          <DateRangeFilter
+                            filters={filters}
+                            route="mock-ups"
+                            buildUrl={buildUrl}
+                          />
+                        </div>
+                        <div className="col-md-2 text-right">
                           <button
                             onClick={() => router.reload()}
-                            className="btn btn-outline-primary"
+                            className="btn btn-outline-primary btn-sm"
                             title="Refresh Data">
-
-                            <i className="ti-reload mr-2"></i> Refresh
+                            <i className="ti-reload mr-1"></i> Refresh
                           </button>
                         </div>
                       </div>
+
+                      {/* Active Filters Indicator */}
+                      {(filters.search || filters.design_status || filters.date_range || filters.branch_id) &&
+                        <div className="row mb-3 mt-3">
+                          <div className="col-12">
+                            <div className="alert alert-light border p-2 mb-0">
+                              <small className="text-muted mr-2">
+                                <i className="ti-filter mr-1"></i>
+                                <strong>Active Filters:</strong>
+                              </small>
+                              {filters.search &&
+                                <span className="badge badge-info mr-2">
+                                  Search: {filters.search}
+                                </span>
+                              }
+                              {filters.design_status &&
+                                <span className="badge badge-info mr-2 text-capitalize">
+                                  Status: {filters.design_status.replace(/_/g, " ")}
+                                </span>
+                              }
+                              {filters.date_range &&
+                                <span className="badge badge-primary mr-2">
+                                  <i className="ti-calendar mr-1"></i>
+                                  {filters.date_range === 'custom' ?
+                                    `Custom: ${filters.start_date} to ${filters.end_date}` :
+                                    filters.date_range.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                  }
+                                </span>
+                              }
+                              {filters.branch_id &&
+                                <span className="badge badge-info mr-2">
+                                  Branch: {branches?.find((b) => b.id == filters.branch_id)?.name}
+                                </span>
+                              }
+                              <button
+                                type="button"
+                                className="btn btn-link btn-sm text-danger p-0 ml-2"
+                                onClick={() => router.get(buildUrl("mock-ups"), {})}>
+                                Clear All
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      }
 
                       <div className="mt-4">
                         <DataTable

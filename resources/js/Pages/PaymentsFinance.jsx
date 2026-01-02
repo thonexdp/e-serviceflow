@@ -363,27 +363,40 @@ export default function PaymentsFinance({
           <button type="button" className="close p-0 m-0 ml-2" onClick={() => setSelectionWarning(null)} style={{ fontSize: '16px', lineHeight: '1', color: 'inherit', float: 'none', opacity: '0.5' }}>&times;</button>
         </div>
       )}
-      {selectedItems.length > 0 && (activeTab === 'receivables' || activeTab === 'pending_payments') && (
+      {(activeTab === 'receivables' || activeTab === 'pending_payments') && (
         <div className="flex items-center gap-1 bg-info/10 p-1 px-2 rounded-md border border-info/20">
-          <span className="text-xs font-bold text-info uppercase mr-2 tracking-tighter">
-            {selectedItems.length} Selected
-          </span>
+          {selectedItems.length > 0 && (
+            <span className="text-xs font-bold text-info uppercase mr-2 tracking-tighter">
+              {selectedItems.length} Selected
+            </span>
+          )}
           <button
             className="btn btn-sm btn-info btn-rounded-md"
             onClick={handleGenerateStatement}
-            style={{ padding: "0 15px", height: "32px", display: "flex", alignItems: "center", gap: "5px" }}
+            disabled={selectedItems.length === 0}
+            style={{
+              padding: "0 15px",
+              height: "32px",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              opacity: selectedItems.length === 0 ? 0.6 : 1,
+              cursor: selectedItems.length === 0 ? 'not-allowed' : 'pointer'
+            }}
           >
             <i className="ti-printer"></i>
-            Generate
+            Print Billing Statement
           </button>
-          <button
-            className="btn btn-sm btn-light btn-outline btn-rounded"
-            onClick={() => setSelectedItems([])}
-            title="Clear Selection"
-            style={{ width: "32px", height: "32px", padding: "0" }}
-          >
-            <i className="ti-close"></i>
-          </button>
+          {selectedItems.length > 0 && (
+            <button
+              className="btn btn-sm btn-light btn-outline btn-rounded"
+              onClick={() => setSelectedItems([])}
+              title="Clear Selection"
+              style={{ width: "32px", height: "32px", padding: "0" }}
+            >
+              <i className="ti-close"></i>
+            </button>
+          )}
         </div>
       )}
       {activeTab === "ledger" &&
