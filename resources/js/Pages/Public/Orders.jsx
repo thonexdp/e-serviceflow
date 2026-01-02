@@ -2354,7 +2354,7 @@ export default function CustomerPOSOrder() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
                 {designFiles.length >= 1 && (
-                  <p className="text-xs text-orange-600 mt-1 font-medium">
+                  <p className="text-xs text-orange-200 mt-1 font-medium">
                     Maximum file limit reached. Remove the file to upload another.
                   </p>
                 )}
@@ -2736,8 +2736,8 @@ export default function CustomerPOSOrder() {
                     <input
                       type="radio"
                       name="payment_method"
-                      value="bank"
-                      checked={paymentMethod === "bank"}
+                      value="bank_transfer"
+                      checked={paymentMethod === "bank_transfer"}
                       onChange={(e) =>
                         setPaymentMethod(e.target.value)
                       }
@@ -2831,7 +2831,7 @@ export default function CustomerPOSOrder() {
                 )}
 
               {/* Bank Transfer Payment Info */}
-              {paymentMethod === "bank" &&
+              {paymentMethod === "bank_transfer" &&
                 settings?.payment?.bank_accounts &&
                 settings.payment.bank_accounts.length > 0 && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
@@ -2983,7 +2983,7 @@ export default function CustomerPOSOrder() {
 
               {/* Payment Proof Upload */}
               {(paymentMethod === "gcash" ||
-                paymentMethod === "bank") && (
+                paymentMethod === "bank_transfer") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Upload Payment Proof (GCash / Bank
@@ -3282,13 +3282,13 @@ export default function CustomerPOSOrder() {
                   disabled={
                     processing ||
                     ((paymentMethod === "gcash" ||
-                      paymentMethod === "bank") &&
+                      paymentMethod === "bank_transfer") &&
                       paymentProofs.length === 0) ||
                     paymentProofs.some((p) => p.invalid)
                   }
                   className={`flex-1 py-4 rounded-lg bg-orange-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all ${processing ||
                     ((paymentMethod === "gcash" ||
-                      paymentMethod === "bank") &&
+                      paymentMethod === "bank_transfer") &&
                       paymentProofs.length === 0) ||
                     paymentProofs.some((p) => p.invalid)
                     ? "opacity-50 cursor-not-allowed"
