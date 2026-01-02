@@ -9,13 +9,15 @@ import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 import { formatPeso } from "@/Utils/currency";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 
 export default function PurchaseOrdersIndex({
   user = {},
   notifications = [],
   messages = [],
   purchaseOrders = { data: [] },
-  filters = {}
+  filters = {},
+  branches = []
 }) {
   const [openReceiveModal, setReceiveModalOpen] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
@@ -352,36 +354,23 @@ export default function PurchaseOrdersIndex({
                     </div>
                     <div className="card-body">
                       <div className="row mt-4 align-items-center">
-                        <div className="col-md-5">
+                        <div className="col-md-3">
                           <SearchBox
                             placeholder="Search by PO number or supplier..."
-                            initialValue={
-                              filters.search || ""
-                            }
-                            route="/purchase-orders" />
-
+                            initialValue={filters.search || ""}
+                            route="purchase-orders" />
                         </div>
-                        <div className="col-md-4">
+                        <div className="col-md-3">
                           <FormInput
                             label=""
                             type="select"
                             name="status"
-                            value={
-                              filters.status ||
-                              "all"
-                            }
+                            value={filters.status || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/purchase-orders"),
+                              router.get(buildUrl("purchase-orders"),
                                 {
                                   ...filters,
-                                  status:
-                                    e.target.
-                                      value ===
-                                      "all" ?
-                                      null :
-                                      e.
-                                        target.
-                                        value
+                                  status: e.target.value === "all" ? null : e.target.value
                                 },
                                 {
                                   preserveState: false,
@@ -390,34 +379,70 @@ export default function PurchaseOrdersIndex({
                               );
                             }}
                             options={[
-                              {
-                                value: "all",
-                                label: "All Status"
-                              },
-                              {
-                                value: "draft",
-                                label: "Draft"
-                              },
-                              {
-                                value: "approved",
-                                label: "Approved"
-                              },
-                              {
-                                value: "ordered",
-                                label: "Ordered"
-                              },
-                              {
-                                value: "received",
-                                label: "Received"
-                              },
-                              {
-                                value: "cancelled",
-                                label: "Cancelled"
-                              }]
-                            } />
-
+                              { value: "all", label: "All Status" },
+                              { value: "draft", label: "Draft" },
+                              { value: "approved", label: "Approved" },
+                              { value: "ordered", label: "Ordered" },
+                              { value: "received", label: "Received" },
+                              { value: "cancelled", label: "Cancelled" }
+                            ]}
+                          />
                         </div>
+                        <div className="col-md-4 mb-4">
+                          <DateRangeFilter
+                            filters={filters}
+                            route="purchase-orders"
+                            buildUrl={buildUrl}
+                          />
+                        </div>
+                        <div className="col-md-2"></div>
+
+
                       </div>
+
+                      {/* Active Filters Indicator */}
+                      {(filters.search || filters.status || filters.date_range || filters.branch_id) &&
+                        <div className="row mb-3 mt-3">
+                          <div className="col-12">
+                            <div className="alert alert-light border p-2 mb-0">
+                              <small className="text-muted mr-2">
+                                <i className="ti-filter mr-1"></i>
+                                <strong>Active Filters:</strong>
+                              </small>
+                              {filters.search &&
+                                <span className="badge badge-info mr-2">
+                                  Search: {filters.search}
+                                </span>
+                              }
+                              {filters.status &&
+                                <span className="badge badge-info mr-2">
+                                  Status: {filters.status}
+                                </span>
+                              }
+                              {filters.date_range &&
+                                <span className="badge badge-primary mr-2">
+                                  <i className="ti-calendar mr-1"></i>
+                                  {filters.date_range === 'custom' ?
+                                    `Custom: ${filters.start_date} to ${filters.end_date}` :
+                                    filters.date_range.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                  }
+                                </span>
+                              }
+                              {filters.branch_id &&
+                                <span className="badge badge-info mr-2">
+                                  Branch: {branches?.find((b) => b.id == filters.branch_id)?.name}
+                                </span>
+                              }
+                              <button
+                                type="button"
+                                className="btn btn-link btn-sm text-danger p-0 ml-2"
+                                onClick={() => router.get(buildUrl("purchase-orders"), {})}>
+                                Clear All
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      }
 
                       <div className="mt-4">
                         <DataTable

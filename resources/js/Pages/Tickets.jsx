@@ -584,10 +584,10 @@ export default function Tickets({
             row.job_type?.name && (
               <i className="text-xs">
                 Type: {row.job_type?.name}
-            </i>
+              </i>
             )
           }
-         
+
           {row.payments?.some((p) => p.status === 'rejected') &&
             <div className="text-danger font-bold text-[9px] uppercase">
               <i className="ti-alert mr-1"></i> Bounced Payment
@@ -820,7 +820,7 @@ export default function Tickets({
           branches={branches} />
 
       </Modal>
-      
+
       {/* Deletion Confirmation Modal with Dependency Checking */}
       <DeletionConfirmationModal
         isOpen={openDeleteModal}
@@ -1410,7 +1410,7 @@ export default function Tickets({
                 </div>
                 <div className="card-body">
                   <div className="row mb-4">
-                    <div className="col-md-3">
+                    <div className="col-md-2">
                       <div className="input-group">
                         <input
                           type="text"
@@ -1476,12 +1476,14 @@ export default function Tickets({
                         </select>
                       </div>
                     }
-                    <DateRangeFilter
-                      filters={filters}
-                      route="tickets"
-                      buildUrl={buildUrl} />
 
-                    <div className="col-md-2">
+
+
+                    <div className="col-md-4">
+                      <DateRangeFilter
+                        filters={filters}
+                        route="tickets"
+                        buildUrl={buildUrl} />
                     </div>
                   </div>
 
