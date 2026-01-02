@@ -1,3 +1,9 @@
+/*!
+ * Developed By: Antonio Jr De Paz
+ * Built with: Laravel, Inertia, React
+ * Year: 2025
+ */
+
 import './bootstrap';
 import '../css/app.css';
 

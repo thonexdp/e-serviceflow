@@ -1,3 +1,8 @@
+/**
+ * @author Antonio Jr De Paz
+ * @description Orders Page
+ */
+
 import { useState, useEffect, useMemo, useRef } from "react";
 import { router, usePage } from "@inertiajs/react";
 import { formatPeso } from "@/Utils/currency";

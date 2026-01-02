@@ -1,3 +1,8 @@
+/**
+ * @author Antonio Jr De Paz
+ * @description Home Page
+ */
+
 import { useState, useEffect } from 'react';
 import { Search, Package, Phone, Mail, MapPin, Plus, CheckCircle, Clock, Printer, Truck } from 'lucide-react';
 import axios from 'axios';

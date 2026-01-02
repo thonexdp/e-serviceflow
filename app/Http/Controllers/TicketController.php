@@ -1,5 +1,11 @@
 <?php
 
+/*!
+ * Developed By: Antonio Jr De Paz
+ * Built with: Laravel, Inertia, React
+ * Year: 2025
+ */
+
 
 namespace App\Http\Controllers;
 
