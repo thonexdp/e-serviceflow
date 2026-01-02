@@ -13,13 +13,18 @@ class CustomerController extends Controller
     {
         $customers = Customer::query()
             ->when($request->search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
+                $normalizedSearch = Customer::normalizePhone($search);
+                $query->where(function ($q) use ($search, $normalizedSearch) {
                     $q->where('firstname', 'like', "%{$search}%")
                         ->orWhere('lastname', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhere('facebook', 'like', "%{$search}%")
                         ->orWhere('address', 'like', "%{$search}%");
+                    
+                    if ($normalizedSearch) {
+                        $q->orWhere('normalized_phone', 'like', "%{$normalizedSearch}%");
+                    }
                 });
             })
             ->latest()
@@ -35,11 +40,17 @@ class CustomerController extends Controller
     public function search(Request $request)
     {
         $q = $request->get('q', '');
+        $normalizedQ = Customer::normalizePhone($q);
+        
         $customers = Customer::query()
             ->where('firstname', 'like', "%{$q}%")
             ->orWhere('lastname', 'like', "%{$q}%")
             ->orWhere('email', 'like', "%{$q}%")
+            ->orWhere('phone', 'like', "%{$q}%")
             ->orWhere('facebook', 'like', "%{$q}%")
+            ->when($normalizedQ, function ($query) use ($normalizedQ) {
+                $query->orWhere('normalized_phone', 'like', "%{$normalizedQ}%");
+            })
             ->limit(10)
             ->get(['id', 'firstname', 'lastname', 'email', 'phone', 'address', 'facebook'])
             ->map(function ($customer) {
@@ -63,6 +74,10 @@ class CustomerController extends Controller
             // 'email' => 'nullable|email|max:255|unique:customers,email',
             'address' => 'nullable|string|max:500',
         ]);
+
+        // Add normalized phone
+        $validated['normalized_phone'] = Customer::normalizePhone($validated['phone'] ?? null);
+
         if($request->has('return_json') && $request->return_json) {
             $customer = Customer::create($validated);
             return response()->json([
@@ -88,14 +103,32 @@ class CustomerController extends Controller
             'address' => 'nullable|string|max:500',
         ]);
 
+        // Add normalized phone
+        $validated['normalized_phone'] = Customer::normalizePhone($validated['phone'] ?? null);
+
         $customer->update($validated);
 
         return redirect()->back()->with('success', 'Customer updated successfully!');
     }
 
+    /**
+     * Check if customer can be deleted and get dependencies
+     */
+    public function checkDeletion(Customer $customer)
+    {
+        $result = $customer->canBeDeleted();
+        return response()->json($result);
+    }
     
     public function destroy(Customer $customer)
     {
+        // Check if can be deleted
+        $check = $customer->canBeDeleted();
+        
+        if (!$check['can_delete']) {
+            return redirect()->back()->with('error', 'Cannot delete customer. They have active tickets or orders.');
+        }
+
         try {
             $customer->delete();
             return redirect()->back()->with('success', 'Customer deleted successfully!');

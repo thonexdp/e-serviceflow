@@ -287,9 +287,14 @@ export default function JobTypes({
       label: "Status",
       key: "is_active",
       render: (row) =>
-        <span className={row.is_active ? "text-success" : "text-danger"}>
-          {row.is_active ? "Active" : "Inactive"}
-        </span>
+        <div className="d-flex flex-column">
+          <span className={row.is_active ? "text-success" : "text-danger"}>
+            {row.is_active ? "Active" : "Inactive"}
+          </span>
+          <span className={`text-xs ${row.show_in_customer_view ? "text-info" : "text-muted"}`}>
+            {row.show_in_customer_view ? "Visible to Customers" : "Hidden from Customers"}
+          </span>
+        </div>
 
     }];
 

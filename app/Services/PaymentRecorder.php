@@ -14,16 +14,16 @@ use Illuminate\Support\Facades\Storage;
 
 class PaymentRecorder
 {
-    
-    public function record(array $payload, array $attachments = []): Payment
+
+    public function record(array $payload, array $attachments = [], $is_log = true): Payment
     {
-        return DB::transaction(function () use ($payload, $attachments) {
+        return DB::transaction(function () use ($payload, $attachments, $is_log) {
             $ticket = null;
             if (!empty($payload['ticket_id'])) {
                 $ticket = Ticket::with('customer')->findOrFail($payload['ticket_id']);
 
-                
-                if (isset($payload['discount'])) {
+
+                if (isset($payload['discount']) && !empty($ticket)) {
                     $oldDiscount = $ticket->discount;
                     $ticket->discount = (float)$payload['discount'];
                     $subtotal = (float)($ticket->subtotal ?? 0);
@@ -32,8 +32,8 @@ class PaymentRecorder
                         $ticket->total_amount = round($subtotal - $discountAmount, 2);
                         $ticket->save();
 
-                        
-                        if ($oldDiscount != $ticket->discount) {
+
+                        if ($oldDiscount != $ticket->discount && $is_log && Auth::id()) {
                             UserActivityLog::log(
                                 Auth::id(),
                                 'ticket_discount_updated',
@@ -56,7 +56,7 @@ class PaymentRecorder
                 ? ($customer->full_name ?? trim("{$customer->firstname} {$customer->lastname}"))
                 : ($payload['payer_name'] ?? 'Walk-in');
 
-            $balanceBefore = $ticket ? $ticket->outstanding_balance : null;
+            $balanceBefore = $ticket ? $ticket?->outstanding_balance : null;
             $balanceAfter = $ticket && $balanceBefore !== null
                 ? max($balanceBefore - (float)$payload['amount'], 0)
                 : null;
@@ -64,7 +64,7 @@ class PaymentRecorder
             $payment = Payment::create([
                 'ticket_id' => $ticket?->id,
                 'customer_id' => $customer?->id,
-                'recorded_by' => Auth::id(),
+                'recorded_by' => Auth::id() ?? null,
                 'invoice_number' => $payload['invoice_number'] ?? null,
                 'official_receipt_number' => $payload['official_receipt_number'] ?? null,
                 'payment_reference' => $payload['payment_reference'] ?? null,
@@ -82,14 +82,16 @@ class PaymentRecorder
                 'metadata' => $payload['metadata'] ?? null,
             ]);
 
-            
-            UserActivityLog::log(
-                Auth::id(),
-                'payment_recorded',
-                "Recorded payment of ₱" . number_format($payload['amount'], 2) . " for " . ($ticket ? "Ticket #{$ticket->ticket_number}" : "Customer {$payerName}"),
-                $payment,
-                $payload
-            );
+            // Log activity (only if user is authenticated)
+            if ($is_log && Auth::id()) {
+                UserActivityLog::log(
+                    Auth::id(),
+                    'payment_recorded',
+                    "Recorded payment of ₱" . number_format($payload['amount'], 2) . " for " . ($ticket ? "Ticket #{$ticket->ticket_number}" : "Customer {$payerName}"),
+                    $payment,
+                    $payload
+                );
+            }
 
             foreach ($attachments as $file) {
                 if (!$file instanceof UploadedFile) {
@@ -99,7 +101,7 @@ class PaymentRecorder
                 $storedPath = Storage::disk($disk)->put('payments', $file, $disk === 's3' ? 'public' : []);
                 PaymentDocument::create([
                     'payment_id' => $payment->id,
-                    'uploaded_by' => Auth::id(),
+                    'uploaded_by' => Auth::id() ?? null,
                     'original_name' => $file->getClientOriginalName(),
                     'file_path' => $storedPath,
                     'mime_type' => $file->getClientMimeType(),

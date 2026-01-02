@@ -9,7 +9,10 @@ export default function DataTable({
   onDelete = null,
   actions = null,
   emptyMessage = "No data found.",
-  getRowClassName = null
+  getRowClassName = null,
+  canDelete = null, // Function to determine if a row can be deleted
+  currentUser = null, // Current user object for permission checks
+  showDeleteForInProgress = false, // Show delete button for in-progress items (admin only)
 }) {
   const handlePageChange = (url) => {
     if (url) {
@@ -25,6 +28,38 @@ export default function DataTable({
         preserveScroll: true
       });
     }
+  };
+
+  /**
+   * Determine if delete button should be shown for a row
+   */
+  const shouldShowDeleteButton = (row) => {
+    // Don't show delete for admin users
+    if (row?.role === 'admin') {
+      return false;
+    }
+
+    // If custom canDelete function provided, use it
+    if (canDelete && typeof canDelete === 'function') {
+      return canDelete(row);
+    }
+
+    // Check if user is admin
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.roles?.some(r => r.name === 'admin');
+
+    // For in-progress items, only show to admins if showDeleteForInProgress is true
+    const inProgressStatuses = ['in_designer', 'ready_to_print', 'in_production', 'pending'];
+    if (row.status && inProgressStatuses.includes(row.status)) {
+      return isAdmin && showDeleteForInProgress;
+    }
+
+    // Don't show delete for completed items
+    if (row.status === 'completed') {
+      return false;
+    }
+
+    // Default: show delete button
+    return true;
   };
 
   return (
@@ -69,7 +104,7 @@ export default function DataTable({
                                                                 {row.status !== 'completed' ? ' Edit' : ' View'}</small>
                                                         </button>
                   }
-                                                    {onDelete && row.status !== 'completed' && row?.role !== 'admin' &&
+                                                    {onDelete && shouldShowDeleteButton(row) &&
                   <button
                     type="button"
                     className="btn btn-link btn-sm text-danger"

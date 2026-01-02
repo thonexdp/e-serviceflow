@@ -9,17 +9,17 @@ use Inertia\Inertia;
 
 class BranchController extends Controller
 {
-    
+
     public function index(Request $request)
     {
-        
+
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
 
         $query = Branch::query();
 
-        
+
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->search . '%')
@@ -28,7 +28,7 @@ class BranchController extends Controller
             });
         }
 
-        
+
         if ($request->has('is_active') && $request->is_active !== null && $request->is_active !== '') {
             $query->where('is_active', $request->is_active);
         }
@@ -43,10 +43,10 @@ class BranchController extends Controller
         ]);
     }
 
-    
+
     public function store(Request $request)
     {
-        
+
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
@@ -63,9 +63,11 @@ class BranchController extends Controller
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer|min:0',
             'notes' => 'nullable|string|max:1000',
+            'facebook' => 'nullable|string|max:255',
+            'business_hours' => 'nullable|array',
         ]);
 
-        
+
         if ($validated['is_default_production'] ?? false) {
             Branch::where('is_default_production', true)->update(['is_default_production' => false]);
         }
@@ -83,10 +85,10 @@ class BranchController extends Controller
             ->with('success', 'Branch created successfully.');
     }
 
-    
+
     public function update(Request $request, Branch $branch)
     {
-        
+
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
@@ -103,9 +105,11 @@ class BranchController extends Controller
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer|min:0',
             'notes' => 'nullable|string|max:1000',
+            'facebook' => 'nullable|string|max:255',
+            'business_hours' => 'nullable|array',
         ]);
 
-        
+
         if ($validated['is_default_production'] ?? false) {
             Branch::where('id', '!=', $branch->id)
                 ->where('is_default_production', true)
@@ -126,21 +130,42 @@ class BranchController extends Controller
             ->with('success', 'Branch updated successfully.');
     }
 
-    
-    public function destroy(Branch $branch)
+
+    /**
+     * Check if branch can be deleted and get dependencies
+     */
+    public function checkDeletion(Branch $branch)
     {
-        
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized access to branch management.');
         }
 
+        $result = $branch->canBeDeleted();
+        return response()->json($result);
+    }
+
+    public function destroy(Branch $branch)
+    {
+
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Unauthorized access to branch management.');
+        }
+
+        // Check if can be deleted
+        $check = $branch->canBeDeleted();
         
+        if (!$check['can_delete']) {
+            return redirect()->route('admin.branches.index')
+                ->with('error', 'Cannot delete branch. It has active users, orders, or production tickets.');
+        }
+
+
         if ($branch->users()->count() > 0) {
             return redirect()->route('admin.branches.index')
                 ->with('error', 'Cannot delete branch with assigned users. Please reassign users first.');
         }
 
-        
+
         if ($branch->orderedTickets()->count() > 0 || $branch->productionTickets()->count() > 0) {
             return redirect()->route('admin.branches.index')
                 ->with('error', 'Cannot delete branch with existing tickets.');
@@ -161,7 +186,7 @@ class BranchController extends Controller
             ->with('success', 'Branch deleted successfully.');
     }
 
-    
+
     public function getActiveBranches()
     {
         $branches = Branch::active()
@@ -172,7 +197,7 @@ class BranchController extends Controller
         return response()->json($branches);
     }
 
-    
+
     public function getOrderBranches()
     {
         $branches = Branch::active()
@@ -184,7 +209,7 @@ class BranchController extends Controller
         return response()->json($branches);
     }
 
-    
+
     public function getProductionBranches()
     {
         $branches = Branch::active()

@@ -32,24 +32,12 @@ export default function AllTickets({
   const [openTimelineModal, setTimelineModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
   const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
   const isAdmin = auth?.user?.role === 'admin';
   const canOnlyPrint = auth?.user?.can_only_print || false;
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
-      }
-    }
-  };
 
   const handleView = (ticket) => {
     setSelectedTicket(ticket);
@@ -124,9 +112,9 @@ export default function AllTickets({
   const getStatusBadge = (status) => {
     const classes = {
       ready_to_print: "badge-info",
-      in_production: "badge-warning",
+      in_production: "badge-primary",
       completed: "badge-success",
-      pending: "badge-secondary"
+      pending: "badge-warning"
     };
     const labels = {
       ready_to_print: "Ready to Print",
@@ -190,7 +178,7 @@ export default function AllTickets({
           {row.mockup_files && row.mockup_files.length > 0 &&
             <div className="mt-1">
               <img
-                src={row.mockup_files[0].file_path}
+                src={row.mockup_files[row.mockup_files.length - 1].file_path}
                 alt="Preview"
                 className="img-thumbnail"
                 style={{ width: '50px', height: '50px', objectFit: 'cover', cursor: 'pointer' }}
@@ -206,6 +194,11 @@ export default function AllTickets({
       key: "description",
       render: (row) =>
         <div>
+          {row.job_type && (
+            <div className="text-muted small mb-1">
+              <strong>Type:</strong> {row.job_type.name}
+            </div>
+          )}
           <div className="font-weight-bold">{row.description}</div>
           <small className="text-muted">
             {row.customer?.firstname} {row.customer?.lastname}
@@ -404,29 +397,45 @@ export default function AllTickets({
                           </tr>
                         </thead>
                         <tbody>
-                          {mockupFiles.map((file) =>
-                            <tr key={file.id}>
-                              <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
-                              <td>{formatDate(file.created_at)}</td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="btn btn-link btn-sm text-orange-500"
-                                  onClick={() => handleDownload(file.id, file.file_name)}>
+                          {mockupFiles.map((file, index) => {
+                            const isLastApproved = index === mockupFiles.length - 1;
 
-                                  <i className="ti-download"></i> Download
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-link btn-sm text-orange-500"
-                                  onClick={() => setSelectedPreviewFile(file)}>
+                            return (
+                              <tr key={file.id}>
+                                <td className="relative max-w-[150px] truncate" title={file.file_name}>
+                                  {file.file_name}
 
-                                  <i className="ti-image"></i> Preview
-                                </button>
-                              </td>
-                            </tr>
-                          )}
+                                  {isLastApproved && (
+                                    <span className="absolute -top-1 -right-2 bg-green-500 text-white text-xs px-2 py-0.5">
+                                      Approved
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td>{formatDate(file.created_at)}</td>
+
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn-link btn-sm text-orange-500"
+                                    onClick={() => handleDownload(file.id, file.file_name)}
+                                  >
+                                    <i className="ti-download"></i> Download
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="btn btn-link btn-sm text-orange-500"
+                                    onClick={() => setSelectedPreviewFile(file)}
+                                  >
+                                    <i className="ti-image"></i> Preview
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
+
                       </table>
                     </div>
                   </div>
@@ -492,7 +501,7 @@ export default function AllTickets({
                           <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
-                            route="/tickets/all" />
+                            route={isAdmin ? `/production/tickets/all` : `/tickets/all`} />
 
                         </div>
                         <div className="col-md-3">
@@ -502,7 +511,7 @@ export default function AllTickets({
                             name="status"
                             value={filters.status || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/tickets/all"), {
+                              router.get(buildUrl(isAdmin ? `/production/tickets/all` : `/tickets/all`), {
                                 ...filters,
                                 status: e.target.value === "all" ? null : e.target.value
                               }, {
@@ -524,7 +533,7 @@ export default function AllTickets({
                             name="workflow_step"
                             value={filters.workflow_step || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/tickets/all"), {
+                              router.get(buildUrl(isAdmin ? `/production/tickets/all` : `/tickets/all`), {
                                 ...filters,
                                 workflow_step: e.target.value === "all" ? null : e.target.value
                               }, {
@@ -548,14 +557,6 @@ export default function AllTickets({
                             title="Refresh Data">
 
                             <i className="ti-reload mr-2"></i> Refresh
-                          </button>
-                          <button
-                            onClick={toggleFullscreen}
-                            className="btn btn-outline-secondary"
-                            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
-
-                            <i className={`ti-${isFullscreen ? 'close' : 'fullscreen'} mr-2`}></i>
-                            {isFullscreen ? 'Exit' : 'Fullscreen'}
                           </button>
                         </div>
                       </div>

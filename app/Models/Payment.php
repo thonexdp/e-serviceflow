@@ -11,8 +11,8 @@ class Payment extends Model
     use HasFactory, SoftDeletes;
 
     public const TYPES = ['collection', 'refund', 'adjustment'];
-    public const METHODS = ['cash', 'gcash', 'bank_transfer', 'credit_card', 'check'];
-    public const ALLOCATIONS = ['downpayment', 'balance', 'full'];
+    public const METHODS = ['cash', 'gcash', 'bank_transfer', 'credit_card', 'check', 'government_ar'];
+    public const ALLOCATIONS = ['downpayment', 'balance', 'full', 'government_charge'];
 
     protected $fillable = [
         'ticket_id',
@@ -50,7 +50,7 @@ class Payment extends Model
         });
 
         static::deleted(function (Payment $payment) {
-            
+
             $payment->ticket?->refreshPaymentSummary();
         });
     }

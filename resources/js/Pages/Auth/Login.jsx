@@ -1,3 +1,8 @@
+/**
+ * @author Antonio Jr De Paz
+ * @description Login Page
+ */
+
 import { useEffect } from 'react';
 import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';

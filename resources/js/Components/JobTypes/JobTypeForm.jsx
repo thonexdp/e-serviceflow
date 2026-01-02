@@ -13,6 +13,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     incentive_price: "",
     is_active: true,
     show_in_dashboard: true,
+    show_in_customer_view: true,
     sort_order: 0
   });
 
@@ -24,7 +25,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     lamination_heatpress: { enabled: false, incentive_price: "" },
     cutting: { enabled: false, incentive_price: "" },
     sewing: { enabled: false, incentive_price: "" },
-    dtf_press: { enabled: false, incentive_price: "" }
+    dtf_press: { enabled: false, incentive_price: "" },
+    embroidery: { enabled: false, incentive_price: "" },
+    knitting: { enabled: false, incentive_price: "" },
+    lasser_cutting: { enabled: false, incentive_price: "" }
   });
   const [errors, setErrors] = useState({});
   const [processing, setProcessing] = useState(false);
@@ -44,6 +48,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         discount: jobType.discount || "",
         is_active: jobType.is_active !== undefined ? jobType.is_active : true,
         show_in_dashboard: jobType.show_in_dashboard !== undefined ? jobType.show_in_dashboard : true,
+        show_in_customer_view: jobType.show_in_customer_view !== undefined ? jobType.show_in_customer_view : true,
         sort_order: jobType.sort_order || 0
       });
       setPriceTiers(
@@ -88,7 +93,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
           lamination_heatpress: { enabled: false, incentive_price: "" },
           cutting: { enabled: false, incentive_price: "" },
           sewing: { enabled: false, incentive_price: "" },
-          dtf_press: { enabled: false, incentive_price: "" }
+          dtf_press: { enabled: false, incentive_price: "" },
+          embroidery: { enabled: false, incentive_price: "" },
+          knitting: { enabled: false, incentive_price: "" },
+          lasser_cutting: { enabled: false, incentive_price: "" }
         };
 
         Object.keys(steps).forEach((step) => {
@@ -115,7 +123,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
           lamination_heatpress: { enabled: false, incentive_price: "" },
           cutting: { enabled: false, incentive_price: "" },
           sewing: { enabled: false, incentive_price: "" },
-          dtf_press: { enabled: false, incentive_price: "" }
+          dtf_press: { enabled: false, incentive_price: "" },
+          embroidery: { enabled: false, incentive_price: "" },
+          knitting: { enabled: false, incentive_price: "" },
+          lasser_cutting: { enabled: false, incentive_price: "" }
         });
       }
       if (jobType && jobType.image_path) {
@@ -133,7 +144,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         lamination_heatpress: { enabled: false, incentive_price: "" },
         cutting: { enabled: false, incentive_price: "" },
         sewing: { enabled: false, incentive_price: "" },
-        dtf_press: { enabled: false, incentive_price: "" }
+        dtf_press: { enabled: false, incentive_price: "" },
+        embroidery: { enabled: false, incentive_price: "" },
+        knitting: { enabled: false, incentive_price: "" },
+        lasser_cutting: { enabled: false, incentive_price: "" }
       });
       setImagePreview(null);
       setImageFile(null);
@@ -421,6 +435,18 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
             <label className="ml-2 text-sm text-gray-700">
               Show in Dashboard
+            </label>
+          </div>
+          <div className="d-flex align-items-center">
+            <input
+              type="checkbox"
+              name="show_in_customer_view"
+              checked={formData.show_in_customer_view}
+              onChange={handleChange}
+              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
+
+            <label className="ml-2 text-sm text-gray-700">
+              Show in Customer View
             </label>
           </div>
         </div>
@@ -941,7 +967,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers' },
             { key: 'cutting', label: 'Cutting', icon: 'ti-cut' },
             { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt' },
-            { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' }].
+            { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' },
+            { key: 'embroidery', label: 'Embroidery', icon: 'ti-pencil-alt' },
+            { key: 'knitting', label: 'Knitting', icon: 'ti-layout-grid2' },
+            { key: 'lasser_cutting', label: 'Laser Cutting', icon: 'ti-bolt' }].
             map((step) =>
               <div key={step.key} className="col-md-4 mb-4">
                 <div className="card h-100 p-3 bg-light border-dashed">

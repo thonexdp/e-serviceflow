@@ -40,6 +40,9 @@ export default function WorkflowView({
   const [ticketToProceed, setTicketToProceed] = useState(null);
   const [producedQuantity, setProducedQuantity] = useState(0);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
+  const [ticketsToBatchUpdate, setTicketsToBatchUpdate] = useState(new Set());
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+  const [selectedEvidenceImage, setSelectedEvidenceImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [updateModalMessage, setUpdateModalMessage] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -321,15 +324,44 @@ export default function WorkflowView({
       return;
     }
 
+    // Batch all user updates into a single request
+    const formData = new FormData();
+    formData.append('workflow_step', workflowStep);
 
+    // Build user updates array
+    const userUpdates = [];
+    usersToUpdate.forEach((user) => {
+      const userQty = parseInt(userQuantities[user.id]) || 0;
+      userUpdates.push({
+        user_id: user.id,
+        quantity_produced: userQty
+      });
+    });
 
+    // Append user updates as JSON
+    formData.append('user_updates', JSON.stringify(userUpdates));
 
+    // Append evidence files for each user
+    let evidenceFileIndex = 0;
+    usersToUpdate.forEach((user) => {
+      const userEvidence = userEvidenceFiles[user.id] || [];
+      userEvidence.forEach((file) => {
+        if (file instanceof File) {
+          formData.append(`evidence_files[${evidenceFileIndex}][file]`, file);
+          formData.append(`evidence_files[${evidenceFileIndex}][user_id]`, user.id);
+          evidenceFileIndex++;
+        }
+      });
+    });
 
+    const endpoint = buildUrl(`/workflow/${workflowStep}/update/${selectedTicket.id}`);
 
-    let currentIndex = 0;
-    const updateNextUser = () => {
-      if (currentIndex >= usersToUpdate.length) {
-
+    router.post(endpoint, formData, {
+      preserveScroll: true,
+      preserveState: false,
+      forceFormData: true,
+      onSuccess: () => {
+        // Check if workflow should auto-complete
         const shouldAutoComplete = totalProgress >= maxQuantity;
         if (shouldAutoComplete) {
           router.post(buildUrl(`/workflow/${workflowStep}/complete/${selectedTicket.id}`), {}, {
@@ -352,8 +384,7 @@ export default function WorkflowView({
               setLoading(false);
             },
             onFinish: () => {
-              handleCloseModals();
-              setLoading(false)
+              setLoading(false);
             }
           });
         } else {
@@ -367,48 +398,16 @@ export default function WorkflowView({
           }, 1500);
           setLoading(false);
         }
-        return;
+      },
+      onError: (errors) => {
+        setUpdateModalMessage({ type: 'error', text: errors?.message || 'Failed to update progress.' });
+        setLoading(false);
+      },
+      onFinish: () => {
+        handleCloseModals();
+        setLoading(false);
       }
-
-      const user = usersToUpdate[currentIndex];
-      const userQty = parseInt(userQuantities[user.id]) || 0;
-      const userEvidence = userEvidenceFiles[user.id] || [];
-
-      const formData = new FormData();
-      formData.append('produced_quantity', userQty);
-      formData.append('workflow_step', workflowStep);
-      formData.append('selected_user_id', user.id);
-
-
-      userEvidence.forEach((file, index) => {
-        if (file instanceof File) {
-          formData.append(`evidence_files[${index}]`, file);
-        }
-      });
-
-      const endpoint = buildUrl(`/workflow/${workflowStep}/update/${selectedTicket.id}`);
-
-      router.post(endpoint, formData, {
-        preserveScroll: true,
-        preserveState: false,
-        forceFormData: true,
-        onSuccess: () => {
-          currentIndex++;
-          updateNextUser();
-          setLoading(false);
-        },
-        onError: (errors) => {
-          setUpdateModalMessage({ type: 'error', text: errors?.message || `Failed to update progress for ${user.name}.` });
-          setLoading(false);
-        },
-        onFinish: () => {
-          handleCloseModals();
-          setLoading(false);
-        }
-      });
-    };
-
-    updateNextUser();
+    });
   };
 
   const handleCompleteWorkflow = () => {
@@ -443,6 +442,8 @@ export default function WorkflowView({
     setSelectedUserId(null);
     setUserQuantities({});
     setUserEvidenceFiles({});
+    setSelectedPreviewFile(null);
+    setSelectedEvidenceImage(null);
   };
 
   const handleDownload = (fileId, filename) => {
@@ -467,9 +468,9 @@ export default function WorkflowView({
   const getStatusBadge = (status) => {
     const classes = {
       ready_to_print: "badge-info",
-      in_production: "badge-warning",
+      in_production: "badge-primary",
       completed: "badge-success",
-      pending: "badge-secondary"
+      pending: "badge-warning"
     };
     const labels = {
       ready_to_print: "Ready to Print",
@@ -493,9 +494,9 @@ export default function WorkflowView({
     if (stepProgress.is_completed) {
       return { status: 'Completed', color: 'success' };
     } else if (stepProgress.completed_quantity > 0) {
-      return { status: 'In Progress', color: 'warning' };
+      return { status: 'In Progress', color: 'info' };
     } else {
-      return { status: 'Pending', color: 'info' };
+      return { status: 'Pending', color: 'warning' };
     }
   };
 
@@ -514,17 +515,28 @@ export default function WorkflowView({
         <div className="d-flex align-items-center">
           {row.mockup_files && row.mockup_files.length > 0 &&
             <img
-              src={row.mockup_files[0].file_path}
+              src={row.mockup_files[row.mockup_files.length - 1].file_path}
               alt="Preview"
               className="img-thumbnail mr-2"
               style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
               onClick={() => handleView(row)} />
 
           }
-          <div>
-            <strong>{row.ticket_number}</strong>
-            <div className="text-muted small">{row.description}</div>
+          <div className="flex flex-col leading-tight">
+            <strong className="leading-tight">{row.ticket_number}</strong>
+
+            {row.job_type && (
+              <span className="text-muted text-xs">
+                <strong>Type:</strong> {row.job_type.name}
+              </span>
+            )}
+
+
+            <span className="text-muted text-xs leading-tight">
+              {row.description}
+            </span>
           </div>
+
         </div>
 
     },
@@ -761,38 +773,39 @@ export default function WorkflowView({
             {/* Design Files - Maximized Space */}
             <div className="mb-4">
               <h5 className="mb-3"><i className="ti-image mr-2"></i>Design Files</h5>
-              {mockupFiles.length > 0 ?
+              {mockupFiles.length > 0 ? (
                 <div className="row">
-                  {mockupFiles.map((file) =>
-                    <div key={file.id} className="col-md-12 col-lg-12 mb-3">
-                      <div className="card h-100 shadow-sm">
-                        <img
-                          src={file.file_path}
-                          alt={file.file_name}
-                          className="card-img-top"
-                          style={{ height: '100%', objectFit: 'cover' }} />
+                  {(() => {
+                    const file = mockupFiles[mockupFiles.length - 1];
 
-                        <div className="card-body p-2">
-                          <small className="text-muted d-block text-truncate mb-2" title={file.file_name}>
-                            {file.file_name}
-                          </small>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-block btn-primary"
-                            onClick={() => handleDownload(file.id, file.file_name)}>
+                    return (
+                      <div key={file.id} className="col-md-12 col-lg-12 mb-2">
+                        <div className="card">
+                          <img
+                            src={file.file_path}
+                            alt={file.file_name}
+                            className="card-img-top"
+                            style={{ height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => setSelectedPreviewFile(file)}
+                          />
 
-                            <i className="ti-download"></i> Download
-                          </button>
+                          <div className="card-body p-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-block btn-primary"
+                              onClick={() => handleDownload(file.id, file.file_name)}
+                            >
+                              <i className="ti-download"></i>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div> :
-
-                <div className="alert alert-info">
-                  <i className="ti-info-alt mr-2"></i>No design files available
+                    );
+                  })()}
                 </div>
-              }
+              ) : (
+                <p className="text-muted">No design files available</p>
+              )}
             </div>
 
           </div>
@@ -1062,6 +1075,62 @@ export default function WorkflowView({
         }
       </Modal>
 
+      {/* Image Preview Modal */}
+      <Modal
+        title="Design File Preview"
+        isOpen={!!selectedPreviewFile}
+        onClose={() => setSelectedPreviewFile(null)}
+        zIndex="z-[60]"
+        size="4xl">
+        {selectedPreviewFile &&
+          <div className="text-center">
+            <img
+              src={selectedPreviewFile.file_path}
+              alt={selectedPreviewFile.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }} />
+          </div>
+        }
+      </Modal>
+
+      {/* Evidence Image Preview Modal */}
+      <Modal
+        title="Evidence Photo"
+        isOpen={!!selectedEvidenceImage}
+        onClose={() => setSelectedEvidenceImage(null)}
+        zIndex="z-[60]"
+        size="4xl">
+        {selectedEvidenceImage &&
+          <div className="modal-body text-center">
+            <img
+              src={selectedEvidenceImage.file_path}
+              alt={selectedEvidenceImage.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }} />
+
+            <div className="mt-3 text-left">
+              <p className="mb-1"><strong>Uploaded by:</strong> {selectedEvidenceImage.user?.name || 'Unknown'}</p>
+              <p className="mb-0"><strong>Date:</strong> {selectedEvidenceImage.uploaded_at ? formatDate(selectedEvidenceImage.uploaded_at) : 'N/A'}</p>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedEvidenceImage(null)}>
+                Close
+              </button>
+              <a
+                href={selectedEvidenceImage.file_path}
+                download={selectedEvidenceImage.file_name}
+                className="btn btn-primary btn-sm">
+                <i className="ti-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
+        }
+      </Modal>
+
       {/* Start Work Confirmation Modal */}
       <Modal
         title={`Start ${workflowInfo.label} Workflow`}
@@ -1120,13 +1189,14 @@ export default function WorkflowView({
                     </div>
                     <div className="card-body">
                       <div className="row mt-4 align-items-center">
-                        <div className="col-md-8">
+                        <div className="col-md-4">
                           <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
                             route={`/workflow/${workflowStep}`} />
 
                         </div>
+                        <div className="col-md-4"></div>
                         <div className="col-md-4 text-right">
                           <button
                             onClick={() => router.visit(buildUrl(`/workflow/${workflowStep}`), {

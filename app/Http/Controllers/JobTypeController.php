@@ -59,7 +59,7 @@ class JobTypeController extends Controller
             $file = $request->file('image');
             // Explicitly use 's3' in production, 'public' otherwise
             $disk = (app()->environment('production') || env('APP_ENV') === 'production') ? 's3' : 'public';
-            
+
             // Verify S3 config in production
             if ($disk === 's3') {
                 $s3Config = config('filesystems.disks.s3');
@@ -72,15 +72,15 @@ class JobTypeController extends Controller
                     'has_secret' => !empty($s3Config['secret']),
                 ]);
             }
-            
+
             try {
                 // For S3/DigitalOcean Spaces, explicitly set visibility to 'public'
                 // Pass 'public' as string for visibility
-                $path = $disk === 's3' 
+                $path = $disk === 's3'
                     ? Storage::disk($disk)->put('job-types', $file, 'public')
                     : Storage::disk($disk)->put('job-types', $file);
                 $validated['image_path'] = $path;
-                
+
                 // Verify file was actually saved
                 try {
                     $exists = Storage::disk($disk)->exists($path);
@@ -93,7 +93,7 @@ class JobTypeController extends Controller
                         $exists = false;
                     }
                 }
-                
+
                 // Log for debugging in production
                 if (app()->environment('production')) {
                     Log::info('JobType image uploaded', [
@@ -143,7 +143,7 @@ class JobTypeController extends Controller
         if ($request->hasFile('image')) {
             // Explicitly use 's3' in production, 'public' otherwise
             $disk = (app()->environment('production') || env('APP_ENV') === 'production') ? 's3' : 'public';
-            
+
             if ($jobType->getRawOriginal('image_path')) {
                 try {
                     Storage::disk($disk)->delete($jobType->getRawOriginal('image_path'));
@@ -155,9 +155,9 @@ class JobTypeController extends Controller
                     ]);
                 }
             }
-            
+
             $file = $request->file('image');
-            
+
             // Verify S3 config in production
             if ($disk === 's3') {
                 $s3Config = config('filesystems.disks.s3');
@@ -170,15 +170,15 @@ class JobTypeController extends Controller
                     'has_secret' => !empty($s3Config['secret']),
                 ]);
             }
-            
+
             try {
                 // For S3/DigitalOcean Spaces, explicitly set visibility to 'public'
                 // Pass 'public' as string for visibility
-                $path = $disk === 's3' 
+                $path = $disk === 's3'
                     ? Storage::disk($disk)->put('job-types', $file, 'public')
                     : Storage::disk($disk)->put('job-types', $file);
                 $validated['image_path'] = $path;
-                
+
                 // Verify file was actually saved
                 try {
                     $exists = Storage::disk($disk)->exists($path);
@@ -191,7 +191,7 @@ class JobTypeController extends Controller
                         $exists = false;
                     }
                 }
-                
+
                 // Log for debugging in production
                 if (app()->environment('production')) {
                     Log::info('JobType image updated', [
@@ -234,8 +234,24 @@ class JobTypeController extends Controller
         return back()->with('success', 'Job type updated successfully!');
     }
 
+    /**
+     * Check if job type can be deleted and get dependencies
+     */
+    public function checkDeletion(JobType $jobType)
+    {
+        $result = $jobType->canBeDeleted();
+        return response()->json($result);
+    }
+
     public function destroy(JobType $jobType)
     {
+        // Check if can be deleted
+        $check = $jobType->canBeDeleted();
+        
+        if (!$check['can_delete']) {
+            return back()->with('error', 'Cannot delete job type. It has active dependencies.');
+        }
+
         $jobTypeName = $jobType->name;
         $jobType->delete();
 
@@ -249,13 +265,13 @@ class JobTypeController extends Controller
         return back()->with('success', 'Job type deleted successfully!');
     }
 
-    
+
     private function syncPromoRules(JobType $jobType, array $promoRules)
     {
-        
+
         $jobType->promoRules()->delete();
 
-        
+
         foreach ($promoRules as $rule) {
             if (!empty($rule['buy_quantity']) && !empty($rule['free_quantity'])) {
                 $jobType->promoRules()->create([
