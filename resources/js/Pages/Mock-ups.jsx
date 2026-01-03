@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -21,6 +22,7 @@ export default function Mockups({
   const [openUploadModal, setUploadModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
   const [uploadFiles, setUploadFiles] = useState([]);
   const [dateRange, setDateRange] = useState(filters.date_range || "");
 
@@ -52,6 +54,7 @@ export default function Mockups({
     setUploadFiles([]);
     setNotes("");
     setShowRevisionNotes(false);
+    setSelectedPreviewFile(null);
   };
 
   const handleFileSelect = (e) => {
@@ -317,7 +320,26 @@ export default function Mockups({
       render: (row, index) =>
         (tickets.current_page - 1) * tickets.per_page + index + 1
     },
-    { label: "Ticket ID", key: "ticket_number" },
+    {
+      label: "Ticket / Preview",
+      key: "ticket_number",
+      render: (row) => (
+        <div className="d-flex align-items-center">
+          {row.mockup_files && row.mockup_files.length > 0 && (
+            <img
+              src={row.mockup_files[row.mockup_files.length - 1].file_path}
+              alt="Preview"
+              className="img-thumbnail mr-2"
+              style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
+              onClick={() => setSelectedPreviewFile(row.mockup_files[row.mockup_files.length - 1])}
+            />
+          )}
+          <div className="flex flex-col leading-tight">
+            <strong className="leading-tight">{row.ticket_number}</strong>
+          </div>
+        </div>
+      )
+    },
     {
       label: "Customer",
       key: "customer",
@@ -332,8 +354,24 @@ export default function Mockups({
       render: (row) => (
         <div>
           {row.job_type && (
-            <div className="text-muted small mb-1">
-              <strong>Type:</strong> {row.job_type.name}
+            <div className="text-muted small mb-1 d-flex align-items-center gap-2">
+              <span><strong>Type:</strong> {row.job_type.name}</span>
+              {row.selected_color && (
+                <div className="d-flex align-items-center ml-2">
+                  <span
+                    className="badge badge-light border d-flex align-items-center gap-1 py-1 px-2 shadow-sm"
+                    style={{ fontSize: '9px', borderRadius: '12px', backgroundColor: '#f8f9fa' }}
+                  >
+                    <div
+                      className="rounded-circle border"
+                      style={{ width: '8px', height: '8px', backgroundColor: row.selected_color }}
+                    ></div>
+                    <span className="text-dark font-weight-bold">
+                      {getFullColorName(row.selected_color, row.job_type)}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <div>{row.description}</div>
@@ -880,6 +918,42 @@ export default function Mockups({
             </div>
           </div>
         }
+      </Modal>
+
+      {/* Image Preview Modal */}
+      <Modal
+        title="Design File Preview"
+        isOpen={!!selectedPreviewFile}
+        onClose={() => setSelectedPreviewFile(null)}
+        size="4xl">
+        {selectedPreviewFile && (
+          <div className="text-center">
+            <img
+              src={selectedPreviewFile.file_path}
+              alt={selectedPreviewFile.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }}
+            />
+            <div className="mt-3 text-left">
+              <p className="mb-1"><strong>Filename:</strong> {selectedPreviewFile.file_name}</p>
+              <p className="mb-0"><strong>Uploaded:</strong> {new Date(selectedPreviewFile.created_at).toLocaleString()}</p>
+            </div>
+            <div className="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedPreviewFile(null)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => handleDownload(selectedPreviewFile.id, selectedPreviewFile.file_name)}>
+                <i className="ti-download mr-2"></i>Download
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <section id="main-content">

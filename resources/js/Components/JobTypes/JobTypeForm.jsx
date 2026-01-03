@@ -14,7 +14,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     is_active: true,
     show_in_dashboard: true,
     show_in_customer_view: true,
-    sort_order: 0
+    sort_order: 0,
+    brochure_link: "",
+    has_colors: false,
+    available_colors: []
   });
 
   const [priceTiers, setPriceTiers] = useState([]);
@@ -35,6 +38,7 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
   const [sizeBase, setSizeBase] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [pendingColor, setPendingColor] = useState("#33ccff");
 
 
   useEffect(() => {
@@ -49,7 +53,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         is_active: jobType.is_active !== undefined ? jobType.is_active : true,
         show_in_dashboard: jobType.show_in_dashboard !== undefined ? jobType.show_in_dashboard : true,
         show_in_customer_view: jobType.show_in_customer_view !== undefined ? jobType.show_in_customer_view : true,
-        sort_order: jobType.sort_order || 0
+        sort_order: jobType.sort_order || 0,
+        brochure_link: jobType.brochure_link || "",
+        has_colors: !!jobType.has_colors,
+        available_colors: jobType.available_colors || []
       });
       setPriceTiers(
         (jobType.price_tiers || []).map((tier) => ({
@@ -383,7 +390,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
       size_rates: formattedSizeRates,
       promo_rules: formattedPromoRules,
       workflow_steps: workflowSteps,
-      image: imageFile
+      image: imageFile,
+      brochure_link: formData.brochure_link,
+      has_colors: formData.has_colors,
+      available_colors: formData.available_colors
     };
 
     onSubmit(submitData);
@@ -408,49 +418,69 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="row mt-1 justify-end">
-        <div className="d-flex align-items-center gap-4">
-          <div className="d-flex align-items-center">
-            <label className="block text-sm font-medium text-gray-700 mr-2">
-              Status:
-            </label>
-            <input
-              type="checkbox"
-              name="is_active"
-              checked={formData.is_active}
-              onChange={handleChange}
-              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
+      <div className="row justify-end">
+        <div className="flex items-center gap-2">
 
-            <label className="ml-2 text-sm text-gray-700">
-              Active
-            </label>
-          </div>
-          <div className="d-flex align-items-center">
-            <input
-              type="checkbox"
-              name="show_in_dashboard"
-              checked={formData.show_in_dashboard}
-              onChange={handleChange}
-              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
-
-            <label className="ml-2 text-sm text-gray-700">
-              Show in Dashboard
+          {/* STATUS */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">
+              Status :
+            </span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="is_active"
+                checked={formData.is_active}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-sm text-gray-700">Active</span>
             </label>
           </div>
-          <div className="d-flex align-items-center">
-            <input
-              type="checkbox"
-              name="show_in_customer_view"
-              checked={formData.show_in_customer_view}
-              onChange={handleChange}
-              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
 
-            <label className="ml-2 text-sm text-gray-700">
-              Show in Customer View
+          {/* DIVIDER */}
+          <span className="h-6 w-px bg-gray-300" />
+
+          {/* VISIBILITY & FEATURES */}
+          <div className="flex items-center gap-5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="show_in_dashboard"
+                checked={formData.show_in_dashboard}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-sm text-gray-700">Dashboard</span>
+            </label>
+            <span className="h-6 w-px bg-gray-300" />
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="show_in_customer_view"
+                checked={formData.show_in_customer_view}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-sm text-gray-700">Customer View</span>
+            </label>
+            <span className="h-6 w-px bg-gray-300" />
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="has_colors"
+                checked={formData.has_colors}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-sm text-gray-700">Enable Colors</span>
             </label>
           </div>
         </div>
       </div>
+
       <div className="row">
         <div className="col-md-6">
           <FormInput
@@ -489,9 +519,110 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             error={errors.description}
             placeholder="Enter description (optional)"
             rows={3} />
-
         </div>
       </div>
+
+      <div className="row">
+        <div className="col-md-12">
+          <FormInput
+            label="Google Drive Brochure Link (Optional)"
+            name="brochure_link"
+            value={formData.brochure_link}
+            onChange={handleChange}
+            error={errors.brochure_link}
+            placeholder="https://drive.google.com/..." />
+        </div>
+      </div>
+
+      {
+        formData.has_colors && (
+          <div className="mt-4 p-4 bg-light rounded border">
+            <h6 className="mb-3 font-weight-bold text-dark">Available Colors</h6>
+            <div className="d-flex flex-column gap-3">
+              <div className="d-flex align-items-center gap-2">
+                <input
+                  type="color"
+                  className="form-control form-control-sm p-0 border-none cursor-pointer"
+                  style={{ width: '32px', height: '32px' }}
+                  id="newColorPicker"
+                  value={pendingColor}
+                  onChange={(e) => setPendingColor(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => {
+                    const color = pendingColor;
+                    const exists = formData.available_colors.some(c =>
+                      (typeof c === 'string' ? c === color : c.hex === color)
+                    );
+                    if (color && !exists) {
+                      setFormData(prev => ({
+                        ...prev,
+                        available_colors: [...prev.available_colors, { hex: color, code: '' }]
+                      }));
+                    }
+                  }}
+                >
+                  Okay
+                </button>
+              </div>
+
+              <div className="d-flex flex-wrap gap-2 w-100">
+                {formData.available_colors.map((colorObj, idx) => {
+                  const hex = typeof colorObj === 'string' ? colorObj : colorObj.hex;
+                  const code = typeof colorObj === 'string' ? '' : colorObj.code;
+
+                  return (
+                    <div key={idx} className="d-flex align-items-center gap-2 p-1 bg-white rounded border shadow-sm" style={{ width: 'fit-content', minWidth: '120px' }}>
+                      <div
+                        className="rounded-circle border"
+                        style={{ width: '18px', height: '18px', backgroundColor: hex, flexShrink: 0 }}
+                        title={hex}
+                      ></div>
+
+                      <input
+                        type="text"
+                        className="form-control form-control-xs border-0 bg-light px-2"
+                        style={{ fontSize: '10px', height: '22px', width: '70px' }}
+                        placeholder="Code"
+                        value={code}
+                        onChange={(e) => {
+                          const newColors = [...formData.available_colors];
+                          if (typeof newColors[idx] === 'string') {
+                            newColors[idx] = { hex: newColors[idx], code: e.target.value };
+                          } else {
+                            newColors[idx] = { ...newColors[idx], code: e.target.value };
+                          }
+                          setFormData(prev => ({ ...prev, available_colors: newColors }));
+                        }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            available_colors: prev.available_colors.filter((_, i) => i !== idx)
+                          }));
+                        }}
+                        className="text-danger border-0 bg-transparent p-0 px-1 font-weight-bold"
+                        style={{ fontSize: '16px', lineHeight: '1' }}
+                        title="Remove"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  );
+                })}
+                {formData.available_colors.length === 0 && (
+                  <span className="text-muted italic text-xs">No colors added yet.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      }
 
       <div className="row">
         <div className="col-md-4">
@@ -1086,6 +1217,6 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
           }
         </button>
       </div>
-    </form>);
+    </form >);
 
 }

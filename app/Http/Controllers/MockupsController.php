@@ -15,7 +15,7 @@ class MockupsController extends Controller
 
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser', 'updatedByUser'])
+        $query = Ticket::with(['customer', 'jobType.category', 'files', 'mockupFiles', 'assignedToUser', 'updatedByUser'])
             ->where('payment_status', '!=', 'awaiting_verification')
             ->whereNotNull('design_status');
 

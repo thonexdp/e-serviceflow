@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -13,7 +14,9 @@ import axios from "axios";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import DeletionConfirmationModal from "@/Components/Common/DeletionConfirmationModal";
 import { formatPeso } from "@/Utils/currency";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import Quotation from "@/Components/Tickets/Quotation";
 
 export default function Tickets({
   user = {},
@@ -23,7 +26,8 @@ export default function Tickets({
   tickets = { data: [] },
   selectedCustomer = null,
   filters = {},
-  branches = []
+  branches = [],
+  customer_order_qrcode = ""
 }) {
   const [openCustomerModal, setCustomerModalOpen] = useState(false);
   const [openTicketModal, setTicketModalOpen] = useState(false);
@@ -48,6 +52,20 @@ export default function Tickets({
   const [revisionNotes, setRevisionNotes] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState(false);
   const [verifyErrors, setVerifyErrors] = useState({});
+
+  const [openQuotationModal, setQuotationModalOpen] = useState(false);
+  const [quotationToPrint, setQuotationToPrint] = useState(null);
+  const [quotationForm, setQuotationForm] = useState({
+    name: "",
+    companyName: "",
+    address: "",
+    validUntil: "",
+    quotationNo: "",
+    projectDescription: "",
+    valueAddedTax: "0",
+    others: "0",
+    date: new Date().toISOString().slice(0, 10)
+  });
 
 
   useEffect(() => {
@@ -480,8 +498,51 @@ export default function Tickets({
     return (
       <div className={`badge ${classes[status] || "badge-secondary"}`}>
         {status?.replace("_", " ").toUpperCase() || "PENDING"}
-      </div>);
+      </div>
+    );
+  };
 
+  const shouldShowDeleteButtonInDataTable = (row) => {
+    if (row?.role === 'admin') return false;
+    const isAdmin = auth.user.role === 'admin' || auth.user.roles?.some(r => r.name === 'admin');
+    const inProgressStatuses = ['in_designer', 'ready_to_print', 'in_production', 'pending'];
+    if (row.status && inProgressStatuses.includes(row.status)) {
+      return isAdmin;
+    }
+    if (row.status === 'completed') return false;
+    return true;
+  };
+
+  const handleOpenQuotationModal = (ticket) => {
+    setSelectedTicket(ticket);
+    setQuotationForm({
+      name: ticket.customer ? `${ticket.customer.firstname} ${ticket.customer.lastname}` : "",
+      companyName: ticket.customer?.company_name || "",
+      address: ticket.customer?.address || "",
+      validUntil: "",
+      quotationNo: ticket.ticket_number,
+      projectDescription: ticket.description || "",
+      valueAddedTax: "0",
+      others: "0",
+      date: new Date().toISOString().slice(0, 10),
+    });
+    setQuotationModalOpen(true);
+  };
+
+  const handlePrintQuotation = () => {
+    setQuotationToPrint({
+      ticket: selectedTicket,
+      customData: quotationForm,
+    });
+    setQuotationModalOpen(false);
+
+    document.body.classList.add("printing-quotation");
+
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove("printing-quotation");
+      setQuotationToPrint(null);
+    }, 500);
   };
 
   const getPaymentStatusBadge = (row) => {
@@ -580,13 +641,32 @@ export default function Tickets({
       render: (row) =>
         <div>
           <div className="font-weight-bold">{row.ticket_number}</div>
-          {
-            row.job_type?.name && (
-              <i className="text-xs">
-                Type: {row.job_type?.name}
-              </i>
-            )
-          }
+          <span className="text-xs">
+            {
+              row.job_type?.name && (
+                <i className="text-xs">
+                  Type: {row.job_type?.name}
+                </i>
+              )
+            }
+          </span>
+          {row.selected_color && (
+            <div className="d-flex align-items-center mt-1">
+              <span
+                className="badge badge-light border d-flex align-items-center gap-1 py-1 px-2 shadow-sm"
+                style={{ fontSize: '9px', borderRadius: '12px', backgroundColor: '#f8f9fa' }}
+              >
+                <div
+                  className="rounded-circle border"
+                  style={{ width: '8px', height: '8px', backgroundColor: row.selected_color }}
+                ></div>
+                <span className="text-dark font-weight-bold">
+                  {getFullColorName(row.selected_color, row.job_type)}
+                </span>
+              </span>
+            </div>
+          )}
+
 
           {row.payments?.some((p) => p.status === 'rejected') &&
             <div className="text-danger font-bold text-[9px] uppercase">
@@ -633,19 +713,6 @@ export default function Tickets({
           new Date(row.due_date).toLocaleDateString() :
           "N/A"
     },
-
-
-
-
-
-
-
-
-
-
-
-
-
     {
       label: "Payment Status",
       key: "payment_status",
@@ -1546,7 +1613,44 @@ export default function Tickets({
                     onDelete={handleDeleteTicket}
                     currentUser={auth.user}
                     showDeleteForInProgress={true}
-                    emptyMessage="No tickets found." />
+                    emptyMessage="No tickets found."
+                    actions={(row) => (
+                      <div className="btn-group">
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm text-primary"
+                          onClick={() => handleEditTicket(row)}
+                          title={`Edit ${row.status !== 'completed' ? 'Edit' : 'View'}`}>
+                          <small>
+                            {row.status !== 'completed' ? <i className="ti-pencil"></i> : <i className="ti-eye"></i>}
+                            {row.status !== 'completed' ? ' Edit' : ' View'}
+                          </small>
+                        </button>
+
+                        {
+                          row.payment_status !== 'paid' && row.payment_status !== 'partial' && (
+                            <button
+                              type="button"
+                              className="btn btn-link btn-sm text-info"
+                              onClick={() => handleOpenQuotationModal(row)}
+                              title="Print Quotation">
+                              <small><i className="ti-printer"></i> Quote</small>
+                            </button>
+                          )
+                        }
+
+                        {shouldShowDeleteButtonInDataTable(row) && (
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm text-danger"
+                            onClick={() => handleDeleteTicket(row.id)}
+                            title="Delete">
+                            <small> <i className="ti-trash"></i> Delete</small>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  />
 
                 </div>
               </div>
@@ -1554,7 +1658,166 @@ export default function Tickets({
           </div>
         </section>
 
+        {/* Quotation Modal */}
+        <Modal
+          title="Prepare Quotation"
+          isOpen={openQuotationModal}
+          onClose={() => setQuotationModalOpen(false)}
+          size="4xl"
+          submitButtonText={null}
+        >
+          <div className="modal-body p-4">
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Client Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.name}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, name: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Company Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.companyName}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, companyName: e.target.value })}
+                />
+              </div>
+              <div className="col-12 mb-3">
+                <label className="form-label font-weight-bold">Address</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.address}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, address: e.target.value })}
+                />
+              </div>
+              <div className="col-md-4 mb-3">
+                <label className="form-label font-weight-bold">Valid Until</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. 7 Days"
+                  value={quotationForm.validUntil}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, validUntil: e.target.value })}
+                />
+              </div>
+              <div className="col-md-4 mb-3">
+                <label className="form-label font-weight-bold">Quotation No.</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.quotationNo}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, quotationNo: e.target.value })}
+                />
+              </div>
+              <div className="col-md-4 mb-3">
+                <label className="form-label font-weight-bold">Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={quotationForm.date}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, date: e.target.value })}
+                />
+              </div>
+              <div className="col-12 mb-3">
+                <label className="form-label font-weight-bold">Project Description</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={quotationForm.projectDescription}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, projectDescription: e.target.value })}
+                ></textarea>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Value Added Tax (VAT)</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={quotationForm.valueAddedTax}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, valueAddedTax: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Others / Extra Fee</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={quotationForm.others}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, others: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer border-top px-0 pb-0 pt-3 mt-2">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setQuotationModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-info btn-sm"
+                onClick={handlePrintQuotation}
+              >
+                <i className="ti-printer mr-1"></i> Print Quotation
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Hidden Quotation Print View - Portaled to Body to avoid container overflow/height issues */}
+        {createPortal(
+          <div id="quotation-print-overlay" style={{ display: quotationToPrint ? 'block' : 'none' }}>
+            {quotationToPrint && (
+              <Quotation
+                ticket={quotationToPrint.ticket}
+                customData={quotationToPrint.customData}
+                customerOrderQrcode={customer_order_qrcode}
+              />
+            )}
+          </div>,
+          document.body
+        )}
+
+        <style>{`
+          @media print {
+            @page {
+              margin: 0;
+              size: auto;
+            }
+            body.printing-quotation {
+              visibility: hidden;
+              overflow: visible !important;
+              height: auto !important;
+            }
+            /* Completely hide the main application container when printing a quotation */
+            #app {
+              display: none !important;
+            }
+            
+            body.printing-quotation #quotation-print-overlay,
+            body.printing-quotation #quotation-print-overlay .quotation-print-container {
+              visibility: visible !important;
+              display: block !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              background: white !important;
+              z-index: 99999 !important;
+            }
+            body.printing-quotation #quotation-print-overlay * {
+              visibility: visible !important;
+            }
+          }
+        `}</style>
       </AdminLayout>
     </>);
-
 }

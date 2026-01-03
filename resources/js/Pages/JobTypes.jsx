@@ -279,6 +279,45 @@ export default function JobTypes({
       }
     },
     {
+      label: "Assets/Colors",
+      key: "assets",
+      render: (row) => (
+        <div className="d-flex flex-column gap-2">
+          {row.brochure_link && (
+            <a
+              href={row.brochure_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm btn-outline-primary"
+              title="View Brochure"
+            >
+              <i className="ti-link"></i> Brochure
+            </a>
+          )}
+          {row.has_colors && row.available_colors?.length > 0 && (
+            <div className="d-flex flex-wrap gap-1">
+              {row.available_colors.slice(0, 5).map((color, idx) => {
+                const hex = typeof color === 'string' ? color : color.hex;
+                const code = typeof color === 'string' ? '' : color.code;
+                return (
+                  <div
+                    key={idx}
+                    className="rounded-circle border"
+                    style={{ width: '12px', height: '12px', backgroundColor: hex }}
+                    title={code ? `${code} (${hex})` : hex}
+                  ></div>
+                );
+              })}
+              {row.available_colors.length > 5 && (
+                <span className="text-xs">+{row.available_colors.length - 5}</span>
+              )}
+            </div>
+          )}
+          {!row.brochure_link && !row.has_colors && <span className="text-muted text-xs">N/A</span>}
+        </div>
+      )
+    },
+    {
       label: "Discount",
       key: "discount",
       render: (row) => row.discount ? `${row.discount}%` : "N/A"

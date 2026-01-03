@@ -174,6 +174,7 @@ class TicketController extends BaseCrudController
                 'order_dir' => $orderDir,
             ],
             'branches' => $user->isAdmin() ? \App\Models\Branch::active()->get() : [],
+            'customer_order_qrcode' => \App\Models\Setting::get('customer_order_qrcode', ''),
         ]);
     }
 
@@ -216,6 +217,7 @@ class TicketController extends BaseCrudController
             'is_size_based' => 'nullable|boolean',
             'custom_width' => 'nullable|numeric|min:0',
             'custom_height' => 'nullable|numeric|min:0',
+            'selected_color' => 'nullable|string|max:50',
         ]);
 
         $ticketData = $validated;
@@ -373,6 +375,7 @@ class TicketController extends BaseCrudController
             'is_size_based' => 'nullable|boolean',
             'custom_width' => 'nullable|numeric|min:0',
             'custom_height' => 'nullable|numeric|min:0',
+            'selected_color' => 'nullable|string|max:50',
         ]);
 
         $ticketData = $validated;
@@ -730,6 +733,7 @@ class TicketController extends BaseCrudController
             'is_size_based' => 'nullable|boolean',
             'custom_width' => 'nullable|numeric|min:0',
             'custom_height' => 'nullable|numeric|min:0',
+            'selected_color' => 'nullable|string|max:50',
         ];
     }
 

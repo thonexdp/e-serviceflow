@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { router, usePage } from "@inertiajs/react";
 import { formatPeso } from "@/Utils/currency";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 
 export default function CustomerPOSOrder() {
   const { jobCategories = [], branches = [] } = usePage().props;
@@ -34,7 +35,8 @@ export default function CustomerPOSOrder() {
     custom_job_type_description: "",
     custom_price_mode: "per_item", // 'per_item' or 'fixed_total'
     custom_price_per_item: "",
-    custom_fixed_total: ""
+    custom_fixed_total: "",
+    selected_color: ""
   });
 
   const [designFiles, setDesignFiles] = useState([]);
@@ -873,6 +875,9 @@ export default function CustomerPOSOrder() {
       }
       if (formData.size_height) {
         orderData.append("size_height", formData.size_height);
+      }
+      if (formData.selected_color) {
+        orderData.append("selected_color", formData.selected_color);
       }
 
       designFiles.forEach((designFile) => {
@@ -1899,105 +1904,104 @@ export default function CustomerPOSOrder() {
                       const hasPriceTiers =
                         (jobType.price_tiers || [])
                           .length > 0;
+                      const isSelected = formData.job_type_id === jobType.id.toString();
+                      const promoRules = jobType.promo_rules || [];
+                      const hasPromoRules = promoRules.length > 0;
+                      const priceTiers = jobType.price_tiers || [];
+                      const sizeRates = jobType.size_rates || [];
+
                       return (
-                        <button
-                          key={jobType.id}
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              job_type_id:
-                                jobType.id.toString(),
-                            }))
-                          }
-                          className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.job_type_id ===
-                            jobType.id.toString()
-                            ? "border-orange-600 bg-orange-50 shadow-sm"
-                            : "border-gray-100 hover:border-orange-300 hover:bg-gray-50"
-                            }`}
-                        >
-                          <div className="flex gap-4 items-center">
-                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
-                              <img
-                                src={
-                                  jobType.image_path ||
-                                  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(
-                                    jobType.name
-                                      .substring(
-                                        0,
-                                        2
-                                      )
-                                      .toUpperCase()
-                                  )}%3C/text%3E%3C/svg%3E`
-                                }
-                                alt={
-                                  jobType.name
-                                }
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                onError={(
-                                  e
-                                ) => {
-                                  e.target.onerror =
-                                    null;
-                                  e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
-                                }}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <p className="font-normal text-gray-900">
-                                    {
+                        <div key={jobType.id} className="space-y-3">
+                          <button
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                job_type_id:
+                                  jobType.id.toString(),
+                              }))
+                            }
+                            className={`w-full p-3 rounded-xl border-2 text-left transition-all ${isSelected
+                              ? "border-orange-600 bg-orange-50 shadow-sm"
+                              : "border-gray-100 hover:border-orange-300 hover:bg-gray-50"
+                              }`}
+                          >
+                            <div className="flex gap-4 items-center">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
+                                <img
+                                  src={
+                                    jobType.image_path ||
+                                    `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(
                                       jobType.name
-                                    }
-                                  </p>
-                                  {jobType.description && (
-                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                      {
-                                        jobType.description
-                                      }
-                                    </p>
-                                  )}
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {jobType.promo_text && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
-                                        🎁
-                                        Promo
-                                      </span>
-                                    )}
-                                    {hasPriceTiers && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
-                                        📊
-                                        Bulk
-                                      </span>
-                                    )}
-                                    {hasSizeRates && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
-                                        📐
-                                        Size
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                {!hasSizeRates &&
-                                  !hasPriceTiers && (
-                                    <span className="text-orange-600 font-bold text-lg">
-                                      {formatPeso(
-                                        parseFloat(
-                                          jobType.price ||
-                                          0
-                                        ).toFixed(
+                                        .substring(
+                                          0,
                                           2
                                         )
+                                        .toUpperCase()
+                                    )}%3C/text%3E%3C/svg%3E`
+                                  }
+                                  alt={
+                                    jobType.name
+                                  }
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(
+                                    e
+                                  ) => {
+                                    e.target.onerror =
+                                      null;
+                                    e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="font-normal text-gray-900">
+                                      {
+                                        jobType.name
+                                      }
+                                    </p>
+                                    {jobType.description && (
+                                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                        {
+                                          jobType.description
+                                        }
+                                      </p>
+                                    )}
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {jobType.brochure_link && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wider">
+                                          📄 Brochure
+                                        </span>
                                       )}
-                                    </span>
-                                  )}
-                                {(hasSizeRates ||
-                                  hasPriceTiers) && (
-                                    <span className="text-orange-600 text-xs mt-1 italic">
-                                      Price Starts
-                                      at{" "}
-                                      <div className="text-lg font-bold">
+                                      {jobType.has_colors && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-100 text-pink-700 uppercase tracking-wider">
+                                          🎨 {jobType.available_colors?.length || 0} Colors
+                                        </span>
+                                      )}
+                                      {jobType.promo_text && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                                          🎁
+                                          Promo
+                                        </span>
+                                      )}
+                                      {hasPriceTiers && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
+                                          📊
+                                          Bulk
+                                        </span>
+                                      )}
+                                      {hasSizeRates && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
+                                          📐
+                                          Size
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {!hasSizeRates &&
+                                    !hasPriceTiers && (
+                                      <span className="text-orange-600 font-bold text-lg">
                                         {formatPeso(
                                           parseFloat(
                                             jobType.price ||
@@ -2006,15 +2010,244 @@ export default function CustomerPOSOrder() {
                                             2
                                           )
                                         )}
+                                      </span>
+                                    )}
+                                  {(hasSizeRates ||
+                                    hasPriceTiers) && (
+                                      <span className="text-orange-600 text-xs mt-1 italic">
+                                        Price Starts
+                                        at{" "}
+                                        <div className="text-lg font-bold">
+                                          {formatPeso(
+                                            parseFloat(
+                                              jobType.price ||
+                                              0
+                                            ).toFixed(
+                                              2
+                                            )
+                                          )}
 
-                                      </div>
+                                        </div>
 
-                                    </span>
-                                  )}
+                                      </span>
+                                    )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </button>
+                          </button>
+
+                          {/* Additional Information - Only shown when this job type is selected */}
+                          {isSelected && (
+                            <div className="ml-4 pl-4 border-l-4 border-orange-300 space-y-4 animate-fadeIn">
+                              {/* Brochure Link */}
+                              {jobType.brochure_link && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-blue-600 text-xl">📄</span>
+                                    <div>
+                                      <p className="font-semibold text-blue-900">Brochure Available</p>
+                                      <a
+                                        href={jobType.brochure_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 text-sm underline"
+                                      >
+                                        View Product Brochure (Google Drive)
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Color Selection */}
+                              {jobType.has_colors && jobType.available_colors?.length > 0 && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                                    Select Color
+                                  </label>
+                                  <div className="flex flex-wrap gap-1">
+                                    {jobType.available_colors.map((colorObj, idx) => {
+                                      const hex = typeof colorObj === 'string' ? colorObj : colorObj.hex;
+                                      const code = typeof colorObj === 'string' ? '' : colorObj.code;
+                                      return (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => setFormData(prev => ({ ...prev, selected_color: hex }))}
+                                          className={`w-10 h-10 border-2 transition-all transform hover:scale-110 ${formData.selected_color === hex
+                                            ? "border-orange-600 ring-2 ring-orange-200"
+                                            : "border-gray-200"
+                                            }`}
+                                          style={{ backgroundColor: hex }}
+                                          title={code ? `${getColorName(hex)} (${code})` : getColorName(hex)}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                  {formData.selected_color && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      Selected: <span className="font-semibold text-gray-900">{getFullColorName(formData.selected_color, selectedJobType)}</span> ({formData.selected_color})
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Promo Rules Display */}
+                              {hasPromoRules && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-green-600 text-xl">
+                                      🎁
+                                    </span>
+                                    <div className="flex-1">
+                                      <p className="font-semibold text-green-900 mb-1">
+                                        Available Promos:
+                                      </p>
+                                      <ul className="text-sm text-green-800 space-y-1">
+                                        {promoRules
+                                          .filter((r) => r.is_active)
+                                          .map((rule, idx) => (
+                                            <li key={idx}>
+                                              {rule.description ||
+                                                `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
+                                            </li>
+                                          ))}
+                                      </ul>
+                                      {formData.quantity > 0 && formData.free_quantity > 0 && (
+                                        <p className="text-sm font-bold text-green-700 mt-2">
+                                          ✓ You get{" "}
+                                          {formData.free_quantity}{" "}
+                                          free item(s)! Total:{" "}
+                                          {parseInt(
+                                            formData.quantity
+                                          ) +
+                                            parseInt(
+                                              formData.free_quantity
+                                            )}{" "}
+                                          pcs
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Price Tiers Display */}
+                              {hasPriceTiers && (
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                  <p className="font-semibold text-orange-900 mb-2">
+                                    📊 Bulk Pricing:
+                                  </p>
+                                  <div className="space-y-1 text-sm">
+                                    {priceTiers.map((tier, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex justify-between"
+                                      >
+                                        <span className="text-orange-800">
+                                          {tier.min_quantity}
+                                          {tier.max_quantity
+                                            ? ` - ${tier.max_quantity}`
+                                            : "+"}{" "}
+                                          pcs:
+                                        </span>
+                                        <span className="font-semibold text-orange-900">
+                                          {formatPeso(
+                                            parseFloat(
+                                              tier.price
+                                            ).toFixed(2)
+                                          )}
+                                          /unit
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Size-Based Pricing */}
+                              {hasSizeRates && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                                    Size Options
+                                  </label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sizeRates.map((rate) => (
+                                      <button
+                                        key={rate.id}
+                                        type="button"
+                                        onClick={() =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            size_rate_id: rate.id.toString(),
+                                          }))
+                                        }
+                                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
+                                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
+                                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
+                                          }`}
+                                      >
+                                        {rate.variant_name}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                                        Width (
+                                        {selectedSizeRate?.dimension_unit ||
+                                          "unit"}
+                                        )
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={formData.size_width}
+                                        onChange={(e) =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            size_width:
+                                              e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        placeholder="0"
+                                        step="0.1"
+                                        min="0"
+                                      />
+                                    </div>
+                                    {selectedSizeRate?.calculation_method !==
+                                      "length" && (
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-600 mb-2">
+                                            Height (
+                                            {selectedSizeRate?.dimension_unit ||
+                                              "unit"}
+                                            )
+                                          </label>
+                                          <input
+                                            type="number"
+                                            value={formData.size_height}
+                                            onChange={(e) =>
+                                              setFormData((prev) => ({
+                                                ...prev,
+                                                size_height:
+                                                  e.target.value,
+                                              }))
+                                            }
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                            placeholder="0"
+                                            step="0.1"
+                                            min="0"
+                                          />
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -2046,175 +2279,6 @@ export default function CustomerPOSOrder() {
                   <p className="text-sm text-gray-500 italic mt-2">
                     Note: Our team will verify this request and provide you with a final price shortly.
                   </p>
-                </div>
-              )}
-
-              {/* Promo Rules Display */}
-              {hasPromoRules && formData.quantity > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 text-xl">
-                      🎁
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-green-900 mb-1">
-                        Available Promos:
-                      </p>
-                      <ul className="text-sm text-green-800 space-y-1">
-                        {promoRules
-                          .filter((r) => r.is_active)
-                          .map((rule, idx) => (
-                            <li key={idx}>
-                              {rule.description ||
-                                `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
-                            </li>
-                          ))}
-                      </ul>
-                      {formData.free_quantity > 0 && (
-                        <p className="text-sm font-bold text-green-700 mt-2">
-                          ✓ You get{" "}
-                          {formData.free_quantity}{" "}
-                          free item(s)! Total:{" "}
-                          {parseInt(
-                            formData.quantity
-                          ) +
-                            parseInt(
-                              formData.free_quantity
-                            )}{" "}
-                          pcs
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Price Tiers Display */}
-              {hasPriceTiers && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <p className="font-semibold text-orange-900 mb-2">
-                    📊 Bulk Pricing:
-                  </p>
-                  <div className="space-y-1 text-sm">
-                    {priceTiers.map((tier, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between"
-                      >
-                        <span className="text-orange-800">
-                          {tier.min_quantity}
-                          {tier.max_quantity
-                            ? ` - ${tier.max_quantity}`
-                            : "+"}{" "}
-                          pcs:
-                        </span>
-                        <span className="font-semibold text-orange-900">
-                          {formatPeso(
-                            parseFloat(
-                              tier.price
-                            ).toFixed(2)
-                          )}
-                          /unit
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Size-Based Pricing */}
-              {hasSizeRates && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Size Options
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {sizeRates.map((rate) => (
-                      <button
-                        key={rate.id}
-                        type="button"
-                        onClick={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            size_rate_id: rate.id.toString(),
-                          }))
-                        }
-                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
-                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
-                          }`}
-                      >
-                        {rate.variant_name}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-2">
-                        Width (
-                        {selectedSizeRate?.dimension_unit ||
-                          "unit"}
-                        )
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.size_width}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            size_width:
-                              e.target.value,
-                          }))
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
-                        step="0.1"
-                        min="0"
-                      />
-                    </div>
-                    {selectedSizeRate?.calculation_method !==
-                      "length" && (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-2">
-                            Height (
-                            {selectedSizeRate?.dimension_unit ||
-                              "unit"}
-                            )
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.size_height}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                size_height:
-                                  e.target.value,
-                              }))
-                            }
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                            placeholder="0"
-                            step="0.1"
-                            min="0"
-                          />
-                        </div>
-                      )}
-                  </div>
-                  {/* {selectedSizeRate && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Rate:{" "}
-                      {formatPeso(
-                        parseFloat(
-                          selectedSizeRate.rate
-                        ).toFixed(2)
-                      )}{" "}
-                      per{" "}
-                      {selectedSizeRate.calculation_method ===
-                        "length"
-                        ? selectedSizeRate.dimension_unit
-                        : `${selectedSizeRate.dimension_unit}²`}
-                    </p>
-                  )} */}
                 </div>
               )}
 
@@ -2642,6 +2706,11 @@ export default function CustomerPOSOrder() {
                       {formData.size_height &&
                         ` × ${formData.size_height}`}{" "}
                       {selectedSizeRate?.dimension_unit}
+                    </p>
+                  )}
+                  {formData.selected_color && (
+                    <p className="text-sm text-gray-600">
+                      Color: <span className="font-semibold text-gray-900">{getFullColorName(formData.selected_color, selectedJobType)}</span> ({formData.selected_color})
                     </p>
                   )}
                 </div>
