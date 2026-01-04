@@ -227,7 +227,6 @@ export default function Productions({
   };
 
   const handleAssignUsers = (ticket, userIds) => {
-    console.log('✅ handleAssignUsers called with ticket:', ticket, 'userIds:', userIds);
     if (!isProductionHead && !isAdmin) {
       showAlert('not_authorized', { message: 'Only Production Head or Admin can assign users.' });
       return;

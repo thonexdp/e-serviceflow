@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { router, usePage } from "@inertiajs/react";
 import { formatPeso } from "@/Utils/currency";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 
 export default function CustomerPOSOrder() {
   const { jobCategories = [], branches = [] } = usePage().props;
@@ -34,7 +35,8 @@ export default function CustomerPOSOrder() {
     custom_job_type_description: "",
     custom_price_mode: "per_item", // 'per_item' or 'fixed_total'
     custom_price_per_item: "",
-    custom_fixed_total: ""
+    custom_fixed_total: "",
+    selected_color: ""
   });
 
   const [designFiles, setDesignFiles] = useState([]);
@@ -64,7 +66,7 @@ export default function CustomerPOSOrder() {
   const designFileInputRef = useRef(null);
   const paymentProofInputRef = useRef(null);
 
-  const MAX_RETRIES = 1;
+  const MAX_RETRIES = 3;
 
   // Phone normalization helper
   const normalizePhone = (phone) => {
@@ -874,6 +876,9 @@ export default function CustomerPOSOrder() {
       if (formData.size_height) {
         orderData.append("size_height", formData.size_height);
       }
+      if (formData.selected_color) {
+        orderData.append("selected_color", formData.selected_color);
+      }
 
       designFiles.forEach((designFile) => {
         if (designFile.file) {
@@ -1541,10 +1546,10 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                 Customer Information
               </h2>
-              <p className="text-gray-500 mt-2">
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
                 Let us know how to reach you
               </p>
             </div>
@@ -1553,7 +1558,7 @@ export default function CustomerPOSOrder() {
               {/* Name Fields - Side by side on desktop, stacked on mobile */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     First Name *
                   </label>
                   <input
@@ -1572,7 +1577,7 @@ export default function CustomerPOSOrder() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Last Name *
                   </label>
                   <input
@@ -1685,10 +1690,10 @@ export default function CustomerPOSOrder() {
                         />
                       </svg>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                        <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-1">
                           This email was used before
                         </p>
-                        <p className="text-sm text-blue-800 mb-2">
+                        <p className="text-xs sm:text-sm text-blue-800 mb-2">
                           Customer:{" "}
                           <strong>
                             {
@@ -1699,7 +1704,7 @@ export default function CustomerPOSOrder() {
                             }
                           </strong>
                         </p>
-                        <p className="text-xs text-blue-700 mb-3">
+                        <p className="text-[10px] sm:text-xs text-blue-700 mb-3 leading-tight">
                           Do you want to use the
                           existing customer data?
                         </p>
@@ -1709,7 +1714,7 @@ export default function CustomerPOSOrder() {
                             onClick={
                               acceptEmailSuggestion
                             }
-                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-3 py-1.5 bg-blue-600 text-white text-[11px] sm:text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
                           >
                             Yes, use this data
                           </button>
@@ -1718,7 +1723,7 @@ export default function CustomerPOSOrder() {
                             onClick={
                               dismissEmailSuggestion
                             }
-                            className="px-4 py-2 bg-white text-blue-700 text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+                            className="px-3 py-1.5 bg-white text-blue-700 text-[11px] sm:text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
                           >
                             No, continue with new
                           </button>
@@ -1816,11 +1821,11 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Select Your Service
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Service Selection
               </h2>
-              <p className="text-gray-500 mt-2">
-                Choose what you need
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Choose the type of service you need
               </p>
             </div>
 
@@ -1888,7 +1893,7 @@ export default function CustomerPOSOrder() {
 
               {availableJobTypes.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
                     Service Type
                   </label>
                   <div className="space-y-3">
@@ -1899,105 +1904,104 @@ export default function CustomerPOSOrder() {
                       const hasPriceTiers =
                         (jobType.price_tiers || [])
                           .length > 0;
+                      const isSelected = formData.job_type_id === jobType.id.toString();
+                      const promoRules = jobType.promo_rules || [];
+                      const hasPromoRules = promoRules.length > 0;
+                      const priceTiers = jobType.price_tiers || [];
+                      const sizeRates = jobType.size_rates || [];
+
                       return (
-                        <button
-                          key={jobType.id}
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              job_type_id:
-                                jobType.id.toString(),
-                            }))
-                          }
-                          className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.job_type_id ===
-                            jobType.id.toString()
-                            ? "border-orange-600 bg-orange-50 shadow-sm"
-                            : "border-gray-100 hover:border-orange-300 hover:bg-gray-50"
-                            }`}
-                        >
-                          <div className="flex gap-4 items-center">
-                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
-                              <img
-                                src={
-                                  jobType.image_path ||
-                                  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(
-                                    jobType.name
-                                      .substring(
-                                        0,
-                                        2
-                                      )
-                                      .toUpperCase()
-                                  )}%3C/text%3E%3C/svg%3E`
-                                }
-                                alt={
-                                  jobType.name
-                                }
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                onError={(
-                                  e
-                                ) => {
-                                  e.target.onerror =
-                                    null;
-                                  e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
-                                }}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <p className="font-normal text-gray-900">
-                                    {
+                        <div key={jobType.id} className="space-y-3">
+                          <button
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                job_type_id:
+                                  jobType.id.toString(),
+                              }))
+                            }
+                            className={`w-full p-3 rounded-xl border-2 text-left transition-all ${isSelected
+                              ? "border-orange-600 bg-orange-50 shadow-sm"
+                              : "border-gray-100 hover:border-orange-300 hover:bg-gray-50"
+                              }`}
+                          >
+                            <div className="flex gap-4 items-center">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
+                                <img
+                                  src={
+                                    jobType.image_path ||
+                                    `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(
                                       jobType.name
-                                    }
-                                  </p>
-                                  {jobType.description && (
-                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                      {
-                                        jobType.description
-                                      }
-                                    </p>
-                                  )}
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {jobType.promo_text && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
-                                        🎁
-                                        Promo
-                                      </span>
-                                    )}
-                                    {hasPriceTiers && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
-                                        📊
-                                        Bulk
-                                      </span>
-                                    )}
-                                    {hasSizeRates && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
-                                        📐
-                                        Size
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                {!hasSizeRates &&
-                                  !hasPriceTiers && (
-                                    <span className="text-orange-600 font-bold text-lg">
-                                      {formatPeso(
-                                        parseFloat(
-                                          jobType.price ||
-                                          0
-                                        ).toFixed(
+                                        .substring(
+                                          0,
                                           2
                                         )
+                                        .toUpperCase()
+                                    )}%3C/text%3E%3C/svg%3E`
+                                  }
+                                  alt={
+                                    jobType.name
+                                  }
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(
+                                    e
+                                  ) => {
+                                    e.target.onerror =
+                                      null;
+                                    e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="font-normal text-gray-900">
+                                      {
+                                        jobType.name
+                                      }
+                                    </p>
+                                    {jobType.description && (
+                                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                        {
+                                          jobType.description
+                                        }
+                                      </p>
+                                    )}
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {jobType.brochure_link && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wider">
+                                          📄 Brochure
+                                        </span>
                                       )}
-                                    </span>
-                                  )}
-                                {(hasSizeRates ||
-                                  hasPriceTiers) && (
-                                    <span className="text-orange-600 text-xs mt-1 italic">
-                                      Price Starts
-                                      at{" "}
-                                      <div className="text-lg font-bold">
+                                      {jobType.has_colors && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-100 text-pink-700 uppercase tracking-wider">
+                                          🎨 {jobType.available_colors?.length || 0} Colors
+                                        </span>
+                                      )}
+                                      {jobType.promo_text && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                                          🎁
+                                          Promo
+                                        </span>
+                                      )}
+                                      {hasPriceTiers && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
+                                          📊
+                                          Bulk
+                                        </span>
+                                      )}
+                                      {hasSizeRates && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
+                                          📐
+                                          Size
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {!hasSizeRates &&
+                                    !hasPriceTiers && (
+                                      <span className="text-orange-600 font-bold text-lg">
                                         {formatPeso(
                                           parseFloat(
                                             jobType.price ||
@@ -2006,15 +2010,244 @@ export default function CustomerPOSOrder() {
                                             2
                                           )
                                         )}
+                                      </span>
+                                    )}
+                                  {(hasSizeRates ||
+                                    hasPriceTiers) && (
+                                      <span className="text-orange-600 text-xs mt-1 italic">
+                                        Price Starts
+                                        at{" "}
+                                        <div className="text-lg font-bold">
+                                          {formatPeso(
+                                            parseFloat(
+                                              jobType.price ||
+                                              0
+                                            ).toFixed(
+                                              2
+                                            )
+                                          )}
 
-                                      </div>
+                                        </div>
 
-                                    </span>
-                                  )}
+                                      </span>
+                                    )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </button>
+                          </button>
+
+                          {/* Additional Information - Only shown when this job type is selected */}
+                          {isSelected && (
+                            <div className="ml-4 pl-4 border-l-4 border-orange-300 space-y-4 animate-fadeIn">
+                              {/* Brochure Link */}
+                              {jobType.brochure_link && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-blue-600 text-xl">📄</span>
+                                    <div>
+                                      <p className="font-semibold text-blue-900">Brochure Available</p>
+                                      <a
+                                        href={jobType.brochure_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 text-sm underline"
+                                      >
+                                        View Product Brochure (Google Drive)
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Color Selection */}
+                              {jobType.has_colors && jobType.available_colors?.length > 0 && (
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
+                                    Select Color
+                                  </label>
+                                  <div className="flex flex-wrap gap-1">
+                                    {jobType.available_colors.map((colorObj, idx) => {
+                                      const hex = typeof colorObj === 'string' ? colorObj : colorObj.hex;
+                                      const code = typeof colorObj === 'string' ? '' : colorObj.code;
+                                      return (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => setFormData(prev => ({ ...prev, selected_color: hex }))}
+                                          className={`w-10 h-10 border-2 transition-all transform hover:scale-110 ${formData.selected_color === hex
+                                            ? "border-orange-600 ring-2 ring-orange-200"
+                                            : "border-gray-200"
+                                            }`}
+                                          style={{ backgroundColor: hex }}
+                                          title={code ? `${getColorName(hex)} (${code})` : getColorName(hex)}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                  {formData.selected_color && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      Selected: <span className="font-semibold text-gray-900">{getFullColorName(formData.selected_color, selectedJobType)}</span> ({formData.selected_color})
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Promo Rules Display */}
+                              {hasPromoRules && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-green-600 text-xl">
+                                      🎁
+                                    </span>
+                                    <div className="flex-1">
+                                      <p className="font-semibold text-green-900 mb-1">
+                                        Available Promos:
+                                      </p>
+                                      <ul className="text-sm text-green-800 space-y-1">
+                                        {promoRules
+                                          .filter((r) => r.is_active)
+                                          .map((rule, idx) => (
+                                            <li key={idx}>
+                                              {rule.description ||
+                                                `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
+                                            </li>
+                                          ))}
+                                      </ul>
+                                      {formData.quantity > 0 && formData.free_quantity > 0 && (
+                                        <p className="text-sm font-bold text-green-700 mt-2">
+                                          ✓ You get{" "}
+                                          {formData.free_quantity}{" "}
+                                          free item(s)! Total:{" "}
+                                          {parseInt(
+                                            formData.quantity
+                                          ) +
+                                            parseInt(
+                                              formData.free_quantity
+                                            )}{" "}
+                                          pcs
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Price Tiers Display */}
+                              {hasPriceTiers && (
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                  <p className="font-semibold text-orange-900 mb-2">
+                                    📊 Bulk Pricing:
+                                  </p>
+                                  <div className="space-y-1 text-sm">
+                                    {priceTiers.map((tier, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex justify-between"
+                                      >
+                                        <span className="text-orange-800">
+                                          {tier.min_quantity}
+                                          {tier.max_quantity
+                                            ? ` - ${tier.max_quantity}`
+                                            : "+"}{" "}
+                                          pcs:
+                                        </span>
+                                        <span className="font-semibold text-orange-900">
+                                          {formatPeso(
+                                            parseFloat(
+                                              tier.price
+                                            ).toFixed(2)
+                                          )}
+                                          /unit
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Size-Based Pricing */}
+                              {hasSizeRates && (
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
+                                    Size Options
+                                  </label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sizeRates.map((rate) => (
+                                      <button
+                                        key={rate.id}
+                                        type="button"
+                                        onClick={() =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            size_rate_id: rate.id.toString(),
+                                          }))
+                                        }
+                                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
+                                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
+                                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
+                                          }`}
+                                      >
+                                        {rate.variant_name}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                                        Width (
+                                        {selectedSizeRate?.dimension_unit ||
+                                          "unit"}
+                                        )
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={formData.size_width}
+                                        onChange={(e) =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            size_width:
+                                              e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        placeholder="0"
+                                        step="0.1"
+                                        min="0"
+                                      />
+                                    </div>
+                                    {selectedSizeRate?.calculation_method !==
+                                      "length" && (
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-600 mb-2">
+                                            Height (
+                                            {selectedSizeRate?.dimension_unit ||
+                                              "unit"}
+                                            )
+                                          </label>
+                                          <input
+                                            type="number"
+                                            value={formData.size_height}
+                                            onChange={(e) =>
+                                              setFormData((prev) => ({
+                                                ...prev,
+                                                size_height:
+                                                  e.target.value,
+                                              }))
+                                            }
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                            placeholder="0"
+                                            step="0.1"
+                                            min="0"
+                                          />
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -2024,7 +2257,7 @@ export default function CustomerPOSOrder() {
               {formData.category_id === "others" && (
                 <div className="space-y-4 animate-fadeIn">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Job Type Description *
                     </label>
                     <input
@@ -2046,175 +2279,6 @@ export default function CustomerPOSOrder() {
                   <p className="text-sm text-gray-500 italic mt-2">
                     Note: Our team will verify this request and provide you with a final price shortly.
                   </p>
-                </div>
-              )}
-
-              {/* Promo Rules Display */}
-              {hasPromoRules && formData.quantity > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 text-xl">
-                      🎁
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-green-900 mb-1">
-                        Available Promos:
-                      </p>
-                      <ul className="text-sm text-green-800 space-y-1">
-                        {promoRules
-                          .filter((r) => r.is_active)
-                          .map((rule, idx) => (
-                            <li key={idx}>
-                              {rule.description ||
-                                `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
-                            </li>
-                          ))}
-                      </ul>
-                      {formData.free_quantity > 0 && (
-                        <p className="text-sm font-bold text-green-700 mt-2">
-                          ✓ You get{" "}
-                          {formData.free_quantity}{" "}
-                          free item(s)! Total:{" "}
-                          {parseInt(
-                            formData.quantity
-                          ) +
-                            parseInt(
-                              formData.free_quantity
-                            )}{" "}
-                          pcs
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Price Tiers Display */}
-              {hasPriceTiers && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <p className="font-semibold text-orange-900 mb-2">
-                    📊 Bulk Pricing:
-                  </p>
-                  <div className="space-y-1 text-sm">
-                    {priceTiers.map((tier, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between"
-                      >
-                        <span className="text-orange-800">
-                          {tier.min_quantity}
-                          {tier.max_quantity
-                            ? ` - ${tier.max_quantity}`
-                            : "+"}{" "}
-                          pcs:
-                        </span>
-                        <span className="font-semibold text-orange-900">
-                          {formatPeso(
-                            parseFloat(
-                              tier.price
-                            ).toFixed(2)
-                          )}
-                          /unit
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Size-Based Pricing */}
-              {hasSizeRates && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Size Options
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {sizeRates.map((rate) => (
-                      <button
-                        key={rate.id}
-                        type="button"
-                        onClick={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            size_rate_id: rate.id.toString(),
-                          }))
-                        }
-                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
-                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
-                          }`}
-                      >
-                        {rate.variant_name}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-2">
-                        Width (
-                        {selectedSizeRate?.dimension_unit ||
-                          "unit"}
-                        )
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.size_width}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            size_width:
-                              e.target.value,
-                          }))
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
-                        step="0.1"
-                        min="0"
-                      />
-                    </div>
-                    {selectedSizeRate?.calculation_method !==
-                      "length" && (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-2">
-                            Height (
-                            {selectedSizeRate?.dimension_unit ||
-                              "unit"}
-                            )
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.size_height}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                size_height:
-                                  e.target.value,
-                              }))
-                            }
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                            placeholder="0"
-                            step="0.1"
-                            min="0"
-                          />
-                        </div>
-                      )}
-                  </div>
-                  {/* {selectedSizeRate && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Rate:{" "}
-                      {formatPeso(
-                        parseFloat(
-                          selectedSizeRate.rate
-                        ).toFixed(2)
-                      )}{" "}
-                      per{" "}
-                      {selectedSizeRate.calculation_method ===
-                        "length"
-                        ? selectedSizeRate.dimension_unit
-                        : `${selectedSizeRate.dimension_unit}²`}
-                    </p>
-                  )} */}
                 </div>
               )}
 
@@ -2290,17 +2354,17 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Order Details
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Design & Details
               </h2>
-              <p className="text-gray-500 mt-2">
-                Tell us more about your order
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Show us what you want to create
               </p>
             </div>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Description *
                 </label>
                 <textarea
@@ -2318,7 +2382,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   When do you need it? *
                 </label>
                 <input
@@ -2336,7 +2400,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Upload Design/Reference (Optional)
                   {designFiles.length > 0 && (
                     <span className="ml-2 text-xs text-gray-500">
@@ -2571,11 +2635,11 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Payment & Review
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                Order Summary & Confirmation
               </h2>
-              <p className="text-gray-500 mt-2">
-                Review your order and choose payment method
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Please review your details before submitting
               </p>
             </div>
 
@@ -2642,6 +2706,11 @@ export default function CustomerPOSOrder() {
                       {formData.size_height &&
                         ` × ${formData.size_height}`}{" "}
                       {selectedSizeRate?.dimension_unit}
+                    </p>
+                  )}
+                  {formData.selected_color && (
+                    <p className="text-sm text-gray-600">
+                      Color: <span className="font-semibold text-gray-900">{getFullColorName(formData.selected_color, selectedJobType)}</span> ({formData.selected_color})
                     </p>
                   )}
                 </div>
@@ -2770,7 +2839,7 @@ export default function CustomerPOSOrder() {
                       {settings.payment.gcash
                         .account_name && (
                           <div>
-                            <p className="text-sm font-medium text-green-800">
+                            <p className="text-xs sm:text-sm font-medium text-green-800">
                               Account Name:
                             </p>
                             <p className="text-lg font-bold text-green-900">
@@ -2784,7 +2853,7 @@ export default function CustomerPOSOrder() {
                         )}
                       {settings.payment.gcash.number && (
                         <div>
-                          <p className="text-sm font-medium text-green-800">
+                          <p className="text-xs sm:text-sm font-medium text-green-800">
                             GCash Number:
                           </p>
                           <p className="text-lg font-bold text-green-900">
@@ -2885,7 +2954,7 @@ export default function CustomerPOSOrder() {
                           <div className="space-y-3">
                             {bankAccount.bank_name && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Bank Name:
                                 </p>
                                 <p className="text-lg font-bold text-orange-900">
@@ -2897,7 +2966,7 @@ export default function CustomerPOSOrder() {
                             )}
                             {bankAccount.account_name && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Account
                                   Name:
                                 </p>
@@ -2910,7 +2979,7 @@ export default function CustomerPOSOrder() {
                             )}
                             {bankAccount.account_number && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Account
                                   Number:
                                 </p>
@@ -2985,7 +3054,7 @@ export default function CustomerPOSOrder() {
               {(paymentMethod === "gcash" ||
                 paymentMethod === "bank_transfer") && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Upload Payment Proof (GCash / Bank
                       Receipts) *
                       {paymentProofs.length > 0 && (
@@ -3100,9 +3169,10 @@ export default function CustomerPOSOrder() {
                             className="max-h-64 mx-auto rounded"
                           />
 
-                          <div className="text-center mt-2 text-sm text-gray-600">
+                          <div className="text-center mt-2 text-sm text-gray-600 truncate max-w-xs mx-auto">
                             {paymentProofs[activeProofTab]?.name}
                           </div>
+
                           <button
                             type="button"
                             onClick={() =>
@@ -3306,11 +3376,11 @@ export default function CustomerPOSOrder() {
 
         {/* Step 5: Success Page */}
         {currentStep === 5 && submittedTicket && (
-          <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 animate-fadeIn">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm ring-6 ring-green-50">
                 <svg
-                  className="w-20 h-20 text-green-600"
+                  className="w-12 h-12 sm:w-14 sm:h-14 text-green-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -3318,15 +3388,15 @@ export default function CustomerPOSOrder() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth="2"
+                    strokeWidth="3"
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 Order Submitted Successfully!
               </h2>
-              <p className="text-gray-500">
+              <p className="text-sm sm:text-base text-gray-500">
                 Your order has been received. We will contact
                 you shortly.
               </p>
@@ -3335,7 +3405,7 @@ export default function CustomerPOSOrder() {
             <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-6">
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Ticket Number:
                   </span>
                   <span className="text-xl font-bold text-orange-600">
@@ -3343,11 +3413,11 @@ export default function CustomerPOSOrder() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Status:
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.status === "pending"
+                    className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${submittedTicket.status === "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : submittedTicket.status ===
                         "completed"
@@ -3359,11 +3429,11 @@ export default function CustomerPOSOrder() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Payment Status:
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.payment_status ===
+                    className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${submittedTicket.payment_status ===
                       "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : submittedTicket.payment_status ===
@@ -3393,7 +3463,7 @@ export default function CustomerPOSOrder() {
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-sm text-orange-800">
+                <p className="text-xs sm:text-sm text-orange-800">
                   <strong>Important:</strong> Please save your
                   ticket number{" "}
                   <strong>
@@ -3417,7 +3487,7 @@ export default function CustomerPOSOrder() {
                   }
                   router.visit("/");
                 }}
-                className="w-full py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-3 sm:py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all text-sm sm:text-base"
               >
                 ← Back to Home
               </button>
@@ -3426,7 +3496,7 @@ export default function CustomerPOSOrder() {
                   setSubmittedTicket(null);
                   clearSavedProgress();
                 }}
-                className="w-full py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-3 sm:py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all text-sm sm:text-base"
               >
                 Place Another Order
               </button>

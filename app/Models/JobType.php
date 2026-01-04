@@ -27,6 +27,9 @@ class JobType extends Model
         'show_in_customer_view',
         'sort_order',
         'workflow_steps',
+        'brochure_link',
+        'has_colors',
+        'available_colors',
     ];
 
     protected $casts = [
@@ -38,6 +41,8 @@ class JobType extends Model
         'show_in_customer_view' => 'boolean',
         'sort_order' => 'integer',
         'workflow_steps' => 'array',
+        'has_colors' => 'boolean',
+        'available_colors' => 'array',
     ];
 
 
@@ -149,7 +154,7 @@ class JobType extends Model
     public function canBeDeleted(): array
     {
         $dependencies = $this->getDeletionDependencies();
-        
+
         return [
             'can_delete' => $dependencies['total_count'] === 0,
             'dependencies' => $dependencies,
@@ -168,7 +173,7 @@ class JobType extends Model
         $completedTickets = Ticket::where('job_type_id', $this->id)
             ->where('status', 'completed')
             ->count();
-        
+
         $stockRequirements = $this->stockRequirements()->count();
         $priceTiers = $this->priceTiers()->count();
         $sizeRates = $this->sizeRates()->count();

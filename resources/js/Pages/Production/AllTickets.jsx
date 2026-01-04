@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -195,8 +196,24 @@ export default function AllTickets({
       render: (row) =>
         <div>
           {row.job_type && (
-            <div className="text-muted small mb-1">
-              <strong>Type:</strong> {row.job_type.name}
+            <div className="text-muted small mb-1 d-flex align-items-center gap-2">
+              <span><strong>Type:</strong> {row.job_type.name}</span>
+              {row.selected_color && (
+                <div className="d-flex align-items-center ml-2">
+                  <span
+                    className="badge badge-light border d-flex align-items-center gap-1 py-1 px-2 shadow-sm"
+                    style={{ fontSize: '9px', borderRadius: '12px', backgroundColor: '#f8f9fa' }}
+                  >
+                    <div
+                      className="rounded-circle border"
+                      style={{ width: '8px', height: '8px', backgroundColor: row.selected_color }}
+                    ></div>
+                    <span className="text-dark font-weight-bold">
+                      {getFullColorName(row.selected_color, row.job_type)}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <div className="font-weight-bold">{row.description}</div>
