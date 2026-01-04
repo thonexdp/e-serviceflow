@@ -12,6 +12,7 @@ import { useRoleApi } from "@/Hooks/useRoleApi";
 import WorkflowTimeline from "@/Components/Production/WorkflowTimeline";
 import TicketAssigner from "@/Components/Production/TicketAssigner";
 import Confirmation from "@/Components/Common/Confirmation";
+import { toast } from "react-hot-toast";
 
 const WORKFLOW_STEPS = {
   printing: { label: 'Printing', icon: 'ti-printer', color: '#2196F3' },
@@ -88,32 +89,11 @@ export default function WorkflowView({
 
       // Show notification toast
       if (data?.notification) {
-        const notification = document.createElement('div');
-        notification.innerHTML = `
-          <div style="
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10000;
-            animation: slideInRight 0.3s ease-out;
-            font-size: 14px;
-            font-weight: 500;
-            max-width: 350px;
-          ">
-            <i class="ti-bell mr-2"></i>${data.notification.message || 'Production updated'}
-          </div>
-        `;
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-          notification.style.animation = 'slideOutRight 0.3s ease-in';
-          setTimeout(() => notification.remove(), 300);
-        }, 3000);
+        toast.success(data.notification.message || 'Production updated', {
+          icon: '🔔',
+          duration: 3000,
+          position: 'top-right',
+        });
       }
 
       router.reload({

@@ -66,7 +66,7 @@ export default function CustomerPOSOrder() {
   const designFileInputRef = useRef(null);
   const paymentProofInputRef = useRef(null);
 
-  const MAX_RETRIES = 1;
+  const MAX_RETRIES = 3;
 
   // Phone normalization helper
   const normalizePhone = (phone) => {
@@ -1546,10 +1546,10 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                 Customer Information
               </h2>
-              <p className="text-gray-500 mt-2">
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
                 Let us know how to reach you
               </p>
             </div>
@@ -1558,7 +1558,7 @@ export default function CustomerPOSOrder() {
               {/* Name Fields - Side by side on desktop, stacked on mobile */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     First Name *
                   </label>
                   <input
@@ -1577,7 +1577,7 @@ export default function CustomerPOSOrder() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Last Name *
                   </label>
                   <input
@@ -1690,10 +1690,10 @@ export default function CustomerPOSOrder() {
                         />
                       </svg>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                        <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-1">
                           This email was used before
                         </p>
-                        <p className="text-sm text-blue-800 mb-2">
+                        <p className="text-xs sm:text-sm text-blue-800 mb-2">
                           Customer:{" "}
                           <strong>
                             {
@@ -1704,7 +1704,7 @@ export default function CustomerPOSOrder() {
                             }
                           </strong>
                         </p>
-                        <p className="text-xs text-blue-700 mb-3">
+                        <p className="text-[10px] sm:text-xs text-blue-700 mb-3 leading-tight">
                           Do you want to use the
                           existing customer data?
                         </p>
@@ -1714,7 +1714,7 @@ export default function CustomerPOSOrder() {
                             onClick={
                               acceptEmailSuggestion
                             }
-                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-3 py-1.5 bg-blue-600 text-white text-[11px] sm:text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
                           >
                             Yes, use this data
                           </button>
@@ -1723,7 +1723,7 @@ export default function CustomerPOSOrder() {
                             onClick={
                               dismissEmailSuggestion
                             }
-                            className="px-4 py-2 bg-white text-blue-700 text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+                            className="px-3 py-1.5 bg-white text-blue-700 text-[11px] sm:text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
                           >
                             No, continue with new
                           </button>
@@ -1821,11 +1821,11 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Select Your Service
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Service Selection
               </h2>
-              <p className="text-gray-500 mt-2">
-                Choose what you need
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Choose the type of service you need
               </p>
             </div>
 
@@ -1893,7 +1893,7 @@ export default function CustomerPOSOrder() {
 
               {availableJobTypes.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
                     Service Type
                   </label>
                   <div className="space-y-3">
@@ -2062,7 +2062,7 @@ export default function CustomerPOSOrder() {
                               {/* Color Selection */}
                               {jobType.has_colors && jobType.available_colors?.length > 0 && (
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
                                     Select Color
                                   </label>
                                   <div className="flex flex-wrap gap-1">
@@ -2168,7 +2168,7 @@ export default function CustomerPOSOrder() {
                               {/* Size-Based Pricing */}
                               {hasSizeRates && (
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
                                     Size Options
                                   </label>
                                   <div className="flex flex-wrap gap-2">
@@ -2257,7 +2257,7 @@ export default function CustomerPOSOrder() {
               {formData.category_id === "others" && (
                 <div className="space-y-4 animate-fadeIn">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Job Type Description *
                     </label>
                     <input
@@ -2354,17 +2354,17 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Order Details
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Design & Details
               </h2>
-              <p className="text-gray-500 mt-2">
-                Tell us more about your order
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Show us what you want to create
               </p>
             </div>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Description *
                 </label>
                 <textarea
@@ -2382,7 +2382,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   When do you need it? *
                 </label>
                 <input
@@ -2400,7 +2400,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Upload Design/Reference (Optional)
                   {designFiles.length > 0 && (
                     <span className="ml-2 text-xs text-gray-500">
@@ -2635,11 +2635,11 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Payment & Review
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                Order Summary & Confirmation
               </h2>
-              <p className="text-gray-500 mt-2">
-                Review your order and choose payment method
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Please review your details before submitting
               </p>
             </div>
 
@@ -2839,7 +2839,7 @@ export default function CustomerPOSOrder() {
                       {settings.payment.gcash
                         .account_name && (
                           <div>
-                            <p className="text-sm font-medium text-green-800">
+                            <p className="text-xs sm:text-sm font-medium text-green-800">
                               Account Name:
                             </p>
                             <p className="text-lg font-bold text-green-900">
@@ -2853,7 +2853,7 @@ export default function CustomerPOSOrder() {
                         )}
                       {settings.payment.gcash.number && (
                         <div>
-                          <p className="text-sm font-medium text-green-800">
+                          <p className="text-xs sm:text-sm font-medium text-green-800">
                             GCash Number:
                           </p>
                           <p className="text-lg font-bold text-green-900">
@@ -2954,7 +2954,7 @@ export default function CustomerPOSOrder() {
                           <div className="space-y-3">
                             {bankAccount.bank_name && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Bank Name:
                                 </p>
                                 <p className="text-lg font-bold text-orange-900">
@@ -2966,7 +2966,7 @@ export default function CustomerPOSOrder() {
                             )}
                             {bankAccount.account_name && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Account
                                   Name:
                                 </p>
@@ -2979,7 +2979,7 @@ export default function CustomerPOSOrder() {
                             )}
                             {bankAccount.account_number && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Account
                                   Number:
                                 </p>
@@ -3054,7 +3054,7 @@ export default function CustomerPOSOrder() {
               {(paymentMethod === "gcash" ||
                 paymentMethod === "bank_transfer") && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Upload Payment Proof (GCash / Bank
                       Receipts) *
                       {paymentProofs.length > 0 && (
@@ -3169,9 +3169,10 @@ export default function CustomerPOSOrder() {
                             className="max-h-64 mx-auto rounded"
                           />
 
-                          <div className="text-center mt-2 text-sm text-gray-600">
+                          <div className="text-center mt-2 text-sm text-gray-600 truncate max-w-xs mx-auto">
                             {paymentProofs[activeProofTab]?.name}
                           </div>
+
                           <button
                             type="button"
                             onClick={() =>
@@ -3375,11 +3376,11 @@ export default function CustomerPOSOrder() {
 
         {/* Step 5: Success Page */}
         {currentStep === 5 && submittedTicket && (
-          <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 animate-fadeIn">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm ring-6 ring-green-50">
                 <svg
-                  className="w-20 h-20 text-green-600"
+                  className="w-12 h-12 sm:w-14 sm:h-14 text-green-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -3387,15 +3388,15 @@ export default function CustomerPOSOrder() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth="2"
+                    strokeWidth="3"
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 Order Submitted Successfully!
               </h2>
-              <p className="text-gray-500">
+              <p className="text-sm sm:text-base text-gray-500">
                 Your order has been received. We will contact
                 you shortly.
               </p>
@@ -3404,7 +3405,7 @@ export default function CustomerPOSOrder() {
             <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-6">
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Ticket Number:
                   </span>
                   <span className="text-xl font-bold text-orange-600">
@@ -3412,11 +3413,11 @@ export default function CustomerPOSOrder() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Status:
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.status === "pending"
+                    className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${submittedTicket.status === "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : submittedTicket.status ===
                         "completed"
@@ -3428,11 +3429,11 @@ export default function CustomerPOSOrder() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Payment Status:
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.payment_status ===
+                    className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${submittedTicket.payment_status ===
                       "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : submittedTicket.payment_status ===
@@ -3462,7 +3463,7 @@ export default function CustomerPOSOrder() {
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-sm text-orange-800">
+                <p className="text-xs sm:text-sm text-orange-800">
                   <strong>Important:</strong> Please save your
                   ticket number{" "}
                   <strong>
@@ -3486,7 +3487,7 @@ export default function CustomerPOSOrder() {
                   }
                   router.visit("/");
                 }}
-                className="w-full py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-3 sm:py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all text-sm sm:text-base"
               >
                 ← Back to Home
               </button>
@@ -3495,7 +3496,7 @@ export default function CustomerPOSOrder() {
                   setSubmittedTicket(null);
                   clearSavedProgress();
                 }}
-                className="w-full py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-3 sm:py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all text-sm sm:text-base"
               >
                 Place Another Order
               </button>

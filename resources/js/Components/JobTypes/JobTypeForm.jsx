@@ -31,7 +31,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     dtf_press: { enabled: false, incentive_price: "" },
     embroidery: { enabled: false, incentive_price: "" },
     knitting: { enabled: false, incentive_price: "" },
-    lasser_cutting: { enabled: false, incentive_price: "" }
+    lasser_cutting: { enabled: false, incentive_price: "" },
+    qa: { enabled: false, incentive_price: "" },
   });
   const [errors, setErrors] = useState({});
   const [processing, setProcessing] = useState(false);
@@ -103,7 +104,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
           dtf_press: { enabled: false, incentive_price: "" },
           embroidery: { enabled: false, incentive_price: "" },
           knitting: { enabled: false, incentive_price: "" },
-          lasser_cutting: { enabled: false, incentive_price: "" }
+          lasser_cutting: { enabled: false, incentive_price: "" },
+          qa: { enabled: false, incentive_price: "" },
         };
 
         Object.keys(steps).forEach((step) => {
@@ -133,7 +135,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
           dtf_press: { enabled: false, incentive_price: "" },
           embroidery: { enabled: false, incentive_price: "" },
           knitting: { enabled: false, incentive_price: "" },
-          lasser_cutting: { enabled: false, incentive_price: "" }
+          lasser_cutting: { enabled: false, incentive_price: "" },
+          qa: { enabled: false, incentive_price: "" },
         });
       }
       if (jobType && jobType.image_path) {
@@ -154,7 +157,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         dtf_press: { enabled: false, incentive_price: "" },
         embroidery: { enabled: false, incentive_price: "" },
         knitting: { enabled: false, incentive_price: "" },
-        lasser_cutting: { enabled: false, incentive_price: "" }
+        lasser_cutting: { enabled: false, incentive_price: "" },
+        qa: { enabled: false, incentive_price: "" }
       });
       setImagePreview(null);
       setImageFile(null);
@@ -1101,7 +1105,8 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
             { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' },
             { key: 'embroidery', label: 'Embroidery', icon: 'ti-pencil-alt' },
             { key: 'knitting', label: 'Knitting', icon: 'ti-layout-grid2' },
-            { key: 'lasser_cutting', label: 'Laser Cutting', icon: 'ti-bolt' }].
+            { key: 'lasser_cutting', label: 'Laser Cutting', icon: 'ti-bolt' },
+            { key: 'qa', label: 'Quality Assurance', icon: 'ti-check-box' }].
             map((step) =>
               <div key={step.key} className="col-md-4 mb-4">
                 <div className="card h-100 p-3 bg-light border-dashed">

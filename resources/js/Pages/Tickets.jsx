@@ -11,6 +11,7 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import DeletionConfirmationModal from "@/Components/Common/DeletionConfirmationModal";
 import { formatPeso } from "@/Utils/currency";
@@ -265,7 +266,7 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Status update failed:", error);
-      alert(error.response?.data?.message || "Failed to update status");
+      toast.error(error.response?.data?.message || "Failed to update status");
     } finally {
       setIsUpdating(false);
     }
@@ -316,7 +317,7 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Payment update failed:", error);
-      alert(error.response?.data?.message || "Failed to record payment.");
+      toast.error(error.response?.data?.message || "Failed to record payment.");
     } finally {
       setIsUpdating(false);
     }
@@ -470,7 +471,7 @@ export default function Tickets({
 
   const handleRequestRevisionDesign = () => {
     if (!selectedTicket || !revisionNotes.trim()) {
-      alert("Please provide notes for the revision request.");
+      toast.error("Please provide notes for the revision request.");
       return;
     }
     setLoading(true);
@@ -914,6 +915,7 @@ export default function Tickets({
         }
 
         <div className="row">
+
           <div className="col-lg-6 p-r-0 title-margin-right">
             <div className="page-header">
               <div className="page-title">
