@@ -80,6 +80,13 @@ export default function Sidebar({ isCollapsed }) {
                                             <i className="ti-user"></i> Customers
                                         </Link>
                                     </li>
+                                    {hasPermission('delivery', 'print') && (
+                                        <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                            <Link href="/delivery-receipts">
+                                                <i className="ti-printer"></i> Delivery Receipts
+                                            </Link>
+                                        </li>
+                                    )}
                                 </>
                             }
 
@@ -113,6 +120,13 @@ export default function Sidebar({ isCollapsed }) {
                                         <i className="ti-calendar"></i> Dashboard
                                     </Link>
                                 </li>
+                                {hasPermission('delivery', 'print') && (
+                                    <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                        <Link href="/delivery-receipts">
+                                            <i className="ti-printer"></i> Delivery Receipts
+                                        </Link>
+                                    </li>
+                                )}
                                 <li className={isActive("/designer/mock-ups") ? "active" : ""}>
                                     <Link href="/designer/mock-ups">
                                         <i className="ti-user"></i> Mock-Ups
@@ -232,6 +246,13 @@ export default function Sidebar({ isCollapsed }) {
                                                 </Link>
                                             </li>)
                                     }
+                                    {hasPermission('delivery', 'print') && (
+                                        <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                            <Link href="/delivery-receipts">
+                                                <i className="ti-printer"></i> Delivery Receipts
+                                            </Link>
+                                        </li>
+                                    )}
                                 </ul> :
                                 role === "Cashier" ?
                                     <ul>
@@ -241,6 +262,13 @@ export default function Sidebar({ isCollapsed }) {
                                                 <i className="ti-calendar"></i> Dashboard
                                             </Link>
                                         </li>
+                                        {hasPermission('delivery', 'print') && (
+                                            <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                                <Link href="/delivery-receipts">
+                                                    <i className="ti-printer"></i> Delivery Receipts
+                                                </Link>
+                                            </li>
+                                        )}
                                         <li className="label">Financials</li>
                                         <li className={isActive("/cashier/finance") ? "active" : ""}>
                                             <Link href="/cashier/finance">
@@ -273,6 +301,13 @@ export default function Sidebar({ isCollapsed }) {
                                                 <i className="ti-image"></i> Mock-Ups
                                             </Link>
                                         </li>
+                                        {hasPermission('delivery', 'print') && (
+                                            <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                                <Link href="/delivery-receipts">
+                                                    <i className="ti-printer"></i> Delivery Receipts
+                                                </Link>
+                                            </li>
+                                        )}
 
                                         <li className="label">Production & Inventory</li>
 

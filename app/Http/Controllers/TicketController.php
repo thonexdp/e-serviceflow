@@ -935,4 +935,58 @@ class TicketController extends BaseCrudController
             ]);
         }
     }
+    public function deliveryReceipts(Request $request)
+    {
+        return Inertia::render('DeliveryReceipts/Index', [
+            'customer_order_qrcode' => \App\Models\Setting::get('customer_order_qrcode', ''),
+        ]);
+    }
+
+    public function searchByTicketNumber(Request $request)
+    {
+        $ticketNo = trim($request->get('ticket_number'));
+
+
+        if (!$ticketNo) {
+            return response()->json(['message' => 'Ticket number is required'], 400);
+        }
+
+        $user = Auth::user();
+        $query = Ticket::with(['customer', 'jobType.category', 'orderBranch', 'productionBranch']);
+
+        // Apply same branch restrictions as in index()
+        if ($user && !$user->isAdmin()) {
+            if ($user->branch_id) {
+                if ($user->isFrontDesk() || $user->isCashier()) {
+                    $query->where('order_branch_id', $user->branch_id);
+                } elseif ($user->isProduction()) {
+                    $query->where('production_branch_id', $user->branch_id);
+                }
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        $ticket = (clone $query)->where('ticket_number', $ticketNo);
+
+        if (is_numeric($ticketNo)) {
+            $ticket->orWhere('id', $ticketNo);
+        }
+
+        $ticket = $ticket->first();
+
+        // Fallback to partial match if exact match fails
+        if (!$ticket) {
+            $ticket = (clone $query)->where('ticket_number', 'like', '%' . $ticketNo . '%')->first();
+        }
+
+        if (!$ticket) {
+            return response()->json(['message' => 'Ticket not found'], 404);
+        }
+
+        return response()->json([
+            'ticket' => $ticket,
+            'customer' => $ticket->customer
+        ]);
+    }
 }

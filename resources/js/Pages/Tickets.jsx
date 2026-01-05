@@ -1671,7 +1671,7 @@ export default function Tickets({
           <div className="modal-body p-4">
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label className="form-label font-weight-bold">Client Name</label>
+                <label className="form-label font-weight-bold">Customer Name</label>
                 <input
                   type="text"
                   className="form-control"
