@@ -48,13 +48,6 @@ export default function Users({ users, availableRoles, availablePermissions, ava
   const [historyMonth, setHistoryMonth] = useState(new Date().getMonth() + 1);
   const [historyYear, setHistoryYear] = useState(new Date().getFullYear());
 
-  const hasPermission = (module, feature) => {
-    if (auth.user.role === "admin") return true;
-
-
-    return auth.user.permissions.includes(`${module}.${feature}`);
-  };
-
   const generateSecurePassword = () => {
     const length = 12;
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
@@ -336,7 +329,6 @@ export default function Users({ users, availableRoles, availablePermissions, ava
   };
 
   const handleEditTicket = (user) => {
-    if (!hasPermission("users", "update")) return;
     openModal(user);
   };
 
@@ -387,7 +379,6 @@ export default function Users({ users, availableRoles, availablePermissions, ava
           <div className="card">
             <div className="card-title pr flex justify-between items-center">
               <h4>All Users</h4>
-              {hasPermission("users", "create") &&
                 <button
                   type="button"
                   onClick={() => openModal()}
@@ -395,15 +386,14 @@ export default function Users({ users, availableRoles, availablePermissions, ava
 
                   <i className="ti-plus text-xs"></i> Add User
                 </button>
-              }
             </div>
             <div className="card-body">
               <DataTable
                 columns={userColumns}
                 data={users}
                 pagination={null}
-                onEdit={hasPermission("users", "update") ? handleEditTicket : null}
-                onDelete={hasPermission("users", "delete") ? handleDeleteUser : null}
+                onEdit={handleEditTicket}
+                onDelete={handleDeleteUser}
                 emptyMessage="No users found." />
 
             </div>
@@ -818,6 +808,8 @@ export default function Users({ users, availableRoles, availablePermissions, ava
                                 <span>
                                   {permission.label ||
                                     permission.feature}
+
+                                  <small className="ml-2 font-thin text-xs font-italic">({permission.description})</small>
                                 </span>
                               </label>
                             )}

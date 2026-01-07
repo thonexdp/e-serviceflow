@@ -27,7 +27,7 @@ class InventoryController extends Controller
 
     public function index(Request $request)
     {
-        $query = StockItem::with(['jobType', 'productionConsumptions' => function ($q) {
+        $query = StockItem::with(['jobType', 'jobTypes', 'productionConsumptions' => function ($q) {
             $q->latest()->limit(5);
         }]);
 
@@ -38,13 +38,22 @@ class InventoryController extends Controller
                     ->orWhere('name', 'like', '%' . $request->search . '%')
                     ->orWhereHas('jobType', function ($q) use ($request) {
                         $q->where('name', 'like', '%' . $request->search . '%');
+                    })
+                    ->orWhereHas('jobTypes', function ($q) use ($request) {
+                        $q->where('name', 'like', '%' . $request->search . '%');
                     });
             });
         }
 
 
         if ($request->has('job_type_id') && $request->job_type_id) {
-            $query->where('job_type_id', $request->job_type_id);
+            // Filter items that have this job type (either in old job_type_id or new jobTypes relationship)
+            $query->where(function ($q) use ($request) {
+                $q->where('job_type_id', $request->job_type_id)
+                    ->orWhereHas('jobTypes', function ($q) use ($request) {
+                        $q->where('job_type_id', $request->job_type_id);
+                    });
+            });
         }
 
 
@@ -57,11 +66,11 @@ class InventoryController extends Controller
         }
 
 
-        if ($request->has('is_active')) {
-            $query->where('is_active', $request->is_active);
-        } else {
-            $query->where('is_active', true);
-        }
+        // if ($request->has('is_active')) {
+        //     $query->where('is_active', $request->is_active);
+        // } else {
+        //     $query->where('is_active', true);
+        // }
 
         $stockItems = $query->orderBy('name')->paginate($request->get('per_page', 15));
 
@@ -78,15 +87,13 @@ class InventoryController extends Controller
             ->get(['id', 'name']);
 
 
-        $lowStockCount = StockItem::where('is_active', true)
-            ->whereRaw('current_stock <= minimum_stock_level')
-            ->count();
+        $lowStockCount = StockItem::whereRaw('current_stock <= minimum_stock_level')->count();
 
         return Inertia::render('Inventory/Index', [
             'stockItems' => $stockItems,
             'jobTypes' => $jobTypes,
             'lowStockCount' => $lowStockCount,
-            'filters' => $request->only(['search', 'job_type_id', 'stock_status', 'is_active']),
+            'filters' => $request->only(['search', 'job_type_id', 'stock_status']),
         ]);
     }
 
@@ -103,7 +110,9 @@ class InventoryController extends Controller
                     $request->is_garment === 'on');
 
             $validated = $request->validate([
-                'job_type_id' => $isGarment ? 'nullable|exists:job_types,id' : 'required|exists:job_types,id',
+                'job_type_id' => 'nullable|exists:job_types,id', // Keep for backward compatibility
+                'job_type_ids' => $isGarment ? 'nullable|array' : 'required|array|min:1',
+                'job_type_ids.*' => 'exists:job_types,id',
                 'sku' => [
                     'required',
                     'string',
@@ -123,14 +132,23 @@ class InventoryController extends Controller
                 'unit_cost' => 'nullable|numeric|min:0',
                 'supplier' => 'nullable|string|max:255',
                 'location' => 'nullable|string|max:255',
-                'is_active' => 'boolean',
+                // 'is_active' => 'boolean',
             ]);
 
-
+            // Store job type IDs for later syncing
+            $jobTypeIds = $validated['job_type_ids'] ?? [];
+            
+            // Remove job_type_ids from validated data as it's not a column
+            unset($validated['job_type_ids']);
+            $validated['is_active'] = true;
             $initialStock = $validated['current_stock'] ?? 0;
             $validated['current_stock'] = 0;
             $stockItem = StockItem::create($validated);
 
+            // Sync job types in pivot table
+            if (!empty($jobTypeIds)) {
+                $stockItem->jobTypes()->sync($jobTypeIds);
+            }
 
             if ($initialStock > 0) {
                 $this->stockService->recordMovement(
@@ -146,7 +164,7 @@ class InventoryController extends Controller
 
             return redirect()->back()->with('success', 'Stock item created successfully.');
         } catch (\Throwable $th) {
-            dd($th);
+            return redirect()->back()->with('error', 'Failed to create stock item: ' . $th->getMessage());
         }
     }
 
@@ -163,7 +181,9 @@ class InventoryController extends Controller
                 $request->is_garment === 'on');
 
         $validated = $request->validate([
-            'job_type_id' => $isGarment ? 'nullable|exists:job_types,id' : 'required|exists:job_types,id',
+            'job_type_id' => 'nullable|exists:job_types,id', // Keep for backward compatibility
+            'job_type_ids' => $isGarment ? 'nullable|array' : 'required|array|min:1',
+            'job_type_ids.*' => 'exists:job_types,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'base_unit_of_measure' => 'required|string|max:50',
@@ -179,9 +199,21 @@ class InventoryController extends Controller
             'is_active' => 'boolean',
         ]);
 
-
+        // Store job type IDs for later syncing
+        $jobTypeIds = $validated['job_type_ids'] ?? [];
+        
+        // Remove job_type_ids from validated data as it's not a column
+        unset($validated['job_type_ids']);
 
         $stockItem->update($validated);
+
+        // Sync job types in pivot table
+        if (!empty($jobTypeIds)) {
+            $stockItem->jobTypes()->sync($jobTypeIds);
+        } elseif ($request->has('job_type_ids')) {
+            // If job_type_ids is explicitly sent as empty array, detach all
+            $stockItem->jobTypes()->detach();
+        }
 
         return redirect()->back()->with('success', 'Stock item updated successfully.');
     }

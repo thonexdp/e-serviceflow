@@ -60,29 +60,32 @@ class JobType extends Model
                     return null;
                 }
 
+                // If it's already a full URL, return it immediately
+                if (filter_var($value, FILTER_VALIDATE_URL)) {
+                    return $value;
+                }
+
+                // Clean the path
+                $cleanValue = ltrim($value, '/');
+                $cleanValue = preg_replace('/^storage\//', '', $cleanValue);
+
+                $isProd = app()->environment('production') || env('APP_ENV') === 'production';
                 $disk = config('filesystems.default');
 
-
+                // Special handling for GCS if configured
                 if ($disk === 'gcs') {
                     $bucket = config('filesystems.disks.gcs.bucket');
-                    return "https://storage.googleapis.com/{$bucket}/{$value}";
+                    return "https://storage.googleapis.com/{$bucket}/{$cleanValue}";
                 }
 
-
-                if ($disk === 'public' || $disk === 'local') {
-                    return "/storage/{$value}";
-                }
-
+                // Default disk selection for S3/Spaces vs Local
+                $activeDisk = $isProd ? 's3' : 'public';
 
                 try {
-                    if ($disk === 's3') {
-                        // Use Storage::disk() directly to avoid helper function issues
-                        $s3Disk = app()->environment('production') ? 's3' : 'public';
-                        return Storage::disk($s3Disk)->url($value);
-                    }
-                    return Storage::url($value);
+                    return Storage::disk($activeDisk)->url($cleanValue);
                 } catch (\Exception $e) {
-                    return "/storage/{$value}";
+                    // Fallback to local /storage only if NOT in production
+                    return $isProd ? $value : "/storage/{$cleanValue}";
                 }
             }
         );

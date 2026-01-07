@@ -187,9 +187,16 @@ class StockManagementService
         if ($stockRequirements->isEmpty()) {
             Log::info("No explicit stock requirements found for job type {$ticket->jobType->id} (Ticket {$ticket->id}). Checking for stock items linked to this job type...");
 
-
-            $linkedStockItems = \App\Models\StockItem::where('job_type_id', $ticket->jobType->id)
-                ->where('is_active', true)
+            // Check for stock items linked via the new many-to-many relationship OR the old job_type_id
+            $linkedStockItems = \App\Models\StockItem::where('is_active', true)
+                ->where(function ($query) use ($ticket) {
+                    // Check old single job_type_id field
+                    $query->where('job_type_id', $ticket->jobType->id)
+                        // OR check new many-to-many jobTypes relationship
+                        ->orWhereHas('jobTypes', function ($q) use ($ticket) {
+                            $q->where('job_type_id', $ticket->jobType->id);
+                        });
+                })
                 ->get();
 
             if ($linkedStockItems->isEmpty()) {

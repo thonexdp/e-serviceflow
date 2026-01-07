@@ -39,7 +39,7 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
     return (
         <div className="quotation-print-container bg-white text-black" style={{
             fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif",
-            fontSize: '12pt',
+            fontSize: '11pt',
             lineHeight: '1.4',
             width: '210mm',
             padding: '20mm',
@@ -86,12 +86,12 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
             `}</style>
 
             {/* Header Section */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <img
-                        src="/images/logo.jpg"
+                        src="/images/logo.png"
                         alt="Logo"
-                        style={{ width: '100px', height: '100px', borderRadius: '50%', marginRight: '15px' }}
+                        style={{ width: '85px', height: '85px', borderRadius: '50%', marginRight: '15px', marginTop: '-10mm' }}
                     />
                     <div>
                         <h1 style={{ fontSize: '18pt', fontWeight: '800', margin: '0', color: '#000', lineHeight: '1.1' }}>
@@ -100,52 +100,56 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
                         <h2 style={{ fontSize: '10pt', fontWeight: '700', margin: '0', color: '#000' }}>
                             & GENERAL MERCHANDISE
                         </h2>
-                        <div style={{ fontSize: '8pt', marginTop: '5px', color: '#666' }}>
+                        <div style={{ fontSize: '8pt', marginTop: '5px', color: '#000' }}>
                             Zone V, Sogod Southern Leyte<br />
                             rcprintshoppe18@gmail.com<br />
                             FB Page: RC Printshoppe<br />
-                            www.rcprintshoppe.com
+                            rcprintshoppe.com
                         </div>
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <h1 style={{ fontSize: '48pt', fontWeight: '400', margin: '0', color: '#000', fontFamily: 'serif', letterSpacing: '2px' }}>
+                    <h1 style={{ fontSize: '42pt', fontWeight: '400', margin: '0', color: '#000', fontFamily: 'serif', letterSpacing: '1px' }}>
                         QUOTATION
                     </h1>
                 </div>
             </div>
 
             {/* Client and Quote Info Row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', marginTop: '60px' }}>
                 <div style={{ width: '60%' }}>
-                    <div style={{ marginBottom: '5px' }}>
-                        <span style={{ fontWeight: '600' }}>Name :</span>
-                        <span className="line-under" style={{ minWidth: '350px' }}>{displayData.name}</span>
+                    <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'flex-end' }}>
+                        <span style={{ fontWeight: '600', width: '130px', flexShrink: 0 }}>Customer :</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, paddingLeft: '5px', minHeight: '1.2em' }}>{displayData.name}</div>
                     </div>
-                    <div style={{ marginBottom: '8px' }}>
-                        <span style={{ fontWeight: '600' }}>Company Name:</span>
-                        <span className="line-under" style={{ minWidth: '300px' }}>{displayData.companyName}</span>
+                    <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'flex-end' }}>
+                        <span style={{ fontWeight: '600', width: '130px', flexShrink: 0 }}>Company Name :</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, paddingLeft: '5px', minHeight: '1.2em' }}>{displayData.companyName}</div>
                     </div>
-                    <div style={{ marginBottom: '8px' }}>
-                        <span style={{ fontWeight: '600' }}>Address:</span>
-                        <span className="line-under" style={{ minWidth: '344px' }}>{displayData.address}</span>
+                    <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'flex-end' }}>
+                        <span style={{ fontWeight: '600', width: '130px', flexShrink: 0 }}>Address :</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, paddingLeft: '5px', minHeight: '1.2em' }}>{displayData.address}</div>
+                    </div>
+                    <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'flex-end' }}>
+                        <span style={{ fontWeight: '600', width: '130px', flexShrink: 0 }}>Contact no. :</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, paddingLeft: '5px', minHeight: '1.2em' }}>{ticket.customer?.phone || ''}</div>
                     </div>
                 </div>
-                <div style={{ width: '35%' }}>
-                    <div style={{ marginBottom: '5px', display: 'flex', justifyContent: 'flex-start' }}>
-                        <span style={{ fontWeight: '600', width: '120px' }}>Quotation No :</span>
+                <div style={{ width: '30%' }}>
+                    <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: '600' }}>Quotation No :</span>
                         <span>{displayData.quotationNo}</span>
                     </div>
-                    <div style={{ marginBottom: '5px', display: 'flex', justifyContent: 'flex-start' }}>
-                        <span style={{ fontWeight: '600', width: '120px' }}>Date :</span>
+                    <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: '600' }}>Date :</span>
                         <span>{displayData.date}</span>
                     </div>
-                    <div style={{ marginBottom: '5px', display: 'flex', justifyContent: 'flex-start' }}>
-                        <span style={{ fontWeight: '600', width: '120px' }}>Valid Until :</span>
+                    <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: '600' }}>Valid Until :</span>
                         <span>{displayData.validUntil}</span>
                     </div>
-                    <div style={{ marginBottom: '5px', display: 'flex', justifyContent: 'flex-start' }}>
-                        <span style={{ fontWeight: '600', width: '120px' }}>Ticket No. :</span>
+                    <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: '600' }}>Ticket No. :</span>
                         <span>{ticket.ticket_number}</span>
                     </div>
                 </div>
@@ -155,23 +159,23 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
             <div style={{ height: '4px', backgroundColor: '#3B8255', width: '100%', marginBottom: '15px' }}></div>
 
             {/* Project Description */}
-            <div style={{ display: 'flex', marginBottom: '15px' }}>
-                <div style={{ width: '30%', fontWeight: '800', fontSize: '12pt' }}>
+            <div style={{ display: 'flex', marginBottom: '15px', alignItems: 'center' }}>
+                <div style={{ width: '25%', fontWeight: '800', fontSize: '11pt', color: '#000' }}>
                     PROJECT DESCRIPTION
                 </div>
-                <div style={{ width: '70%', fontSize: '11pt', color: '#444' }}>
-                    {displayData.projectDescription}
+                <div style={{ width: '75%', fontSize: '11pt', color: '#000', paddingLeft: '10px' }}>
+                    {displayData.projectDescription || "Add a brief and concise description of the project, item, or service here."}
                 </div>
             </div>
 
             {/* Items Table */}
             <table className="quotation-table">
-                <thead style={{ backgroundColor: '#3B8255', color: '#fff', height: '20px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <thead style={{ backgroundColor: '#F27121', color: '#fff', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                     <tr>
-                        <th style={{ width: '45%', textAlign: 'left' }}>Description</th>
-                        <th style={{ width: '15%' }}>Quantity</th>
-                        <th style={{ width: '20%' }}>Price</th>
-                        <th style={{ width: '20%' }}>Total</th>
+                        <th style={{ width: '45%', textAlign: 'left', border: 'none' }}>Description</th>
+                        <th style={{ width: '15%', border: 'none' }}>Quantity</th>
+                        <th style={{ width: '20%', border: 'none' }}>Price</th>
+                        <th style={{ width: '20%', border: 'none' }}>Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -197,35 +201,35 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
             </table>
 
             {/* Footer calculations and QR */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <div style={{ width: '40%', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px' }}>
+                <div style={{ width: '50%', textAlign: 'left' }}>
                     {customerOrderQrcode && (
-                        <div style={{ display: 'inline-block', textAlign: 'center' }}>
+                        <div style={{ textAlign: 'left' }}>
                             <img
                                 src={customerOrderQrcode}
                                 alt="QR Code"
-                                style={{ width: '120px', height: '120px', border: '1px solid #ddd', padding: '5px' }}
+                                style={{ width: '120px', height: '120px', border: 'none', marginLeft: '10px' }}
                             />
-                            <div style={{ marginTop: '5px', fontSize: '10pt', fontWeight: '600' }}>scan me to order</div>
+                            <div style={{ marginTop: '5px', fontSize: '11pt', fontWeight: '800', color: '#F27121', textAlign: 'left', textTransform: 'uppercase' }}>SCAN TO ORDER ONLINE</div>
                         </div>
                     )}
                 </div>
-                <div style={{ width: '40%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: '700' }}>Subtotal</span>
+                <div style={{ width: '35%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: '700', color: '#000' }}>Subtotal</span>
                         <span>{formatPeso(subtotal)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: '700' }}>Value-Added Tax</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: '700', color: '#000' }}>Value-Added Tax</span>
                         <span>{formatPeso(displayData.valueAddedTax)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: '700' }}>Others</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: '700', color: '#000' }}>Others</span>
                         <span>{formatPeso(displayData.others)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', backgroundColor: '#F27121', color: '#fff', padding: '10px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        <span style={{ fontWeight: '800', fontSize: '13pt' }}>Total</span>
-                        <span style={{ fontWeight: '800', fontSize: '13pt' }}>{formatPeso(total)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', backgroundColor: '#F27121', color: '#fff', padding: '8px 12px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        <span style={{ fontWeight: '800', fontSize: '12pt' }}>Total</span>
+                        <span style={{ fontWeight: '800', fontSize: '12pt' }}>{formatPeso(total)}</span>
                     </div>
                 </div>
             </div>
@@ -234,29 +238,51 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
             <div style={{ height: '4px', backgroundColor: '#3B8255', width: '100%', marginTop: '20px', marginBottom: '15px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}></div>
 
             {/* Terms and Conditions */}
-            <div style={{ display: 'flex', marginBottom: '40px' }}>
-                <div style={{ width: '30%', fontWeight: '800', fontSize: '11pt' }}>
+            <div style={{ display: 'flex', marginBottom: '15px' }}>
+                <div style={{ width: '25%', fontWeight: '800', fontSize: '11pt', color: '#000' }}>
                     TERMS & CONDITIONS
                 </div>
-                <div style={{ width: '70%', fontSize: '9pt', lineHeight: '1.5', color: '#444' }}>
+                <div style={{ width: '75%', fontSize: '9pt', color: '#000', paddingLeft: '10px' }}>
                     Above information is not an invoice and only an estimate of goods/services. Payment will be due prior to provision or delivery of goods/services.
-                    <br /><br />
-                    <div style={{ fontWeight: '800', fontSize: '11pt', color: '#000' }}>
-                        PLEASE CONFIRM YOUR ACCEPTANCE OF THIS QUOTE
+                </div>
+            </div>
+
+            <div style={{ textAlign: 'center', fontSize: '8pt', color: '#000', fontWeight: '800', margin: '20px 0 0 20px', textTransform: 'uppercase' }}>
+                "THIS QUOTATION IS NOT A SALES INVOICE. PRICES ARE SUBJECT TO CHANGE AND PRODUCTION WILL COMMENCE UPON APPROVAL AND DOWNPAYMENT."
+            </div>
+
+            {/* Signatures */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', width: '60%' }}>
+                        <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>Prepared by:</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, marginLeft: '5px', minHeight: '1.2em' }}></div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', width: '35%' }}>
+                        <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>Date:</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, marginLeft: '5px', minHeight: '1.2em' }}></div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'flex-end', width: '60%' }}>
+                    <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>Approved by (Client):</span>
+                    <div style={{ borderBottom: '1px solid #999', flexGrow: 1, marginLeft: '5px', minHeight: '1.2em' }}></div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', width: '45%' }}>
+                        <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>Signature:</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, marginLeft: '5px', minHeight: '1.2em' }}></div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', width: '35%' }}>
+                        <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>Date:</span>
+                        <div style={{ borderBottom: '1px solid #999', flexGrow: 1, marginLeft: '5px', minHeight: '1.2em' }}></div>
                     </div>
                 </div>
             </div>
 
-            {/* Signatures */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '50px', marginTop: '30px' }}>
-                <div style={{ textAlign: 'center', width: '250px' }}>
-                    <div style={{ borderTop: '1px solid #000', marginBottom: '5px' }}></div>
-                    <div style={{ fontSize: '10pt' }}>Signature over printed name</div>
-                </div>
-                <div style={{ textAlign: 'center', width: '150px' }}>
-                    <div style={{ borderTop: '1px solid #000', marginBottom: '5px' }}></div>
-                    <div style={{ fontSize: '10pt' }}>Date signed</div>
-                </div>
+            <div style={{ textAlign: 'center', fontWeight: '800', fontSize: '11pt', color: '#000', marginTop: '30px' }}>
+                PLEASE CONFIRM YOUR ACCEPTANCE OF THIS QUOTE
             </div>
         </div>
     );
