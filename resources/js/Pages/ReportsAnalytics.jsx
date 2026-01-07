@@ -13,82 +13,82 @@ import { formatDate } from "@/Utils/formatDate";
 import "../../css/reports.css";
 
 export default function ReportsAnalytics({
-  user = {},
-  notifications = [],
-  messages = [],
-  reportType = 'sales',
-  dateRange = 'this_month',
-  startDate,
-  endDate,
-  reportData = {},
-  filters = {}
+    user = {},
+    notifications = [],
+    messages = [],
+    reportType = 'sales',
+    dateRange = 'this_month',
+    startDate,
+    endDate,
+    reportData = {},
+    filters = {}
 }) {
-  const printRef = useRef();
-  const [selectedReport, setSelectedReport] = useState(reportType);
-  const [selectedDateRange, setSelectedDateRange] = useState(dateRange);
+    const printRef = useRef();
+    const [selectedReport, setSelectedReport] = useState(reportType);
+    const [selectedDateRange, setSelectedDateRange] = useState(dateRange);
 
-  const reportTypes = [
-  { value: 'sales', label: 'Sales Reports', icon: 'ti-stats-up' },
+    const reportTypes = [
+        { value: 'sales', label: 'Sales Reports', icon: 'ti-stats-up' },
 
-  { value: 'receivables', label: 'Receivables', icon: 'ti-receipt' },
+        { value: 'receivables', label: 'Receivables', icon: 'ti-receipt' },
 
-  { value: 'inventory', label: 'Inventory Consumption', icon: 'ti-package' },
+        { value: 'inventory', label: 'Inventory Consumption', icon: 'ti-package' },
 
-  { value: 'production', label: 'Production Report', icon: 'ti-settings' },
-  { value: 'production_incentives', label: 'Production Incentives', icon: 'ti-gift' },
-  { value: 'customer_insights', label: 'Customer Insights', icon: 'ti-user' },
-  { value: 'online_orders', label: 'Online Orders', icon: 'ti-shopping-cart' },
-
-
-  { value: 'expenses', label: 'Expenses Report', icon: 'ti-wallet' },
-
-  { value: 'staff_performance', label: 'Staff Status', icon: 'ti-id-badge' }];
+        { value: 'production', label: 'Production Report', icon: 'ti-settings' },
+        { value: 'production_incentives', label: 'Production Incentives', icon: 'ti-gift' },
+        { value: 'customer_insights', label: 'Customer Insights', icon: 'ti-user' },
+        { value: 'online_orders', label: 'Online Orders', icon: 'ti-shopping-cart' },
 
 
-  const dateRanges = [
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'this_week', label: 'This Week' },
-  { value: 'last_week', label: 'Last Week' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'this_year', label: 'This Year' },
-  { value: 'last_year', label: 'Last Year' }];
+        { value: 'expenses', label: 'Expenses Report', icon: 'ti-wallet' },
+
+        { value: 'staff_performance', label: 'Staff Status', icon: 'ti-id-badge' }];
 
 
-  const handleReportChange = (reportValue) => {
-    setSelectedReport(reportValue);
-    router.get('/admin/reports', {
-      report_type: reportValue,
-      date_range: selectedDateRange
-    }, {
-      preserveState: true,
-      preserveScroll: true
-    });
-  };
+    const dateRanges = [
+        { value: 'today', label: 'Today' },
+        { value: 'yesterday', label: 'Yesterday' },
+        { value: 'this_week', label: 'This Week' },
+        { value: 'last_week', label: 'Last Week' },
+        { value: 'this_month', label: 'This Month' },
+        { value: 'last_month', label: 'Last Month' },
+        { value: 'this_year', label: 'This Year' },
+        { value: 'last_year', label: 'Last Year' }];
 
-  const handleDateRangeChange = (range) => {
-    setSelectedDateRange(range);
-    router.get('/admin/reports', {
-      report_type: selectedReport,
-      date_range: range
-    }, {
-      preserveState: true,
-      preserveScroll: true
-    });
-  };
 
-  const handlePrint = () => {
-    window.print();
-  };
+    const handleReportChange = (reportValue) => {
+        setSelectedReport(reportValue);
+        router.get('/admin/reports', {
+            report_type: reportValue,
+            date_range: selectedDateRange
+        }, {
+            preserveState: true,
+            preserveScroll: true
+        });
+    };
 
-  const handleExport = () => {
+    const handleDateRangeChange = (range) => {
+        setSelectedDateRange(range);
+        router.get('/admin/reports', {
+            report_type: selectedReport,
+            date_range: range
+        }, {
+            preserveState: true,
+            preserveScroll: true
+        });
+    };
 
-    alert('Export feature coming soon!');
-  };
+    const handlePrint = () => {
+        window.print();
+    };
 
-  return (
-    <AdminLayout user={user} notifications={notifications} messages={messages}>
+    const handleExport = () => {
+
+        alert('Export feature coming soon!');
+    };
+
+    return (
+        <AdminLayout user={user} notifications={notifications} messages={messages}>
             <Head title="Reports & Analytics" />
 
             <div className="row no-print">
@@ -124,15 +124,15 @@ export default function ReportsAnalytics({
                             <div className="card-body">
                                 <div className="list-group">
                                     {reportTypes.map((report) =>
-                  <button
-                    key={report.value}
-                    className={`list-group-item list-group-item-action ${selectedReport === report.value ? 'active' : ''}`
-                    }
-                    onClick={() => handleReportChange(report.value)}>
+                                        <button
+                                            key={report.value}
+                                            className={`list-group-item list-group-item-action ${selectedReport === report.value ? 'active' : ''}`
+                                            }
+                                            onClick={() => handleReportChange(report.value)}>
 
                                             <i className={report.icon}></i> {report.label}
                                         </button>
-                  )}
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -144,44 +144,44 @@ export default function ReportsAnalytics({
                         <div className="card no-print">
                             <div className="card-body">
                                 {
-                selectedReport !== "staff_performance" &&
-                <div className="row">
-                                            <div className="col-md-6">
+                                    selectedReport !== "staff_performance" &&
+                                    <div className="row">
+                                        <div className="col-md-6">
 
 
-                                                <label>Date Range:</label>
-                                                <select
-                      className="form-control"
-                      value={selectedDateRange}
-                      onChange={(e) => handleDateRangeChange(e.target.value)}>
+                                            <label>Date Range:</label>
+                                            <select
+                                                className="form-control"
+                                                value={selectedDateRange}
+                                                onChange={(e) => handleDateRangeChange(e.target.value)}>
 
-                                                    {dateRanges.map((range) =>
-                      <option key={range.value} value={range.value}>
-                                                            {range.label}
-                                                        </option>
-                      )}
-                                                </select>
-                                            </div>
-                                            <div className="col-md-6 text-right">
-                                                <label>&nbsp;</label>
-                                                <div>
-                                                    <button
-                        className="btn btn-primary btn-sm mr-2"
-                        onClick={handlePrint}>
+                                                {dateRanges.map((range) =>
+                                                    <option key={range.value} value={range.value}>
+                                                        {range.label}
+                                                    </option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div className="col-md-6 text-right">
+                                            <label>&nbsp;</label>
+                                            <div>
+                                                {/* <button
+                                                    className="btn btn-primary btn-sm mr-2"
+                                                    onClick={handlePrint}>
 
-                                                        <i className="ti-printer"></i> Print
-                                                    </button>
-                                                    {/* <button
+                                                    <i className="ti-printer"></i> Print
+                                                </button> */}
+                                                {/* <button
                            className="btn btn-success btn-sm"
                            // onClick={handleExport}
                         >
                            <i className="ti-download"></i> Export
                         </button> */}
-                                                </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                }
+                                }
                             </div>
                         </div>
 
@@ -252,10 +252,10 @@ export default function ReportsAnalytics({
 
 
 function SalesReport({ data }) {
-  const { daily = [], monthly = [], payment_methods = [], summary = {} } = data;
+    const { daily = [], monthly = [], payment_methods = [], summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Sales Summary</h4>
             <div className="row mb-4">
                 <div className="col-md-3">
@@ -295,12 +295,12 @@ function SalesReport({ data }) {
                 </thead>
                 <tbody>
                     {payment_methods.map((method, index) =>
-          <tr key={index}>
+                        <tr key={index}>
                             <td className="text-capitalize">{method.payment_method}</td>
                             <td>{method.count}</td>
                             <td className="text-right">{formatPeso(method.total)}</td>
                         </tr>
-          )}
+                    )}
                 </tbody>
             </table>
 
@@ -315,12 +315,12 @@ function SalesReport({ data }) {
                 </thead>
                 <tbody>
                     {daily.map((day, index) =>
-          <tr key={index}>
+                        <tr key={index}>
                             <td>{day.date}</td>
                             <td>{day.transactions}</td>
                             <td className="text-right">{formatPeso(day.total)}</td>
                         </tr>
-          )}
+                    )}
                 </tbody>
             </table>
         </div>);
@@ -328,10 +328,10 @@ function SalesReport({ data }) {
 }
 
 function RevenueCashflowReport({ data }) {
-  const { cashflow = [], summary = {} } = data;
+    const { cashflow = [], summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Revenue & Cashflow Summary</h4>
             <div className="row mb-4">
                 <div className="col-md-3">
@@ -373,7 +373,7 @@ function RevenueCashflowReport({ data }) {
                 </thead>
                 <tbody>
                     {cashflow.map((item, index) =>
-          <tr key={index}>
+                        <tr key={index}>
                             <td>{formatDate(item.date)}</td>
                             <td className="text-right text-success">{formatPeso(item.inflow)}</td>
                             <td className="text-right text-danger">{formatPeso(item.outflow)}</td>
@@ -384,7 +384,7 @@ function RevenueCashflowReport({ data }) {
                                 </strong>
                             </td>
                         </tr>
-          )}
+                    )}
                 </tbody>
             </table>
         </div>);
@@ -392,10 +392,10 @@ function RevenueCashflowReport({ data }) {
 }
 
 function ReceivablesReport({ data }) {
-  const { receivables = [], aging = {}, summary = {} } = data;
+    const { receivables = [], aging = {}, summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Receivables Summary</h4>
             <div className="row mb-4">
                 <div className="col-md-4">
@@ -463,14 +463,14 @@ function ReceivablesReport({ data }) {
                 </thead>
                 <tbody>
                     {receivables.map((item) =>
-          <tr key={item.id} className={item.days_overdue > 30 ? 'table-warning' : ''}>
+                        <tr key={item.id} className={item.days_overdue > 30 ? 'table-warning' : ''}>
                             <td>{item.ticket_number}</td>
                             <td>{item.customer?.full_name || 'N/A'}</td>
                             <td>{formatDate(item.due_date)}</td>
                             <td>{item.days_overdue > 0 ? `${item.days_overdue} days` : 'Not due'}</td>
                             <td className="text-right">{formatPeso(item.outstanding_balance)}</td>
                         </tr>
-          )}
+                    )}
                 </tbody>
             </table>
         </div>);
@@ -478,8 +478,8 @@ function ReceivablesReport({ data }) {
 }
 
 function NetIncomeReport({ data }) {
-  return (
-    <div>
+    return (
+        <div>
             <h4>Net Income Statement</h4>
             <table className="table table-bordered mt-4">
                 <tbody>
@@ -530,10 +530,10 @@ function NetIncomeReport({ data }) {
 
 
 function InventoryReport({ data }) {
-  const { by_item = [], summary = {} } = data;
+    const { by_item = [], summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Inventory Consumption Report</h4>
             <div className="row mb-4">
                 <div className="col-md-6">
@@ -551,7 +551,7 @@ function InventoryReport({ data }) {
             </div>
 
             {Object.keys(by_item).length > 0 ?
-      <table className="table">
+                <table className="table">
                     <thead>
                         <tr>
                             <th>Item</th>
@@ -562,27 +562,27 @@ function InventoryReport({ data }) {
                     </thead>
                     <tbody>
                         {Object.values(by_item).map((item, index) =>
-          <tr key={index}>
+                            <tr key={index}>
                                 <td>{item.item}</td>
                                 <td>{item.total_consumed}</td>
                                 <td>{item.unit}</td>
                                 <td>{item.tickets_count}</td>
                             </tr>
-          )}
+                        )}
                     </tbody>
                 </table> :
 
-      <div className="alert alert-info">No inventory consumption data available for this period.</div>
-      }
+                <div className="alert alert-info">No inventory consumption data available for this period.</div>
+            }
         </div>);
 
 }
 
 function ProductProfitabilityReport({ data }) {
-  const { by_product = [], summary = {} } = data;
+    const { by_product = [], summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Product Profitability Analysis</h4>
             <div className="row mb-4">
                 <div className="col-md-4">
@@ -606,7 +606,7 @@ function ProductProfitabilityReport({ data }) {
             </div>
 
             {Object.keys(by_product).length > 0 ?
-      <table className="table">
+                <table className="table">
                     <thead>
                         <tr>
                             <th>Product/Service</th>
@@ -619,7 +619,7 @@ function ProductProfitabilityReport({ data }) {
                     </thead>
                     <tbody>
                         {Object.values(by_product).map((product, index) =>
-          <tr key={index}>
+                            <tr key={index}>
                                 <td>{product.job_type}</td>
                                 <td>{product.quantity}</td>
                                 <td className="text-right">{formatPeso(product.revenue)}</td>
@@ -627,21 +627,21 @@ function ProductProfitabilityReport({ data }) {
                                 <td className="text-right text-success">{formatPeso(product.profit)}</td>
                                 <td className="text-right">{product.margin.toFixed(2)}%</td>
                             </tr>
-          )}
+                        )}
                     </tbody>
                 </table> :
 
-      <div className="alert alert-info">No product data available for this period.</div>
-      }
+                <div className="alert alert-info">No product data available for this period.</div>
+            }
         </div>);
 
 }
 
 function ProductionReport({ data }) {
-  const { summary = {} } = data;
+    const { summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Production Performance Report</h4>
             <div className="row">
                 <div className="col-md-3">
@@ -674,12 +674,12 @@ function ProductionReport({ data }) {
 }
 
 function CustomerInsightsReport({ data }) {
-  const { customers: customersData = [], summary = {} } = data;
+    const { customers: customersData = [], summary = {} } = data;
 
-  const customers = Array.isArray(customersData) ? customersData : Object.values(customersData || {});
+    const customers = Array.isArray(customersData) ? customersData : Object.values(customersData || {});
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Customer Insights</h4>
             <div className="row mb-4">
                 <div className="col-md-4">
@@ -714,13 +714,13 @@ function CustomerInsightsReport({ data }) {
                 </thead>
                 <tbody>
                     {customers.slice(0, 20).map((customer) =>
-          <tr key={customer.id}>
+                        <tr key={customer.id}>
                             <td>{customer.name}</td>
                             <td>{customer.total_orders}</td>
                             <td className="text-right">{formatPeso(customer.total_spent)}</td>
                             <td className="text-right">{formatPeso(customer.avg_order_value)}</td>
                         </tr>
-          )}
+                    )}
                 </tbody>
             </table>
         </div>);
@@ -728,10 +728,10 @@ function CustomerInsightsReport({ data }) {
 }
 
 function OnlineOrdersReport({ data }) {
-  const { summary = {} } = data;
+    const { summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Online Orders Report</h4>
             <div className="row">
                 <div className="col-md-4">
@@ -758,10 +758,10 @@ function OnlineOrdersReport({ data }) {
 }
 
 function DesignerApprovalsReport({ data }) {
-  const { summary = {} } = data;
+    const { summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Designer Approvals Report</h4>
             <div className="row">
                 <div className="col-md-3">
@@ -794,10 +794,10 @@ function DesignerApprovalsReport({ data }) {
 }
 
 function PaymentConfirmationsReport({ data }) {
-  const { summary = {} } = data;
+    const { summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Payment Confirmations Report</h4>
             <div className="row">
                 <div className="col-md-3">
@@ -830,10 +830,10 @@ function PaymentConfirmationsReport({ data }) {
 }
 
 function ExpensesReport({ data }) {
-  const { summary = {}, by_category = [] } = data;
+    const { summary = {}, by_category = [] } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Expenses Report</h4>
             <div className="row mb-4">
                 <div className="col-md-4">
@@ -857,7 +857,7 @@ function ExpensesReport({ data }) {
             </div>
 
             {Object.keys(by_category).length > 0 &&
-      <>
+                <>
                     <h5>By Category</h5>
                     <table className="table">
                         <thead>
@@ -869,25 +869,25 @@ function ExpensesReport({ data }) {
                         </thead>
                         <tbody>
                             {Object.values(by_category).map((cat, index) =>
-            <tr key={index}>
+                                <tr key={index}>
                                     <td className="text-capitalize">{cat.category}</td>
                                     <td>{cat.count}</td>
                                     <td className="text-right">{formatPeso(cat.total)}</td>
                                 </tr>
-            )}
+                            )}
                         </tbody>
                     </table>
                 </>
-      }
+            }
         </div>);
 
 }
 
 function ReceiptsReport({ data }) {
-  const { summary = {} } = data;
+    const { summary = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>OR / Receipt Report</h4>
             <div className="row">
                 <div className="col-md-6">
@@ -908,10 +908,10 @@ function ReceiptsReport({ data }) {
 }
 
 function ProductionIncentivesReport({ data }) {
-  const { records = [], summary = {}, filters = {} } = data;
+    const { records = [], summary = {}, filters = {} } = data;
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Production Incentives Report</h4>
             <div className="row mb-4">
                 <div className="col-md-3">
@@ -941,20 +941,20 @@ function ProductionIncentivesReport({ data }) {
             </div>
 
             {filters.user_id &&
-      <div className="alert alert-info mb-3">
+                <div className="alert alert-info mb-3">
                     <i className="ti-filter"></i> Filtered by User: {filters.user_name || 'N/A'}
                 </div>
-      }
+            }
 
             {filters.job_type_id &&
-      <div className="alert alert-info mb-3">
+                <div className="alert alert-info mb-3">
                     <i className="ti-filter"></i> Filtered by Job Type: {filters.job_type_name || 'N/A'}
                 </div>
-      }
+            }
 
             <h5 className="mt-4">Incentive Records</h5>
             {records && records.length > 0 ?
-      <div className="table-responsive">
+                <div className="table-responsive">
                     <table className="table table-striped">
                         <thead>
                             <tr>
@@ -971,7 +971,7 @@ function ProductionIncentivesReport({ data }) {
                         </thead>
                         <tbody>
                             {records.map((record, index) =>
-            <tr key={record.id || index}>
+                                <tr key={record.id || index}>
                                     <td>{formatDate(record.created_at || record.date)}</td>
                                     <td>{record.user_name || 'N/A'}</td>
                                     <td>{record.ticket_number || 'N/A'}</td>
@@ -988,15 +988,15 @@ function ProductionIncentivesReport({ data }) {
                                     </td>
                                     <td>
                                         {record.evidence_files && record.evidence_files.length > 0 ?
-                <span className="badge badge-info">
+                                            <span className="badge badge-info">
                                                 <i className="ti-image"></i> {record.evidence_files.length} file(s)
                                             </span> :
 
-                <span className="text-muted">No evidence</span>
-                }
+                                            <span className="text-muted">No evidence</span>
+                                        }
                                     </td>
                                 </tr>
-            )}
+                            )}
                         </tbody>
                         <tfoot>
                             <tr className="table-active">
@@ -1012,15 +1012,15 @@ function ProductionIncentivesReport({ data }) {
                     </table>
                 </div> :
 
-      <div className="alert alert-info">No incentive records found for the selected period.</div>
-      }
+                <div className="alert alert-info">No incentive records found for the selected period.</div>
+            }
 
             {/* Summary by Workflow with Detailed User Breakdown */}
             {summary.by_workflow && summary.by_workflow.length > 0 &&
-      <>
+                <>
                     <h5 className="mt-4">Summary by Workflow</h5>
                     {summary.by_workflow.map((workflow) =>
-        <div key={workflow.workflow_step} className="mb-4">
+                        <div key={workflow.workflow_step} className="mb-4">
                             <div className="card">
                                 <div className="card-header bg-orange-400 text-white">
                                     <h6 className="mb-0 text-capitalize">
@@ -1044,7 +1044,7 @@ function ProductionIncentivesReport({ data }) {
                                     </div>
 
                                     {workflow.users && workflow.users.length > 0 &&
-              <>
+                                        <>
                                             <h6 className="mt-3 mb-2">User Breakdown:</h6>
                                             <div className="table-responsive">
                                                 <table className="table table-sm table-bordered table-striped">
@@ -1057,14 +1057,14 @@ function ProductionIncentivesReport({ data }) {
                                                     </thead>
                                                     <tbody>
                                                         {workflow.users.map((user, index) =>
-                      <tr key={user.user_id || index}>
+                                                            <tr key={user.user_id || index}>
                                                                 <td>{user.user_name}</td>
                                                                 <td className="text-right">{user.total_quantity || 0}</td>
                                                                 <td className="text-right font-weight-bold text-success">
                                                                     {formatPeso(user.total_incentives || 0)}
                                                                 </td>
                                                             </tr>
-                      )}
+                                                        )}
                                                     </tbody>
                                                     <tfoot>
                                                         <tr className="table-active">
@@ -1076,102 +1076,102 @@ function ProductionIncentivesReport({ data }) {
                                                 </table>
                                             </div>
                                         </>
-              }
+                                    }
                                 </div>
                             </div>
                         </div>
-        )}
+                    )}
                 </>
 
-      }
+            }
 
             {/* Summary by User */}
             {
-      summary.by_user && summary.by_user.length > 0 &&
-      <>
-                        <h5 className="mt-4">Summary by User</h5>
-                        <div className="table-responsive">
-                            <table className="table table-sm table-bordered">
-                                <thead className="thead-light">
-                                    <tr>
-                                        <th>User Name</th>
-                                        <th className="text-right">Total Quantity</th>
-                                        <th className="text-right">Total Incentives</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {summary.by_user.map((userSummary, index) =>
-              <tr key={index}>
-                                            <td>{userSummary.user_name}</td>
-                                            <td className="text-right">{userSummary.total_quantity || 0}</td>
-                                            <td className="text-right font-weight-bold text-success">
-                                                {formatPeso(userSummary.total_incentives || 0)}
-                                            </td>
-                                        </tr>
-              )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-
-      }
-
-            {/* Summary by Job Type */}
-            {
-      summary.by_job_type && Object.keys(summary.by_job_type).length > 0 &&
-      <>
-                        <h5 className="mt-4">Summary by Job Type</h5>
-                        <table className="table table-sm">
-                            <thead>
+                summary.by_user && summary.by_user.length > 0 &&
+                <>
+                    <h5 className="mt-4">Summary by User</h5>
+                    <div className="table-responsive">
+                        <table className="table table-sm table-bordered">
+                            <thead className="thead-light">
                                 <tr>
-                                    <th>Job Type</th>
+                                    <th>User Name</th>
                                     <th className="text-right">Total Quantity</th>
                                     <th className="text-right">Total Incentives</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {Object.values(summary.by_job_type).map((jobTypeSummary, index) =>
-            <tr key={index}>
-                                        <td>{jobTypeSummary.job_type_name}</td>
-                                        <td className="text-right">{jobTypeSummary.total_quantity || 0}</td>
-                                        <td className="text-right">
-                                            <strong>{formatPeso(jobTypeSummary.total_incentives || 0)}</strong>
+                                {summary.by_user.map((userSummary, index) =>
+                                    <tr key={index}>
+                                        <td>{userSummary.user_name}</td>
+                                        <td className="text-right">{userSummary.total_quantity || 0}</td>
+                                        <td className="text-right font-weight-bold text-success">
+                                            {formatPeso(userSummary.total_incentives || 0)}
                                         </td>
                                     </tr>
-            )}
+                                )}
                             </tbody>
                         </table>
-                    </>
+                    </div>
+                </>
 
-      }
+            }
+
+            {/* Summary by Job Type */}
+            {
+                summary.by_job_type && Object.keys(summary.by_job_type).length > 0 &&
+                <>
+                    <h5 className="mt-4">Summary by Job Type</h5>
+                    <table className="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Job Type</th>
+                                <th className="text-right">Total Quantity</th>
+                                <th className="text-right">Total Incentives</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.values(summary.by_job_type).map((jobTypeSummary, index) =>
+                                <tr key={index}>
+                                    <td>{jobTypeSummary.job_type_name}</td>
+                                    <td className="text-right">{jobTypeSummary.total_quantity || 0}</td>
+                                    <td className="text-right">
+                                        <strong>{formatPeso(jobTypeSummary.total_incentives || 0)}</strong>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </>
+
+            }
         </div>);
 
 }
 
 function StaffPerformanceReport({ data }) {
-  const { staff = [], summary = {} } = data;
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [activityLogs, setActivityLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-  const [showLogsModal, setShowLogsModal] = useState(false);
+    const { staff = [], summary = {} } = data;
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [activityLogs, setActivityLogs] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+    const [showLogsModal, setShowLogsModal] = useState(false);
 
-  const loadUserActivityLogs = async (userId) => {
-    setLoadingLogs(true);
-    setSelectedUser(staff.find((s) => s.id === userId));
-    try {
-      const response = await fetch(`/admin/users/${userId}/activity-logs`);
-      const result = await response.json();
-      setActivityLogs(result.data || []);
-      setShowLogsModal(true);
-      setLoadingLogs(false);
-    } catch (error) {
-      console.error('Error loading activity logs:', error);
-      setLoadingLogs(false);
-    }
-  };
+    const loadUserActivityLogs = async (userId) => {
+        setLoadingLogs(true);
+        setSelectedUser(staff.find((s) => s.id === userId));
+        try {
+            const response = await fetch(`/admin/users/${userId}/activity-logs`);
+            const result = await response.json();
+            setActivityLogs(result.data || []);
+            setShowLogsModal(true);
+            setLoadingLogs(false);
+        } catch (error) {
+            console.error('Error loading activity logs:', error);
+            setLoadingLogs(false);
+        }
+    };
 
-  return (
-    <div>
+    return (
+        <div>
             <h4>Staff Report</h4>
             <div className="row mb-3">
                 <div className="col-md-3">
@@ -1181,13 +1181,13 @@ function StaffPerformanceReport({ data }) {
                     </div>
                 </div>
                 {summary.by_role && Object.entries(summary.by_role).map(([role, count]) =>
-        <div key={role} className="col-md-3">
+                    <div key={role} className="col-md-3">
                         <div className="stat-card">
                             <h6>{role}</h6>
                             <h3>{count}</h3>
                         </div>
                     </div>
-        )}
+                )}
             </div>
 
             <table className="table">
@@ -1204,7 +1204,7 @@ function StaffPerformanceReport({ data }) {
                 </thead>
                 <tbody>
                     {staff.map((member) =>
-          <tr key={member.id}>
+                        <tr key={member.id}>
                             <td>{member.name}</td>
                             <td><i>{member.role}</i></td>
                             <td>{member.email}</td>
@@ -1213,21 +1213,21 @@ function StaffPerformanceReport({ data }) {
                             <td>{new Date(member.last_active).toLocaleDateString()}</td>
                             <td>
                                 <button
-                className="btn btn-sm btn-info"
-                onClick={() => loadUserActivityLogs(member.id)}
-                title="View Activity Logs">
+                                    className="btn btn-sm btn-info"
+                                    onClick={() => loadUserActivityLogs(member.id)}
+                                    title="View Activity Logs">
 
                                     <i className="ti-time"></i> View Logs
                                 </button>
                             </td>
                         </tr>
-          )}
+                    )}
                 </tbody>
             </table>
 
             {/* Activity Logs Modal */}
             {showLogsModal &&
-      <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+                <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
                     <div className="modal-dialog modal-lg">
                         <div className="modal-content">
                             <div className="modal-header">
@@ -1235,74 +1235,74 @@ function StaffPerformanceReport({ data }) {
                                     Activity Logs - {selectedUser?.name}
                                 </h5>
                                 <button
-                type="button"
-                className="close"
-                onClick={() => {
-                  setShowLogsModal(false);
-                  setActivityLogs([]);
-                  setSelectedUser(null);
-                }}>
+                                    type="button"
+                                    className="close"
+                                    onClick={() => {
+                                        setShowLogsModal(false);
+                                        setActivityLogs([]);
+                                        setSelectedUser(null);
+                                    }}>
 
                                     <span>&times;</span>
                                 </button>
                             </div>
                             <div className="modal-body">
                                 {loadingLogs ?
-              <div className="text-center py-4">
+                                    <div className="text-center py-4">
                                         <i className="ti-reload animate-spin text-2xl text-gray-400"></i>
                                         <p className="mt-2 text-gray-500">Loading activity logs...</p>
                                     </div> :
-              activityLogs.length > 0 ?
-              <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                                        <table className="table table-sm table-striped">
-                                            <thead className="sticky top-0 bg-white">
-                                                <tr>
-                                                    <th>Date/Time</th>
-                                                    <th>Action</th>
-                                                    <th>Description</th>
-                                                    <th>Related Item</th>
-                                                    <th>IP Address</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {activityLogs.map((log) =>
-                    <tr key={log.id}>
-                                                        <td className="text-xs">
-                                                            {new Date(log.created_at).toLocaleString()}
-                                                        </td>
-                                                        <td>
-                                                            <span className="badge badge-info badge-sm">
-                                                                {log.action.replace(/_/g, ' ')}
-                                                            </span>
-                                                        </td>
-                                                        <td className="text-sm">{log.description || '-'}</td>
-                                                        <td className="text-xs text-muted">
-                                                            {log.model_type ? log.model_type.split('\\').pop() : '-'}
-                                                        </td>
-                                                        <td className="text-xs text-muted">
-                                                            {log.ip_address || '-'}
-                                                        </td>
+                                    activityLogs.length > 0 ?
+                                        <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                                            <table className="table table-sm table-striped">
+                                                <thead className="sticky top-0 bg-white">
+                                                    <tr>
+                                                        <th>Date/Time</th>
+                                                        <th>Action</th>
+                                                        <th>Description</th>
+                                                        <th>Related Item</th>
+                                                        <th>IP Address</th>
                                                     </tr>
-                    )}
-                                            </tbody>
-                                        </table>
-                                    </div> :
+                                                </thead>
+                                                <tbody>
+                                                    {activityLogs.map((log) =>
+                                                        <tr key={log.id}>
+                                                            <td className="text-xs">
+                                                                {new Date(log.created_at).toLocaleString()}
+                                                            </td>
+                                                            <td>
+                                                                <span className="badge badge-info badge-sm">
+                                                                    {log.action.replace(/_/g, ' ')}
+                                                                </span>
+                                                            </td>
+                                                            <td className="text-sm">{log.description || '-'}</td>
+                                                            <td className="text-xs text-muted">
+                                                                {log.model_type ? log.model_type.split('\\').pop() : '-'}
+                                                            </td>
+                                                            <td className="text-xs text-muted">
+                                                                {log.ip_address || '-'}
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div> :
 
-              <div className="text-center py-8 text-gray-500">
-                                        <i className="ti-time text-3xl mb-2"></i>
-                                        <p>No activity logs found for this user.</p>
-                                    </div>
-              }
+                                        <div className="text-center py-8 text-gray-500">
+                                            <i className="ti-time text-3xl mb-2"></i>
+                                            <p>No activity logs found for this user.</p>
+                                        </div>
+                                }
                             </div>
                             <div className="modal-footer">
                                 <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowLogsModal(false);
-                  setActivityLogs([]);
-                  setSelectedUser(null);
-                }}>
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowLogsModal(false);
+                                        setActivityLogs([]);
+                                        setSelectedUser(null);
+                                    }}>
 
                                     Close
                                 </button>
@@ -1310,10 +1310,10 @@ function StaffPerformanceReport({ data }) {
                         </div>
                     </div>
                 </div>
-      }
+            }
             {showLogsModal &&
-      <div className="modal-backdrop fade show"></div>
-      }
+                <div className="modal-backdrop fade show"></div>
+            }
         </div>);
 
 }

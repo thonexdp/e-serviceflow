@@ -42,14 +42,47 @@ class CustomerController extends Controller
         $q = $request->get('q', '');
         $normalizedQ = Customer::normalizePhone($q);
         
+        // Split search terms by space
+        $terms = array_filter(explode(' ', trim($q)));
+        
         $customers = Customer::query()
-            ->where('firstname', 'like', "%{$q}%")
-            ->orWhere('lastname', 'like', "%{$q}%")
-            ->orWhere('email', 'like', "%{$q}%")
-            ->orWhere('phone', 'like', "%{$q}%")
-            ->orWhere('facebook', 'like', "%{$q}%")
-            ->when($normalizedQ, function ($query) use ($normalizedQ) {
-                $query->orWhere('normalized_phone', 'like', "%{$normalizedQ}%");
+            ->where(function ($query) use ($q, $normalizedQ, $terms) {
+                // Search in individual fields with the full query
+                $query->where('firstname', 'like', "%{$q}%")
+                    ->orWhere('lastname', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%")
+                    ->orWhere('phone', 'like', "%{$q}%")
+                    ->orWhere('facebook', 'like', "%{$q}%");
+                
+                // Search in normalized phone
+                if ($normalizedQ) {
+                    $query->orWhere('normalized_phone', 'like', "%{$normalizedQ}%");
+                }
+                
+                // If multiple terms, search across firstname and lastname
+                if (count($terms) >= 2) {
+                    foreach ($terms as $i => $term1) {
+                        // Try matching any term in firstname and any other term in lastname
+                        $query->orWhere(function ($q) use ($terms, $i, $term1) {
+                            $q->where('firstname', 'like', "%{$term1}%");
+                            foreach ($terms as $j => $term2) {
+                                if ($i !== $j) {
+                                    $q->where('lastname', 'like', "%{$term2}%");
+                                }
+                            }
+                        });
+                        
+                        // Try matching any term in lastname and any other term in firstname
+                        $query->orWhere(function ($q) use ($terms, $i, $term1) {
+                            $q->where('lastname', 'like', "%{$term1}%");
+                            foreach ($terms as $j => $term2) {
+                                if ($i !== $j) {
+                                    $q->where('firstname', 'like', "%{$term2}%");
+                                }
+                            }
+                        });
+                    }
+                }
             })
             ->limit(10)
             ->get(['id', 'firstname', 'lastname', 'email', 'phone', 'address', 'facebook'])

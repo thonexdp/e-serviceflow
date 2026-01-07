@@ -19,6 +19,7 @@ class Ticket extends Model
         'order_branch_id',
         'production_branch_id',
         'description',
+        'selected_color',
         'job_type',
         'job_type_id',
         'quantity',
@@ -30,6 +31,9 @@ class Ticket extends Model
         'total_amount',
         'subtotal',
         'discount',
+        'original_price',
+        'discount_percentage',
+        'discount_amount',
         'downpayment',
         'payment_method',
         'status',
@@ -57,6 +61,9 @@ class Ticket extends Model
         'total_amount' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
+        'original_price' => 'decimal:2',
+        'discount_percentage' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
         'downpayment' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'quantity' => 'integer',
@@ -481,7 +488,7 @@ class Ticket extends Model
     public function canBeDeleted(): array
     {
         $dependencies = $this->getDeletionDependencies();
-        
+
         return [
             'can_delete' => $dependencies['blocking_count'] === 0,
             'dependencies' => $dependencies,
@@ -497,7 +504,7 @@ class Ticket extends Model
         $payments = $this->payments()->count();
         $postedPayments = $this->payments()->where('status', 'posted')->count();
         $totalPaid = $this->payments()->where('status', 'posted')->sum('amount');
-        
+
         $files = $this->files()->count();
         $productionRecords = $this->productionRecords()->count();
         $workflowProgress = $this->workflowProgress()->count();

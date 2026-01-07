@@ -363,27 +363,40 @@ export default function PaymentsFinance({
           <button type="button" className="close p-0 m-0 ml-2" onClick={() => setSelectionWarning(null)} style={{ fontSize: '16px', lineHeight: '1', color: 'inherit', float: 'none', opacity: '0.5' }}>&times;</button>
         </div>
       )}
-      {selectedItems.length > 0 && (activeTab === 'receivables' || activeTab === 'pending_payments') && (
+      {(activeTab === 'receivables' || activeTab === 'pending_payments') && (
         <div className="flex items-center gap-1 bg-info/10 p-1 px-2 rounded-md border border-info/20">
-          <span className="text-xs font-bold text-info uppercase mr-2 tracking-tighter">
-            {selectedItems.length} Selected
-          </span>
+          {selectedItems.length > 0 && (
+            <span className="text-xs font-bold text-info uppercase mr-2 tracking-tighter">
+              {selectedItems.length} Selected
+            </span>
+          )}
           <button
             className="btn btn-sm btn-info btn-rounded-md"
             onClick={handleGenerateStatement}
-            style={{ padding: "0 15px", height: "32px", display: "flex", alignItems: "center", gap: "5px" }}
+            disabled={selectedItems.length === 0}
+            style={{
+              padding: "0 15px",
+              height: "32px",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              opacity: selectedItems.length === 0 ? 0.6 : 1,
+              cursor: selectedItems.length === 0 ? 'not-allowed' : 'pointer'
+            }}
           >
             <i className="ti-printer"></i>
-            Generate
+            Print Billing Statement
           </button>
-          <button
-            className="btn btn-sm btn-light btn-outline btn-rounded"
-            onClick={() => setSelectedItems([])}
-            title="Clear Selection"
-            style={{ width: "32px", height: "32px", padding: "0" }}
-          >
-            <i className="ti-close"></i>
-          </button>
+          {selectedItems.length > 0 && (
+            <button
+              className="btn btn-sm btn-light btn-outline btn-rounded"
+              onClick={() => setSelectedItems([])}
+              title="Clear Selection"
+              style={{ width: "32px", height: "32px", padding: "0" }}
+            >
+              <i className="ti-close"></i>
+            </button>
+          )}
         </div>
       )}
       {activeTab === "ledger" &&
@@ -577,9 +590,22 @@ export default function PaymentsFinance({
     if (paymentForm.ticket_id) {
       const selectedTicket = openTickets.find((t) => t.id === paymentForm.ticket_id);
       if (selectedTicket) {
-        const subtotal = parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0);
-        const discountPercent = parseFloat(paymentForm.discount || 0);
-        const discountAmount = subtotal * (discountPercent / 100);
+        // Use ticket's stored discount info or manual discount input
+        const ticketDiscountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
+        const ticketDiscountAmount = parseFloat(selectedTicket.discount_amount || 0);
+        const manualDiscountPct = parseFloat(paymentForm.discount || 0);
+        
+        // Prioritize ticket's stored discount, fallback to manual input
+        const discountPercent = ticketDiscountPct > 0 ? ticketDiscountPct : manualDiscountPct;
+        
+        // Calculate subtotal and discount
+        const subtotal = parseFloat(selectedTicket.original_price || selectedTicket.subtotal || selectedTicket.total_amount || 0);
+        
+        // If ticket has stored discount_amount, use it; otherwise calculate from percentage
+        const discountAmount = (ticketDiscountPct > 0 && ticketDiscountAmount > 0) 
+          ? ticketDiscountAmount 
+          : (subtotal * (discountPercent / 100));
+        
         const ticketTotal = subtotal - discountAmount;
         const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
         const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
@@ -1004,7 +1030,28 @@ export default function PaymentsFinance({
         </span>
 
     },
-    { label: "Total Amount", render: (row) => formatPeso(row.total_invoiced) },
+    { 
+      label: "Total Amount", 
+      render: (row) => {
+        const hasDiscount = row.job_type?.discount > 0;
+        if (hasDiscount) {
+          const originalPrice = parseFloat(row.original_price || row.total_invoiced || 0);
+          const discountPct = parseFloat(row.discount_percentage || row.job_type?.discount || 0);
+          const discountAmount = parseFloat(row.discount_amount || 0);
+          const calculatedDiscount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
+          const discountedTotal = originalPrice - calculatedDiscount;
+          
+          return (
+            <div className="flex flex-col">
+              <span className="text-xs text-muted line-through">{formatPeso(originalPrice)}</span>
+              <span className="font-semibold text-success">{formatPeso(discountedTotal)}</span>
+              <span className="text-xs text-success">-{discountPct}% OFF</span>
+            </div>
+          );
+        }
+        return formatPeso(row.total_invoiced);
+      }
+    },
     { label: "Paid", render: (row) => formatPeso(row.total_paid) },
     {
       label: "Balance",
@@ -1022,7 +1069,7 @@ export default function PaymentsFinance({
     {
       label: "Action",
       render: (row) =>
-        hasPermission('finance', 'create') &&
+        hasPermission('finance', 'manage') &&
         <button
           className="btn btn-primary btn-sm btn-rounded-md"
           onClick={() => handleProcessPayment(row)}>
@@ -1386,10 +1433,22 @@ export default function PaymentsFinance({
               const isGovSummary = paymentForm.payment_method === 'government_ar';
               const isPendingSummary = isCheckSummary || isGovSummary;
 
-
-              const subtotal = parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0);
-              const discountPercent = parseFloat(paymentForm.discount || 0);
-              const discountAmount = subtotal * (discountPercent / 100);
+              // Use ticket's stored discount info or manual discount input
+              const ticketDiscountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
+              const ticketDiscountAmount = parseFloat(selectedTicket.discount_amount || 0);
+              const manualDiscountPct = parseFloat(paymentForm.discount || 0);
+              
+              // Prioritize ticket's stored discount, fallback to manual input
+              const discountPercent = ticketDiscountPct > 0 ? ticketDiscountPct : manualDiscountPct;
+              
+              // Calculate subtotal and discount
+              let subtotal = parseFloat(selectedTicket.original_price || selectedTicket.subtotal || selectedTicket.total_amount || 0);
+              
+              // If ticket has stored discount_amount, use it; otherwise calculate from percentage
+              const discountAmount = (ticketDiscountPct > 0 && ticketDiscountAmount > 0) 
+                ? ticketDiscountAmount 
+                : (subtotal * (discountPercent / 100));
+              
               const ticketTotal = subtotal - discountAmount;
 
               const previousPayments = parseFloat(selectedTicket.amount_paid || 0);

@@ -28,6 +28,11 @@ class JobTypeRequest extends FormRequest
             'show_in_customer_view' => 'boolean',
             'sort_order' => 'nullable|integer|min:0',
             'image' => 'nullable|image|max:2048',
+            'brochure_link' => 'nullable|url|max:500',
+            'has_colors' => 'boolean',
+            'available_colors' => 'nullable|array',
+            'available_colors.*.hex' => 'required_with:available_colors|string|max:20',
+            'available_colors.*.code' => 'nullable|string|max:50',
 
 
             'price_tiers' => 'nullable|array',

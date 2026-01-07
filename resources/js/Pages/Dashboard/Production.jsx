@@ -4,11 +4,11 @@ import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
 import DataTable from "@/Components/Common/DataTable";
 import SearchBox from "@/Components/Common/SearchBox";
-import FlashMessage from "@/Components/Common/FlashMessage";
 import FormInput from "@/Components/Common/FormInput";
 import ProductionBoard from "@/Components/Production/ProductionBoard";
 import { formatDate } from "@/Utils/formatDate";
 import CardStatistics from "@/Components/Common/CardStatistics";
+import { toast } from "react-hot-toast";
 
 export default function Productions({
   user = {},
@@ -374,31 +374,11 @@ export default function Productions({
 
 
       // Always show notification regardless of fullscreen state
-      const notification = document.createElement('div');
-      notification.innerHTML = `
-          <div style="
-              position: fixed;
-              top: 80px;
-              right: 20px;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-              padding: 12px 20px;
-              border-radius: 8px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              z-index: 10000;
-              animation: slideInRight 0.3s ease-out;
-              font-size: 14px;
-              font-weight: 500;
-          ">
-              <i class="ti-bell mr-2"></i>${data.notification?.message || 'Production updated'}
-          </div>
-      `;
-      document.body.appendChild(notification);
-
-      setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease-in';
-        setTimeout(() => notification.remove(), 300);
-      }, 3000);
+      toast.success(data.notification?.message || 'Production updated', {
+        icon: '🔔',
+        duration: 3000,
+        position: 'top-right',
+      });
     };
 
 
@@ -510,7 +490,7 @@ export default function Productions({
 
     const quantity = parseInt(producedQuantity) || 0;
     if (quantity < 0 || quantity > selectedTicket.quantity) {
-      alert(`Quantity must be between 0 and ${selectedTicket.quantity}`);
+      toast.error(`Quantity must be between 0 and ${selectedTicket.quantity}`);
       return;
     }
 
@@ -623,7 +603,7 @@ export default function Productions({
     );
 
     if (validConsumptions.length === 0) {
-      alert("Please add at least one stock consumption record.");
+      toast.error("Please add at least one stock consumption record.");
       return;
     }
 
@@ -772,10 +752,10 @@ export default function Productions({
     if (!step) return <span className="text-muted">{workflowStep}</span>;
 
     return (
-      <span className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
+      <div className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
         <i className={`${step.icon} mr-1`}></i>
         {step.label}
-      </span>);
+      </div>);
 
   };
 
@@ -806,7 +786,7 @@ export default function Productions({
       label: "Ticket ID",
       key: "ticket_number",
       render: (row) =>
-        <div className="d-flex align-items-center">
+        <div className="d-flex align-items-center" style={{ maxWidth: isFullscreen ? '350px' : '250px' }}>
           {row.mockup_files && row.mockup_files.length > 0 &&
             <div className="mr-3">
               <img
@@ -828,13 +808,26 @@ export default function Productions({
 
             </div>
           }
-          <div>
+          <div style={{ overflow: 'hidden' }}>
             {row.job_type &&
-              <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
+              <div className="text-muted font-weight-bold mb-1" style={{
+                fontSize: isFullscreen ? '1rem' : '0.8rem',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
                 {row.job_type.name}
               </div>
             }
-            <strong style={{ fontSize: isFullscreen ? '1rem' : '1.2rem', color: '#1a1a1a', display: 'block' }}>#{row.ticket_number}</strong>
+            <strong style={{
+              fontSize: isFullscreen ? '1rem' : '1.2rem',
+              color: '#1a1a1a',
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>#{row.ticket_number}</strong>
           </div>
         </div>
 
@@ -843,8 +836,13 @@ export default function Productions({
       label: "Description",
       key: "description",
       render: (row) =>
-        <div>
-          <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.15rem' : '1rem' }}>{row.description}</div>
+        <div style={{ maxWidth: isFullscreen ? '500px' : '300px' }}>
+          <div className="font-weight-bold" style={{
+            fontSize: isFullscreen ? '1.15rem' : '1rem',
+            whiteSpace: 'normal',
+            wordBreak: 'break-word',
+            lineHeight: '1.2'
+          }}>{row.description}</div>
           <div className="text-primary font-weight-bold" style={{ fontSize: isFullscreen ? '1rem' : '0.85rem' }}>
             {row.customer?.firstname} {row.customer?.lastname}
           </div>
@@ -963,8 +961,7 @@ export default function Productions({
       key: "status",
       render: (row) =>
         <div style={{
-          fontSize: isFullscreen ? '1.1rem' : '1rem',
-          minWidth: isFullscreen ? '180px' : '120px',
+          fontSize: '1rem',
           whiteSpace: 'nowrap',
           fontWeight: 'bold'
         }}>
@@ -1073,14 +1070,6 @@ export default function Productions({
           }
         </button>
       </div>
-
-      {/* Flash Messages */}
-      {flash?.success &&
-        <FlashMessage type="success" message={flash.success} />
-      }
-      {flash?.error &&
-        <FlashMessage type="error" message={flash.error} />
-      }
 
       {/* Header / Logo Section */}
       {isFullscreen ?
@@ -1210,7 +1199,7 @@ export default function Productions({
               <div className="row">
                 <div className="col-lg-12">
                   <div
-                    className="card"
+                    className="card p-0 m-0"
                     style={{
                       border: "none",
                       boxShadow: isFullscreen ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
@@ -1233,7 +1222,7 @@ export default function Productions({
                     }
 
                     <div className="card-body" style={{ padding: isFullscreen ? '0' : '1.25rem' }}>
-                      <div className="mt-2">
+                      <div>
                         {activeView === 'board' ?
                           <ProductionBoard tickets={tickets.data} isFullscreen={isFullscreen} /> :
 

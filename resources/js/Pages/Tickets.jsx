@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -10,10 +11,13 @@ import FlashMessage from "@/Components/Common/FlashMessage";
 import CustomerSearchBox from "@/Components/Common/CustomerSearchBox";
 import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 import PreviewModal from "@/Components/Main/PreviewModal";
 import DeletionConfirmationModal from "@/Components/Common/DeletionConfirmationModal";
 import { formatPeso } from "@/Utils/currency";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import { useRoleApi } from "@/Hooks/useRoleApi";
+import Quotation from "@/Components/Tickets/Quotation";
 
 export default function Tickets({
   user = {},
@@ -23,7 +27,8 @@ export default function Tickets({
   tickets = { data: [] },
   selectedCustomer = null,
   filters = {},
-  branches = []
+  branches = [],
+  customer_order_qrcode = ""
 }) {
   const [openCustomerModal, setCustomerModalOpen] = useState(false);
   const [openTicketModal, setTicketModalOpen] = useState(false);
@@ -48,6 +53,20 @@ export default function Tickets({
   const [revisionNotes, setRevisionNotes] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState(false);
   const [verifyErrors, setVerifyErrors] = useState({});
+
+  const [openQuotationModal, setQuotationModalOpen] = useState(false);
+  const [quotationToPrint, setQuotationToPrint] = useState(null);
+  const [quotationForm, setQuotationForm] = useState({
+    name: "",
+    companyName: "",
+    address: "",
+    validUntil: "",
+    quotationNo: "",
+    projectDescription: "",
+    valueAddedTax: "0",
+    others: "0",
+    date: new Date().toISOString().slice(0, 10)
+  });
 
 
   useEffect(() => {
@@ -213,6 +232,15 @@ export default function Tickets({
 
 
   const handleOpenPaymentModal = (ticket) => {
+    console.log('📊 Ticket Payment Data:', {
+      ticket_number: ticket.ticket_number,
+      total_amount: ticket.total_amount,
+      subtotal: ticket.subtotal,
+      original_price: ticket.original_price,
+      discount: ticket.discount,
+      discount_percentage: ticket.discount_percentage,
+      discount_amount: ticket.discount_amount
+    });
     setSelectedTicket(ticket);
     setPaymentFormData({
       ticket_id: ticket.id,
@@ -247,7 +275,7 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Status update failed:", error);
-      alert(error.response?.data?.message || "Failed to update status");
+      toast.error(error.response?.data?.message || "Failed to update status");
     } finally {
       setIsUpdating(false);
     }
@@ -298,7 +326,7 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Payment update failed:", error);
-      alert(error.response?.data?.message || "Failed to record payment.");
+      toast.error(error.response?.data?.message || "Failed to record payment.");
     } finally {
       setIsUpdating(false);
     }
@@ -452,7 +480,7 @@ export default function Tickets({
 
   const handleRequestRevisionDesign = () => {
     if (!selectedTicket || !revisionNotes.trim()) {
-      alert("Please provide notes for the revision request.");
+      toast.error("Please provide notes for the revision request.");
       return;
     }
     setLoading(true);
@@ -480,8 +508,51 @@ export default function Tickets({
     return (
       <div className={`badge ${classes[status] || "badge-secondary"}`}>
         {status?.replace("_", " ").toUpperCase() || "PENDING"}
-      </div>);
+      </div>
+    );
+  };
 
+  const shouldShowDeleteButtonInDataTable = (row) => {
+    if (row?.role === 'admin') return false;
+    const isAdmin = auth.user.role === 'admin' || auth.user.roles?.some(r => r.name === 'admin');
+    const inProgressStatuses = ['in_designer', 'ready_to_print', 'in_production', 'pending'];
+    if (row.status && inProgressStatuses.includes(row.status)) {
+      return isAdmin;
+    }
+    if (row.status === 'completed') return false;
+    return true;
+  };
+
+  const handleOpenQuotationModal = (ticket) => {
+    setSelectedTicket(ticket);
+    setQuotationForm({
+      name: ticket.customer ? `${ticket.customer.firstname} ${ticket.customer.lastname}` : "",
+      companyName: ticket.customer?.company_name || "",
+      address: ticket.customer?.address || "",
+      validUntil: "",
+      quotationNo: ticket.ticket_number,
+      projectDescription: ticket.description || "",
+      valueAddedTax: "0",
+      others: "0",
+      date: new Date().toISOString().slice(0, 10),
+    });
+    setQuotationModalOpen(true);
+  };
+
+  const handlePrintQuotation = () => {
+    setQuotationToPrint({
+      ticket: selectedTicket,
+      customData: quotationForm,
+    });
+    setQuotationModalOpen(false);
+
+    document.body.classList.add("printing-quotation");
+
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove("printing-quotation");
+      setQuotationToPrint(null);
+    }, 500);
   };
 
   const getPaymentStatusBadge = (row) => {
@@ -580,14 +651,33 @@ export default function Tickets({
       render: (row) =>
         <div>
           <div className="font-weight-bold">{row.ticket_number}</div>
-          {
-            row.job_type?.name && (
-              <i className="text-xs">
-                Type: {row.job_type?.name}
-            </i>
-            )
-          }
-         
+          <span className="text-xs">
+            {
+              row.job_type?.name && (
+                <i className="text-xs">
+                  Type: {row.job_type?.name}
+                </i>
+              )
+            }
+          </span>
+          {row.selected_color && (
+            <div className="d-flex align-items-center mt-1">
+              <span
+                className="badge badge-light border d-flex align-items-center gap-1 py-1 px-2 shadow-sm"
+                style={{ fontSize: '9px', borderRadius: '12px', backgroundColor: '#f8f9fa' }}
+              >
+                <div
+                  className="rounded-circle border"
+                  style={{ width: '8px', height: '8px', backgroundColor: row.selected_color }}
+                ></div>
+                <span className="text-dark font-weight-bold">
+                  {getFullColorName(row.selected_color, row.job_type)}
+                </span>
+              </span>
+            </div>
+          )}
+
+
           {row.payments?.some((p) => p.status === 'rejected') &&
             <div className="text-danger font-bold text-[9px] uppercase">
               <i className="ti-alert mr-1"></i> Bounced Payment
@@ -633,19 +723,6 @@ export default function Tickets({
           new Date(row.due_date).toLocaleDateString() :
           "N/A"
     },
-
-
-
-
-
-
-
-
-
-
-
-
-
     {
       label: "Payment Status",
       key: "payment_status",
@@ -820,7 +897,7 @@ export default function Tickets({
           branches={branches} />
 
       </Modal>
-      
+
       {/* Deletion Confirmation Modal with Dependency Checking */}
       <DeletionConfirmationModal
         isOpen={openDeleteModal}
@@ -847,6 +924,7 @@ export default function Tickets({
         }
 
         <div className="row">
+
           <div className="col-lg-6 p-r-0 title-margin-right">
             <div className="page-header">
               <div className="page-title">
@@ -1021,38 +1099,84 @@ export default function Tickets({
                     </p>
                   </div>
                   <div className="col-md-6">
-                    <p className="m-b-5">
-                      <strong>Subtotal:</strong>{" "}
-                      {parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0) > 0
-                        ? formatPeso(selectedTicket.subtotal || selectedTicket.total_amount)
-                        : "To be confirmed"}
-                    </p>
-                    {parseFloat(selectedTicket.discount || 0) > 0 &&
-                      <p className="m-b-5 text-success">
-                        <strong>Discount:</strong>{" "}
-                        {parseFloat(selectedTicket.discount)}% OFF
-                      </p>
-                    }
-                    <p className="m-b-5">
-                      <strong>Total Amount:</strong>{" "}
-                      {parseFloat(selectedTicket.total_amount || 0) > 0
-                        ? formatPeso(selectedTicket.total_amount)
-                        : "To be confirmed"}
-                    </p>
-                    <p className="m-b-5">
-                      <strong>Amount Paid:</strong>{" "}
-                      {formatPeso(
-                        selectedTicket.amount_paid
-                      )}
-                    </p>
-                    <p className="m-b-0 text-danger font-bold border-t pt-1">
-                      <strong>Balance:</strong>{" "}
-                      {parseFloat(selectedTicket.total_amount || 0) > 0
-                        ? formatPeso(
-                          Math.max(0, parseFloat(selectedTicket.total_amount || 0) - parseFloat(selectedTicket.amount_paid || 0))
-                        )
-                        : "To be confirmed"}
-                    </p>
+                    {(() => {
+                      const discountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
+                      const hasDiscount = discountPct > 0;
+                      let originalPrice = parseFloat(selectedTicket.original_price || 0);
+                      let totalAmount = parseFloat(selectedTicket.total_amount || 0);
+                      
+                      // Calculate discounted total if we have discount info
+                      let finalTotal = totalAmount; // Default to total_amount
+                      if (hasDiscount) {
+                        // If original_price is not set, use total_amount as original
+                        if (originalPrice === 0 && totalAmount > 0) {
+                          originalPrice = totalAmount;
+                        }
+                        
+                        // Calculate discounted amount
+                        const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
+                        const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
+                        const discountedTotal = originalPrice - calculatedDiscountAmount;
+                        finalTotal = discountedTotal; // Use discounted total for balance calculation
+                        
+                        return (
+                          <>
+                            <p className="m-b-5 text-muted">
+                              <strong>Original Price:</strong>{" "}
+                              <span className="text-decoration-line-through">
+                                {formatPeso(originalPrice.toFixed(2))}
+                              </span>
+                            </p>
+                            <p className="m-b-5 text-success">
+                              <strong>Discount:</strong>{" "}
+                              {discountPct}% OFF
+                              <span> (-{formatPeso(calculatedDiscountAmount.toFixed(2))})</span>
+                            </p>
+                            <p className="m-b-5 font-weight-bold">
+                              <strong>Total Amount:</strong>{" "}
+                              <span className="text-success">
+                                {formatPeso(discountedTotal.toFixed(2))}
+                              </span>
+                            </p>
+                            <p className="m-b-5">
+                              <strong>Amount Paid:</strong>{" "}
+                              {formatPeso(selectedTicket.amount_paid)}
+                            </p>
+                            <p className="m-b-0 text-danger font-bold border-t pt-1">
+                              <strong>Balance:</strong>{" "}
+                              {formatPeso(Math.max(0, discountedTotal - parseFloat(selectedTicket.amount_paid || 0)).toFixed(2))}
+                            </p>
+                          </>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          <p className="m-b-5">
+                            <strong>Subtotal:</strong>{" "}
+                            {parseFloat(selectedTicket.subtotal || totalAmount || 0) > 0
+                              ? formatPeso((selectedTicket.subtotal || totalAmount))
+                              : "To be confirmed"}
+                          </p>
+                          <p className="m-b-5">
+                            <strong>Total Amount:</strong>{" "}
+                            {totalAmount > 0
+                              ? formatPeso(totalAmount.toFixed(2))
+                              : "To be confirmed"}
+                          </p>
+                          <p className="m-b-5">
+                            <strong>Amount Paid:</strong>{" "}
+                            {formatPeso(selectedTicket.amount_paid)}
+                          </p>
+                          <p className="m-b-0 text-danger font-bold border-t pt-1">
+                            <strong>Balance:</strong>{" "}
+                            {parseFloat(totalAmount || 0) > 0
+                              ? formatPeso(Math.max(0, parseFloat(totalAmount || 0) - parseFloat(selectedTicket.amount_paid || 0)).toFixed(2))
+                              : "To be confirmed"}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1171,7 +1295,38 @@ export default function Tickets({
                 </h6>
                 <p className="mb-0 small">
                   Ticket: <strong>{selectedTicket.ticket_number}</strong><br />
-                  Total Amount: <strong>{parseFloat(selectedTicket.total_amount || 0) > 0 ? formatPeso(selectedTicket.total_amount) : "To be confirmed"}</strong>
+                  {(() => {
+                    const discountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
+                    const hasDiscount = discountPct > 0;
+                    let originalPrice = parseFloat(selectedTicket.original_price || 0);
+                    let totalAmount = parseFloat(selectedTicket.total_amount || 0);
+                    
+                    if (hasDiscount) {
+                      // If original_price is not set, use total_amount as original
+                      if (originalPrice === 0 && totalAmount > 0) {
+                        originalPrice = totalAmount;
+                      }
+                      
+                      // Calculate discounted amount
+                      const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
+                      const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
+                      const discountedTotal = originalPrice - calculatedDiscountAmount;
+                      
+                      return (
+                        <>
+                          Original Price: <span className="text-decoration-line-through">{formatPeso(originalPrice.toFixed(2))}</span><br />
+                          Discount: <span className="text-success font-weight-bold">{discountPct}% OFF (-{formatPeso(calculatedDiscountAmount.toFixed(2))})</span><br />
+                          Total Amount: <strong className="text-success">{formatPeso(discountedTotal.toFixed(2))}</strong>
+                        </>
+                      );
+                    }
+                    
+                    return (
+                      <>
+                        Total Amount: <strong>{totalAmount > 0 ? formatPeso(totalAmount.toFixed(2)) : "To be confirmed"}</strong>
+                      </>
+                    );
+                  })()}
                   {selectedTicket.payment_method === 'cash' &&
                     <><br />Confirm this order once the customer arrives at the branch.</>
                   }
@@ -1256,7 +1411,7 @@ export default function Tickets({
 
         <section id="main-content">
           {/* Customer Search and Add Section */}
-          {hasPermission('customers', 'create') &&
+          {hasPermission('customers', 'manage') &&
             <div className="row">
               <div className="col-lg-6">
                 <div className="card">
@@ -1410,7 +1565,7 @@ export default function Tickets({
                 </div>
                 <div className="card-body">
                   <div className="row mb-4">
-                    <div className="col-md-3">
+                    <div className="col-md-2">
                       <div className="input-group">
                         <input
                           type="text"
@@ -1476,12 +1631,14 @@ export default function Tickets({
                         </select>
                       </div>
                     }
-                    <DateRangeFilter
-                      filters={filters}
-                      route="tickets"
-                      buildUrl={buildUrl} />
 
-                    <div className="col-md-2">
+
+
+                    <div className="col-md-4">
+                      <DateRangeFilter
+                        filters={filters}
+                        route="tickets"
+                        buildUrl={buildUrl} />
                     </div>
                   </div>
 
@@ -1544,7 +1701,44 @@ export default function Tickets({
                     onDelete={handleDeleteTicket}
                     currentUser={auth.user}
                     showDeleteForInProgress={true}
-                    emptyMessage="No tickets found." />
+                    emptyMessage="No tickets found."
+                    actions={(row) => (
+                      <div className="btn-group">
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm text-primary"
+                          onClick={() => handleEditTicket(row)}
+                          title={`Edit ${row.status !== 'completed' ? 'Edit' : 'View'}`}>
+                          <small>
+                            {row.status !== 'completed' ? <i className="ti-pencil"></i> : <i className="ti-eye"></i>}
+                            {row.status !== 'completed' ? ' Edit' : ' View'}
+                          </small>
+                        </button>
+
+                        {
+                          row.payment_status !== 'paid' && row.payment_status !== 'partial' && (
+                            <button
+                              type="button"
+                              className="btn btn-link btn-sm text-info"
+                              onClick={() => handleOpenQuotationModal(row)}
+                              title="Print Quotation">
+                              <small><i className="ti-printer"></i> Quote</small>
+                            </button>
+                          )
+                        }
+
+                        {shouldShowDeleteButtonInDataTable(row) && (
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm text-danger"
+                            onClick={() => handleDeleteTicket(row.id)}
+                            title="Delete">
+                            <small> <i className="ti-trash"></i> Delete</small>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  />
 
                 </div>
               </div>
@@ -1552,7 +1746,166 @@ export default function Tickets({
           </div>
         </section>
 
+        {/* Quotation Modal */}
+        <Modal
+          title="Prepare Quotation"
+          isOpen={openQuotationModal}
+          onClose={() => setQuotationModalOpen(false)}
+          size="4xl"
+          submitButtonText={null}
+        >
+          <div className="modal-body p-4">
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Customer Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.name}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, name: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Company Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.companyName}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, companyName: e.target.value })}
+                />
+              </div>
+              <div className="col-12 mb-3">
+                <label className="form-label font-weight-bold">Address</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.address}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, address: e.target.value })}
+                />
+              </div>
+              <div className="col-md-4 mb-3">
+                <label className="form-label font-weight-bold">Valid Until</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. 7 Days"
+                  value={quotationForm.validUntil}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, validUntil: e.target.value })}
+                />
+              </div>
+              <div className="col-md-4 mb-3">
+                <label className="form-label font-weight-bold">Quotation No.</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={quotationForm.quotationNo}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, quotationNo: e.target.value })}
+                />
+              </div>
+              <div className="col-md-4 mb-3">
+                <label className="form-label font-weight-bold">Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={quotationForm.date}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, date: e.target.value })}
+                />
+              </div>
+              <div className="col-12 mb-3">
+                <label className="form-label font-weight-bold">Project Description</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={quotationForm.projectDescription}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, projectDescription: e.target.value })}
+                ></textarea>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Value Added Tax (VAT)</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={quotationForm.valueAddedTax}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, valueAddedTax: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label font-weight-bold">Others / Extra Fee</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={quotationForm.others}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, others: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer border-top px-0 pb-0 pt-3 mt-2">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setQuotationModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-info btn-sm"
+                onClick={handlePrintQuotation}
+              >
+                <i className="ti-printer mr-1"></i> Print Quotation
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Hidden Quotation Print View - Portaled to Body to avoid container overflow/height issues */}
+        {createPortal(
+          <div id="quotation-print-overlay" style={{ display: quotationToPrint ? 'block' : 'none' }}>
+            {quotationToPrint && (
+              <Quotation
+                ticket={quotationToPrint.ticket}
+                customData={quotationToPrint.customData}
+                customerOrderQrcode={customer_order_qrcode}
+              />
+            )}
+          </div>,
+          document.body
+        )}
+
+        <style>{`
+          @media print {
+            @page {
+              margin: 0;
+              size: auto;
+            }
+            body.printing-quotation {
+              visibility: hidden;
+              overflow: visible !important;
+              height: auto !important;
+            }
+            /* Completely hide the main application container when printing a quotation */
+            #app {
+              display: none !important;
+            }
+            
+            body.printing-quotation #quotation-print-overlay,
+            body.printing-quotation #quotation-print-overlay .quotation-print-container {
+              visibility: visible !important;
+              display: block !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              background: white !important;
+              z-index: 99999 !important;
+            }
+            body.printing-quotation #quotation-print-overlay * {
+              visibility: visible !important;
+            }
+          }
+        `}</style>
       </AdminLayout>
     </>);
-
 }

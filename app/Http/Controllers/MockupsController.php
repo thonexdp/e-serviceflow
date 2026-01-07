@@ -15,7 +15,7 @@ class MockupsController extends Controller
 
     public function index(Request $request)
     {
-        $query = Ticket::with(['customer', 'jobType.category', 'files', 'assignedToUser', 'updatedByUser'])
+        $query = Ticket::with(['customer', 'jobType.category', 'files', 'mockupFiles', 'assignedToUser', 'updatedByUser'])
             ->where('payment_status', '!=', 'awaiting_verification')
             ->whereNotNull('design_status');
 
@@ -31,38 +31,42 @@ class MockupsController extends Controller
             });
         }
 
+        $dateRange = $request->input('date_range');
 
-        if ($request->has('design_status') && $request->design_status && $request->design_status !== 'all') {
-            $query->where('design_status', $request->design_status);
+        if ($dateRange) {
+            if ($dateRange === 'custom' && $request->filled('start_date') && $request->filled('end_date')) {
+                $query->whereBetween('created_at', [
+                    $request->start_date . ' 00:00:00',
+                    $request->end_date . ' 23:59:59'
+                ]);
+            } elseif ($dateRange === 'last_30_days') {
+                $query->whereBetween('created_at', [
+                    now()->subDays(30)->startOfDay(),
+                    now()->endOfDay()
+                ]);
+            } elseif ($dateRange === 'today') {
+                $query->whereDate('created_at', today());
+            } elseif ($dateRange === 'this_week') {
+                $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
+            } elseif ($dateRange === 'this_month') {
+                $query->whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year);
+            } elseif ($dateRange === 'last_month') {
+                $query->whereMonth('created_at', now()->subMonth()->month)
+                    ->whereYear('created_at', now()->subMonth()->year);
+            } elseif (is_numeric($dateRange) && strlen($dateRange) === 4) {
+                $query->whereYear('created_at', $dateRange);
+            }
         }
 
-
-        $dateRange = $request->get('date_range');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-
-
-        if ($dateRange !== '' && $dateRange !== null) {
-            if ($startDate) {
-                $query->whereDate('created_at', '>=', $startDate);
-            }
-
-            if ($endDate) {
-                $query->whereDate('created_at', '<=', $endDate);
-            }
-        }
-
-        $tickets = $query->latest('updated_at')->paginate($request->get('per_page', 15));
+        $tickets = $query->latest('updated_at')
+            ->paginate($request->get('per_page', 15))
+            ->withQueryString();
 
         return Inertia::render('Mock-ups', [
             'tickets' => $tickets,
-            'filters' => [
-                'search' => $request->get('search'),
-                'design_status' => $request->get('design_status'),
-                'date_range' => $dateRange,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-            ],
+            'filters' => $request->only(['search', 'design_status', 'date_range', 'start_date', 'end_date', 'branch_id']),
+            'branches' => \App\Models\Branch::all(['id', 'name']),
         ]);
     }
 
@@ -82,7 +86,7 @@ class MockupsController extends Controller
 
         $request->validate([
             'files' => 'required|array|min:1',
-            'files.*' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'files.*' => 'file|mimes:jpg,jpeg,png|max:10240',
             'notes' => 'nullable|string|max:1000',
         ]);
 

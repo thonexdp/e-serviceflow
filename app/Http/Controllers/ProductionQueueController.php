@@ -1574,23 +1574,30 @@ class ProductionQueueController extends Controller
             });
         }
 
-        if ($request->filled('date_range')) {
-            switch ($request->date_range) {
-                case 'today':
-                    $query->whereDate('workflow_completed_at', today());
-                    break;
-                case 'this_week':
-                    $query->whereBetween('workflow_completed_at', [now()->startOfWeek(), now()->endOfWeek()]);
-                    break;
-                case 'this_month':
-                    $query->whereMonth('workflow_completed_at', now()->month)
-                        ->whereYear('workflow_completed_at', now()->year);
-                    break;
-                case 'last_month':
-                    $query->whereMonth('workflow_completed_at', now()->subMonth()->month)
-                        ->whereYear('workflow_completed_at', now()->subMonth()->year);
-                    break;
-            }
+        $dateRange = $request->input('date_range', 'last_30_days');
+
+        if ($dateRange === 'custom' && $request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('workflow_completed_at', [
+                $request->start_date . ' 00:00:00',
+                $request->end_date . ' 23:59:59'
+            ]);
+        } elseif ($dateRange === 'last_30_days') {
+            $query->whereBetween('workflow_completed_at', [
+                now()->subDays(30)->startOfDay(),
+                now()->endOfDay()
+            ]);
+        } elseif ($dateRange === 'today') {
+            $query->whereDate('workflow_completed_at', today());
+        } elseif ($dateRange === 'this_week') {
+            $query->whereBetween('workflow_completed_at', [now()->startOfWeek(), now()->endOfWeek()]);
+        } elseif ($dateRange === 'this_month') {
+            $query->whereMonth('workflow_completed_at', now()->month)
+                ->whereYear('workflow_completed_at', now()->year);
+        } elseif ($dateRange === 'last_month') {
+            $query->whereMonth('workflow_completed_at', now()->subMonth()->month)
+                ->whereYear('workflow_completed_at', now()->subMonth()->year);
+        } elseif (is_numeric($dateRange) && strlen($dateRange) === 4) {
+            $query->whereYear('workflow_completed_at', $dateRange);
         }
 
         $tickets = $query->orderBy('workflow_completed_at', 'desc')
@@ -1599,7 +1606,10 @@ class ProductionQueueController extends Controller
 
         return Inertia::render('Production/CompletedTickets', [
             'tickets' => $tickets,
-            'filters' => $request->only(['search', 'date_range']),
+            'filters' => array_merge($request->only(['search', 'date_range', 'start_date', 'end_date', 'branch_id']), [
+                'date_range' => $dateRange
+            ]),
+            'branches' => \App\Models\Branch::all(['id', 'name']),
         ]);
     }
 

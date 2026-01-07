@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -9,11 +10,14 @@ import FormInput from "@/Components/Common/FormInput";
 import { formatDate } from "@/Utils/formatDate";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 import WorkflowTimeline from "@/Components/Production/WorkflowTimeline";
+import DateRangeFilter from "@/Components/Common/DateRangeFilter";
 
 const TeamMemberCell = ({ productionRecords }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [placement, setPlacement] = useState('bottom');
   const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
 
 
   const userWorkflows = {};
@@ -46,16 +50,73 @@ const TeamMemberCell = ({ productionRecords }) => {
 
   const totalMembers = userList.length;
 
-  const toggleDropdown = () => {
-    if (!isExpanded && buttonRef.current) {
+  const updatePosition = React.useCallback(() => {
+    if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setCoords({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX - 220 + rect.width
-      });
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const dropdownHeight = 350; // Max height from style
+      const dropdownWidth = 240;
+
+      let top = rect.bottom + 5;
+      let left = rect.left + rect.width - dropdownWidth;
+      let newPlacement = 'bottom';
+
+      // Check if it goes off bottom
+      if (top + dropdownHeight > viewportHeight) {
+        // If it can fit above, show it on top of the row
+        if (rect.top > dropdownHeight) {
+          top = rect.top - dropdownHeight - 5;
+          newPlacement = 'top';
+        } else {
+          // If it can't fit above either, try to center it vertically relative to viewport
+          // or just pull it up enough to be visible
+          top = Math.max(10, viewportHeight - dropdownHeight - 10);
+        }
+      }
+
+      // Ensure it doesn't go off left/right
+      if (left < 10) left = 10;
+      if (left + dropdownWidth > viewportWidth - 10) {
+        left = viewportWidth - dropdownWidth - 10;
+      }
+
+      setCoords({ top, left });
+      setPlacement(newPlacement);
+    }
+  }, []);
+
+  const toggleDropdown = () => {
+    if (!isExpanded) {
+      updatePosition();
     }
     setIsExpanded(!isExpanded);
   };
+
+  React.useEffect(() => {
+    if (!isExpanded) return;
+
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isExpanded, updatePosition]);
+
+  // Close on click outside
+  React.useEffect(() => {
+    if (!isExpanded) return;
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+        buttonRef.current && !buttonRef.current.contains(event.target)) {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isExpanded]);
 
   return (
     <div className="position-relative">
@@ -72,59 +133,54 @@ const TeamMemberCell = ({ productionRecords }) => {
       </button>
 
       {isExpanded &&
-        <>
-          {/* Backdrop to close on click outside */}
-          <div
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1040 }}
-            onClick={() => setIsExpanded(false)} />
+        <div
+          ref={dropdownRef}
+          className="card shadow-lg border p-3 animate-in fade-in zoom-in duration-200"
+          style={{
+            position: "fixed",
+            zIndex: 1050,
+            minWidth: "240px",
+            width: "240px",
+            left: `${coords.left}px`,
+            top: `${coords.top}px`,
+            backgroundColor: "#fff",
+            maxHeight: "350px",
+            overflowY: "auto",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+            borderRadius: "8px",
+            border: '1px solid #dee2e6'
+          }}>
 
-          <div
-            className="card shadow-lg border p-3"
-            style={{
-              position: "fixed",
-              zIndex: 1050,
-              minWidth: "240px",
-              left: `${coords.left}px`,
-              top: `${coords.top + 5}px`,
-              backgroundColor: "#fff",
-              maxHeight: "350px",
-              overflowY: "auto",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
-              borderRadius: "8px",
-              border: '1px solid #dee2e6'
-            }}>
-
-            <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
-              <span className="font-weight-bold text-primary" style={{ fontSize: "0.85rem" }}>
-                <i className="ti-user mr-1"></i> Team Production
-              </span>
-              <i
-                className="ti-close text-muted cursor-pointer"
-                style={{ fontSize: "0.8rem" }}
-                onClick={() => setIsExpanded(false)}>
-              </i>
-            </div>
-            {userList.map((u, idx) =>
-              <div key={idx} className="mb-3 pb-2 border-bottom last:border-0">
-                <div className="small font-weight-bold text-dark d-flex align-items-center mb-1" style={{ fontSize: "0.80rem" }}>
-                  {u.name}
-                </div>
-                <div className="mt-1">
-                  {Object.entries(u.steps).map(([step, qty], sIdx) =>
-                    <div key={sIdx} className="d-flex justify-content-between align-items-center ml-2 mb-1" style={{ fontSize: "0.7rem" }}>
-                      <span className="text-capitalize text-muted small mr-2">
-                        {step.replace(/_/g, " ")}:
-                      </span>
-                      <span className="badge badge-light border text-dark">
-                        <b>{qty}</b> pcs
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+          <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+            <span className="font-weight-bold text-primary" style={{ fontSize: "0.85rem" }}>
+              <i className="ti-user mr-1"></i> Team Production
+            </span>
+            <i
+              className="ti-close text-muted cursor-pointer"
+              style={{ fontSize: "0.8rem" }}
+              onClick={() => setIsExpanded(false)}>
+            </i>
           </div>
-        </>
+          {userList.map((u, idx) =>
+            <div key={idx} className="mb-3 pb-2 border-bottom last:border-0">
+              <div className="small font-weight-bold text-dark d-flex align-items-center mb-1" style={{ fontSize: "0.80rem" }}>
+                {u.name}
+              </div>
+              <div className="mt-1">
+                {Object.entries(u.steps).map(([step, qty], sIdx) =>
+                  <div key={sIdx} className="d-flex justify-content-between align-items-center ml-2 mb-1" style={{ fontSize: "0.7rem" }}>
+                    <span className="text-capitalize text-muted small mr-2">
+                      {step.replace(/_/g, " ")}:
+                    </span>
+                    <span className="badge badge-light border text-dark">
+                      <b>{qty}</b> pcs
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       }
     </div>);
 
@@ -135,7 +191,8 @@ export default function CompletedTickets({
   notifications = [],
   messages = [],
   tickets = { data: [] },
-  filters = {}
+  filters = {},
+  branches = []
 }) {
   const [openViewModal, setViewModalOpen] = useState(false);
   const [openTimelineModal, setTimelineModalOpen] = useState(false);
@@ -223,9 +280,25 @@ export default function CompletedTickets({
             <strong className="leading-tight">{row.ticket_number}</strong>
 
             {row.job_type && (
-              <span className="text-muted text-xs">
-                <strong>Type:</strong> {row.job_type.name}
-              </span>
+              <div className="text-muted text-xs d-flex align-items-center gap-2">
+                <span><strong>Type:</strong> {row.job_type.name}</span>
+                {row.selected_color && (
+                  <div className="d-flex align-items-center ml-2">
+                    <span
+                      className="badge badge-light border d-flex align-items-center gap-1 py-1 px-2 shadow-sm"
+                      style={{ fontSize: '9px', borderRadius: '12px', backgroundColor: '#f8f9fa' }}
+                    >
+                      <div
+                        className="rounded-circle border"
+                        style={{ width: '8px', height: '8px', backgroundColor: row.selected_color }}
+                      ></div>
+                      <span className="text-dark font-weight-bold">
+                        {getFullColorName(row.selected_color, row.job_type)}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
 
 
@@ -641,40 +714,24 @@ export default function CompletedTickets({
                     </div>
                     <div className="card-body">
                       <div className="row mt-4 align-items-center">
-                        <div className="col-md-6">
+                        <div className="col-md-4">
                           <SearchBox
                             placeholder="Search completed tickets..."
                             initialValue={filters.search || ""}
-                            route="/completed" />
+                            route="production/completed" />
 
                         </div>
-                        <div className="col-md-3">
-                          <FormInput
-                            label=""
-                            type="select"
-                            name="date_range"
-                            value={filters.date_range || "all"}
-                            onChange={(e) => {
-                              router.get(buildUrl("/completed"), {
-                                ...filters,
-                                date_range: e.target.value === "all" ? null : e.target.value
-                              }, {
-                                preserveState: false,
-                                preserveScroll: true
-                              });
-                            }}
-                            options={[
-                              { value: "all", label: "All Time" },
-                              { value: "today", label: "Today" },
-                              { value: "this_week", label: "This Week" },
-                              { value: "this_month", label: "This Month" },
-                              { value: "last_month", label: "Last Month" }]
-                            } />
+                        <div className="col-md-4 mb-4">
+                          <DateRangeFilter
+                            filters={filters}
+                            route="production/completed"
+                            buildUrl={buildUrl} />
 
                         </div>
-                        <div className="col-md-3 text-right">
+
+                        <div className="col-md-4 text-right">
                           <button
-                            onClick={() => router.reload()}
+                            onClick={() => router.visit('completed')}
                             className="btn btn-outline-success"
                             title="Refresh Data">
 
@@ -682,6 +739,55 @@ export default function CompletedTickets({
                           </button>
                         </div>
                       </div>
+
+                      {/* Active Filters Indicator */}
+                      {(filters.search || filters.status || filters.payment_status || filters.date_range) &&
+                        <div className="row mb-3 mt-3">
+                          <div className="col-12">
+                            <div className="alert alert-light border p-2 mb-0">
+                              <small className="text-muted mr-2">
+                                <i className="ti-filter mr-1"></i>
+                                <strong>Active Filters:</strong>
+                              </small>
+                              {filters.search &&
+                                <span className="badge badge-info mr-2">
+                                  Search: {filters.search}
+                                </span>
+                              }
+                              {filters.status &&
+                                <span className="badge badge-info mr-2">
+                                  Status: {filters.status}
+                                </span>
+                              }
+                              {filters.payment_status &&
+                                <span className="badge badge-info mr-2">
+                                  Payment: {filters.payment_status}
+                                </span>
+                              }
+                              {filters.date_range &&
+                                <span className="badge badge-primary mr-2">
+                                  <i className="ti-calendar mr-1"></i>
+                                  {filters.date_range === 'custom' ?
+                                    `Custom: ${filters.start_date} to ${filters.end_date}` :
+                                    filters.date_range.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                  }
+                                </span>
+                              }
+                              {filters.branch_id &&
+                                <span className="badge badge-info mr-2">
+                                  Branch: {branches?.find((b) => b.id == filters.branch_id)?.name}
+                                </span>
+                              }
+                              <button
+                                type="button"
+                                className="btn btn-link btn-sm text-danger p-0 ml-2"
+                                onClick={() => router.get(buildUrl("/production/completed"), { date_range: 'last_30_days' })}>
+                                Clear All
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      }
 
                       <div className="mt-4">
                         <DataTable

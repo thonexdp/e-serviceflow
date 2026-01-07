@@ -119,6 +119,7 @@ class PublicOrderController extends Controller
             'subtotal' => 'nullable|numeric|min:0',
             'total_amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:walkin,cash,gcash,bank_transfer,check,government_ar',
+            'selected_color' => 'nullable|string|max:50',
             'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'payment_proofs.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
@@ -128,6 +129,10 @@ class PublicOrderController extends Controller
             'custom_price_mode' => 'nullable|in:per_item,fixed_total',
             'custom_price_per_item' => 'nullable|numeric|min:0',
             'custom_fixed_total' => 'nullable|numeric|min:0',
+            // Discount fields
+            'original_price' => 'nullable|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'discount_amount' => 'nullable|numeric|min:0',
         ]);
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
@@ -162,12 +167,17 @@ class PublicOrderController extends Controller
             'description' => $validated['description'],
             'quantity' => $validated['quantity'],
             'free_quantity' => $validated['free_quantity'] ?? 0,
+            'selected_color' => $validated['selected_color'] ?? null,
             'due_date' => $validated['due_date'],
             'subtotal' => $validated['subtotal'] ?? 0,
             'total_amount' => $validated['total_amount'] ?? $validated['subtotal'] ?? 0,
             'payment_method' => $paymentMethod === 'walkin' ? 'cash' : $paymentMethod,
             'payment_status' => $paymentStatus,
             'status' => 'pending',
+            // Discount fields
+            'original_price' => $validated['original_price'] ?? null,
+            'discount_percentage' => $validated['discount_percentage'] ?? null,
+            'discount_amount' => $validated['discount_amount'] ?? null,
         ];
 
         // Handle job type based on category
@@ -200,6 +210,25 @@ class PublicOrderController extends Controller
 
         $this->applyPricing($ticketData, $request);
 
+        // Apply discount if provided (after applyPricing to ensure we have correct original price)
+        if (isset($validated['discount_percentage']) && $validated['discount_percentage'] > 0) {
+            // Store original price if not already set
+            if (empty($ticketData['original_price'])) {
+                $ticketData['original_price'] = $ticketData['total_amount'];
+            }
+            
+            // Calculate and apply discount
+            $discountPercentage = floatval($validated['discount_percentage']);
+            $originalAmount = floatval($ticketData['original_price']);
+            $discountAmount = $originalAmount * ($discountPercentage / 100);
+            $discountedAmount = $originalAmount - $discountAmount;
+            
+            // Update ticket data with discounted values
+            $ticketData['discount_percentage'] = $discountPercentage;
+            $ticketData['discount_amount'] = round($discountAmount, 2);
+            $ticketData['total_amount'] = round($discountedAmount, 2);
+            $ticketData['subtotal'] = round($discountedAmount, 2);
+        }
 
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 

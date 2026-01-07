@@ -34,6 +34,30 @@ export default function DateRangeFilter({ filters = {}, route, buildUrl = null }
     }
 
     switch (rangeType) {
+      case 'today':
+        return {
+          start_date: today.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        };
+      case 'this_week':
+        const firstDayOfWeek = new Date(today);
+        firstDayOfWeek.setDate(today.getDate() - today.getDay());
+        return {
+          start_date: firstDayOfWeek.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        };
+      case 'this_month':
+        return {
+          start_date: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        };
+      case 'last_month':
+        const lastMonthFirst = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastMonthLast = new Date(today.getFullYear(), today.getMonth(), 0);
+        return {
+          start_date: lastMonthFirst.toISOString().split('T')[0],
+          end_date: lastMonthLast.toISOString().split('T')[0]
+        };
       case 'last_30_days':
         const thirtyDaysAgo = new Date(today);
         thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -128,56 +152,60 @@ export default function DateRangeFilter({ filters = {}, route, buildUrl = null }
 
   return (
     <>
-            <div className="col-md-4">
-                <select
+      <div className="col-md-4">
+        <select
           className="form-control"
           value={dateRange}
           onChange={(e) => handleDateRangeChange(e.target.value)}
           title="Filter by date range">
 
-                    <option value="">All Dates</option>
-                    <option value="last_30_days">Last 30 Days</option>
-                    {filterYears.map((year) =>
-          <option key={year} value={year}>{year}</option>
+          <option value="">All Dates</option>
+          <option value="today">Today</option>
+          <option value="this_week">This Week</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="last_30_days">Last 30 Days</option>
+          {filterYears.map((year) =>
+            <option key={year} value={year}>{year}</option>
           )}
-                    <option value="custom">Custom Range</option>
-                </select>
+          <option value="custom">Custom Range</option>
+        </select>
+      </div>
+
+      {showCustomDateInputs &&
+        <div className="col-md-12 mt-3">
+          <div className="row align-items-center">
+            <div className="col-md-4">
+              <label className="mb-1">Start Date:</label>
+              <input
+                type="date"
+                className="form-control"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)} />
+
             </div>
+            <div className="col-md-4">
+              <label className="mb-1">End Date:</label>
+              <input
+                type="date"
+                className="form-control"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)} />
 
-            {showCustomDateInputs &&
-      <div className="col-md-12 mt-3">
-                    <div className="row align-items-center">
-                        <div className="col-md-4">
-                            <label className="mb-1">Start Date:</label>
-                            <input
-              type="date"
-              className="form-control"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)} />
+            </div>
+            <div className="col-md-4">
+              <label className="mb-1">&nbsp;</label>
+              <button
+                type="button"
+                className="btn btn-primary btn-block"
+                onClick={applyCustomDateRange}>
 
-                        </div>
-                        <div className="col-md-4">
-                            <label className="mb-1">End Date:</label>
-                            <input
-              type="date"
-              className="form-control"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)} />
-
-                        </div>
-                        <div className="col-md-4">
-                            <label className="mb-1">&nbsp;</label>
-                            <button
-              type="button"
-              className="btn btn-primary btn-block"
-              onClick={applyCustomDateRange}>
-
-                                Apply Custom Range
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                Apply Custom Range
+              </button>
+            </div>
+          </div>
+        </div>
       }
-        </>);
+    </>);
 
 }

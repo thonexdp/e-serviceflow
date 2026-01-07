@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 
 class StockManagementService
 {
-    
+
     public function recordMovement(
         StockItem $stockItem,
         string $movementType,
@@ -33,34 +33,34 @@ class StockManagementService
         ) {
             $stockBefore = $stockItem->current_stock;
 
-            
+
             if ($movementType === 'in') {
-                
+
                 $stockAfter = $stockBefore + abs($quantity);
             } elseif ($movementType === 'adjustment') {
-                
-                $stockAfter = $stockBefore + $quantity; 
-                $stockAfter = max(0, $stockAfter); 
+
+                $stockAfter = $stockBefore + $quantity;
+                $stockAfter = max(0, $stockAfter);
             } elseif ($movementType === 'out') {
                 $stockAfter = max(0, $stockBefore - abs($quantity));
             } else {
                 $stockAfter = $stockBefore;
             }
 
-            
+
             $cost = $unitCost ?? $stockItem->unit_cost;
             $totalCost = $cost * abs($quantity);
 
-            
+
             $stockItem->current_stock = $stockAfter;
             if ($unitCost && ($movementType === 'in')) {
-                
+
                 $totalValue = ($stockBefore * $stockItem->unit_cost) + $totalCost;
                 $stockItem->unit_cost = $stockAfter > 0 ? $totalValue / $stockAfter : $cost;
             }
             $stockItem->save();
 
-            
+
             return StockMovement::create([
                 'stock_item_id' => $stockItem->id,
                 'movement_type' => $movementType,
@@ -77,7 +77,7 @@ class StockManagementService
         });
     }
 
-    
+
     public function receivePurchaseOrderItems(PurchaseOrder $purchaseOrder, array $receivedItems): void
     {
         DB::transaction(function () use ($purchaseOrder, $receivedItems) {
@@ -85,16 +85,16 @@ class StockManagementService
                 $poItem = PurchaseOrderItem::findOrFail($itemData['id']);
                 $receivedQty = $itemData['received_quantity'] ?? $poItem->quantity;
 
-                
+
                 if ($receivedQty > $poItem->remaining_quantity) {
                     throw new \Exception("Received quantity cannot exceed remaining quantity for item {$poItem->stockItem->name}");
                 }
 
-                
+
                 $poItem->received_quantity += $receivedQty;
                 $poItem->save();
 
-                
+
                 $this->recordMovement(
                     $poItem->stockItem,
                     'in',
@@ -106,7 +106,7 @@ class StockManagementService
                 );
             }
 
-            
+
             if ($purchaseOrder->isFullyReceived()) {
                 $purchaseOrder->status = 'received';
                 $purchaseOrder->received_date = now();
@@ -118,7 +118,7 @@ class StockManagementService
         });
     }
 
-    
+
     public function consumeStockForProduction(
         int $ticketId,
         int $stockItemId,
@@ -132,7 +132,7 @@ class StockManagementService
         }
 
         DB::transaction(function () use ($ticketId, $stockItem, $quantity, $notes) {
-            
+
             \App\Models\ProductionStockConsumption::create([
                 'ticket_id' => $ticketId,
                 'stock_item_id' => $stockItem->id,
@@ -142,7 +142,7 @@ class StockManagementService
                 'notes' => $notes,
             ]);
 
-            
+
             $this->recordMovement(
                 $stockItem,
                 'out',
@@ -155,7 +155,7 @@ class StockManagementService
         });
     }
 
-    
+
     public function getLowStockItems()
     {
         return StockItem::where('is_active', true)
@@ -164,10 +164,10 @@ class StockManagementService
             ->get();
     }
 
-    
+
     public function autoConsumeStockForProduction(\App\Models\Ticket $ticket): array
     {
-        
+
         if (!$ticket->relationLoaded('jobType')) {
             $ticket->load('jobType');
         }
@@ -177,19 +177,26 @@ class StockManagementService
             return [];
         }
 
-        
+
         $stockRequirements = $ticket->jobType->stockRequirements()
             ->where('is_required', true)
             ->with('stockItem')
             ->get();
 
-        
+
         if ($stockRequirements->isEmpty()) {
             Log::info("No explicit stock requirements found for job type {$ticket->jobType->id} (Ticket {$ticket->id}). Checking for stock items linked to this job type...");
 
-            
-            $linkedStockItems = \App\Models\StockItem::where('job_type_id', $ticket->jobType->id)
-                ->where('is_active', true)
+            // Check for stock items linked via the new many-to-many relationship OR the old job_type_id
+            $linkedStockItems = \App\Models\StockItem::where('is_active', true)
+                ->where(function ($query) use ($ticket) {
+                    // Check old single job_type_id field
+                    $query->where('job_type_id', $ticket->jobType->id)
+                        // OR check new many-to-many jobTypes relationship
+                        ->orWhereHas('jobTypes', function ($q) use ($ticket) {
+                            $q->where('job_type_id', $ticket->jobType->id);
+                        });
+                })
                 ->get();
 
             if ($linkedStockItems->isEmpty()) {
@@ -197,11 +204,11 @@ class StockManagementService
                 return [];
             }
 
-            
+
             Log::info("Found {$linkedStockItems->count()} stock item(s) linked to job type {$ticket->jobType->id}. Creating requirements automatically...");
 
             foreach ($linkedStockItems as $stockItem) {
-                
+
                 $requirement = \App\Models\JobTypeStockRequirement::firstOrCreate(
                     [
                         'job_type_id' => $ticket->jobType->id,
@@ -216,7 +223,7 @@ class StockManagementService
                     ]
                 );
 
-                
+
                 $requirement->load('stockItem');
                 $stockRequirements->push($requirement);
             }
@@ -224,12 +231,12 @@ class StockManagementService
             Log::info("Created {$stockRequirements->count()} stock requirement(s) for job type {$ticket->jobType->id}.");
         }
 
-        
+
         $productionLength = null;
         $productionWidth = null;
 
         if ($ticket->size_value) {
-            
+
             if (preg_match('/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i', $ticket->size_value, $matches)) {
                 $productionLength = floatval($matches[1]);
                 $productionWidth = floatval($matches[2]);
@@ -253,28 +260,28 @@ class StockManagementService
                     continue;
                 }
 
-                
+
                 $requiredQuantity = 0;
-                $areaConsumed = 0; 
+                $areaConsumed = 0;
 
                 if ($stockItem->is_area_based) {
-                    
+
                     if ($productionLength && $productionWidth && $stockItem->length && $stockItem->width) {
-                        
+
                         $productionArea = $productionLength * $productionWidth;
                         $totalAreaNeeded = $productionArea * $ticket->quantity;
 
-                        
+
                         $stockArea = $stockItem->length * $stockItem->width;
 
-                        
-                        
+
+
                         $requiredQuantity = $totalAreaNeeded / $stockArea;
                         $areaConsumed = $totalAreaNeeded;
 
                         Log::info("Area-based calculation for '{$stockItem->name}': Production area = {$productionArea} sq.ft × {$ticket->quantity} = {$totalAreaNeeded} sq.ft. Stock area = {$stockArea} sq.ft. Required = {$requiredQuantity} pieces.");
                     } else {
-                        
+
                         $qtyPerUnit = $requirement->quantity_per_unit ?? 1;
                         $requiredQuantity = $qtyPerUnit * $ticket->quantity;
                         if ($stockItem->length && $stockItem->width) {
@@ -283,20 +290,20 @@ class StockManagementService
                         }
                     }
                 } else {
-                    
+
                     $qtyPerUnit = $requirement->quantity_per_unit ?? 1;
                     $requiredQuantity = $qtyPerUnit * $ticket->quantity;
                 }
 
                 if ($requiredQuantity <= 0) {
-                    
+
                     continue;
                 }
 
-                
+
                 $stockItem->refresh();
 
-                
+
                 if ($stockItem->is_area_based && $areaConsumed > 0) {
                     $availableArea = $stockItem->current_stock * ($stockItem->length * $stockItem->width);
                     if ($availableArea < $areaConsumed) {
@@ -304,25 +311,25 @@ class StockManagementService
                         continue;
                     }
                 } else {
-                    
+
                     if ($stockItem->current_stock < $requiredQuantity) {
                         $errors[] = "Insufficient stock for '{$stockItem->name}'. Available: {$stockItem->current_stock}, Required: {$requiredQuantity}";
                         continue;
                     }
                 }
 
-                
+
                 $existingConsumption = \App\Models\ProductionStockConsumption::where('ticket_id', $ticket->id)
                     ->where('stock_item_id', $stockItem->id)
                     ->first();
 
                 if ($existingConsumption) {
-                    
+
                     Log::info("Stock already consumed for ticket {$ticket->id}, stock item {$stockItem->id}");
                     continue;
                 }
 
-                
+
                 $consumptionNotes = "Auto-consumed based on job type requirements";
                 if ($stockItem->is_area_based && $areaConsumed > 0) {
                     $consumptionNotes .= " (Area: " . number_format($areaConsumed, 2) . " sq.ft)";
@@ -337,8 +344,8 @@ class StockManagementService
                     'notes' => $consumptionNotes,
                 ]);
 
-                
-                
+
+
                 $movementNotes = "Auto-consumed for production (Ticket: {$ticket->ticket_number})";
                 if ($stockItem->is_area_based && $areaConsumed > 0) {
                     $movementNotes .= " - Area: " . number_format($areaConsumed, 2) . " sq.ft";
@@ -357,13 +364,13 @@ class StockManagementService
                 $consumptions[] = $consumption;
             }
 
-            
-            if (!empty($errors) && empty($consumptions)) {
-                throw new \Exception(implode(' ', $errors));
-            }
+
+            // if (!empty($errors) && empty($consumptions)) {
+            //     throw new \Exception(implode(' ', $errors));
+            // }
         });
 
-        
+
         if (!empty($errors)) {
             Log::warning("Auto-consumption warnings for ticket {$ticket->id}: " . implode(' ', $errors));
         }

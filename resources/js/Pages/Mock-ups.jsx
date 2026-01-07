@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
@@ -14,12 +15,14 @@ export default function Mockups({
   notifications = [],
   messages = [],
   tickets = { data: [] },
-  filters = {}
+  filters = {},
+  branches = []
 }) {
   const [openReviewModal, setReviewModalOpen] = useState(false);
   const [openUploadModal, setUploadModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
   const [uploadFiles, setUploadFiles] = useState([]);
   const [dateRange, setDateRange] = useState(filters.date_range || "");
 
@@ -51,6 +54,7 @@ export default function Mockups({
     setUploadFiles([]);
     setNotes("");
     setShowRevisionNotes(false);
+    setSelectedPreviewFile(null);
   };
 
   const handleFileSelect = (e) => {
@@ -316,7 +320,26 @@ export default function Mockups({
       render: (row, index) =>
         (tickets.current_page - 1) * tickets.per_page + index + 1
     },
-    { label: "Ticket ID", key: "ticket_number" },
+    {
+      label: "Ticket / Preview",
+      key: "ticket_number",
+      render: (row) => (
+        <div className="d-flex align-items-center">
+          {row.mockup_files && row.mockup_files.length > 0 && (
+            <img
+              src={row.mockup_files[row.mockup_files.length - 1].file_path}
+              alt="Preview"
+              className="img-thumbnail mr-2"
+              style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
+              onClick={() => setSelectedPreviewFile(row.mockup_files[row.mockup_files.length - 1])}
+            />
+          )}
+          <div className="flex flex-col leading-tight">
+            <strong className="leading-tight">{row.ticket_number}</strong>
+          </div>
+        </div>
+      )
+    },
     {
       label: "Customer",
       key: "customer",
@@ -331,8 +354,24 @@ export default function Mockups({
       render: (row) => (
         <div>
           {row.job_type && (
-            <div className="text-muted small mb-1">
-              <strong>Type:</strong> {row.job_type.name}
+            <div className="text-muted small mb-1 d-flex align-items-center gap-2">
+              <span><strong>Type:</strong> {row.job_type.name}</span>
+              {row.selected_color && (
+                <div className="d-flex align-items-center ml-2">
+                  <span
+                    className="badge badge-light border d-flex align-items-center gap-1 py-1 px-2 shadow-sm"
+                    style={{ fontSize: '9px', borderRadius: '12px', backgroundColor: '#f8f9fa' }}
+                  >
+                    <div
+                      className="rounded-circle border"
+                      style={{ width: '8px', height: '8px', backgroundColor: row.selected_color }}
+                    ></div>
+                    <span className="text-dark font-weight-bold">
+                      {getFullColorName(row.selected_color, row.job_type)}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <div>{row.description}</div>
@@ -795,14 +834,14 @@ export default function Mockups({
                         <p className="mb-2 text-sm text-gray-500">
                           <span className="font-semibold">Click to upload Design</span> or drag and drop
                         </p>
-                        <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
+                        <p className="text-xs text-gray-500">PNG, JPG, up to 10MB</p>
                       </div>
                       <input
                         id="dropzone-file"
                         type="file"
                         className="hidden"
                         multiple
-                        accept="image/*,.pdf"
+                        accept="image/*"
                         onChange={handleFileSelect} />
 
                     </label>
@@ -881,6 +920,42 @@ export default function Mockups({
         }
       </Modal>
 
+      {/* Image Preview Modal */}
+      <Modal
+        title="Design File Preview"
+        isOpen={!!selectedPreviewFile}
+        onClose={() => setSelectedPreviewFile(null)}
+        size="4xl">
+        {selectedPreviewFile && (
+          <div className="text-center">
+            <img
+              src={selectedPreviewFile.file_path}
+              alt={selectedPreviewFile.file_name}
+              className="img-fluid"
+              style={{ maxHeight: '70vh' }}
+            />
+            <div className="mt-3 text-left">
+              <p className="mb-1"><strong>Filename:</strong> {selectedPreviewFile.file_name}</p>
+              <p className="mb-0"><strong>Uploaded:</strong> {new Date(selectedPreviewFile.created_at).toLocaleString()}</p>
+            </div>
+            <div className="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedPreviewFile(null)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => handleDownload(selectedPreviewFile.id, selectedPreviewFile.file_name)}>
+                <i className="ti-download mr-2"></i>Download
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <section id="main-content">
         <div className="content-wrap">
           <div className="main">
@@ -897,17 +972,16 @@ export default function Mockups({
                           <SearchBox
                             placeholder="Search tickets..."
                             initialValue={filters.search || ""}
-                            route="/mock-ups" />
-
+                            route="mock-ups" />
                         </div>
-                        <div className="col-md-4">
+                        <div className="col-md-3">
                           <FormInput
                             label=""
                             type="select"
                             name="design_status"
                             value={filters.design_status || "all"}
                             onChange={(e) => {
-                              router.get(buildUrl("/mock-ups"), {
+                              router.get(buildUrl("mock-ups"), {
                                 ...filters,
                                 design_status: e.target.value === "all" ? null : e.target.value
                               }, {
@@ -921,20 +995,70 @@ export default function Mockups({
                               { value: "in_review", label: "In Review" },
                               { value: "revision_requested", label: "Revision Requested" },
                               { value: "mockup_uploaded", label: "Mock-up Uploaded" },
-                              { value: "approved", label: "Approved" }]
-                            } />
-
+                              { value: "approved", label: "Approved" }
+                            ]}
+                          />
                         </div>
-                        <div className="col-md-5 text-right">
+                        <div className="col-md-4 mb-4">
+                          <DateRangeFilter
+                            filters={filters}
+                            route="mock-ups"
+                            buildUrl={buildUrl}
+                          />
+                        </div>
+                        <div className="col-md-2 text-right">
                           <button
                             onClick={() => router.reload()}
-                            className="btn btn-outline-primary"
+                            className="btn btn-outline-primary btn-sm"
                             title="Refresh Data">
-
-                            <i className="ti-reload mr-2"></i> Refresh
+                            <i className="ti-reload mr-1"></i> Refresh
                           </button>
                         </div>
                       </div>
+
+                      {/* Active Filters Indicator */}
+                      {(filters.search || filters.design_status || filters.date_range || filters.branch_id) &&
+                        <div className="row mb-3 mt-3">
+                          <div className="col-12">
+                            <div className="alert alert-light border p-2 mb-0">
+                              <small className="text-muted mr-2">
+                                <i className="ti-filter mr-1"></i>
+                                <strong>Active Filters:</strong>
+                              </small>
+                              {filters.search &&
+                                <span className="badge badge-info mr-2">
+                                  Search: {filters.search}
+                                </span>
+                              }
+                              {filters.design_status &&
+                                <span className="badge badge-info mr-2 text-capitalize">
+                                  Status: {filters.design_status.replace(/_/g, " ")}
+                                </span>
+                              }
+                              {filters.date_range &&
+                                <span className="badge badge-primary mr-2">
+                                  <i className="ti-calendar mr-1"></i>
+                                  {filters.date_range === 'custom' ?
+                                    `Custom: ${filters.start_date} to ${filters.end_date}` :
+                                    filters.date_range.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                  }
+                                </span>
+                              }
+                              {filters.branch_id &&
+                                <span className="badge badge-info mr-2">
+                                  Branch: {branches?.find((b) => b.id == filters.branch_id)?.name}
+                                </span>
+                              }
+                              <button
+                                type="button"
+                                className="btn btn-link btn-sm text-danger p-0 ml-2"
+                                onClick={() => router.get(buildUrl("mock-ups"), {})}>
+                                Clear All
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      }
 
                       <div className="mt-4">
                         <DataTable

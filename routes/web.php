@@ -224,6 +224,8 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
 
 Route::middleware('auth')->group(function () {
     Route::put('/user/password', [ProfileController::class, 'updatePassword'])->name('user.password.update');
+    Route::get('/delivery-receipts', [TicketController::class, 'deliveryReceipts'])->name('delivery-receipts.index');
+    Route::get('/api/tickets/search', [TicketController::class, 'searchByTicketNumber'])->name('api.tickets.search');
 });
 
 Route::prefix('frontdesk')->middleware(['auth', 'role:admin,FrontDesk'])->name('frontdesk.')->group(function () {

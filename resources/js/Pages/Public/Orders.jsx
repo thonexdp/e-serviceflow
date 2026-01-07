@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { router, usePage } from "@inertiajs/react";
 import { formatPeso } from "@/Utils/currency";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 
 export default function CustomerPOSOrder() {
   const { jobCategories = [], branches = [] } = usePage().props;
@@ -34,7 +35,8 @@ export default function CustomerPOSOrder() {
     custom_job_type_description: "",
     custom_price_mode: "per_item", // 'per_item' or 'fixed_total'
     custom_price_per_item: "",
-    custom_fixed_total: ""
+    custom_fixed_total: "",
+    selected_color: ""
   });
 
   const [designFiles, setDesignFiles] = useState([]);
@@ -63,8 +65,14 @@ export default function CustomerPOSOrder() {
   const [paymentProofError, setPaymentProofError] = useState("");
   const designFileInputRef = useRef(null);
   const paymentProofInputRef = useRef(null);
+  const serviceTypeSectionRef = useRef(null);
 
-  const MAX_RETRIES = 1;
+  // Discount tracking
+  const [originalPrice, setOriginalPrice] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+
+  const MAX_RETRIES = 3;
 
   // Phone normalization helper
   const normalizePhone = (phone) => {
@@ -201,7 +209,6 @@ export default function CustomerPOSOrder() {
           // Show restoration banner
           setShowRestoredBanner(true);
 
-          console.log("Order progress restored from localStorage (including files)");
         } else {
           // Data is too old, clear it
           localStorage.removeItem("rc_printshop_order_progress");
@@ -300,6 +307,22 @@ export default function CustomerPOSOrder() {
     return category?.job_types || category?.jobTypes || [];
   }, [formData.category_id, jobCategories]);
 
+
+
+
+  // Scroll to service type section when category changes
+  useEffect(() => {
+    if (formData.category_id && availableJobTypes.length > 0 && serviceTypeSectionRef.current) {
+      // Delay scroll to allow DOM to update
+      setTimeout(() => {
+        serviceTypeSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 100);
+    }
+  }, [formData.category_id, availableJobTypes.length]);
+
   useEffect(() => {
     if (formData.job_type_id) {
       const jobType = availableJobTypes.find(
@@ -383,6 +406,23 @@ export default function CustomerPOSOrder() {
       calculated = (parseFloat(selectedJobType.price) || 0) * quantity;
     }
 
+    // Store original price before discount
+    setOriginalPrice(calculated);
+
+    // Apply discount if available
+    const discount = selectedJobType.discount_percentage || selectedJobType.discount || 0;
+    const discountValue = parseFloat(discount);
+
+    if (discountValue > 0) {
+      const discountAmountCalc = calculated * (discountValue / 100);
+      setDiscountAmount(discountAmountCalc);
+      setDiscountPercentage(discountValue);
+      calculated = calculated - discountAmountCalc;
+    } else {
+      setDiscountAmount(0);
+      setDiscountPercentage(0);
+    }
+
     setSubtotal(calculated);
 
     const promoRules = selectedJobType.promo_rules || [];
@@ -443,6 +483,11 @@ export default function CustomerPOSOrder() {
 
     setSubtotal(calculated);
     setFormData((prev) => ({ ...prev, free_quantity: 0 }));
+
+    // Reset discount for custom orders
+    setOriginalPrice(calculated);
+    setDiscountAmount(0);
+    setDiscountPercentage(0);
   }, [
     formData.category_id,
     formData.quantity,
@@ -680,7 +725,6 @@ export default function CustomerPOSOrder() {
       setErrors({});
       setDesignFileError("");
       setPaymentProofError("");
-      console.log("Saved progress cleared");
     } catch (e) {
       console.error("Error clearing saved progress:", e);
     }
@@ -843,6 +887,13 @@ export default function CustomerPOSOrder() {
       orderData.append("due_date", formData.due_date);
       orderData.append("subtotal", subtotal.toFixed(2));
       orderData.append("total_amount", subtotal.toFixed(2));
+      
+      // Append discount information if applicable
+      if (discountPercentage > 0) {
+        orderData.append("original_price", originalPrice.toFixed(2));
+        orderData.append("discount_percentage", discountPercentage.toString());
+        orderData.append("discount_amount", discountAmount.toFixed(2));
+      }
 
       // Append Others category fields
       if (formData.category_id === "others") {
@@ -873,6 +924,9 @@ export default function CustomerPOSOrder() {
       }
       if (formData.size_height) {
         orderData.append("size_height", formData.size_height);
+      }
+      if (formData.selected_color) {
+        orderData.append("selected_color", formData.selected_color);
       }
 
       designFiles.forEach((designFile) => {
@@ -1286,20 +1340,20 @@ export default function CustomerPOSOrder() {
     return { field: friendlyFieldName, message: friendlyMessage };
   };
 
-  const canProceedStep1 =
+  const canProceedCustomer =
     formData.customer_firstname &&
     formData.customer_lastname &&
     formData.customer_phone &&
     formData.customer_facebook &&
     formData.branch_id;
-  const canProceedStep2 =
+  const canProceedService =
     formData.category_id &&
     (formData.category_id === "others"
       ? formData.custom_job_type_description
       : formData.job_type_id) &&
     parseInt(formData.quantity) > 0;
   const hasInvalidDesignFiles = designFiles.some((f) => f.invalid);
-  const canProceedStep3 =
+  const canProceedDesign =
     formData.description && formData.due_date && !hasInvalidDesignFiles;
 
   const priceTiers = selectedJobType?.price_tiers || [];
@@ -1409,59 +1463,59 @@ export default function CustomerPOSOrder() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                  <img
-                    src="/images/logo.jpg"
-                    alt="RC PrintShoppe"
-                    className="w-12 h-12 rounded-full"
-                  />
-                </div>
-                <div
-                  onClick={() =>
-                    router.visit("/", {
-                      preserveState: true,
-                      preserveScroll: true,
-                      replace: true,
-                    })
-                  }
-                >
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    RC PrintShoppe
-                  </h1>
-                  <p className="text-sm text-gray-600">
-                    Click here to track your order
-                  </p>
-                </div>
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          {/* Header section */}
+          <div className="flex items-center justify-between mb-3 sm:mb-0">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center">
+                <img
+                  src="/images/logo.png"
+                  alt="RC PrintShoppe"
+                  className="w212 h212 rounded-full"
+                />
+              </div>
+              <div
+                onClick={() =>
+                  router.visit("/", {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                  })
+                }
+                className="cursor-pointer"
+              >
+                <h1 className="text-base sm:text-xl font-bold text-gray-900">
+                  RC Printshoppe
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600">
+                  Click here to track your order
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* Step Indicator */}
-            <div className="hidden sm:flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div key={step} className="flex items-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStep >= step
-                      ? "bg-orange-600 text-white"
-                      : "bg-gray-200 text-gray-500"
-                      }`}
-                  >
-                    {step}
-                  </div>
-                  {step < 5 && (
-                    <div
-                      className={`w-8 h-0.5 ${currentStep > step
-                        ? "bg-orange-600"
-                        : "bg-gray-200"
-                        }`}
-                    />
-                  )}
+          {/* Step Indicator - Now visible on mobile */}
+          <div className="flex items-center justify-center gap-1 sm:gap-2 mt-2 sm:mt-3">
+            {[1, 2, 3, 4, 5].map((step) => (
+              <div key={step} className="flex items-center">
+                <div
+                  className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold transition-all ${currentStep >= step
+                    ? "bg-orange-600 text-white"
+                    : "bg-gray-200 text-gray-500"
+                    }`}
+                >
+                  {step}
                 </div>
-              ))}
-            </div>
+                {step < 5 && (
+                  <div
+                    className={`w-4 sm:w-8 h-0.5 transition-all ${currentStep > step
+                      ? "bg-orange-600"
+                      : "bg-gray-200"
+                      }`}
+                  />
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -1522,8 +1576,8 @@ export default function CustomerPOSOrder() {
           </div>
         )}
 
-        {/* Step 1: Customer Info */}
-        {currentStep === 1 && (
+        {/* Step 3: Customer Information */}
+        {currentStep === 3 && (
           <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1541,10 +1595,10 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
                 Customer Information
               </h2>
-              <p className="text-gray-500 mt-2">
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
                 Let us know how to reach you
               </p>
             </div>
@@ -1553,7 +1607,7 @@ export default function CustomerPOSOrder() {
               {/* Name Fields - Side by side on desktop, stacked on mobile */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     First Name *
                   </label>
                   <input
@@ -1572,7 +1626,7 @@ export default function CustomerPOSOrder() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Last Name *
                   </label>
                   <input
@@ -1592,7 +1646,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
                 <input
@@ -1612,7 +1666,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Facebook *
                 </label>
                 <input
@@ -1635,7 +1689,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Email Address (optional)
                 </label>
                 <input
@@ -1685,10 +1739,10 @@ export default function CustomerPOSOrder() {
                         />
                       </svg>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                        <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-1">
                           This email was used before
                         </p>
-                        <p className="text-sm text-blue-800 mb-2">
+                        <p className="text-xs sm:text-sm text-blue-800 mb-2">
                           Customer:{" "}
                           <strong>
                             {
@@ -1699,7 +1753,7 @@ export default function CustomerPOSOrder() {
                             }
                           </strong>
                         </p>
-                        <p className="text-xs text-blue-700 mb-3">
+                        <p className="text-[10px] sm:text-xs text-blue-700 mb-3 leading-tight">
                           Do you want to use the
                           existing customer data?
                         </p>
@@ -1709,7 +1763,7 @@ export default function CustomerPOSOrder() {
                             onClick={
                               acceptEmailSuggestion
                             }
-                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-3 py-1.5 bg-blue-600 text-white text-[11px] sm:text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
                           >
                             Yes, use this data
                           </button>
@@ -1718,7 +1772,7 @@ export default function CustomerPOSOrder() {
                             onClick={
                               dismissEmailSuggestion
                             }
-                            className="px-4 py-2 bg-white text-blue-700 text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+                            className="px-3 py-1.5 bg-white text-blue-700 text-[11px] sm:text-sm font-medium border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
                           >
                             No, continue with new
                           </button>
@@ -1730,7 +1784,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Address (optional)
                 </label>
                 <textarea
@@ -1748,7 +1802,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Select Branch *
                 </label>
                 <select
@@ -1783,22 +1837,30 @@ export default function CustomerPOSOrder() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setCurrentStep(2)}
-                disabled={!canProceedStep1}
-                className={`w-full py-4 rounded-lg font-semibold text-white transition-all ${canProceedStep1
-                  ? "bg-orange-600 hover:bg-orange-700 shadow-lg hover:shadow-xl"
-                  : "bg-gray-300 cursor-not-allowed"
-                  }`}
-              >
-                Continue →
-              </button>
+              <div className="flex gap-2 sm:gap-3">
+                <button
+                  onClick={() => setCurrentStep(2)}
+                  className="flex-1 py-3 sm:py-4 rounded-lg border-2 border-gray-300 font-semibold text-sm sm:text-base text-gray-700 hover:bg-gray-50 transition-all"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={() => setCurrentStep(4)}
+                  disabled={!canProceedCustomer}
+                  className={`flex-1 py-3 sm:py-4 rounded-lg font-semibold text-sm sm:text-base text-white transition-all ${canProceedCustomer
+                    ? "bg-orange-600 hover:bg-orange-700 shadow-lg"
+                    : "bg-gray-300 cursor-not-allowed"
+                    }`}
+                >
+                  Continue →
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Step 2: Select Service */}
-        {currentStep === 2 && (
+        {/* Step 1: Select Service */}
+        {currentStep === 1 && (
           <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1816,25 +1878,27 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Select Your Service
+              <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
+                Service Selection
               </h2>
-              <p className="text-gray-500 mt-2">
-                Choose what you need
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+                Choose the type of service you need
               </p>
             </div>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
                   Category
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {jobCategories.map((category) => {
                     const jobTypes =
                       category.job_types ||
                       category.jobTypes ||
                       [];
+                    const isSelected = formData.category_id === category.id.toString();
+
                     return (
                       <button
                         key={category.id}
@@ -1846,49 +1910,100 @@ export default function CustomerPOSOrder() {
                             job_type_id: "",
                           }))
                         }
-                        className={`p-4 rounded-lg border-2 transition-all ${formData.category_id ===
-                          category.id.toString()
-                          ? "border-orange-600 bg-orange-50"
-                          : "border-gray-200 hover:border-orange-300"
+                        className={`group relative flex flex-row items-center p-3 rounded-2xl border-2 transition-all duration-300 ${isSelected
+                          ? "border-orange-500 bg-orange-50 shadow-md transform scale-[1.01]"
+                          : "border-gray-100 bg-white hover:border-orange-200 hover:shadow-sm"
                           }`}
                       >
-                        <p className="font-semibold text-gray-900">
-                          {category.name}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {jobTypes.length} services
-                        </p>
+                        {/* Image Container */}
+                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden mr-4 bg-gray-50 border flex-shrink-0 transition-all duration-300 ${isSelected ? "border-orange-200" : "border-gray-100 group-hover:border-orange-100"
+                          }`}>
+                          {category.image_path ? (
+                            <img
+                              src={category.image_path.replace('/storage/storage/', '/storage/')}
+                              alt={category.name}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                              <i className="ti-image text-xl mb-1"></i>
+                              <span className="text-[10px] font-medium uppercase tracking-wider">{category.name.substring(0, 2)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 text-left">
+                          <p className={`font-bold text-sm sm:text-base transition-colors ${isSelected ? "text-orange-900" : "text-gray-700 group-hover:text-orange-600"
+                            }`}>
+                            {category.name}
+                          </p>
+                          <p className="text-[11px] sm:text-xs text-gray-500 mt-1 font-medium">
+                            {jobTypes.length} services available
+                          </p>
+                        </div>
+
+                        {/* Selection Badge */}
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-sm z-10 animate-scaleIn">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
                       </button>
                     );
                   })}
+
+                  {/* Others/Custom Category */}
                   <button
                     onClick={() =>
                       setFormData((prev) => ({
                         ...prev,
                         category_id: "others",
                         job_type_id: "",
-                        // Reset other custom fields when switching to others
                         custom_job_type_description: "",
                         custom_price_mode: "per_item",
                         custom_price_per_item: "",
                         custom_fixed_total: ""
                       }))
                     }
-                    className={`p-4 rounded-lg border-2 transition-all ${formData.category_id === "others"
-                      ? "border-orange-600 bg-orange-50"
-                      : "border-gray-200 hover:border-orange-300"
+                    className={`group relative flex flex-row items-center p-3 rounded-2xl border-2 transition-all duration-300 ${formData.category_id === "others"
+                      ? "border-orange-500 bg-orange-50 shadow-md transform scale-[1.01]"
+                      : "border-gray-100 bg-white hover:border-orange-200 hover:shadow-sm"
                       }`}
                   >
-                    <p className="font-semibold text-gray-900">
-                      Others (Custom)
-                    </p>
+                    <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden mr-4 bg-gray-50 border flex-shrink-0 flex items-center justify-center transition-all duration-300 ${formData.category_id === "others" ? "border-orange-200" : "border-gray-100 group-hover:border-orange-100"
+                      }`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${formData.category_id === "others" ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-400 group-hover:bg-orange-50 group-hover:text-orange-400"
+                        }`}>
+                        <i className="ti-layers-alt text-xl"></i>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 text-left">
+                      <p className={`font-bold text-sm sm:text-base transition-colors ${formData.category_id === "others" ? "text-orange-900" : "text-gray-700 group-hover:text-orange-600"
+                        }`}>
+                        Others
+                      </p>
+                      <p className="text-[11px] sm:text-xs text-gray-500 mt-1 font-medium">
+                        Custom Order
+                      </p>
+                    </div>
+
+                    {formData.category_id === "others" && (
+                      <div className="absolute top-2 right-2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-sm z-10 animate-scaleIn">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
                   </button>
                 </div>
               </div>
 
               {availableJobTypes.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                <div ref={serviceTypeSectionRef}>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
                     Service Type
                   </label>
                   <div className="space-y-3">
@@ -1899,122 +2014,433 @@ export default function CustomerPOSOrder() {
                       const hasPriceTiers =
                         (jobType.price_tiers || [])
                           .length > 0;
+                      const isSelected = formData.job_type_id === jobType.id.toString();
+                      const promoRules = jobType.promo_rules || [];
+                      const hasPromoRules = promoRules.length > 0;
+                      const hasActivePromo = promoRules.some(r => r.is_active);
+                      const discountPercentage = jobType.discount_percentage || jobType.discount || null;
+                      const hasDiscount = discountPercentage && parseFloat(discountPercentage) > 0;
+                      const priceTiers = jobType.price_tiers || [];
+                      const sizeRates = jobType.size_rates || [];
+
                       return (
-                        <button
-                          key={jobType.id}
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              job_type_id:
-                                jobType.id.toString(),
-                            }))
-                          }
-                          className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.job_type_id ===
-                            jobType.id.toString()
-                            ? "border-orange-600 bg-orange-50 shadow-sm"
-                            : "border-gray-100 hover:border-orange-300 hover:bg-gray-50"
-                            }`}
-                        >
-                          <div className="flex gap-4 items-center">
-                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
-                              <img
-                                src={
-                                  jobType.image_path ||
-                                  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(
-                                    jobType.name
-                                      .substring(
-                                        0,
-                                        2
-                                      )
-                                      .toUpperCase()
-                                  )}%3C/text%3E%3C/svg%3E`
-                                }
-                                alt={
-                                  jobType.name
-                                }
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                onError={(
-                                  e
-                                ) => {
-                                  e.target.onerror =
-                                    null;
-                                  e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
-                                }}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <p className="font-normal text-gray-900">
-                                    {
-                                      jobType.name
-                                    }
-                                  </p>
-                                  {jobType.description && (
-                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                      {
-                                        jobType.description
-                                      }
-                                    </p>
-                                  )}
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {jobType.promo_text && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
-                                        🎁
-                                        Promo
+                        <div key={jobType.id} className="space-y-3">
+                          <button
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                job_type_id:
+                                  jobType.id.toString(),
+                              }))
+                            }
+                            className={`relative w-full p-3 rounded-xl border-2 text-left transition-all overflow-hidden ${isSelected
+                              ? "border-orange-600 bg-orange-50 shadow-sm"
+                              : "border-gray-100 hover:border-orange-300 hover:bg-gray-50"
+                              }`}
+                          >
+                            {/* Discount/Promo Corner Ribbons */}
+                            {hasDiscount && (
+                              <div className="absolute top-0 right-0 z-10">
+                                <div className="relative">
+                                  <div className="bg-gradient-to-br from-red-500 to-red-600 text-white px-3 py-1 rounded-bl-lg shadow-lg animate-pulse">
+                                    <div className="flex items-center gap-1">
+                                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                      <span className="text-xs font-black tracking-tight">
+                                        {parseFloat(parseFloat(discountPercentage).toFixed(2))}% OFF
                                       </span>
-                                    )}
-                                    {hasPriceTiers && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
-                                        📊
-                                        Bulk
-                                      </span>
-                                    )}
-                                    {hasSizeRates && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
-                                        📐
-                                        Size
-                                      </span>
-                                    )}
+                                    </div>
                                   </div>
+                                  {/* Corner fold effect */}
+                                  <div className="absolute -bottom-1 right-0 w-0 h-0 border-l-[12px] border-l-transparent border-t-[8px] border-t-red-800 opacity-40"></div>
                                 </div>
-                                {!hasSizeRates &&
-                                  !hasPriceTiers && (
-                                    <span className="text-orange-600 font-bold text-lg">
-                                      {formatPeso(
-                                        parseFloat(
-                                          jobType.price ||
-                                          0
-                                        ).toFixed(
+                              </div>
+                            )}
+
+                            {hasActivePromo && !hasDiscount && (
+                              <div className="absolute top-0 right-0 z-10">
+                                <div className="relative">
+                                  <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white px-3 py-1 rounded-bl-lg shadow-lg">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs">🎁</span>
+                                      <span className="text-xs font-black tracking-tight uppercase">
+                                        Promo!
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {/* Corner fold effect */}
+                                  <div className="absolute -bottom-1 right-0 w-0 h-0 border-l-[12px] border-l-transparent border-t-[8px] border-t-emerald-800 opacity-40"></div>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex gap-4 items-center">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100 shadow-sm">
+                                <img
+                                  src={
+                                    (jobType.image_path ? jobType.image_path.replace('/storage/storage/', '/storage/') : null) ||
+                                    `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3E${encodeURIComponent(
+                                      jobType.name
+                                        .substring(
+                                          0,
                                           2
                                         )
+                                        .toUpperCase()
+                                    )}%3C/text%3E%3C/svg%3E`
+                                  }
+                                  alt={
+                                    jobType.name
+                                  }
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(
+                                    e
+                                  ) => {
+                                    e.target.onerror =
+                                      null;
+                                    e.target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af'%3ENA%3C/text%3E%3C/svg%3E`;
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex-1 pr-2">
+                                    <p className="font-normal text-gray-900">
+                                      {
+                                        jobType.name
+                                      }
+                                    </p>
+                                    {jobType.description && (
+                                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                        {
+                                          jobType.description
+                                        }
+                                      </p>
+                                    )}
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {/* Show discount badge in tags too */}
+                                      {hasDiscount && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300 animate-pulse">
+                                          💥 {parseFloat(parseFloat(discountPercentage).toFixed(2))}% OFF
+                                        </span>
                                       )}
-                                    </span>
-                                  )}
-                                {(hasSizeRates ||
-                                  hasPriceTiers) && (
-                                    <span className="text-orange-600 text-xs mt-1 italic">
-                                      Price Starts
-                                      at{" "}
-                                      <div className="text-lg font-bold">
-                                        {formatPeso(
-                                          parseFloat(
-                                            jobType.price ||
-                                            0
-                                          ).toFixed(
-                                            2
-                                          )
-                                        )}
+                                      {hasActivePromo && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gradient-to-r from-green-100 to-emerald-200 text-green-800 border border-green-300">
+                                          🎁 PROMO
+                                        </span>
+                                      )}
+                                      {jobType.brochure_link && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wider">
+                                          📄 Brochure
+                                        </span>
+                                      )}
+                                      {jobType.has_colors && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-100 text-pink-700 uppercase tracking-wider">
+                                          🎨 {jobType.available_colors?.length || 0} Colors
+                                        </span>
+                                      )}
+                                      {jobType.promo_text && !hasActivePromo && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                                          🎁
+                                          Promo
+                                        </span>
+                                      )}
+                                      {hasPriceTiers && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-800">
+                                          📊
+                                          Bulk
+                                        </span>
+                                      )}
+                                      {hasSizeRates && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
+                                          📐
+                                          Size
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {/* Price section - with spacing to avoid ribbon overlap */}
+                                  <div className={`flex-shrink-0 ${(hasDiscount || hasActivePromo) ? 'mt-3 sm:mr-0' : ''}`}>
+                                    {!hasSizeRates &&
+                                      !hasPriceTiers && (
+                                        <div className="text-right flex flex-col items-end">
+                                          {hasDiscount ? (
+                                            <>
+                                              <span className="text-xs text-gray-400 line-through">
+                                                {formatPeso(parseFloat(jobType.price || 0).toFixed(2))}
+                                              </span>
+                                              <span className="text-green-600 font-bold text-lg">
+                                                {formatPeso((parseFloat(jobType.price || 0) * (1 - parseFloat(discountPercentage) / 100)).toFixed(2))}
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <span className="text-orange-600 font-bold text-lg">
+                                              {formatPeso(
+                                                parseFloat(
+                                                  jobType.price ||
+                                                  0
+                                                ).toFixed(
+                                                  2
+                                                )
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    {(hasSizeRates ||
+                                      hasPriceTiers) && (
+                                        <div className="text-right flex flex-col items-end">
+                                          {hasDiscount ? (
+                                            <>
+                                              <span className="text-xs text-gray-400 line-through">
+                                                {formatPeso(parseFloat(jobType.price || 0).toFixed(2))}
+                                              </span>
+                                              <span className="text-green-600 text-xs italic">
+                                                Starts at{" "}
+                                                <span className="text-lg font-bold not-italic block">
+                                                  {formatPeso((parseFloat(jobType.price || 0) * (1 - parseFloat(discountPercentage) / 100)).toFixed(2))}
+                                                </span>
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <span className="text-orange-600 text-xs mt-1 italic">
+                                              Price Starts
+                                              at{" "}
+                                              <div className="text-lg font-bold">
+                                                {formatPeso(
+                                                  parseFloat(
+                                                    jobType.price ||
+                                                    0
+                                                  ).toFixed(
+                                                    2
+                                                  )
+                                                )}
 
-                                      </div>
+                                              </div>
 
-                                    </span>
-                                  )}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </button>
+                          </button>
+
+                          {/* Additional Information - Only shown when this job type is selected */}
+                          {isSelected && (
+                            <div className="ml-4 pl-4 border-l-4 border-orange-300 space-y-4 animate-fadeIn">
+                              {/* Brochure Link */}
+                              {jobType.brochure_link && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-blue-600 text-xl">📄</span>
+                                    <div>
+                                      <p className="font-semibold text-blue-900">Brochure Available</p>
+                                      <a
+                                        href={jobType.brochure_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 text-sm underline"
+                                      >
+                                        View Product Brochure (Google Drive)
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Color Selection */}
+                              {jobType.has_colors && jobType.available_colors?.length > 0 && (
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
+                                    Select Color
+                                  </label>
+                                  <div className="flex flex-wrap gap-1">
+                                    {jobType.available_colors.map((colorObj, idx) => {
+                                      const hex = typeof colorObj === 'string' ? colorObj : colorObj.hex;
+                                      const code = typeof colorObj === 'string' ? '' : colorObj.code;
+                                      return (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => setFormData(prev => ({ ...prev, selected_color: hex }))}
+                                          className={`w-10 h-10 border-2 transition-all transform hover:scale-110 ${formData.selected_color === hex
+                                            ? "border-orange-600 ring-2 ring-orange-200"
+                                            : "border-gray-200"
+                                            }`}
+                                          style={{ backgroundColor: hex }}
+                                          title={code ? `${getColorName(hex)} (${code})` : getColorName(hex)}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                  {formData.selected_color && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      Selected: <span className="font-semibold text-gray-900">{getFullColorName(formData.selected_color, selectedJobType)}</span> ({formData.selected_color})
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Promo Rules Display */}
+                              {hasPromoRules && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-green-600 text-xl">
+                                      🎁
+                                    </span>
+                                    <div className="flex-1">
+                                      <p className="font-semibold text-green-900 mb-1">
+                                        Available Promos:
+                                      </p>
+                                      <ul className="text-sm text-green-800 space-y-1">
+                                        {promoRules
+                                          .filter((r) => r.is_active)
+                                          .map((rule, idx) => (
+                                            <li key={idx}>
+                                              {rule.description ||
+                                                `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
+                                            </li>
+                                          ))}
+                                      </ul>
+                                      {formData.quantity > 0 && formData.free_quantity > 0 && (
+                                        <p className="text-sm font-bold text-green-700 mt-2">
+                                          ✓ You get{" "}
+                                          {formData.free_quantity}{" "}
+                                          free item(s)! Total:{" "}
+                                          {parseInt(
+                                            formData.quantity
+                                          ) +
+                                            parseInt(
+                                              formData.free_quantity
+                                            )}{" "}
+                                          pcs
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Price Tiers Display */}
+                              {hasPriceTiers && (
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                  <p className="font-semibold text-orange-900 mb-2">
+                                    📊 Bulk Pricing:
+                                  </p>
+                                  <div className="space-y-1 text-sm">
+                                    {priceTiers.map((tier, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex justify-between"
+                                      >
+                                        <span className="text-orange-800">
+                                          {tier.min_quantity}
+                                          {tier.max_quantity
+                                            ? ` - ${tier.max_quantity}`
+                                            : "+"}{" "}
+                                          pcs:
+                                        </span>
+                                        <span className="font-semibold text-orange-900">
+                                          {formatPeso(
+                                            parseFloat(
+                                              tier.price
+                                            ).toFixed(2)
+                                          )}
+                                          /unit
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Size-Based Pricing */}
+                              {hasSizeRates && (
+                                <div>
+                                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
+                                    Size Options
+                                  </label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sizeRates.map((rate) => (
+                                      <button
+                                        key={rate.id}
+                                        type="button"
+                                        onClick={() =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            size_rate_id: rate.id.toString(),
+                                          }))
+                                        }
+                                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
+                                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
+                                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
+                                          }`}
+                                      >
+                                        {rate.variant_name}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                                        Width (
+                                        {selectedSizeRate?.dimension_unit ||
+                                          "unit"}
+                                        )
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={formData.size_width}
+                                        onChange={(e) =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            size_width:
+                                              e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        placeholder="0"
+                                        step="0.1"
+                                        min="0"
+                                      />
+                                    </div>
+                                    {selectedSizeRate?.calculation_method !==
+                                      "length" && (
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-600 mb-2">
+                                            Height (
+                                            {selectedSizeRate?.dimension_unit ||
+                                              "unit"}
+                                            )
+                                          </label>
+                                          <input
+                                            type="number"
+                                            value={formData.size_height}
+                                            onChange={(e) =>
+                                              setFormData((prev) => ({
+                                                ...prev,
+                                                size_height:
+                                                  e.target.value,
+                                              }))
+                                            }
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                            placeholder="0"
+                                            step="0.1"
+                                            min="0"
+                                          />
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -2024,7 +2450,7 @@ export default function CustomerPOSOrder() {
               {formData.category_id === "others" && (
                 <div className="space-y-4 animate-fadeIn">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Job Type Description *
                     </label>
                     <input
@@ -2046,175 +2472,6 @@ export default function CustomerPOSOrder() {
                   <p className="text-sm text-gray-500 italic mt-2">
                     Note: Our team will verify this request and provide you with a final price shortly.
                   </p>
-                </div>
-              )}
-
-              {/* Promo Rules Display */}
-              {hasPromoRules && formData.quantity > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 text-xl">
-                      🎁
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-green-900 mb-1">
-                        Available Promos:
-                      </p>
-                      <ul className="text-sm text-green-800 space-y-1">
-                        {promoRules
-                          .filter((r) => r.is_active)
-                          .map((rule, idx) => (
-                            <li key={idx}>
-                              {rule.description ||
-                                `Buy ${rule.buy_quantity}, Get ${rule.free_quantity} Free`}
-                            </li>
-                          ))}
-                      </ul>
-                      {formData.free_quantity > 0 && (
-                        <p className="text-sm font-bold text-green-700 mt-2">
-                          ✓ You get{" "}
-                          {formData.free_quantity}{" "}
-                          free item(s)! Total:{" "}
-                          {parseInt(
-                            formData.quantity
-                          ) +
-                            parseInt(
-                              formData.free_quantity
-                            )}{" "}
-                          pcs
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Price Tiers Display */}
-              {hasPriceTiers && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <p className="font-semibold text-orange-900 mb-2">
-                    📊 Bulk Pricing:
-                  </p>
-                  <div className="space-y-1 text-sm">
-                    {priceTiers.map((tier, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between"
-                      >
-                        <span className="text-orange-800">
-                          {tier.min_quantity}
-                          {tier.max_quantity
-                            ? ` - ${tier.max_quantity}`
-                            : "+"}{" "}
-                          pcs:
-                        </span>
-                        <span className="font-semibold text-orange-900">
-                          {formatPeso(
-                            parseFloat(
-                              tier.price
-                            ).toFixed(2)
-                          )}
-                          /unit
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Size-Based Pricing */}
-              {hasSizeRates && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Size Options
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {sizeRates.map((rate) => (
-                      <button
-                        key={rate.id}
-                        type="button"
-                        onClick={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            size_rate_id: rate.id.toString(),
-                          }))
-                        }
-                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${formData.size_rate_id === rate.id.toString()
-                          ? "border-orange-600 bg-orange-50 text-orange-700 shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-gray-50"
-                          }`}
-                      >
-                        {rate.variant_name}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-2">
-                        Width (
-                        {selectedSizeRate?.dimension_unit ||
-                          "unit"}
-                        )
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.size_width}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            size_width:
-                              e.target.value,
-                          }))
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
-                        step="0.1"
-                        min="0"
-                      />
-                    </div>
-                    {selectedSizeRate?.calculation_method !==
-                      "length" && (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-2">
-                            Height (
-                            {selectedSizeRate?.dimension_unit ||
-                              "unit"}
-                            )
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.size_height}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                size_height:
-                                  e.target.value,
-                              }))
-                            }
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                            placeholder="0"
-                            step="0.1"
-                            min="0"
-                          />
-                        </div>
-                      )}
-                  </div>
-                  {/* {selectedSizeRate && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Rate:{" "}
-                      {formatPeso(
-                        parseFloat(
-                          selectedSizeRate.rate
-                        ).toFixed(2)
-                      )}{" "}
-                      per{" "}
-                      {selectedSizeRate.calculation_method ===
-                        "length"
-                        ? selectedSizeRate.dimension_unit
-                        : `${selectedSizeRate.dimension_unit}²`}
-                    </p>
-                  )} */}
                 </div>
               )}
 
@@ -2251,16 +2508,10 @@ export default function CustomerPOSOrder() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setCurrentStep(1)}
-                  className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={() => setCurrentStep(3)}
-                  disabled={!canProceedStep2}
-                  className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedStep2
-                    ? "bg-orange-600 hover:bg-orange-700"
+                  onClick={() => setCurrentStep(2)}
+                  disabled={!canProceedService}
+                  className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${canProceedService
+                    ? "bg-orange-600 hover:bg-orange-700 shadow-lg"
                     : "bg-gray-300 cursor-not-allowed"
                     }`}
                 >
@@ -2271,8 +2522,8 @@ export default function CustomerPOSOrder() {
           </div>
         )}
 
-        {/* Step 3: Details & Upload */}
-        {currentStep === 3 && (
+        {/* Step 2: Details & Upload */}
+        {currentStep === 2 && (
           <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2290,17 +2541,17 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Order Details
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Design & Details
               </h2>
-              <p className="text-gray-500 mt-2">
-                Tell us more about your order
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Show us what you want to create
               </p>
             </div>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Description *
                 </label>
                 <textarea
@@ -2318,7 +2569,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   When do you need it? *
                 </label>
                 <input
@@ -2336,7 +2587,7 @@ export default function CustomerPOSOrder() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Upload Design/Reference (Optional)
                   {designFiles.length > 0 && (
                     <span className="ml-2 text-xs text-gray-500">
@@ -2532,20 +2783,20 @@ export default function CustomerPOSOrder() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => setCurrentStep(1)}
                   className="flex-1 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   ← Back
                 </button>
                 <button
-                  onClick={() => setCurrentStep(4)}
-                  disabled={!canProceedStep3}
-                  className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedStep3
-                    ? "bg-orange-600 hover:bg-orange-700"
+                  onClick={() => setCurrentStep(3)}
+                  disabled={!canProceedDesign}
+                  className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${canProceedDesign
+                    ? "bg-orange-600 hover:bg-orange-700 shadow-md"
                     : "bg-gray-300 cursor-not-allowed"
                     }`}
                 >
-                  Review Order →
+                  Continue →
                 </button>
               </div>
             </div>
@@ -2571,11 +2822,11 @@ export default function CustomerPOSOrder() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Payment & Review
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                Order Summary & Confirmation
               </h2>
-              <p className="text-gray-500 mt-2">
-                Review your order and choose payment method
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                Please review your details before submitting
               </p>
             </div>
 
@@ -2644,6 +2895,11 @@ export default function CustomerPOSOrder() {
                       {selectedSizeRate?.dimension_unit}
                     </p>
                   )}
+                  {formData.selected_color && (
+                    <p className="text-sm text-gray-600">
+                      Color: <span className="font-semibold text-gray-900">{getFullColorName(formData.selected_color, selectedJobType)}</span> ({formData.selected_color})
+                    </p>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
@@ -2662,13 +2918,53 @@ export default function CustomerPOSOrder() {
                 </div>
 
                 <div className="border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-gray-900">
-                      Total Amount:
-                    </span>
-                    <span className="text-sm font-bold text-orange-600">
-                      {subtotal > 0 ? formatPeso(subtotal.toFixed(2)) : "To be confirmed"}
-                    </span>
+                  {/* Price Breakdown */}
+                  <div className="space-y-2">
+                    {/* Original Price */}
+                    {discountPercentage > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">
+                          Original Price:
+                        </span>
+                        <span className="text-sm text-gray-500 line-through">
+                          {formatPeso(originalPrice.toFixed(2))}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Discount */}
+                    {discountPercentage > 0 && (
+                      <div className="flex justify-between items-center bg-red-50 -mx-2 px-2 py-2 rounded">
+                        <span className="text-sm font-semibold text-red-700 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                          Discount ({parseFloat(parseFloat(discountPercentage).toFixed(2))}%):
+                        </span>
+                        <span className="text-sm font-bold text-red-700">
+                          - {formatPeso(discountAmount.toFixed(2))}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Total */}
+                    <div className={`flex justify-between items-center pt-2 ${discountPercentage > 0 ? 'border-t' : ''}`}>
+                      <span className="text-lg font-semibold text-gray-900">
+                        Total Amount:
+                      </span>
+                      <span className={`text-xl font-bold ${discountPercentage > 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                        {subtotal > 0 ? formatPeso(subtotal.toFixed(2)) : "To be confirmed"}
+                      </span>
+                    </div>
+
+                    {/* Savings highlight */}
+                    {discountPercentage > 0 && subtotal > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-2 mt-2">
+                        <p className="text-xs text-green-800 font-semibold text-center">
+                          🎉 You save {formatPeso(discountAmount.toFixed(2))} with this discount!
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2770,7 +3066,7 @@ export default function CustomerPOSOrder() {
                       {settings.payment.gcash
                         .account_name && (
                           <div>
-                            <p className="text-sm font-medium text-green-800">
+                            <p className="text-xs sm:text-sm font-medium text-green-800">
                               Account Name:
                             </p>
                             <p className="text-lg font-bold text-green-900">
@@ -2784,7 +3080,7 @@ export default function CustomerPOSOrder() {
                         )}
                       {settings.payment.gcash.number && (
                         <div>
-                          <p className="text-sm font-medium text-green-800">
+                          <p className="text-xs sm:text-sm font-medium text-green-800">
                             GCash Number:
                           </p>
                           <p className="text-lg font-bold text-green-900">
@@ -2885,7 +3181,7 @@ export default function CustomerPOSOrder() {
                           <div className="space-y-3">
                             {bankAccount.bank_name && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Bank Name:
                                 </p>
                                 <p className="text-lg font-bold text-orange-900">
@@ -2897,7 +3193,7 @@ export default function CustomerPOSOrder() {
                             )}
                             {bankAccount.account_name && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Account
                                   Name:
                                 </p>
@@ -2910,7 +3206,7 @@ export default function CustomerPOSOrder() {
                             )}
                             {bankAccount.account_number && (
                               <div>
-                                <p className="text-sm font-medium text-orange-800">
+                                <p className="text-xs sm:text-sm font-medium text-orange-800">
                                   Account
                                   Number:
                                 </p>
@@ -2985,7 +3281,7 @@ export default function CustomerPOSOrder() {
               {(paymentMethod === "gcash" ||
                 paymentMethod === "bank_transfer") && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Upload Payment Proof (GCash / Bank
                       Receipts) *
                       {paymentProofs.length > 0 && (
@@ -3100,9 +3396,10 @@ export default function CustomerPOSOrder() {
                             className="max-h-64 mx-auto rounded"
                           />
 
-                          <div className="text-center mt-2 text-sm text-gray-600">
+                          <div className="text-center mt-2 text-sm text-gray-600 truncate max-w-xs mx-auto">
                             {paymentProofs[activeProofTab]?.name}
                           </div>
+
                           <button
                             type="button"
                             onClick={() =>
@@ -3306,11 +3603,11 @@ export default function CustomerPOSOrder() {
 
         {/* Step 5: Success Page */}
         {currentStep === 5 && submittedTicket && (
-          <div className="bg-white rounded-2xl shadow-lg p-8 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 animate-fadeIn">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm ring-6 ring-green-50">
                 <svg
-                  className="w-20 h-20 text-green-600"
+                  className="w-12 h-12 sm:w-14 sm:h-14 text-green-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -3318,15 +3615,15 @@ export default function CustomerPOSOrder() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth="2"
+                    strokeWidth="3"
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 Order Submitted Successfully!
               </h2>
-              <p className="text-gray-500">
+              <p className="text-sm sm:text-base text-gray-500">
                 Your order has been received. We will contact
                 you shortly.
               </p>
@@ -3335,7 +3632,7 @@ export default function CustomerPOSOrder() {
             <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-6">
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Ticket Number:
                   </span>
                   <span className="text-xl font-bold text-orange-600">
@@ -3343,11 +3640,11 @@ export default function CustomerPOSOrder() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Status:
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.status === "pending"
+                    className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${submittedTicket.status === "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : submittedTicket.status ===
                         "completed"
@@ -3359,11 +3656,11 @@ export default function CustomerPOSOrder() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">
                     Payment Status:
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${submittedTicket.payment_status ===
+                    className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${submittedTicket.payment_status ===
                       "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : submittedTicket.payment_status ===
@@ -3393,7 +3690,7 @@ export default function CustomerPOSOrder() {
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-sm text-orange-800">
+                <p className="text-xs sm:text-sm text-orange-800">
                   <strong>Important:</strong> Please save your
                   ticket number{" "}
                   <strong>
@@ -3417,7 +3714,7 @@ export default function CustomerPOSOrder() {
                   }
                   router.visit("/");
                 }}
-                className="w-full py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-3 sm:py-4 rounded-lg border-2 border-orange-600 font-bold text-orange-600 hover:bg-orange-50 shadow-lg hover:shadow-xl transition-all text-sm sm:text-base"
               >
                 ← Back to Home
               </button>
@@ -3426,7 +3723,7 @@ export default function CustomerPOSOrder() {
                   setSubmittedTicket(null);
                   clearSavedProgress();
                 }}
-                className="w-full py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-3 sm:py-4 rounded-lg bg-orange-600 font-bold text-white hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all text-sm sm:text-base"
               >
                 Place Another Order
               </button>
@@ -3442,6 +3739,29 @@ export default function CustomerPOSOrder() {
         }
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 640px) {
+          /* Adjust input field padding for mobile */
+          input[type="text"],
+          input[type="email"],
+          input[type="tel"],
+          textarea,
+          select {
+            font-size: 14px;
+            padding: 10px 12px;
+          }
+          
+          /* Ensure proper text scaling on mobile */
+          body {
+            -webkit-text-size-adjust: 100%;
+          }
+          
+          /* Smaller step indicator on mobile */
+          .step-indicator-mobile {
+            gap: 0.25rem;
+          }
         }
       `}</style>
     </div>

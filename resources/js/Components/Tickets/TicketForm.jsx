@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
+import { getColorName, getFullColorName } from "@/Utils/colors";
 import FormInput from "@/Components/Common/FormInput";
 import { usePage } from "@inertiajs/react";
 
@@ -88,7 +89,8 @@ export default function TicketForm({
     custom_fixed_total: "",
     is_size_based: false,
     custom_width: "",
-    custom_height: ""
+    custom_height: "",
+    selected_color: ""
   });
 
   const [errors, setErrors] = useState({});
@@ -122,16 +124,16 @@ export default function TicketForm({
     if (ticket) {
 
       const jobTypeId = ticket.job_type_id?.toString() || "";
-      
+
       // Check if it's a custom ticket:
       // 1. If job_type is a string (not an object), it's custom
       // 2. If job_type_id is null/empty and job_type exists as string
       // 3. If custom_job_type_description exists (for newer records)
       const isJobTypeString = typeof ticket.job_type === 'string';
-      const isCustomTicket = isJobTypeString || 
-                            (!ticket.job_type_id && ticket.job_type) ||
-                            ticket.custom_job_type_description ||
-                            (!ticket.job_type_id && !ticket.job_type?.id);
+      const isCustomTicket = isJobTypeString ||
+        (!ticket.job_type_id && ticket.job_type) ||
+        ticket.custom_job_type_description ||
+        (!ticket.job_type_id && !ticket.job_type?.id);
 
       let categoryId = "";
       if (isCustomTicket) {
@@ -153,7 +155,7 @@ export default function TicketForm({
       }
 
       const parsedSize = parseSizeValue(ticket.size_value);
-      
+
       // Parse custom size if it's a custom ticket with size
       let customWidth = "";
       let customHeight = "";
@@ -169,16 +171,16 @@ export default function TicketForm({
       let customPriceMode = "per_item";
       let customPricePerItem = "";
       let customFixedTotal = "";
-      
+
       if (isCustomTicket && ticket.total_amount) {
         const totalAmount = parseFloat(ticket.total_amount);
         const quantity = parseFloat(ticket.quantity) || 1;
-        
+
         // If we have subtotal, use it to determine mode
         if (ticket.subtotal && parseFloat(ticket.subtotal) > 0) {
           const subtotal = parseFloat(ticket.subtotal);
           const pricePerItem = subtotal / quantity;
-          
+
           // Check if it's a round number (likely per_item) or not (likely fixed_total)
           if (pricePerItem === Math.round(pricePerItem * 100) / 100 && pricePerItem > 0) {
             customPriceMode = "per_item";
@@ -201,15 +203,21 @@ export default function TicketForm({
       }
 
       // Get custom job type description - could be from job_type string or custom_job_type_description
-      const customJobTypeDesc = ticket.custom_job_type_description || 
-                                (isJobTypeString ? ticket.job_type : "") || 
-                                "";
+      const customJobTypeDesc = ticket.custom_job_type_description ||
+        (isJobTypeString ? ticket.job_type : "") ||
+        "";
 
       // Ensure isOthersCategory is set before formData to avoid race conditions
       if (isCustomTicket) {
         setIsOthersCategory(true);
       }
 
+      // Use original_price as subtotal if available, otherwise use subtotal or total_amount
+      const ticketSubtotal = ticket.original_price || ticket.subtotal || ticket.total_amount || "";
+      
+      // Use discount_percentage if available, fallback to discount
+      const ticketDiscount = ticket.discount_percentage || ticket.discount || "";
+      
       setFormData({
         customer_id: ticket.customer_id || customerId || "",
         description: ticket.description || "",
@@ -227,9 +235,9 @@ export default function TicketForm({
             ticket.due_date.split("T")[0] :
             ticket.due_date :
           "",
-        subtotal: ticket.subtotal || ticket.total_amount || "",
-        discount: ticket.discount || "",
-        discount_amount: "",
+        subtotal: ticketSubtotal,
+        discount: ticketDiscount,
+        discount_amount: ticket.discount_amount || "",
         total_amount: ticket.total_amount || "",
         downpayment: ticket.downpayment || "",
         balance: "",
@@ -249,10 +257,23 @@ export default function TicketForm({
         custom_fixed_total: customFixedTotal,
         is_size_based: isSizeBased,
         custom_width: customWidth,
-        custom_height: customHeight
+        custom_height: customHeight,
+        selected_color: ticket.selected_color || ""
       });
       setSizeDimensions(parsedSize);
-      setEnableDiscount(parseFloat(ticket.discount) > 0);
+      // Enable discount if ticket has discount_percentage, discount, or job type discount
+      const hasDiscount = parseFloat(
+        ticket.discount_percentage || 
+        ticket.discount || 
+        ticket.job_type?.discount || 
+        0
+      ) > 0;
+      setEnableDiscount(hasDiscount);
+      
+      // Set selectedJobType if ticket has job_type object (for customer orders)
+      if (ticket.job_type && typeof ticket.job_type === 'object') {
+        setSelectedJobType(ticket.job_type);
+      }
     } else if (customerId) {
       setFormData((prev) => ({
         ...prev,
@@ -285,9 +306,13 @@ export default function TicketForm({
       if (jobType) {
         let newDiscount = jobType.discount;
 
-
+        // When editing a ticket, prioritize ticket's stored discount over job type's discount
         if (ticket && ticket.job_type_id?.toString() === formData.job_type_id?.toString()) {
-          newDiscount = ticket.discount;
+          // Check all possible discount sources (in order of priority)
+          newDiscount = ticket.discount_percentage || // New field (highest priority)
+                       ticket.discount ||            // Old field
+                       ticket.job_type?.discount ||  // Job type's discount on ticket object
+                       jobType.discount;             // Current job type's discount (fallback)
         }
 
         setFormData((prev) => ({
@@ -296,7 +321,7 @@ export default function TicketForm({
           subtotal: (jobType.price * (prev.quantity || 1)).toFixed(2)
         }));
 
-
+        // Check if discount should be enabled
         const discountToCheck = newDiscount !== undefined && newDiscount !== null ?
           newDiscount :
           formData.discount;
@@ -983,21 +1008,24 @@ export default function TicketForm({
                     </div>
 
                     {/* Discount */}
-                    <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                      <span className="text-muted small Billing text-uppercase font-weight-bold">
-                        Discount
-                      </span>
-                      <span className="text-danger font-weight-bold">
-                        -₱
-                        {discountAmountValue.toLocaleString(
-                          "en-US",
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          }
-                        )}
-                      </span>
-                    </div>
+                    {(enableDiscount || discountAmountValue > 0) && (
+                      <div className="d-flex justify-content-between align-items-center py-2 border-bottom bg-success-subtle">
+                        <span className="text-success small text-uppercase font-weight-bold">
+                          <i className="ti-gift mr-1"></i>
+                          Discount {parseFloat(formData.discount || 0) > 0 && `(${parseFloat(formData.discount).toFixed(2)}%)`}
+                        </span>
+                        <span className="text-success font-weight-bold">
+                          -₱
+                          {discountAmountValue.toLocaleString(
+                            "en-US",
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            }
+                          )}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Total Amount */}
                     <div className="d-flex justify-content-between align-items-center py-3 rounded">
@@ -1145,6 +1173,57 @@ export default function TicketForm({
 
               </div>
             </div>
+
+            {selectedJobType?.has_colors && selectedJobType?.available_colors?.length > 0 && (
+              <div className="row mt-3">
+                <div className="col-12">
+                  <label className="form-label d-block">Available Colors</label>
+                  <div className="d-flex flex-wrap gap-2">
+                    {selectedJobType.available_colors.map((colorObj, idx) => {
+                      const hex = typeof colorObj === 'string' ? colorObj : colorObj.hex;
+                      const code = typeof colorObj === 'string' ? '' : colorObj.code;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setFormData(prev => ({ ...prev, selected_color: hex }))}
+                          className={`rounded-circle border cursor-pointer transition-all ${formData.selected_color === hex ? 'border-primary ring-2 ring-primary shadow-sm' : 'border-light'}`}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            backgroundColor: hex,
+                            padding: '2px',
+                            border: formData.selected_color === hex ? '2px solid #000' : '1px solid #ddd',
+                            transform: formData.selected_color === hex ? 'scale(1.1)' : 'scale(1)'
+                          }}
+                          title={code ? `${getColorName(hex)} (${code})` : getColorName(hex)}
+                        >
+                          {formData.selected_color === hex && (
+                            <div className="w-100 h-100 d-flex align-items-center justify-center">
+                              <i className="ti-check text-white" style={{ fontSize: '12px', textShadow: '0 0 2px #000' }}></i>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {formData.selected_color && (
+                    <div className="mt-3 d-flex align-items-center gap-2">
+                      <span className="text-muted small">Selected Variant:</span>
+                      <span className="badge badge-light border d-flex align-items-center gap-2 py-2 px-3 shadow-sm" style={{ borderRadius: '20px', backgroundColor: '#f8f9fa' }}>
+                        <div
+                          className="rounded-circle border"
+                          style={{ width: '12px', height: '12px', backgroundColor: formData.selected_color }}
+                        ></div>
+                        <span className="text-dark font-weight-bold" style={{ fontSize: '11px' }}>
+                          {getFullColorName(formData.selected_color, selectedJobType)}
+                        </span>
+                        <code className="text-muted small" style={{ fontSize: '9px' }}>{formData.selected_color}</code>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Others Category Custom Fields */}
             {isOthersCategory && (

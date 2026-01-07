@@ -80,6 +80,13 @@ export default function Sidebar({ isCollapsed }) {
                                             <i className="ti-user"></i> Customers
                                         </Link>
                                     </li>
+                                    {hasPermission('delivery', 'print') && (
+                                        <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                            <Link href="/delivery-receipts">
+                                                <i className="ti-printer"></i> Delivery Receipts
+                                            </Link>
+                                        </li>
+                                    )}
                                 </>
                             }
 
@@ -95,11 +102,15 @@ export default function Sidebar({ isCollapsed }) {
                             )}
 
                             <li className="label">Resources</li>
-                            <li className={isActive("/frontdesk/inventory") ? "active" : ""}>
-                                <Link href="/frontdesk/inventory">
-                                    <i className="ti-package"></i> Inventory
-                                </Link>
-                            </li>
+                            {
+                                hasPermission('inventory', 'read') && (
+                                    <li className={isActive("/frontdesk/inventory") ? "active" : ""}>
+                                        <Link href="/frontdesk/inventory">
+                                            <i className="ti-package"></i> Inventory
+                                        </Link>
+                                    </li>
+                                )
+                            }
                         </ul> :
                         role === "Designer" ?
                             <ul>
@@ -109,6 +120,13 @@ export default function Sidebar({ isCollapsed }) {
                                         <i className="ti-calendar"></i> Dashboard
                                     </Link>
                                 </li>
+                                {hasPermission('delivery', 'print') && (
+                                    <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                        <Link href="/delivery-receipts">
+                                            <i className="ti-printer"></i> Delivery Receipts
+                                        </Link>
+                                    </li>
+                                )}
                                 <li className={isActive("/designer/mock-ups") ? "active" : ""}>
                                     <Link href="/designer/mock-ups">
                                         <i className="ti-user"></i> Mock-Ups
@@ -204,19 +222,37 @@ export default function Sidebar({ isCollapsed }) {
                                     })()}
 
                                     {/* Other Production Menu Items */}
-                                    <li className="label">Resources</li>
+                                    {
+                                        (hasPermission('inventory', 'read') || hasPermission('purchase_orders', 'read')) && (
+                                            <li className="label">Resources</li>
+                                        )
+                                    }
 
-                                    <li className={isActive("/production/inventory") ? "active" : ""}>
-                                        <Link href="/production/inventory">
-                                            <i className="ti-package"></i> Inventory
-                                        </Link>
-                                    </li>
-                                    <li className={isActive("/production/purchase-orders") ? "active" : ""}>
-                                        <Link href="/production/purchase-orders">
-                                            <i className="ti-shopping-cart"></i>{" "}
-                                            Purchase Orders
-                                        </Link>
-                                    </li>
+                                    {
+                                        hasPermission('inventory', 'read') && (
+                                            <li className={isActive("/production/inventory") ? "active" : ""}>
+                                                <Link href="/production/inventory">
+                                                    <i className="ti-package"></i> Inventory
+                                                </Link>
+                                            </li>
+                                        )
+                                    }
+                                    {
+                                        hasPermission('purchase_orders', 'read') && (
+                                            <li className={isActive("/production/purchase-orders") ? "active" : ""}>
+                                                <Link href="/production/purchase-orders">
+                                                    <i className="ti-shopping-cart"></i>{" "}
+                                                    Purchase Orders
+                                                </Link>
+                                            </li>)
+                                    }
+                                    {hasPermission('delivery', 'print') && (
+                                        <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                            <Link href="/delivery-receipts">
+                                                <i className="ti-printer"></i> Delivery Receipts
+                                            </Link>
+                                        </li>
+                                    )}
                                 </ul> :
                                 role === "Cashier" ?
                                     <ul>
@@ -226,6 +262,13 @@ export default function Sidebar({ isCollapsed }) {
                                                 <i className="ti-calendar"></i> Dashboard
                                             </Link>
                                         </li>
+                                        {hasPermission('delivery', 'print') && (
+                                            <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                                <Link href="/delivery-receipts">
+                                                    <i className="ti-printer"></i> Delivery Receipts
+                                                </Link>
+                                            </li>
+                                        )}
                                         <li className="label">Financials</li>
                                         <li className={isActive("/cashier/finance") ? "active" : ""}>
                                             <Link href="/cashier/finance">
@@ -258,6 +301,13 @@ export default function Sidebar({ isCollapsed }) {
                                                 <i className="ti-image"></i> Mock-Ups
                                             </Link>
                                         </li>
+                                        {hasPermission('delivery', 'print') && (
+                                            <li className={isActive("/delivery-receipts") ? "active" : ""}>
+                                                <Link href="/delivery-receipts">
+                                                    <i className="ti-printer"></i> Delivery Receipts
+                                                </Link>
+                                            </li>
+                                        )}
 
                                         <li className="label">Production & Inventory</li>
 
