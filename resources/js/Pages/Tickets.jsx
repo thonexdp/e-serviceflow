@@ -1546,7 +1546,7 @@ export default function Tickets({
                       <i className="ti-reload"></i>
                     </button>
 
-                    {hasPermission('tickets', 'create') &&
+                    {hasPermission('tickets', 'manage') &&
 
                       <button
                         type="button"
