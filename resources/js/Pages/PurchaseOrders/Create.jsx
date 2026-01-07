@@ -23,7 +23,7 @@ export default function PurchaseOrdersCreate({
         notes: "",
         internal_notes: ""
     });
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
 
     const handleAddItem = () => {
@@ -78,6 +78,11 @@ export default function PurchaseOrdersCreate({
             preserveScroll: true
         });
     };
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+      };
+    
 
     return (
         <AdminLayout user={user} notifications={notifications} messages={messages}>
@@ -340,9 +345,11 @@ export default function PurchaseOrdersCreate({
 
                                                         Cancel
                                                     </button>
+                                                    {hasPermission('purchase_orders', 'manage') && (
                                                     <button type="submit" className="btn btn-primary">
                                                         <i className="ti-save"></i> Create Purchase Order
                                                     </button>
+                                                    )}
                                                 </div>
                                             </form>
                                         </div>

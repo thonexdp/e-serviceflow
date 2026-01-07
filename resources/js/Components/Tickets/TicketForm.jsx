@@ -212,6 +212,12 @@ export default function TicketForm({
         setIsOthersCategory(true);
       }
 
+      // Use original_price as subtotal if available, otherwise use subtotal or total_amount
+      const ticketSubtotal = ticket.original_price || ticket.subtotal || ticket.total_amount || "";
+      
+      // Use discount_percentage if available, fallback to discount
+      const ticketDiscount = ticket.discount_percentage || ticket.discount || "";
+      
       setFormData({
         customer_id: ticket.customer_id || customerId || "",
         description: ticket.description || "",
@@ -229,9 +235,9 @@ export default function TicketForm({
             ticket.due_date.split("T")[0] :
             ticket.due_date :
           "",
-        subtotal: ticket.subtotal || ticket.total_amount || "",
-        discount: ticket.discount || "",
-        discount_amount: "",
+        subtotal: ticketSubtotal,
+        discount: ticketDiscount,
+        discount_amount: ticket.discount_amount || "",
         total_amount: ticket.total_amount || "",
         downpayment: ticket.downpayment || "",
         balance: "",
@@ -255,7 +261,19 @@ export default function TicketForm({
         selected_color: ticket.selected_color || ""
       });
       setSizeDimensions(parsedSize);
-      setEnableDiscount(parseFloat(ticket.discount) > 0);
+      // Enable discount if ticket has discount_percentage, discount, or job type discount
+      const hasDiscount = parseFloat(
+        ticket.discount_percentage || 
+        ticket.discount || 
+        ticket.job_type?.discount || 
+        0
+      ) > 0;
+      setEnableDiscount(hasDiscount);
+      
+      // Set selectedJobType if ticket has job_type object (for customer orders)
+      if (ticket.job_type && typeof ticket.job_type === 'object') {
+        setSelectedJobType(ticket.job_type);
+      }
     } else if (customerId) {
       setFormData((prev) => ({
         ...prev,
@@ -288,9 +306,13 @@ export default function TicketForm({
       if (jobType) {
         let newDiscount = jobType.discount;
 
-
+        // When editing a ticket, prioritize ticket's stored discount over job type's discount
         if (ticket && ticket.job_type_id?.toString() === formData.job_type_id?.toString()) {
-          newDiscount = ticket.discount;
+          // Check all possible discount sources (in order of priority)
+          newDiscount = ticket.discount_percentage || // New field (highest priority)
+                       ticket.discount ||            // Old field
+                       ticket.job_type?.discount ||  // Job type's discount on ticket object
+                       jobType.discount;             // Current job type's discount (fallback)
         }
 
         setFormData((prev) => ({
@@ -299,7 +321,7 @@ export default function TicketForm({
           subtotal: (jobType.price * (prev.quantity || 1)).toFixed(2)
         }));
 
-
+        // Check if discount should be enabled
         const discountToCheck = newDiscount !== undefined && newDiscount !== null ?
           newDiscount :
           formData.discount;
@@ -986,21 +1008,24 @@ export default function TicketForm({
                     </div>
 
                     {/* Discount */}
-                    <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                      <span className="text-muted small Billing text-uppercase font-weight-bold">
-                        Discount
-                      </span>
-                      <span className="text-danger font-weight-bold">
-                        -₱
-                        {discountAmountValue.toLocaleString(
-                          "en-US",
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          }
-                        )}
-                      </span>
-                    </div>
+                    {(enableDiscount || discountAmountValue > 0) && (
+                      <div className="d-flex justify-content-between align-items-center py-2 border-bottom bg-success-subtle">
+                        <span className="text-success small text-uppercase font-weight-bold">
+                          <i className="ti-gift mr-1"></i>
+                          Discount {parseFloat(formData.discount || 0) > 0 && `(${parseFloat(formData.discount).toFixed(2)}%)`}
+                        </span>
+                        <span className="text-success font-weight-bold">
+                          -₱
+                          {discountAmountValue.toLocaleString(
+                            "en-US",
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            }
+                          )}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Total Amount */}
                     <div className="d-flex justify-content-between align-items-center py-3 rounded">

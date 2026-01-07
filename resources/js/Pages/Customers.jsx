@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
@@ -11,147 +10,148 @@ import DeleteConfirmation from "@/Components/Common/DeleteConfirmation";
 import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Customers({
-  user = {},
-  notifications = [],
-  messages = [],
-  customers = { data: [] },
-  filters = {}
+    user = {},
+    notifications = [],
+    messages = [],
+    customers = { data: [] },
+    filters = {},
 }) {
-  const [openCustomerModal, setCustomerModalOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
-  const [selectedID, setSelectedID] = useState(null);
-  const [loading, setLoading] = useState(false);
+    const [openCustomerModal, setCustomerModalOpen] = useState(false);
+    const [editingCustomer, setEditingCustomer] = useState(null);
+    const [selectedID, setSelectedID] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-  const [openDeleteModal, setDeleteModalOpen] = useState(false);
-  const { flash, auth } = usePage().props;
-  const { buildUrl } = useRoleApi();
+    const [openDeleteModal, setDeleteModalOpen] = useState(false);
+    const { flash, auth } = usePage().props;
+    const { buildUrl } = useRoleApi();
 
-  const hasPermission = (module, feature) => {
-    if (auth.user.role === 'admin') return true;
-    return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
-  };
-
-  const handleOpenModal = (customer = null) => {
-    setEditingCustomer(customer);
-    setCustomerModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setDeleteModalOpen(false);
-    setCustomerModalOpen(false);
-    setEditingCustomer(null);
-  };
-
-  const handleCustomerSubmit = (data) => {
-    if (editingCustomer) {
-      router.put(buildUrl(`/customers/${editingCustomer.id}`), data, {
-        onSuccess: () => {
-          handleCloseModal();
-        },
-        preserveState: false,
-        preserveScroll: true,
-        onFinish: () => setLoading(false)
-      });
-    } else {
-      router.post(buildUrl("/customers"), data, {
-        onSuccess: () => {
-          handleCloseModal();
-        },
-        preserveState: false,
-        preserveScroll: true,
-        onFinish: () => setLoading(false)
-      });
-    }
-  };
-
-  const handleDelete = (customerId) => {
-    setSelectedID(customerId);
-    setDeleteModalOpen(true);
-  };
-
-  const handleDeleteCustomer = () => {
-    if (!selectedID) return;
-    router.delete(buildUrl(`/customers/${selectedID}`), {
-      preserveScroll: true,
-      preserveState: false,
-
-      onBefore: () => {
-        setLoading(true);
-      },
-      onSuccess: () => {
-        handleCloseModal();
-        setLoading(false);
-        toast.success("Customer deleted successfully.");
-      },
-      onError: (errors) => {
-        setLoading(false);
-        toast.error("Failed to delete customer. Please try again.");
-      },
-
-
-      onFinish: () => {
-        setLoading(false);
-      }
-    });
-  };
-
-
-  const customerColumns = [
-  {
-    label: "#",
-    key: "index",
-    render: (row, index) => {
-      if (customers.current_page && customers.per_page) {
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === "admin") return true;
         return (
-          (customers.current_page - 1) * customers.per_page +
-          index +
-          1);
+            auth.user.permissions &&
+            auth.user.permissions.includes(`${module}.${feature}`)
+        );
+    };
 
-      }
-      return index + 1;
-    }
-  },
-  {
-    label: "Name",
-    key: "name",
-    render: (row) => `${row.firstname} ${row.lastname}`
-  },
-  {
-    label: "Phone",
-    key: "phone",
-    render: (row) => row.phone || "N/A"
-  },
-  {
-    label: "Email",
-    key: "email",
-    render: (row) => row.email || "N/A"
-  },
-  {
-    label: "Facebook",
-    key: "facebook",
-    render: (row) => row.facebook || "N/A"
-  },
-  {
-    label: "Address",
-    key: "address",
-    render: (row) => row.address || "N/A"
-  }];
+    const handleOpenModal = (customer = null) => {
+        setEditingCustomer(customer);
+        setCustomerModalOpen(true);
+    };
 
+    const handleCloseModal = () => {
+        setDeleteModalOpen(false);
+        setCustomerModalOpen(false);
+        setEditingCustomer(null);
+    };
 
-  return (
-    <AdminLayout
-      user={user}
-      notifications={notifications}
-      messages={messages}>
+    const handleCustomerSubmit = (data) => {
+        if (editingCustomer) {
+            router.put(buildUrl(`/customers/${editingCustomer.id}`), data, {
+                onSuccess: () => {
+                    handleCloseModal();
+                },
+                preserveState: false,
+                preserveScroll: true,
+                onFinish: () => setLoading(false),
+            });
+        } else {
+            router.post(buildUrl("/customers"), data, {
+                onSuccess: () => {
+                    handleCloseModal();
+                },
+                preserveState: false,
+                preserveScroll: true,
+                onFinish: () => setLoading(false),
+            });
+        }
+    };
 
+    const handleDelete = (customerId) => {
+        setSelectedID(customerId);
+        setDeleteModalOpen(true);
+    };
+
+    const handleDeleteCustomer = () => {
+        if (!selectedID) return;
+        router.delete(buildUrl(`/customers/${selectedID}`), {
+            preserveScroll: true,
+            preserveState: false,
+
+            onBefore: () => {
+                setLoading(true);
+            },
+            onSuccess: () => {
+                handleCloseModal();
+                setLoading(false);
+                toast.success("Customer deleted successfully.");
+            },
+            onError: (errors) => {
+                setLoading(false);
+                toast.error("Failed to delete customer. Please try again.");
+            },
+
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
+    };
+
+    const customerColumns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) => {
+                if (customers.current_page && customers.per_page) {
+                    return (
+                        (customers.current_page - 1) * customers.per_page +
+                        index +
+                        1
+                    );
+                }
+                return index + 1;
+            },
+        },
+        {
+            label: "Name",
+            key: "name",
+            render: (row) => `${row.firstname} ${row.lastname}`,
+        },
+        {
+            label: "Phone",
+            key: "phone",
+            render: (row) => row.phone || "N/A",
+        },
+        {
+            label: "Email",
+            key: "email",
+            render: (row) => row.email || "N/A",
+        },
+        {
+            label: "Facebook",
+            key: "facebook",
+            render: (row) => row.facebook || "N/A",
+        },
+        {
+            label: "Address",
+            key: "address",
+            render: (row) => row.address || "N/A",
+        },
+    ];
+
+    return (
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
             <Head title="Customers" />
             {/* Flash Messages */}
-            {flash?.success &&
-      <FlashMessage type="success" message={flash.success} />
-      }
-            {flash?.error &&
-      <FlashMessage type="error" message={flash.error} />
-      }
+            {flash?.success && (
+                <FlashMessage type="success" message={flash.success} />
+            )}
+            {flash?.error && (
+                <FlashMessage type="error" message={flash.error} />
+            )}
 
             <div className="row">
                 <div className="col-lg-8 p-r-0 title-margin-right">
@@ -181,32 +181,32 @@ export default function Customers({
 
             {/* Customer Modal */}
             <Modal
-        title={"Delete Customer"}
-        isOpen={openDeleteModal}
-        onClose={handleCloseModal}
-        size="md"
-        submitButtonText={null}>
-
+                title={"Delete Customer"}
+                isOpen={openDeleteModal}
+                onClose={handleCloseModal}
+                size="md"
+                submitButtonText={null}
+            >
                 <DeleteConfirmation
-          label="customer"
-          loading={loading}
-          onSubmit={handleDeleteCustomer}
-          onCancel={handleCloseModal} />
-
+                    label="customer"
+                    loading={loading}
+                    onSubmit={handleDeleteCustomer}
+                    onCancel={handleCloseModal}
+                />
             </Modal>
 
             <Modal
-        title={editingCustomer ? "Edit Customer" : "Add Customer"}
-        isOpen={openCustomerModal}
-        onClose={handleCloseModal}
-        size="4xl"
-        submitButtonText={null}>
-
+                title={editingCustomer ? "Edit Customer" : "Add Customer"}
+                isOpen={openCustomerModal}
+                onClose={handleCloseModal}
+                size="4xl"
+                submitButtonText={null}
+            >
                 <CustomerForm
-          customer={editingCustomer}
-          onSubmit={handleCustomerSubmit}
-          onCancel={handleCloseModal} />
-
+                    customer={editingCustomer}
+                    onSubmit={handleCustomerSubmit}
+                    onCancel={handleCloseModal}
+                />
             </Modal>
 
             <section id="main-content">
@@ -223,50 +223,71 @@ export default function Customers({
                                             <div className="row mt-4 align-items-center">
                                                 <div className="col-md-5">
                                                     <SearchBox
-                            placeholder="Search customers..."
-                            initialValue={
-                            filters.search || ""
-                            }
-                            route="/customers" />
-
+                                                        placeholder="Search customers..."
+                                                        initialValue={
+                                                            filters.search || ""
+                                                        }
+                                                        route="/customers"
+                                                    />
                                                 </div>
 
                                                 <div className="col-md-7 d-flex justify-content-end">
                                                     <button
-                            type="button"
-                            onClick={() =>
-                            router.replace(buildUrl("/customers"))
-                            }
-                            className="btn btn-sm btn-outline-info mr-2"
-                            title="Refresh">
-
+                                                        type="button"
+                                                        onClick={() =>
+                                                            router.replace(
+                                                                buildUrl(
+                                                                    "/customers"
+                                                                )
+                                                            )
+                                                        }
+                                                        className="btn btn-sm btn-outline-info mr-2"
+                                                        title="Refresh"
+                                                    >
                                                         <i className="ti-reload"></i>
                                                     </button>
 
-                                                    {hasPermission('customers', 'create') &&
-                          <button
-                            type="button"
-                            onClick={() =>
-                            handleOpenModal()
-                            }
-                            className="btn btn-sm btn-primary">
-
+                                                    {hasPermission(
+                                                        "customers",
+                                                        "manage"
+                                                    ) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleOpenModal()
+                                                            }
+                                                            className="btn btn-sm btn-primary"
+                                                        >
                                                             <i className="ti-plus text-xs"></i>{" "}
                                                             Add Customer
                                                         </button>
-                          }
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="mt-4">
                                                 <DataTable
-                          columns={customerColumns}
-                          data={customers.data}
-                          pagination={customers}
-                          onEdit={hasPermission('customers', 'update') ? handleOpenModal : null}
-                          onDelete={hasPermission('customers', 'delete') ? handleDelete : null}
-                          emptyMessage="No customers found." />
-
+                                                    columns={customerColumns}
+                                                    data={customers.data}
+                                                    pagination={customers}
+                                                    onEdit={
+                                                        hasPermission(
+                                                            "customers",
+                                                            "manage"
+                                                        )
+                                                            ? handleOpenModal
+                                                            : null
+                                                    }
+                                                    onDelete={
+                                                        hasPermission(
+                                                            "customers",
+                                                            "manage"
+                                                        )
+                                                            ? handleDelete
+                                                            : null
+                                                    }
+                                                    emptyMessage="No customers found."
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -276,7 +297,6 @@ export default function Customers({
                     </div>
                 </div>
             </section>
-
-        </AdminLayout>);
-
+        </AdminLayout>
+    );
 }

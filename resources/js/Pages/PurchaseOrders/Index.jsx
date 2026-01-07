@@ -23,13 +23,19 @@ export default function PurchaseOrdersIndex({
   const [selectedPO, setSelectedPO] = useState(null);
   const [error, setError] = useState("");
   const [receivedItems, setReceivedItems] = useState({});
-  const { flash } = usePage().props;
+  const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
   const hasProcessedUrlParam = useRef(false);
 
   const handleView = (po) => {
     router.get(buildUrl(`/purchase-orders/${po.id}`));
   };
+
+  const hasPermission = (module, feature) => {
+    if (auth.user.role === 'admin') return true;
+    return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
+  };
+
 
   const handleOpenReceiveModal = (po) => {
     setSelectedPO(po);
@@ -342,6 +348,7 @@ export default function PurchaseOrdersIndex({
                   <div className="card">
                     <div className="card-title mt-3 d-flex justify-content-between align-items-center">
                       <h4>Purchase Orders</h4>
+                      {hasPermission('purchase_orders', 'manage') && (
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() =>
@@ -351,6 +358,7 @@ export default function PurchaseOrdersIndex({
                         <i className="ti-plus text-xs"></i>{" "}
                         Create PO
                       </button>
+                      )}
                     </div>
                     <div className="card-body">
                       <div className="row mt-4 align-items-center">

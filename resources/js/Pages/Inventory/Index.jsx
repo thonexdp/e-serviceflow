@@ -31,7 +31,10 @@ export default function InventoryIndex({
   const [adjustNotes, setAdjustNotes] = useState("");
   const [isAreaBased, setIsAreaBased] = useState(false);
   const [isGarment, setIsGarment] = useState(false);
+  const [selectedJobTypes, setSelectedJobTypes] = useState([]);
   const { flash, auth, errors } = usePage().props;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
 
   const isAdmin = auth?.user?.role === "admin";
   const { buildUrl } = useRoleApi();
@@ -39,6 +42,18 @@ export default function InventoryIndex({
     setEditingStockItem(stockItem);
     setIsAreaBased(stockItem?.is_area_based || false);
     setIsGarment(stockItem?.is_garment || false);
+    // Initialize selected job types - handle both array and single job_type_id
+    if (stockItem) {
+      if (Array.isArray(stockItem.job_types)) {
+        setSelectedJobTypes(stockItem.job_types.map(jt => jt.id));
+      } else if (stockItem.job_type_id) {
+        setSelectedJobTypes([stockItem.job_type_id]);
+      } else {
+        setSelectedJobTypes([]);
+      }
+    } else {
+      setSelectedJobTypes([]);
+    }
     setStockModalOpen(true);
   };
   const hasPermission = (module, feature) => {
@@ -56,6 +71,7 @@ export default function InventoryIndex({
     setAdjustNotes("");
     setIsAreaBased(false);
     setIsGarment(false);
+    setSelectedJobTypes([]);
     setSubmitting(false);
     setLoading(false);
   };
@@ -71,8 +87,27 @@ export default function InventoryIndex({
     setAdjustModalOpen(true);
   };
 
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+
+    router.visit(buildUrl("inventory"), {
+      preserveState: false,
+      preserveScroll: true,
+      onFinish: () => setIsRefreshing(false)
+    });
+
+  };
+  
+
   const handleStockItemSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate job types selection for non-garment items
+    if (!isGarment && selectedJobTypes.length === 0) {
+      alert('Please select at least one job type for this item.');
+      return;
+    }
+    
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
 
@@ -80,15 +115,17 @@ export default function InventoryIndex({
 
     data.is_active = data.is_active === "on" || data.is_active === true;
     data.is_area_based =
-    data.is_area_based === "on" ||
-    data.is_area_based === true ||
-    isAreaBased;
+      data.is_area_based === "on" ||
+      data.is_area_based === true ||
+      isAreaBased;
     data.is_garment =
-    data.is_garment === "on" ||
-    data.is_garment === true ||
-    isGarment;
+      data.is_garment === "on" ||
+      data.is_garment === true ||
+      isGarment;
 
-    data.job_type_id = data.job_type_id ? parseInt(data.job_type_id) : null;
+    // Send array of job type IDs instead of single ID
+    data.job_type_ids = selectedJobTypes.length > 0 ? selectedJobTypes : [];
+    delete data.job_type_id; // Remove the old single field if it exists
     data.current_stock = parseFloat(data.current_stock) || 0;
     data.minimum_stock_level = parseFloat(data.minimum_stock_level) || 0;
     data.maximum_stock_level = parseFloat(data.maximum_stock_level) || 0;
@@ -147,7 +184,7 @@ export default function InventoryIndex({
     let quantity = parseFloat(adjustQuantity);
 
 
-    if (hasPermission('inventory', 'adjust') && !hasPermission('inventory', 'update')) {
+    if (hasPermission('inventory', 'adjust') && !hasPermission('inventory', 'manage')) {
       if (quantity > 0) {
         quantity = -quantity;
       }
@@ -202,189 +239,204 @@ export default function InventoryIndex({
   };
 
   const stockItemColumns = [
-  {
-    label: "#",
-    key: "index",
-    render: (row, index) =>
-    (stockItems.current_page - 1) * stockItems.per_page + index + 1
-  },
-  { label: "SKU", key: "sku" },
-  { label: "Name", key: "name" },
-  {
-    label: "Job Type",
-    key: "job_type",
-    render: (row) => row.job_type?.name || "N/A"
-  },
-  {
-    label: "Dimensions",
-    key: "dimensions",
-    render: (row) => {
-      if (row.is_area_based && row.length && row.width) {
-        return `${parseFloat(row.length).toFixed(2)} x ${parseFloat(
-          row.width
-        ).toFixed(2)} ${row.base_unit_of_measure}`;
+    {
+      label: "#",
+      key: "index",
+      render: (row, index) =>
+        (stockItems.current_page - 1) * stockItems.per_page + index + 1
+    },
+    { label: "SKU", key: "sku" },
+    { label: "Name", key: "name" },
+    { label: "Description", key: "description" },
+    {
+      label: "Job Types",
+      key: "job_types",
+      render: (row) => {
+        // Handle both array of job_types and single job_type for backward compatibility
+        if (Array.isArray(row.job_types) && row.job_types.length > 0) {
+          return (
+            <div className="flex flex-wrap gap-1">
+              {row.job_types.map((jt, index) => (
+                <b key={index}>
+                  {jt.name}
+                </b>
+              ))}
+            </div>
+          );
+        } else if (row.job_type?.name) {
+          return <b>{row.job_type.name}</b>;
+        }
+        return <b className="text-muted">N/A</b>;
       }
-      return "-";
-    }
-  },
-  {
-    label: "Current Stock",
-    key: "current_stock",
-    render: (row) =>
-    <div>
-                    <strong>{parseFloat(row.current_stock).toFixed(2)}</strong>{" "}
-                    {row.base_unit_of_measure}
-                    {row.is_area_based && row.length && row.width &&
-      <div className="text-xs text-muted mt-1">
-                            Area:{" "}
-                            {(
-        parseFloat(row.length) * parseFloat(row.width)).
-        toFixed(2)}{" "}
-                            {row.base_unit_of_measure}² per piece
-                        </div>
+    },
+    {
+      label: "Dimensions",
+      key: "dimensions",
+      render: (row) => {
+        if (row.is_area_based && row.length && row.width) {
+          return `${parseFloat(row.length).toFixed(2)} x ${parseFloat(
+            row.width
+          ).toFixed(2)} ${row.base_unit_of_measure}`;
+        }
+        return "-";
       }
-                </div>
+    },
+    {
+      label: "Current Stock",
+      key: "current_stock",
+      render: (row) =>
+        <div>
+          <strong>{parseFloat(row.current_stock).toFixed(2)}</strong>{" "}
+          {row.base_unit_of_measure}
+          {row.is_area_based && row.length && row.width &&
+            <div className="text-xs text-muted mt-1">
+              Area:{" "}
+              {(
+                parseFloat(row.length) * parseFloat(row.width)).
+                toFixed(2)}{" "}
+              {row.base_unit_of_measure}² per piece
+            </div>
+          }
+        </div>
 
-  },
-  {
-    label: "Consumption",
-    key: "consumption",
-    render: (row) => {
-      if (row.is_area_based && row.length && row.width) {
-        const stockArea =
-        parseFloat(row.length) * parseFloat(row.width);
+    },
+    {
+      label: "Consumption",
+      key: "consumption",
+      render: (row) => {
+        if (row.is_area_based && row.length && row.width) {
+          const stockArea =
+            parseFloat(row.length) * parseFloat(row.width);
+          return (
+            <div className="text-xs">
+              <div>
+                <strong>Stock Area:</strong>{" "}
+                {stockArea.toFixed(2)}{" "}
+                {row.base_unit_of_measure}²
+              </div>
+              <div className="text-muted mt-1">
+                <small>
+                  Consumption: Calculated by production area
+                </small>
+              </div>
+              <div className="text-muted">
+                <small>
+                  Formula: ceil(prod_area / stock_area) × qty
+                </small>
+              </div>
+            </div>);
+
+        }
         return (
-          <div className="text-xs">
-                            <div>
-                                <strong>Stock Area:</strong>{" "}
-                                {stockArea.toFixed(2)}{" "}
-                                {row.base_unit_of_measure}²
-                            </div>
-                            <div className="text-muted mt-1">
-                                <small>
-                                    Consumption: Calculated by production area
-                                </small>
-                            </div>
-                            <div className="text-muted">
-                                <small>
-                                    Formula: ceil(prod_area / stock_area) × qty
-                                </small>
-                            </div>
-                        </div>);
+          <div className="text-xs text-muted">
+            <div>Standard: 1 piece per unit</div>
+            {row.production_consumptions &&
+              row.production_consumptions.length > 0 &&
+              <div className="mt-1">
+                <small>
+                  Recent:{" "}
+                  {row.production_consumptions.length}{" "}
+                  consumption(s)
+                </small>
+              </div>
+            }
+          </div>);
 
       }
-      return (
-        <div className="text-xs text-muted">
-                        <div>Standard: 1 piece per unit</div>
-                        {row.production_consumptions &&
-          row.production_consumptions.length > 0 &&
-          <div className="mt-1">
-                                    <small>
-                                        Recent:{" "}
-                                        {row.production_consumptions.length}{" "}
-                                        consumption(s)
-                                    </small>
-                                </div>
-          }
-                    </div>);
+    },
+    {
+      label: "Min Level",
+      key: "minimum_stock_level",
+      adminOnly: true,
+      render: (row) =>
+        <div>
+          {parseFloat(row.minimum_stock_level).toFixed(2)}{" "}
+          {row.base_unit_of_measure}
+        </div>
 
-    }
-  },
-  {
-    label: "Min Level",
-    key: "minimum_stock_level",
-    adminOnly: true,
-    render: (row) =>
-    <div>
-                    {parseFloat(row.minimum_stock_level).toFixed(2)}{" "}
-                    {row.base_unit_of_measure}
-                </div>
-
-  },
-  {
-    label: "Unit Cost",
-    key: "unit_cost",
-    adminOnly: true,
-    render: (row) => `${formatPeso(parseFloat(row.unit_cost).toFixed(2))}`
-  },
-  {
-    label: "Status",
-    key: "status",
-    render: (row) => getStockStatusBadge(row)
-  },
-  {
-    label: "Actions",
-    key: "actions",
-    render: (row) => {
-      const canRead = isAdmin || hasPermission('inventory', 'read');
-      const canUpdate = isAdmin || hasPermission('inventory', 'update');
-      const canDelete = isAdmin || hasPermission('inventory', 'delete');
-      const canAdjust = isAdmin || hasPermission('inventory', 'adjust');
+    },
+    {
+      label: "Unit Cost",
+      key: "unit_cost",
+      adminOnly: true,
+      render: (row) => `${formatPeso(parseFloat(row.unit_cost).toFixed(2))}`
+    },
+    {
+      label: "Status",
+      key: "status",
+      render: (row) => getStockStatusBadge(row)
+    },
+    {
+      label: "Actions",
+      key: "actions",
+      render: (row) => {
+        const canRead = isAdmin || hasPermission('inventory', 'read');
+        const canManage = isAdmin || hasPermission('inventory', 'manage');
+        const canAdjust = isAdmin || hasPermission('inventory', 'adjust');
 
 
-      if (!canRead && !canUpdate && !canDelete && !canAdjust) {
-        return null;
+        if (!canRead && !canManage) {
+          return null;
+        }
+
+        return (
+          <div className="btn-group">
+            {isAdmin &&
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-orange-500"
+                onClick={() =>
+                  router.get(buildUrl(`/inventory/${row.id}/movements`))
+                }>
+
+                <i className="ti-eye"></i> Movements
+              </button>
+            }
+            {canAdjust && (isAdmin || row.is_garment) &&
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-warning"
+                onClick={() => handleOpenAdjustModal(row)}>
+
+                <i className="ti-pencil"></i> Adjust
+              </button>
+            }
+            {canManage && (
+              <>
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-primary"
+                onClick={() => handleOpenModal(row)}>
+
+                <i className="ti-pencil"></i> Edit
+              </button>
+              <button
+                type="button"
+                className="btn btn-link btn-sm text-danger"
+                onClick={() => handleDelete(row.id)}>
+
+                <i className="ti-trash"></i> Delete
+              </button>
+              </>
+            )}
+          </div>);
+
+      }
+    }].
+    filter((col) => {
+
+      if (col.adminOnly && !isAdmin) {
+        return false;
       }
 
-      return (
-        <div className="btn-group">
-                        {isAdmin &&
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-orange-500"
-            onClick={() =>
-            router.get(buildUrl(`/inventory/${row.id}/movements`))
-            }>
-
-                                <i className="ti-eye"></i> Movements
-                            </button>
-          }
-                        {canAdjust && (isAdmin || row.is_garment) &&
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-warning"
-            onClick={() => handleOpenAdjustModal(row)}>
-
-                                <i className="ti-pencil"></i> Adjust
-                            </button>
-          }
-                        {canUpdate &&
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-primary"
-            onClick={() => handleOpenModal(row)}>
-
-                                <i className="ti-pencil"></i> Edit
-                            </button>
-          }
-                        {canDelete &&
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-danger"
-            onClick={() => handleDelete(row.id)}>
-
-                                <i className="ti-trash"></i> Delete
-                            </button>
-          }
-                    </div>);
-
-    }
-  }].
-  filter((col) => {
-
-    if (col.adminOnly && !isAdmin) {
-      return false;
-    }
-
-    if (col.key === 'actions') {
-      const canRead = isAdmin || hasPermission('inventory', 'read');
-      const canUpdate = isAdmin || hasPermission('inventory', 'update');
-      const canDelete = isAdmin || hasPermission('inventory', 'delete');
-      const canAdjust = isAdmin || hasPermission('inventory', 'adjust');
-      return canRead || canUpdate || canDelete || canAdjust;
-    }
-    return true;
-  });
+      if (col.key === 'actions') {
+        const canRead = isAdmin || hasPermission('inventory', 'read');
+        const canManage = isAdmin || hasPermission('inventory', 'manage');
+        const canAdjust = isAdmin || hasPermission('inventory', 'adjust');  
+        return canRead || canManage || canAdjust;
+      }
+      return true;
+    });
 
   return (
     <AdminLayout
@@ -392,53 +444,53 @@ export default function InventoryIndex({
       notifications={notifications}
       messages={messages}>
 
-            <Head title="Inventory Management" />
+      <Head title="Inventory Management" />
 
-            {flash?.success &&
-      <FlashMessage type="success" message={flash.success} />
+      {flash?.success &&
+        <FlashMessage type="success" message={flash.success} />
       }
-            {flash?.error &&
-      <FlashMessage type="error" message={flash.error} />
+      {flash?.error &&
+        <FlashMessage type="error" message={flash.error} />
       }
 
-            <div className="row">
-                <div className="col-lg-8 p-r-0 title-margin-right">
-                    <div className="page-header">
-                        <div className="page-title">
-                            <h1>
-                                Inventory <span>Management</span>
-                            </h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-lg-4 p-l-0 title-margin-left">
-                    <div className="page-header">
-                        <div className="page-title">
-                            <ol className="breadcrumb">
-                                <li className="breadcrumb-item">
-                                    <a href="/dashboard">Dashboard</a>
-                                </li>
-                                <li className="breadcrumb-item active">
-                                    Inventory
-                                </li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
+      <div className="row">
+        <div className="col-lg-8 p-r-0 title-margin-right">
+          <div className="page-header">
+            <div className="page-title">
+              <h1>
+                Inventory <span>Management</span>
+              </h1>
             </div>
+          </div>
+        </div>
+        <div className="col-lg-4 p-l-0 title-margin-left">
+          <div className="page-header">
+            <div className="page-title">
+              <ol className="breadcrumb">
+                <li className="breadcrumb-item">
+                  <a href="/dashboard">Dashboard</a>
+                </li>
+                <li className="breadcrumb-item active">
+                  Inventory
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Stock Item Modal */}
-            <Modal
+      {/* Stock Item Modal */}
+      <Modal
         key={editingStockItem?.id || 'new-stock-item'}
         title={editingStockItem ? "Edit Stock Item" : "Add Stock Item"}
         isOpen={openStockModal}
         onClose={handleCloseModal}
         size="4xl">
 
-                <form onSubmit={handleStockItemSubmit}>
-                    <div className="row">
-                        <div className="col-md-6">
-                            <FormInput
+        <form onSubmit={handleStockItemSubmit}>
+          <div className="row">
+            <div className="col-md-6">
+              <FormInput
                 label="SKU"
                 type="text"
                 name="sku"
@@ -447,9 +499,9 @@ export default function InventoryIndex({
                 disabled={!!editingStockItem}
                 error={errors?.sku} />
 
-                        </div>
-                        <div className="col-md-6">
-                            <FormInput
+            </div>
+            <div className="col-md-6">
+              <FormInput
                 label="Name"
                 type="text"
                 name="name"
@@ -457,11 +509,11 @@ export default function InventoryIndex({
                 required
                 error={errors?.name} />
 
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-10">
-                            <FormInput
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-md-10">
+              <FormInput
                 label="Description (Optional)"
                 type="textarea"
                 rows={2}
@@ -469,52 +521,81 @@ export default function InventoryIndex({
                 defaultValue={editingStockItem?.description}
                 error={errors?.description} />
 
-                        </div>
-                        <div className="col-md-2">
-                            <FormInput
+            </div>
+            {/* <div className="col-md-2">
+              <FormInput
                 label="Active"
                 type="checkbox"
                 name="is_active"
                 defaultChecked={
-                editingStockItem?.is_active !== false
+                  editingStockItem?.is_active !== false
                 } />
 
+            </div> */}
+          </div>
+          <div className="row">
+            <div className="col-md-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Job Types {!isGarment && <span className="text-red-500">*</span>}
+                </label>
+                <div className="border border-gray-300 rounded-md p-3 bg-white max-h-48 overflow-y-auto">
+                  {jobTypes.length === 0 ? (
+                    <p className="text-sm text-gray-500">No job types available</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {jobTypes.map((jt) => (
+                        <div key={jt.id} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`job_type_${jt.id}`}
+                            checked={selectedJobTypes.includes(jt.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedJobTypes([...selectedJobTypes, jt.id]);
+                              } else {
+                                setSelectedJobTypes(selectedJobTypes.filter(id => id !== jt.id));
+                              }
+                            }}
+                            className="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                          />
+                          <label
+                            htmlFor={`job_type_${jt.id}`}
+                            className="ml-2 text-sm text-gray-700 cursor-pointer"
+                          >
+                            {jt.name}
+                          </label>
                         </div>
+                      ))}
                     </div>
-                    <div className="row">
-                        <div className="col-md-6">
-                            <FormInput
-                label="Job Type"
-                type="select"
-                name="job_type_id"
-                defaultValue={editingStockItem?.job_type_id}
-                required={!isGarment}
-                error={errors?.job_type_id}
-                options={[
-                { value: "", label: "Select Job Type" },
-                ...jobTypes.map((jt) => ({
-                  value: jt.id,
-                  label: jt.name
-                }))]
-                } />
-
-                        </div>
-                        <div className="col-md-3">
-                            <FormInput
+                  )}
+                </div>
+                {errors?.job_type_ids && (
+                  <p className="text-red-500 text-xs mt-1">{errors.job_type_ids}</p>
+                )}
+                {!isGarment && selectedJobTypes.length === 0 && (
+                  <small className="text-muted d-block mt-1">
+                    Please select at least one job type
+                  </small>
+                )}
+              </div>
+            </div>
+            <div className="col-md-3">
+              <FormInput
                 label="Base Unit of Measure"
                 type="text"
                 name="base_unit_of_measure"
                 defaultValue={
-                editingStockItem?.base_unit_of_measure ||
-                ""
+                  editingStockItem?.base_unit_of_measure ||
+                  ""
                 }
                 required
                 placeholder="pcs, kg, liter, roll, sheet, sqm"
                 error={errors?.base_unit_of_measure} />
 
-                        </div>
-                        <div className="col-md-3">
-                            <FormInput
+            </div>
+            <div className="col-md-3">
+              <FormInput
                 label="Unit Cost"
                 type="number"
                 name="unit_cost"
@@ -523,13 +604,13 @@ export default function InventoryIndex({
                 min="0"
                 error={errors?.unit_cost} />
 
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6">
-                            <div className="mb-4">
-                                <div className="flex items-center gap-2">
-                                    <input
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-md-6">
+              <div className="mb-4">
+                <div className="flex items-center gap-2">
+                  <input
                     type="checkbox"
                     name="is_area_based"
                     id="is_area_based"
@@ -539,23 +620,23 @@ export default function InventoryIndex({
                     }}
                     className="h-4 w-4 text-orange-600 border-gray-300 rounded" />
 
-                                    <label
+                  <label
                     htmlFor="is_area_based"
                     className="text-sm font-medium text-gray-700">
 
-                                        Area Based Material
-                                    </label>
-                                </div>
-                                <small className="text-muted d-block mt-1">
-                                    Check if this material is cut by area
-                                    (tarpaulin, fabric, etc.)
-                                </small>
-                            </div>
-                        </div>
-                        <div className="col-md-6">
-                            <div className="mb-4">
-                                <div className="flex items-center gap-2">
-                                    <input
+                    Area Based Material
+                  </label>
+                </div>
+                <small className="text-muted d-block mt-1">
+                  Check if this material is cut by area
+                  (tarpaulin, fabric, etc.)
+                </small>
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="mb-4">
+                <div className="flex items-center gap-2">
+                  <input
                     type="checkbox"
                     name="is_garment"
                     id="is_garment"
@@ -565,395 +646,405 @@ export default function InventoryIndex({
                     }}
                     className="h-4 w-4 text-orange-600 border-gray-300 rounded" />
 
-                                    <label
+                  <label
                     htmlFor="is_garment"
                     className="text-sm font-medium text-gray-700">
 
-                                        Garment
-                                    </label>
-                                </div>
-                                <small className="text-muted d-block mt-1">
-                                    Check if this is a garment item that requires manual stock management (Job Type becomes optional)
-                                </small>
-                            </div>
-                        </div>
-                        {isAreaBased &&
-            <>
-                                <div className="col-md-3">
-                                    <FormInput
-                  label="Length"
-                  type="number"
-                  name="length"
-                  defaultValue={
-                  editingStockItem?.length || 0
-                  }
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="Length in base unit"
-                  error={errors?.length} />
+                    Garment
+                  </label>
+                </div>
+                <small className="text-muted d-block mt-1">
+                  Check if this is a garment item that requires manual stock management (Job Type becomes optional)
+                </small>
+              </div>
+            </div>
+            {isAreaBased &&
+              <>
+                <div className="col-md-3">
+                  <FormInput
+                    label="Length"
+                    type="number"
+                    name="length"
+                    defaultValue={
+                      editingStockItem?.length || 0
+                    }
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="Length in base unit"
+                    error={errors?.length} />
 
-                                </div>
-                                <div className="col-md-3">
-                                    <FormInput
-                  label="Width"
-                  type="number"
-                  name="width"
-                  defaultValue={
-                  editingStockItem?.width || 0
-                  }
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="Width in base unit"
-                  error={errors?.width} />
+                </div>
+                <div className="col-md-3">
+                  <FormInput
+                    label="Width"
+                    type="number"
+                    name="width"
+                    defaultValue={
+                      editingStockItem?.width || 0
+                    }
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="Width in base unit"
+                    error={errors?.width} />
 
-                                </div>
-                            </>
+                </div>
+              </>
             }
-                    </div>
-                    <div className="row">
-                        {!editingStockItem &&
+          </div>
+          <div className="row">
+            {!editingStockItem &&
+              <div className="col-md-4">
+                <FormInput
+                  label="Initial Stock"
+                  type="number"
+                  name="current_stock"
+                  defaultValue={
+                    editingStockItem?.current_stock || 0
+                  }
+                  step="0.01"
+                  min="0"
+                  error={errors?.current_stock} />
+
+              </div>
+            }
             <div className="col-md-4">
-                                <FormInput
-                label="Initial Stock"
-                type="number"
-                name="current_stock"
-                defaultValue={
-                editingStockItem?.current_stock || 0
-                }
-                step="0.01"
-                min="0"
-                error={errors?.current_stock} />
-
-                            </div>
-            }
-                        <div className="col-md-4">
-                            <FormInput
+              <FormInput
                 label="Minimum Stock Level"
                 type="number"
                 name="minimum_stock_level"
                 defaultValue={
-                editingStockItem?.minimum_stock_level || 0
+                  editingStockItem?.minimum_stock_level || 0
                 }
                 step="0.01"
                 min="0"
                 error={errors?.minimum_stock_level} />
 
-                        </div>
-                        <div className="col-md-4">
-                            <FormInput
+            </div>
+            <div className="col-md-4">
+              <FormInput
                 label="Maximum Stock Level"
                 type="number"
                 name="maximum_stock_level"
                 defaultValue={
-                editingStockItem?.maximum_stock_level || 0
+                  editingStockItem?.maximum_stock_level || 0
                 }
                 step="0.01"
                 min="0"
                 error={errors?.maximum_stock_level} />
 
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6">
-                            <FormInput
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-md-6">
+              <FormInput
                 label="Supplier"
                 type="text"
                 name="supplier"
                 defaultValue={editingStockItem?.supplier}
                 error={errors?.supplier} />
 
-                        </div>
-                        <div className="col-md-6">
-                            <FormInput
+            </div>
+            <div className="col-md-6">
+              <FormInput
                 label="Location"
                 type="text"
                 name="location"
                 defaultValue={editingStockItem?.location}
                 error={errors?.location} />
 
-                        </div>
-                    </div>
-                    <div className="d-flex justify-content-end gap-2 mt-3">
-                        <button
+            </div>
+          </div>
+          <div className="d-flex justify-content-end gap-2 mt-3">
+            <button
               type="submit"
               className="btn btn-primary"
               disabled={submitting}>
 
-                            {submitting ?
-              <>
-                                    <i className="fa fa-spinner fa-spin"></i>{" "}
-                                    {editingStockItem ? "Updating..." : "Creating..."}
-                                </> :
+              {submitting ?
+                <>
+                  <i className="fa fa-spinner fa-spin"></i>{" "}
+                  {editingStockItem ? "Updating..." : "Creating..."}
+                </> :
 
-              <>
-                                    <i className="ti-save"></i>{" "}
-                                    {editingStockItem ? "Update" : "Create"}
-                                </>
+                <>
+                  <i className="ti-save"></i>{" "}
+                  {editingStockItem ? "Update" : "Create"}
+                </>
               }
-                        </button>
-                        <button
+            </button>
+            <button
               type="button"
               className="btn btn-secondary"
               onClick={handleCloseModal}
               disabled={submitting}>
 
-                            Cancel
-                        </button>
-                    </div>
-                </form>
-            </Modal>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-            {/* Adjust Stock Modal */}
-            <Modal
+      {/* Adjust Stock Modal */}
+      <Modal
         key={selectedStockItem?.id || 'adjust-stock'}
         title={`Adjust Stock - ${selectedStockItem?.name}`}
         isOpen={openAdjustModal}
         onClose={handleCloseModal}
         size="lg">
 
-                {selectedStockItem &&
-        <form onSubmit={handleAdjustStock}>
-                        <div className="mb-3">
-                            <p>
-                                <strong>Current Stock:</strong>{" "}
-                                {selectedStockItem.current_stock}{" "}
-                                {selectedStockItem.base_unit_of_measure}
-                            </p>
-                        </div>
-                        <div className="mb-4">
-                            <label
-              htmlFor="adjustment_quantity"
-              className="block text-sm font-medium text-gray-700 mb-1">
+        {selectedStockItem &&
+          <form onSubmit={handleAdjustStock}>
+            <div className="mb-3">
+              <p>
+                <strong>Current Stock:</strong>{" "}
+                {selectedStockItem.current_stock}{" "}
+                {selectedStockItem.base_unit_of_measure}
+              </p>
+            </div>
+            <div className="mb-4">
+              <label
+                htmlFor="adjustment_quantity"
+                className="block text-sm font-medium text-gray-700 mb-1">
 
-                                Adjustment Quantity <span className="text-red-500">*</span>
-                            </label>
-                            <input
-              id="adjustment_quantity"
-              type="number"
-              name="quantity"
-              value={adjustQuantity}
-              onChange={(e) => {
-                setAdjustQuantity(e.target.value);
-              }}
-              onBlur={(e) => {
+                Adjustment Quantity <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="adjustment_quantity"
+                type="number"
+                name="quantity"
+                value={adjustQuantity}
+                onChange={(e) => {
+                  setAdjustQuantity(e.target.value);
+                }}
+                onBlur={(e) => {
 
-                if (hasPermission('inventory', 'adjust') && !hasPermission('inventory', 'update')) {
-                  const numValue = parseFloat(e.target.value);
-                  if (!isNaN(numValue) && numValue > 0) {
-                    setAdjustQuantity(-numValue);
+                  if (hasPermission('inventory', 'adjust') && !hasPermission('inventory', 'manage')) {
+                    const numValue = parseFloat(e.target.value);
+                    if (!isNaN(numValue) && numValue > 0) {
+                      setAdjustQuantity(-numValue);
+                    }
                   }
+                }}
+                step="0.01"
+                required
+                min={hasPermission('inventory', 'manage') ? undefined : -999999}
+                placeholder={
+                  hasPermission('inventory', 'manage') ?
+                    "Positive for increase, negative for decrease" :
+                    "Enter value to deduct stock (automatically converted to negative)"
                 }
-              }}
-              step="0.01"
-              required
-              min={hasPermission('inventory', 'update') ? undefined : -999999}
-              placeholder={
-              hasPermission('inventory', 'update') ?
-              "Positive for increase, negative for decrease" :
-              "Enter value to deduct stock (automatically converted to negative)"
-              }
-              className="w-full text-sm rounded-md border border-gray-300 p-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition duration-150 ease-in-out placeholder-gray-400 bg-white" />
+                className="w-full text-sm rounded-md border border-gray-300 p-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition duration-150 ease-in-out placeholder-gray-400 bg-white" />
 
-                        </div>
-                        {!hasPermission('inventory', 'update') &&
-          <small className="text-muted d-block mt-1">
-                                You can only deduct stock. Positive values will be automatically converted to negative.
-                            </small>
-          }
-                        <FormInput
-            label="Notes"
-            type="textarea"
-            name="notes"
-            value={adjustNotes}
-            onChange={(e) => setAdjustNotes(e.target.value)} />
+            </div>
+            {!hasPermission('inventory', 'manage') &&
+              <small className="text-muted d-block mt-1">
+                You can only deduct stock. Positive values will be automatically converted to negative.
+              </small>
+            }
+            <FormInput
+              label="Notes"
+              type="textarea"
+              name="notes"
+              value={adjustNotes}
+              onChange={(e) => setAdjustNotes(e.target.value)} />
 
-                        <div className="d-flex justify-content-end gap-2 mt-3">
-                            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting}>
+            <div className="d-flex justify-content-end gap-2 mt-3">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={submitting}>
 
-                                {submitting ?
-              <>
-                                        <i className="fa fa-spinner fa-spin"></i> Adjusting...
-                                    </> :
+                {submitting ?
+                  <>
+                    <i className="fa fa-spinner fa-spin"></i> Adjusting...
+                  </> :
 
-              <>
-                                        <i className="ti-save"></i> Adjust Stock
-                                    </>
-              }
-                            </button>
-                            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleCloseModal}
-              disabled={submitting}>
+                  <>
+                    <i className="ti-save"></i> Adjust Stock
+                  </>
+                }
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleCloseModal}
+                disabled={submitting}>
 
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
+                Cancel
+              </button>
+            </div>
+          </form>
         }
-            </Modal>
+      </Modal>
 
-            <Modal
+      <Modal
         title={"Delete Stock"}
         isOpen={openDeleteModal}
         onClose={handleCloseModal}
         size="md"
         submitButtonText={null}>
 
-                <DeleteConfirmation
+        <DeleteConfirmation
           label="stock"
           loading={loading}
           onSubmit={handleDeleteStockItem}
           onCancel={handleCloseModal} />
 
-            </Modal>
+      </Modal>
 
-            <section id="main-content">
-                <div className="content-wrap">
-                    <div className="main">
-                        <div className="container-fluid">
-                            <div className="row">
-                                <div className="col-lg-12">
-                                    <div className="card">
-                                        <div className="card-title mt-3 d-flex justify-content-between align-items-center">
-                                            <h4>Stock Items</h4>
-                                            <div>
-                                                {lowStockCount > 0 &&
-                        <a
-                          href={buildUrl('/inventory/low-stock')}
-                          className="btn btn-warning btn-sm mr-2">
+      <section id="main-content">
+        <div className="content-wrap">
+          <div className="main">
+            <div className="container-fluid">
+              <div className="row">
+                <div className="col-lg-12">
+                  <div className="card">
+                    <div className="card-title mt-3 d-flex justify-content-between align-items-center">
+                      <h4>Stock Items</h4>
+                      <div>
+                        {lowStockCount > 0 &&
+                          <a
+                            href={buildUrl('/inventory/low-stock')}
+                            className="btn btn-warning btn-sm mr-2">
 
-                                                        <i className="ti-alert"></i>{" "}
-                                                        Low Stock (
-                                                        {lowStockCount})
-                                                    </a>
+                            <i className="ti-alert"></i>{" "}
+                            Low Stock (
+                            {lowStockCount})
+                          </a>
                         }
-                                                {(isAdmin || hasPermission('inventory', 'create')) &&
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() =>
-                          handleOpenModal()
-                          }>
+                        {(isAdmin || hasPermission('inventory', 'manage')) &&
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() =>
+                              handleOpenModal()
+                            }>
 
-                                                        <i className="ti-plus"></i>{" "}
-                                                        Add Stock Item
-                                                    </button>
+                            <i className="ti-plus"></i>{" "}
+                            Add Stock Item
+                          </button>
                         }
-                                            </div>
-                                        </div>
-                                        <div className="card-body">
-                                            <div className="row mt-4 align-items-center">
-                                                <div className="col-md-4">
-                                                    <SearchBox
+                         <button
+                          className="btn btn-sm btn-light btn-rounded ml-2 text-orange-500"
+                          onClick={handleRefresh}
+                          disabled={isRefreshing}
+                          title="Refresh Table"
+                          // style={{ width: "32px", height: "32px", padding: "0", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+
+                          <i className={`ti-reload ${isRefreshing ? "spin-animation" : ""}`}></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="card-body">
+                      <div className="row mt-4 align-items-center">
+                        <div className="col-md-4">
+                          <SearchBox
                             placeholder="Search by SKU, name, or category..."
                             initialValue={
-                            filters.search || ""
+                              filters.search || ""
                             }
                             route="/inventory" />
 
-                                                </div>
-                                                <div className="col-md-3">
-                                                    <FormInput
+                        </div>
+                        <div className="col-md-3">
+                          <FormInput
                             label=""
                             type="select"
                             name="job_type_id"
                             value={
-                            filters.job_type_id ||
-                            ""
+                              filters.job_type_id ||
+                              ""
                             }
                             onChange={(e) => {
                               router.get(buildUrl("/inventory"),
-                              {
-                                ...filters,
-                                job_type_id:
-                                e.target.
-                                value ||
-                                null
-                              },
-                              {
-                                preserveState: false,
-                                preserveScroll: true
-                              }
+                                {
+                                  ...filters,
+                                  job_type_id:
+                                    e.target.
+                                      value ||
+                                    null
+                                },
+                                {
+                                  preserveState: false,
+                                  preserveScroll: true
+                                }
                               );
                             }}
                             options={[
-                            {
-                              value: "",
-                              label: "All Job Types"
-                            },
-                            ...jobTypes.map(
-                              (jt) => ({
-                                value: jt.id,
-                                label: jt.name
-                              })
-                            )]
+                              {
+                                value: "",
+                                label: "Filter by Job Type (All)"
+                              },
+                              ...jobTypes.map(
+                                (jt) => ({
+                                  value: jt.id,
+                                  label: jt.name
+                                })
+                              )]
                             } />
 
-                                                </div>
-                                                <div className="col-md-3">
-                                                    <FormInput
+                        </div>
+                        <div className="col-md-3">
+                          <FormInput
                             label=""
                             type="select"
                             name="stock_status"
                             value={
-                            filters.stock_status ||
-                            ""
+                              filters.stock_status ||
+                              ""
                             }
                             onChange={(e) => {
                               router.get(buildUrl("/inventory"),
-                              {
-                                ...filters,
-                                stock_status:
-                                e.target.
-                                value ||
-                                null
-                              },
-                              {
-                                preserveState: false,
-                                preserveScroll: true
-                              }
+                                {
+                                  ...filters,
+                                  stock_status:
+                                    e.target.
+                                      value ||
+                                    null
+                                },
+                                {
+                                  preserveState: false,
+                                  preserveScroll: true
+                                }
                               );
                             }}
                             options={[
-                            {
-                              value: "",
-                              label: "All Status"
-                            },
-                            {
-                              value: "low",
-                              label: "Low Stock"
-                            },
-                            {
-                              value: "out",
-                              label: "Out of Stock"
-                            }]
+                              {
+                                value: "",
+                                label: "All Status"
+                              },
+                              {
+                                value: "low",
+                                label: "Low Stock"
+                              },
+                              {
+                                value: "out",
+                                label: "Out of Stock"
+                              }]
                             } />
 
-                                                </div>
-                                            </div>
+                        </div>
+                      </div>
 
-                                            <div className="mt-4">
-                                                <DataTable
+                      <div className="mt-4">
+                        <DataTable
                           columns={stockItemColumns}
                           data={stockItems.data}
                           pagination={stockItems}
                           emptyMessage="No stock items found." />
 
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                      </div>
                     </div>
+                  </div>
                 </div>
-            </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        </AdminLayout>);
+    </AdminLayout>);
 
 }

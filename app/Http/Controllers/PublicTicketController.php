@@ -53,6 +53,11 @@ class PublicTicketController extends Controller
         $totalAmount = (float) $ticket->total_amount;
         $amountPaid = (float) $ticket->amount_paid;
         $balance = max($totalAmount - $amountPaid, 0);
+        
+        // Discount information
+        $originalPrice = (float) ($ticket->original_price ?? $totalAmount);
+        $discountPercentage = (float) ($ticket->discount_percentage ?? $ticket->discount ?? 0);
+        $discountAmount = (float) ($ticket->discount_amount ?? 0);
 
 
         $paymentStatusLabel = 'Pending';
@@ -99,6 +104,9 @@ class PublicTicketController extends Controller
             ],
             'payment' => [
                 'totalAmount' => $totalAmount,
+                'originalPrice' => $originalPrice,
+                'discountPercentage' => $discountPercentage,
+                'discountAmount' => $discountAmount,
                 'amountPaid' => $amountPaid,
                 'balance' => $balance,
                 'status' => $paymentStatusLabel,

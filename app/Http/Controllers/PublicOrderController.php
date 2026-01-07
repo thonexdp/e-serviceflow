@@ -129,6 +129,10 @@ class PublicOrderController extends Controller
             'custom_price_mode' => 'nullable|in:per_item,fixed_total',
             'custom_price_per_item' => 'nullable|numeric|min:0',
             'custom_fixed_total' => 'nullable|numeric|min:0',
+            // Discount fields
+            'original_price' => 'nullable|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'discount_amount' => 'nullable|numeric|min:0',
         ]);
 
         $paymentMethod = $validated['payment_method'] ?? 'walkin';
@@ -170,6 +174,10 @@ class PublicOrderController extends Controller
             'payment_method' => $paymentMethod === 'walkin' ? 'cash' : $paymentMethod,
             'payment_status' => $paymentStatus,
             'status' => 'pending',
+            // Discount fields
+            'original_price' => $validated['original_price'] ?? null,
+            'discount_percentage' => $validated['discount_percentage'] ?? null,
+            'discount_amount' => $validated['discount_amount'] ?? null,
         ];
 
         // Handle job type based on category
@@ -202,6 +210,25 @@ class PublicOrderController extends Controller
 
         $this->applyPricing($ticketData, $request);
 
+        // Apply discount if provided (after applyPricing to ensure we have correct original price)
+        if (isset($validated['discount_percentage']) && $validated['discount_percentage'] > 0) {
+            // Store original price if not already set
+            if (empty($ticketData['original_price'])) {
+                $ticketData['original_price'] = $ticketData['total_amount'];
+            }
+            
+            // Calculate and apply discount
+            $discountPercentage = floatval($validated['discount_percentage']);
+            $originalAmount = floatval($ticketData['original_price']);
+            $discountAmount = $originalAmount * ($discountPercentage / 100);
+            $discountedAmount = $originalAmount - $discountAmount;
+            
+            // Update ticket data with discounted values
+            $ticketData['discount_percentage'] = $discountPercentage;
+            $ticketData['discount_amount'] = round($discountAmount, 2);
+            $ticketData['total_amount'] = round($discountedAmount, 2);
+            $ticketData['subtotal'] = round($discountedAmount, 2);
+        }
 
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
 

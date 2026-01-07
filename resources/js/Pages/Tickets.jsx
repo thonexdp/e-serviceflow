@@ -232,6 +232,15 @@ export default function Tickets({
 
 
   const handleOpenPaymentModal = (ticket) => {
+    console.log('📊 Ticket Payment Data:', {
+      ticket_number: ticket.ticket_number,
+      total_amount: ticket.total_amount,
+      subtotal: ticket.subtotal,
+      original_price: ticket.original_price,
+      discount: ticket.discount,
+      discount_percentage: ticket.discount_percentage,
+      discount_amount: ticket.discount_amount
+    });
     setSelectedTicket(ticket);
     setPaymentFormData({
       ticket_id: ticket.id,
@@ -1090,38 +1099,84 @@ export default function Tickets({
                     </p>
                   </div>
                   <div className="col-md-6">
-                    <p className="m-b-5">
-                      <strong>Subtotal:</strong>{" "}
-                      {parseFloat(selectedTicket.subtotal || selectedTicket.total_amount || 0) > 0
-                        ? formatPeso(selectedTicket.subtotal || selectedTicket.total_amount)
-                        : "To be confirmed"}
-                    </p>
-                    {parseFloat(selectedTicket.discount || 0) > 0 &&
-                      <p className="m-b-5 text-success">
-                        <strong>Discount:</strong>{" "}
-                        {parseFloat(selectedTicket.discount)}% OFF
-                      </p>
-                    }
-                    <p className="m-b-5">
-                      <strong>Total Amount:</strong>{" "}
-                      {parseFloat(selectedTicket.total_amount || 0) > 0
-                        ? formatPeso(selectedTicket.total_amount)
-                        : "To be confirmed"}
-                    </p>
-                    <p className="m-b-5">
-                      <strong>Amount Paid:</strong>{" "}
-                      {formatPeso(
-                        selectedTicket.amount_paid
-                      )}
-                    </p>
-                    <p className="m-b-0 text-danger font-bold border-t pt-1">
-                      <strong>Balance:</strong>{" "}
-                      {parseFloat(selectedTicket.total_amount || 0) > 0
-                        ? formatPeso(
-                          Math.max(0, parseFloat(selectedTicket.total_amount || 0) - parseFloat(selectedTicket.amount_paid || 0))
-                        )
-                        : "To be confirmed"}
-                    </p>
+                    {(() => {
+                      const discountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
+                      const hasDiscount = discountPct > 0;
+                      let originalPrice = parseFloat(selectedTicket.original_price || 0);
+                      let totalAmount = parseFloat(selectedTicket.total_amount || 0);
+                      
+                      // Calculate discounted total if we have discount info
+                      let finalTotal = totalAmount; // Default to total_amount
+                      if (hasDiscount) {
+                        // If original_price is not set, use total_amount as original
+                        if (originalPrice === 0 && totalAmount > 0) {
+                          originalPrice = totalAmount;
+                        }
+                        
+                        // Calculate discounted amount
+                        const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
+                        const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
+                        const discountedTotal = originalPrice - calculatedDiscountAmount;
+                        finalTotal = discountedTotal; // Use discounted total for balance calculation
+                        
+                        return (
+                          <>
+                            <p className="m-b-5 text-muted">
+                              <strong>Original Price:</strong>{" "}
+                              <span className="text-decoration-line-through">
+                                {formatPeso(originalPrice.toFixed(2))}
+                              </span>
+                            </p>
+                            <p className="m-b-5 text-success">
+                              <strong>Discount:</strong>{" "}
+                              {discountPct}% OFF
+                              <span> (-{formatPeso(calculatedDiscountAmount.toFixed(2))})</span>
+                            </p>
+                            <p className="m-b-5 font-weight-bold">
+                              <strong>Total Amount:</strong>{" "}
+                              <span className="text-success">
+                                {formatPeso(discountedTotal.toFixed(2))}
+                              </span>
+                            </p>
+                            <p className="m-b-5">
+                              <strong>Amount Paid:</strong>{" "}
+                              {formatPeso(selectedTicket.amount_paid)}
+                            </p>
+                            <p className="m-b-0 text-danger font-bold border-t pt-1">
+                              <strong>Balance:</strong>{" "}
+                              {formatPeso(Math.max(0, discountedTotal - parseFloat(selectedTicket.amount_paid || 0)).toFixed(2))}
+                            </p>
+                          </>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          <p className="m-b-5">
+                            <strong>Subtotal:</strong>{" "}
+                            {parseFloat(selectedTicket.subtotal || totalAmount || 0) > 0
+                              ? formatPeso((selectedTicket.subtotal || totalAmount))
+                              : "To be confirmed"}
+                          </p>
+                          <p className="m-b-5">
+                            <strong>Total Amount:</strong>{" "}
+                            {totalAmount > 0
+                              ? formatPeso(totalAmount.toFixed(2))
+                              : "To be confirmed"}
+                          </p>
+                          <p className="m-b-5">
+                            <strong>Amount Paid:</strong>{" "}
+                            {formatPeso(selectedTicket.amount_paid)}
+                          </p>
+                          <p className="m-b-0 text-danger font-bold border-t pt-1">
+                            <strong>Balance:</strong>{" "}
+                            {parseFloat(totalAmount || 0) > 0
+                              ? formatPeso(Math.max(0, parseFloat(totalAmount || 0) - parseFloat(selectedTicket.amount_paid || 0)).toFixed(2))
+                              : "To be confirmed"}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1240,7 +1295,38 @@ export default function Tickets({
                 </h6>
                 <p className="mb-0 small">
                   Ticket: <strong>{selectedTicket.ticket_number}</strong><br />
-                  Total Amount: <strong>{parseFloat(selectedTicket.total_amount || 0) > 0 ? formatPeso(selectedTicket.total_amount) : "To be confirmed"}</strong>
+                  {(() => {
+                    const discountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
+                    const hasDiscount = discountPct > 0;
+                    let originalPrice = parseFloat(selectedTicket.original_price || 0);
+                    let totalAmount = parseFloat(selectedTicket.total_amount || 0);
+                    
+                    if (hasDiscount) {
+                      // If original_price is not set, use total_amount as original
+                      if (originalPrice === 0 && totalAmount > 0) {
+                        originalPrice = totalAmount;
+                      }
+                      
+                      // Calculate discounted amount
+                      const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
+                      const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
+                      const discountedTotal = originalPrice - calculatedDiscountAmount;
+                      
+                      return (
+                        <>
+                          Original Price: <span className="text-decoration-line-through">{formatPeso(originalPrice.toFixed(2))}</span><br />
+                          Discount: <span className="text-success font-weight-bold">{discountPct}% OFF (-{formatPeso(calculatedDiscountAmount.toFixed(2))})</span><br />
+                          Total Amount: <strong className="text-success">{formatPeso(discountedTotal.toFixed(2))}</strong>
+                        </>
+                      );
+                    }
+                    
+                    return (
+                      <>
+                        Total Amount: <strong>{totalAmount > 0 ? formatPeso(totalAmount.toFixed(2)) : "To be confirmed"}</strong>
+                      </>
+                    );
+                  })()}
                   {selectedTicket.payment_method === 'cash' &&
                     <><br />Confirm this order once the customer arrives at the branch.</>
                   }
@@ -1325,7 +1411,7 @@ export default function Tickets({
 
         <section id="main-content">
           {/* Customer Search and Add Section */}
-          {hasPermission('customers', 'create') &&
+          {hasPermission('customers', 'manage') &&
             <div className="row">
               <div className="col-lg-6">
                 <div className="card">

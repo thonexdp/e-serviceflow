@@ -452,18 +452,69 @@ export default function PrintShoppeLanding() {
 
                                         {/* Payment Info */}
                                         <div className="pt-4 space-y-2">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Total Amount</span>
-                                                <span className="font-medium text-gray-900">{formatPeso(orderData.payment.totalAmount.toFixed(2))}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Amount Paid</span>
-                                                <span className="font-medium text-green-600">{formatPeso(orderData.payment.amountPaid.toFixed(2))}</span>
-                                            </div>
-                                            <div className="flex justify-between pt-2 border-t border-gray-200">
-                                                <span className="font-semibold text-gray-900">Balance Due</span>
-                                                <span className="font-bold text-red-600">{formatPeso(orderData.payment.balance.toFixed(2))}</span>
-                                            </div>
+                                            {(() => {
+                                                const discountPct = parseFloat(orderData.payment.discountPercentage || 0);
+                                                const hasDiscount = discountPct > 0;
+                                                
+                                                if (hasDiscount) {
+                                                    let originalPrice = parseFloat(orderData.payment.originalPrice || 0);
+                                                    const totalAmount = parseFloat(orderData.payment.totalAmount || 0);
+                                                    
+                                                    // If original_price is not set, use total_amount as original
+                                                    if (originalPrice === 0 && totalAmount > 0) {
+                                                        originalPrice = totalAmount;
+                                                    }
+                                                    
+                                                    // Calculate discount and discounted total
+                                                    const discountAmount = parseFloat(orderData.payment.discountAmount || 0);
+                                                    const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
+                                                    const discountedTotal = originalPrice - calculatedDiscountAmount;
+                                                    const amountPaid = parseFloat(orderData.payment.amountPaid || 0);
+                                                    const balance = Math.max(0, discountedTotal - amountPaid);
+                                                    
+                                                    return (
+                                                        <>
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-gray-600">Original Price</span>
+                                                                <span className="font-medium text-gray-500 line-through">{formatPeso(originalPrice.toFixed(2))}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-gray-600">Discount ({discountPct}%)</span>
+                                                                <span className="font-medium text-green-600">-{formatPeso(calculatedDiscountAmount.toFixed(2))}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2">
+                                                                <span className="text-gray-900">Total Amount</span>
+                                                                <span className="text-green-600">{formatPeso(discountedTotal.toFixed(2))}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-gray-600">Amount Paid</span>
+                                                                <span className="font-medium text-green-600">{formatPeso(amountPaid.toFixed(2))}</span>
+                                                            </div>
+                                                            <div className="flex justify-between pt-2 border-t border-gray-200">
+                                                                <span className="font-semibold text-gray-900">Balance Due</span>
+                                                                <span className="font-bold text-red-600">{formatPeso(balance.toFixed(2))}</span>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                }
+                                                
+                                                return (
+                                                    <>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-gray-600">Total Amount</span>
+                                                            <span className="font-medium text-gray-900">{formatPeso(orderData.payment.totalAmount.toFixed(2))}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-gray-600">Amount Paid</span>
+                                                            <span className="font-medium text-green-600">{formatPeso(orderData.payment.amountPaid.toFixed(2))}</span>
+                                                        </div>
+                                                        <div className="flex justify-between pt-2 border-t border-gray-200">
+                                                            <span className="font-semibold text-gray-900">Balance Due</span>
+                                                            <span className="font-bold text-red-600">{formatPeso(orderData.payment.balance.toFixed(2))}</span>
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-600">Payment Status</span>
                                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${orderData.payment.status === 'Paid' ? 'bg-green-100 text-green-700' :

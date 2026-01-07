@@ -112,13 +112,34 @@ export default function JobTypes({
     const url = editingCategory ?
       buildUrl(`/job-categories/${editingCategory.id}`) :
       buildUrl("/job-categories");
-    const method = editingCategory ? "put" : "post";
 
-    router[method](url, data, {
-      onSuccess: handleCloseModals,
-      preserveState: false,
-      preserveScroll: true
+    // Check if there's a file to upload
+    const hasFile = data.image && data.image instanceof File;
+    const submitData = { ...data };
+
+    // Remove null/undefined values to avoid issues
+    Object.keys(submitData).forEach(key => {
+      if (submitData[key] === null || submitData[key] === undefined) {
+        delete submitData[key];
+      }
     });
+
+    if (hasFile && editingCategory) {
+      // Laravel requires POST with _method PUT for multipart/form-data updates
+      submitData._method = 'PUT';
+      router.post(url, submitData, {
+        onSuccess: handleCloseModals,
+        preserveState: false,
+        preserveScroll: true
+      });
+    } else {
+      const method = editingCategory ? "put" : "post";
+      router[method](url, submitData, {
+        onSuccess: handleCloseModals,
+        preserveState: false,
+        preserveScroll: true
+      });
+    }
   };
 
 
@@ -345,6 +366,26 @@ export default function JobTypes({
       render: (row, index) => {
         const { current_page = 1, per_page = 10 } = categories;
         return (current_page - 1) * per_page + index + 1;
+      }
+    },
+    {
+      label: "Image",
+      key: "image_path",
+      render: (row) => {
+        const fallbackSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='%239ca3af'%3E${encodeURIComponent(row.name.substring(0, 2).toUpperCase())}%3C/text%3E%3C/svg%3E`;
+        return (
+          <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden border">
+            <img
+              src={row.image_path || fallbackSvg}
+              alt={row.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = fallbackSvg;
+              }}
+            />
+          </div>
+        );
       }
     },
     {

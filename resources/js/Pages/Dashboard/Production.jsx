@@ -752,10 +752,10 @@ export default function Productions({
     if (!step) return <span className="text-muted">{workflowStep}</span>;
 
     return (
-      <span className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
+      <div className="badge" style={{ backgroundColor: step.color, color: 'white' }}>
         <i className={`${step.icon} mr-1`}></i>
         {step.label}
-      </span>);
+      </div>);
 
   };
 
@@ -786,7 +786,7 @@ export default function Productions({
       label: "Ticket ID",
       key: "ticket_number",
       render: (row) =>
-        <div className="d-flex align-items-center">
+        <div className="d-flex align-items-center" style={{ maxWidth: isFullscreen ? '350px' : '250px' }}>
           {row.mockup_files && row.mockup_files.length > 0 &&
             <div className="mr-3">
               <img
@@ -808,13 +808,26 @@ export default function Productions({
 
             </div>
           }
-          <div>
+          <div style={{ overflow: 'hidden' }}>
             {row.job_type &&
-              <div className="text-muted font-weight-bold mb-1" style={{ fontSize: isFullscreen ? '1rem' : '0.8rem', textTransform: 'uppercase' }}>
+              <div className="text-muted font-weight-bold mb-1" style={{
+                fontSize: isFullscreen ? '1rem' : '0.8rem',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
                 {row.job_type.name}
               </div>
             }
-            <strong style={{ fontSize: isFullscreen ? '1rem' : '1.2rem', color: '#1a1a1a', display: 'block' }}>#{row.ticket_number}</strong>
+            <strong style={{
+              fontSize: isFullscreen ? '1rem' : '1.2rem',
+              color: '#1a1a1a',
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>#{row.ticket_number}</strong>
           </div>
         </div>
 
@@ -823,8 +836,13 @@ export default function Productions({
       label: "Description",
       key: "description",
       render: (row) =>
-        <div>
-          <div className="font-weight-bold" style={{ fontSize: isFullscreen ? '1.15rem' : '1rem' }}>{row.description}</div>
+        <div style={{ maxWidth: isFullscreen ? '500px' : '300px' }}>
+          <div className="font-weight-bold" style={{
+            fontSize: isFullscreen ? '1.15rem' : '1rem',
+            whiteSpace: 'normal',
+            wordBreak: 'break-word',
+            lineHeight: '1.2'
+          }}>{row.description}</div>
           <div className="text-primary font-weight-bold" style={{ fontSize: isFullscreen ? '1rem' : '0.85rem' }}>
             {row.customer?.firstname} {row.customer?.lastname}
           </div>
@@ -943,8 +961,7 @@ export default function Productions({
       key: "status",
       render: (row) =>
         <div style={{
-          fontSize: isFullscreen ? '1.1rem' : '1rem',
-          minWidth: isFullscreen ? '180px' : '120px',
+          fontSize: '1rem',
           whiteSpace: 'nowrap',
           fontWeight: 'bold'
         }}>
