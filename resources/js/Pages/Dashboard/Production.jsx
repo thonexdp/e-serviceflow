@@ -820,14 +820,7 @@ export default function Productions({
                 {row.job_type.name}
               </div>
             }
-            <strong style={{
-              fontSize: isFullscreen ? '1rem' : '1.2rem',
-              color: '#1a1a1a',
-              display: 'block',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>#{row.ticket_number}</strong>
+            {row.ticket_number}
           </div>
         </div>
 
@@ -869,12 +862,12 @@ export default function Productions({
         const percentage = totalQty > 0 ? Math.round(stepQuantity / totalQty * 100) : 0;
 
         return (
-          <div style={{ minWidth: isFullscreen ? '200px' : '150px' }}>
+          <div style={{ minWidth: '100px' }}>
             <div className="d-flex justify-content-between mb-1">
-              <span className={stepQuantity >= totalQty ? "text-success font-weight-bold" : "text-warning font-weight-bold"} style={{ fontSize: isFullscreen ? '1.2rem' : '1rem' }}>
+              <span className={stepQuantity >= totalQty ? "text-success font-weight-bold" : "text-warning font-weight-bold"} style={{ fontSize: '1rem' }}>
                 {stepQuantity} / {totalQty}
               </span>
-              <span className="font-weight-bold" style={{ color: '#667eea', fontSize: isFullscreen ? '1.1rem' : '0.9rem' }}>{percentage}%</span>
+              <span className="font-weight-semibold" style={{ color: '#667eea', fontSize: '1rem' }}>{percentage}%</span>
             </div>
             <div className="progress shadow-sm" style={{ height: isFullscreen ? '14px' : '8px', borderRadius: '10px' }}>
               <div

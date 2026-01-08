@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { getColorName, getFullColorName } from "@/Utils/colors";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
@@ -23,6 +24,8 @@ export default function Mockups({
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+  const [selectedPreviewTicket, setSelectedPreviewTicket] = useState(null);
+  const [previewToPrint, setPreviewToPrint] = useState(null);
   const [uploadFiles, setUploadFiles] = useState([]);
   const [dateRange, setDateRange] = useState(filters.date_range || "");
 
@@ -55,6 +58,7 @@ export default function Mockups({
     setNotes("");
     setShowRevisionNotes(false);
     setSelectedPreviewFile(null);
+    setSelectedPreviewTicket(null);
   };
 
   const handleFileSelect = (e) => {
@@ -153,6 +157,23 @@ export default function Mockups({
 
   const handlePreview = (filepath) => {
     setSelectedImage(filepath);
+  };
+
+  const handlePrint = () => {
+    if (!selectedPreviewFile || !selectedPreviewTicket) return;
+    
+    setPreviewToPrint({
+      file: selectedPreviewFile,
+      ticket: selectedPreviewTicket
+    });
+
+    document.body.classList.add("printing-preview");
+
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove("printing-preview");
+      setPreviewToPrint(null);
+    }, 500);
   };
 
   const handleClaimTicket = (ticketId) => {
@@ -323,22 +344,36 @@ export default function Mockups({
     {
       label: "Ticket / Preview",
       key: "ticket_number",
-      render: (row) => (
-        <div className="d-flex align-items-center">
-          {row.mockup_files && row.mockup_files.length > 0 && (
-            <img
-              src={row.mockup_files[row.mockup_files.length - 1].file_path}
-              alt="Preview"
-              className="img-thumbnail mr-2"
-              style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
-              onClick={() => setSelectedPreviewFile(row.mockup_files[row.mockup_files.length - 1])}
-            />
-          )}
-          <div className="flex flex-col leading-tight">
-            <strong className="leading-tight">{row.ticket_number}</strong>
+      render: (row) => {
+        // Get preview file - prefer mockup files, fallback to customer files
+        const mockupFiles = row.mockup_files || [];
+        const customerFiles = row.files?.filter((f) => f.type === 'customer') || [];
+        const previewFile = mockupFiles.length > 0 
+          ? mockupFiles[mockupFiles.length - 1]
+          : customerFiles.length > 0 
+            ? customerFiles[customerFiles.length - 1]
+            : null;
+
+        return (
+          <div className="d-flex align-items-center">
+            {previewFile && (
+              <img
+                src={previewFile.file_path}
+                alt="Preview"
+                className="img-thumbnail mr-2"
+                style={{ width: '60px', height: '60px', objectFit: 'cover', cursor: 'pointer' }}
+                onClick={() => {
+                  setSelectedPreviewFile(previewFile);
+                  setSelectedPreviewTicket(row);
+                }}
+              />
+            )}
+            <div className="flex flex-col leading-tight">
+              <strong className="leading-tight">{row.ticket_number}</strong>
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       label: "Customer",
@@ -470,12 +505,12 @@ export default function Mockups({
         title={`Review Design - Ticket #${selectedTicket?.ticket_number}`}
         isOpen={openReviewModal}
         onClose={handleCloseModals}
-        size="6xl">
+        size="9xl">
 
         {selectedTicket &&
-          <div className="row">
-            {/* Left Side - Form Content */}
-            <div className="col-md-7">
+          <div className="row flex-row-reverse">
+            {/* Right Side - Form Content */}
+            <div className="col-md-5 border-left">
               <div className="mb-4">
                 <h5>
                   Customer: <b>{selectedTicket.customer?.firstname} {selectedTicket.customer?.lastname}</b>
@@ -487,6 +522,18 @@ export default function Mockups({
                   <span>Status: {getDesignStatusBadge(selectedTicket.design_status)}</span>
                 </div>
               </div>
+
+              {selectedTicket.design_description && (
+                <div className="design-description-review mb-4 p-3 bg-white border rounded shadow-sm">
+                  <h6 className="font-weight-bold text-primary mb-2">
+                    <i className="ti-info-alt mr-1"></i> Design Elaboration:
+                  </h6>
+                  <div
+                    className="tiptap-content small text-dark p-2"
+                    dangerouslySetInnerHTML={{ __html: selectedTicket.design_description }}
+                  />
+                </div>
+              )}
 
               {selectedTicket.design_notes && (
                 <div className="alert alert-warning border shadow-sm mb-4">
@@ -508,7 +555,6 @@ export default function Mockups({
                     <thead>
                       <tr>
                         <th>Filename</th>
-                        <th>Uploaded</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -516,31 +562,27 @@ export default function Mockups({
                       {customerFiles.length > 0 ?
                         customerFiles.map((file) =>
                           <tr key={file.id}>
-                            <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
-                            <td>{new Date(file.created_at).toLocaleDateString()}</td>
+                            <td className="max-w-[120px] truncate" title={file.file_name}>{file.file_name}</td>
                             <td>
                               <div className="btn-group">
                                 <button
                                   type="button"
-                                  className="btn btn-link btn-sm text-orange-500"
+                                  className="btn btn-link btn-sm text-orange-500 p-0 mr-2"
                                   onClick={() => handleDownload(file.id, file.file_name)}>
-
-                                  <i className="ti-download"></i> Download
+                                  <i className="ti-download"></i>
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn btn-link btn-sm text-green-500"
+                                  className="btn btn-link btn-sm text-green-500 p-0"
                                   onClick={() => handlePreview(file.file_path)}>
-
-                                  <i className="ti-eye"></i> Preview
+                                  <i className="ti-eye"></i>
                                 </button>
                               </div>
                             </td>
                           </tr>
                         ) :
-
                         <tr>
-                          <td colSpan="3" className="text-center text-muted">No customer files</td>
+                          <td colSpan="2" className="text-center text-muted">No customer files</td>
                         </tr>
                       }
                     </tbody>
@@ -549,49 +591,42 @@ export default function Mockups({
               </div>
 
               {mockupFiles.length > 0 &&
-                <>
-                  <hr className="my-3" />
-                  <div className="mb-4">
-                    <h6>Mock-up Files:</h6>
-                    <div className="table-responsive">
-                      <table className="table table-sm table-bordered">
-                        <thead>
-                          <tr>
-                            <th>Filename</th>
-                            <th>Uploaded</th>
-                            <th>Actions</th>
+                <div className="mb-4">
+                  <h6>Mock-up Files:</h6>
+                  <div className="table-responsive">
+                    <table className="table table-sm table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Filename</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mockupFiles.map((file) =>
+                          <tr key={file.id}>
+                            <td className="max-w-[120px] truncate" title={file.file_name}>{file.file_name}</td>
+                            <td>
+                              <div className="btn-group">
+                                <button
+                                  type="button"
+                                  className="btn btn-link btn-sm text-orange-500 p-0 mr-2"
+                                  onClick={() => handleDownload(file.id, file.file_name)}>
+                                  <i className="ti-download"></i>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-link btn-sm text-green-500 p-0"
+                                  onClick={() => handlePreview(file.file_path)}>
+                                  <i className="ti-eye"></i>
+                                </button>
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {mockupFiles.map((file) =>
-                            <tr key={file.id}>
-                              <td className="max-w-[150px] truncate" title={file.file_name}>{file.file_name}</td>
-                              <td>{new Date(file.created_at).toLocaleDateString()}</td>
-                              <td>
-                                <div className="btn-group">
-                                  <button
-                                    type="button"
-                                    className="btn btn-link btn-sm text-orange-500"
-                                    onClick={() => handleDownload(file.id, file.file_name)}>
-
-                                    <i className="ti-download"></i> Download
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-link btn-sm text-green-500"
-                                    onClick={() => handlePreview(file.file_path)}>
-
-                                    <i className="ti-eye"></i> Preview
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                </>
+                </div>
               }
 
               {/* Actions Section */}
@@ -622,7 +657,7 @@ export default function Mockups({
                               onClick={handleRequestRevision}
                               disabled={loading || !notes.trim()}
                             >
-                              <i className="ti-check mr-1"></i> Confirm & Send Revision Request
+                              <i className="ti-check mr-1"></i> Send Revision
                             </button>
                             <button
                               type="button"
@@ -655,59 +690,65 @@ export default function Mockups({
                     </div>
                   </div>
                 ) : (
-                  <div className="alert alert-secondary text-center">
+                  <div className="alert alert-secondary text-center small p-2">
                     {selectedTicket.design_status === 'approved' ? (
-                      <span className="text-success">
-                        <i className="ti-check-box mr-2"></i> This design has been approved.
+                      <span className="text-success font-weight-bold">
+                        <i className="ti-check-box mr-2"></i> Design Approved.
                       </span>
                     ) : (
                       <span>Current status: <b>{selectedTicket.design_status.replace('_', ' ')}</b></span>
                     )}
                   </div>
                 )}
-
                 <button
                   type="button"
-                  className="btn btn-secondary btn-block mt-3"
+                  className="btn btn-secondary btn-block btn-sm mt-3"
                   onClick={handleCloseModals}
                 >
                   Close Review
                 </button>
               </div>
-
             </div>
 
-            {/* Right Side - Image Preview */}
-            <div className="col-md-5">
-              <div className="sticky-top" style={{ top: '20px' }}>
+            {/* Left Side - Image Preview */}
+            <div className="col-md-7">
+              <div className="sticky-top" style={{ top: '0px' }}>
                 <h6 className="mb-2 d-flex justify-content-between align-items-center">
-                  <span>Document Preview</span>
-                  {selectedImage && (
-                    <span className="badge badge-info">Preview Mode</span>
-                  )}
+                  <span>Design Preview</span>
                 </h6>
                 {selectedImage ? (
-                  <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container">
+                  <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
                     <img
                       src={selectedImage}
                       alt="Preview"
                       className="img-fluid rounded"
-                      style={{ maxHeight: '600px', width: '100%', objectFit: 'contain' }}
+                      style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
                     />
+                  </div>
+                ) : mockupFiles.length > 0 ? (
+                  <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
+                    <img
+                      src={mockupFiles[mockupFiles.length - 1].file_path}
+                      alt="Latest Mockup"
+                      className="img-fluid rounded"
+                      style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
+                    />
+                    <p className="mt-2 small text-muted">Showing latest uploaded mock-up</p>
+                  </div>
+                ) : customerFiles.length > 0 ? (
+                  <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
+                    <img
+                      src={customerFiles[customerFiles.length - 1].file_path}
+                      alt="Latest Customer File"
+                      className="img-fluid rounded"
+                      style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
+                    />
+                    <p className="mt-2 small text-muted">Showing latest customer attachment</p>
                   </div>
                 ) : (
                   <div className="border rounded p-5 text-center text-muted bg-light d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '400px' }}>
                     <i className="ti-image" style={{ fontSize: '64px', opacity: 0.3 }}></i>
-                    <p className="mt-3 font-italic">Select a file from the list to preview</p>
-                  </div>
-                )}
-
-                {selectedTicket.design_status === "mockup_uploaded" && !showRevisionNotes && (
-                  <div className="mt-3 p-3 bg-light border rounded small">
-                    <p className="mb-0 text-muted">
-                      <i className="ti-info-alt mr-1"></i>
-                      Please review the mockup carefully before approving. Approved designs move to production.
-                    </p>
+                    <p className="mt-3 font-italic">No design files available yet</p>
                   </div>
                 )}
               </div>
@@ -920,37 +961,92 @@ export default function Mockups({
         }
       </Modal>
 
-      {/* Image Preview Modal */}
       <Modal
         title="Design File Preview"
         isOpen={!!selectedPreviewFile}
-        onClose={() => setSelectedPreviewFile(null)}
-        size="4xl">
+        onClose={() => {
+          setSelectedPreviewFile(null);
+          setSelectedPreviewTicket(null);
+        }}
+        size="10xl">
         {selectedPreviewFile && (
-          <div className="text-center">
-            <img
-              src={selectedPreviewFile.file_path}
-              alt={selectedPreviewFile.file_name}
-              className="img-fluid"
-              style={{ maxHeight: '70vh' }}
-            />
-            <div className="mt-3 text-left">
-              <p className="mb-1"><strong>Filename:</strong> {selectedPreviewFile.file_name}</p>
-              <p className="mb-0"><strong>Uploaded:</strong> {new Date(selectedPreviewFile.created_at).toLocaleString()}</p>
+          <div className="row">
+            <div className="col-md-7">
+              <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
+                <img
+                  src={selectedPreviewFile.file_path}
+                  alt={selectedPreviewFile.file_name}
+                  className="img-fluid"
+                  style={{ maxHeight: '75vh', width: '100%', objectFit: 'contain' }}
+                />
+              </div>
             </div>
-            <div className="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setSelectedPreviewFile(null)}>
-                Close
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => handleDownload(selectedPreviewFile.id, selectedPreviewFile.file_name)}>
-                <i className="ti-download mr-2"></i>Download
-              </button>
+            <div className="col-md-5 border-left">
+              <div className="p-3">
+                <h5 className="font-weight-bold mb-3">Design Information</h5>
+                <hr />
+                {selectedPreviewTicket?.ticket_number && (
+                  <div className="mb-3">
+                    <p className="mb-1 text-muted small uppercase font-weight-bold">Ticket Number</p>
+                    <p className="mb-0 font-weight-500">{selectedPreviewTicket.ticket_number}</p>
+                  </div>
+                )}
+                {selectedPreviewTicket?.customer && (
+                  <div className="mb-3">
+                    <p className="mb-1 text-muted small uppercase font-weight-bold">Customer</p>
+                    <p className="mb-0 font-weight-500">{selectedPreviewTicket.customer.firstname} {selectedPreviewTicket.customer.lastname}</p>
+                  </div>
+                )}
+                {selectedPreviewTicket?.description && (
+                  <div className="mb-3">
+                    <p className="mb-1 text-muted small uppercase font-weight-bold">Description</p>
+                    <p className="mb-0 font-weight-500">{selectedPreviewTicket.description}</p>
+                  </div>
+                )}
+                <div className="mb-3">
+                  <p className="mb-1 text-muted small uppercase font-weight-bold">Filename</p>
+                  <p className="mb-0 font-weight-500">{selectedPreviewFile.file_name}</p>
+                </div>
+                <div className="mb-3">
+                  <p className="mb-1 text-muted small uppercase font-weight-bold">Uploaded On</p>
+                  <p className="mb-0 font-weight-500">{new Date(selectedPreviewFile.created_at).toLocaleString()}</p>
+                </div>
+
+                {selectedPreviewTicket?.design_description && (
+                  <div className="mt-4">
+                    <p className="mb-2 text-primary small uppercase font-weight-bold">Design Description / Elaboration</p>
+                    <div
+                      className="p-3 bg-light border rounded shadow-inner tiptap-content"
+                      style={{ maxHeight: '300px', overflowY: 'auto' }}
+                      dangerouslySetInnerHTML={{ __html: selectedPreviewTicket.design_description }}
+                    />
+                  </div>
+                )}
+
+                <div className="mt-5 d-flex flex-column gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-block py-2"
+                    onClick={() => handleDownload(selectedPreviewFile.id, selectedPreviewFile.file_name)}>
+                    <i className="ti-download mr-2"></i>Download Design File
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-info btn-block py-2"
+                    onClick={handlePrint}>
+                    <i className="ti-printer mr-2"></i>Print Preview
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-block py-2"
+                    onClick={() => {
+                      setSelectedPreviewFile(null);
+                      setSelectedPreviewTicket(null);
+                    }}>
+                    Close Preview
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1076,6 +1172,142 @@ export default function Mockups({
           </div>
         </div>
       </section>
+
+      {/* Hidden Print Preview - Portaled to Body */}
+      {createPortal(
+        <div id="preview-print-overlay" style={{ display: previewToPrint ? 'block' : 'none' }}>
+          {previewToPrint && (
+            <div className="preview-print-container bg-white text-black" style={{
+              fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif",
+              fontSize: '11pt',
+              width: '297mm',
+              minHeight: '210mm',
+              margin: '0 auto',
+              boxSizing: 'border-box',
+              position: 'relative',
+              color: '#333',
+              WebkitPrintColorAdjust: 'exact',
+              printColorAdjust: 'exact'
+            }}>
+              <div style={{ display: 'flex', width: '100%', minHeight: '100%'}}>
+                {/* Left Side - Image (only on first page) */}
+                <div 
+                  className="print-image-container"
+                  style={{ 
+                    width: '70%', 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    justifyContent: 'center',
+                    border: '1px solid #ddd',
+                    padding: '10px',
+                    flexShrink: 0
+                  }}>
+                  <img
+                    src={previewToPrint.file.file_path}
+                    alt={previewToPrint.file.file_name}
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '180mm', 
+                      objectFit: 'contain' 
+                    }}
+                  />
+                </div>
+
+                {/* Right Side - Design Description Only */}
+                <div style={{ 
+                  width: '30%', 
+                  paddingLeft: '5px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: '100%'
+                }}>
+                  {previewToPrint.ticket.design_description ? (
+                    <div
+                      className="tiptap-content print-description"
+                      style={{ 
+                        fontSize: '11pt', 
+                        padding: '5px',
+                        border: '1px solid #eee',
+                        borderRadius: '4px',
+                        minHeight: '100%'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: previewToPrint.ticket.design_description }}
+                    />
+                  ) : (
+                    <div style={{ 
+                      fontSize: '11pt', 
+                      color: '#999',
+                      fontStyle: 'italic',
+                      padding: '20px'
+                    }}>
+                      No design description available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      <style>{`
+        @media print {
+          @page {
+            margin: 0;
+            size: A4 landscape;
+          }
+          body.printing-preview {
+            visibility: hidden;
+            overflow: visible !important;
+            height: auto !important;
+          }
+          #app {
+            display: none !important;
+          }
+          
+          body.printing-preview #preview-print-overlay,
+          body.printing-preview #preview-print-overlay .preview-print-container {
+            visibility: visible !important;
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            background: white !important;
+            z-index: 99999 !important;
+            overflow: visible !important;
+            page-break-inside: avoid;
+          }
+          body.printing-preview #preview-print-overlay * {
+            visibility: visible !important;
+          }
+          
+          /* Image only on first page - keep together */
+          body.printing-preview #preview-print-overlay .print-image-container {
+            page-break-inside: avoid;
+          }
+          
+          /* Allow description to flow across pages */
+          body.printing-preview #preview-print-overlay .print-description {
+            overflow: visible !important;
+            max-height: none !important;
+            page-break-inside: auto;
+            break-inside: auto;
+          }
+          
+          body.printing-preview #preview-print-overlay .print-description * {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          
+          /* Ensure content can flow to new pages */
+          body.printing-preview #preview-print-overlay .preview-print-container > div {
+            page-break-inside: auto;
+          }
+        }
+      `}</style>
 
     </AdminLayout>);
 

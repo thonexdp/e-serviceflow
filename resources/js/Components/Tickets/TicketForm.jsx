@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { getColorName, getFullColorName } from "@/Utils/colors";
 import FormInput from "@/Components/Common/FormInput";
+import TiptapEditor from "@/Components/Common/TiptapEditor";
 import { usePage } from "@inertiajs/react";
 
 const parseSizeValue = (value) => {
@@ -90,7 +91,8 @@ export default function TicketForm({
     is_size_based: false,
     custom_width: "",
     custom_height: "",
-    selected_color: ""
+    selected_color: "",
+    design_description: ""
   });
 
   const [errors, setErrors] = useState({});
@@ -214,10 +216,10 @@ export default function TicketForm({
 
       // Use original_price as subtotal if available, otherwise use subtotal or total_amount
       const ticketSubtotal = ticket.original_price || ticket.subtotal || ticket.total_amount || "";
-      
+
       // Use discount_percentage if available, fallback to discount
       const ticketDiscount = ticket.discount_percentage || ticket.discount || "";
-      
+
       setFormData({
         customer_id: ticket.customer_id || customerId || "",
         description: ticket.description || "",
@@ -258,18 +260,19 @@ export default function TicketForm({
         is_size_based: isSizeBased,
         custom_width: customWidth,
         custom_height: customHeight,
-        selected_color: ticket.selected_color || ""
+        selected_color: ticket.selected_color || "",
+        design_description: ticket.design_description || ""
       });
       setSizeDimensions(parsedSize);
       // Enable discount if ticket has discount_percentage, discount, or job type discount
       const hasDiscount = parseFloat(
-        ticket.discount_percentage || 
-        ticket.discount || 
-        ticket.job_type?.discount || 
+        ticket.discount_percentage ||
+        ticket.discount ||
+        ticket.job_type?.discount ||
         0
       ) > 0;
       setEnableDiscount(hasDiscount);
-      
+
       // Set selectedJobType if ticket has job_type object (for customer orders)
       if (ticket.job_type && typeof ticket.job_type === 'object') {
         setSelectedJobType(ticket.job_type);
@@ -310,9 +313,9 @@ export default function TicketForm({
         if (ticket && ticket.job_type_id?.toString() === formData.job_type_id?.toString()) {
           // Check all possible discount sources (in order of priority)
           newDiscount = ticket.discount_percentage || // New field (highest priority)
-                       ticket.discount ||            // Old field
-                       ticket.job_type?.discount ||  // Job type's discount on ticket object
-                       jobType.discount;             // Current job type's discount (fallback)
+            ticket.discount ||            // Old field
+            ticket.job_type?.discount ||  // Job type's discount on ticket object
+            jobType.discount;             // Current job type's discount (fallback)
         }
 
         setFormData((prev) => ({
@@ -1830,6 +1833,7 @@ export default function TicketForm({
                   multiple
                   onChange={handleTicketAttachmentUpload} />
 
+
                 {ticketAttachments.length > 0 &&
                   <div className="mt-3">
                     {ticketAttachments.length > 1 &&
@@ -1928,6 +1932,18 @@ export default function TicketForm({
               </div>
             </div>
           </Section>
+
+          <div className="row mt-3">
+            <div className="col-md-12">
+              <label className="text-sm font-medium text-gray-700 mb-2">
+                <i className="ti-info-alt mr-1"></i> Design Description / Elaboration
+              </label>
+              <TiptapEditor
+                value={formData.design_description}
+                onChange={(html) => setFormData(prev => ({ ...prev, design_description: html }))}
+              />
+            </div>
+          </div>
 
           {/* ACTION BUTTONS */}
           <div className="mt-4 d-flex justify-content-end gap-3">

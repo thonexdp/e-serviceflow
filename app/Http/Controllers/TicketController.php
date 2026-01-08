@@ -218,6 +218,7 @@ class TicketController extends BaseCrudController
             'custom_width' => 'nullable|numeric|min:0',
             'custom_height' => 'nullable|numeric|min:0',
             'selected_color' => 'nullable|string|max:50',
+            'design_description' => 'nullable|string',
         ]);
 
         $ticketData = $validated;
@@ -376,6 +377,7 @@ class TicketController extends BaseCrudController
             'custom_width' => 'nullable|numeric|min:0',
             'custom_height' => 'nullable|numeric|min:0',
             'selected_color' => 'nullable|string|max:50',
+            'design_description' => 'nullable|string',
         ]);
 
         $ticketData = $validated;
@@ -734,6 +736,7 @@ class TicketController extends BaseCrudController
             'custom_width' => 'nullable|numeric|min:0',
             'custom_height' => 'nullable|numeric|min:0',
             'selected_color' => 'nullable|string|max:50',
+            'design_description' => 'nullable|string',
         ];
     }
 

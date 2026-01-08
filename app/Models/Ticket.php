@@ -54,6 +54,7 @@ class Ticket extends Model
         'is_size_based',
         'custom_width',
         'custom_height',
+        'design_description',
     ];
 
     protected $casts = [
