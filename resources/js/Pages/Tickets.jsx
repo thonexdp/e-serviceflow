@@ -782,85 +782,120 @@ export default function Tickets({
 
   return (
     <>
-      <PreviewModal
+      <Modal
         isOpen={show}
         onClose={() => setShow(false)}
-        fileUrl={filepath}
-        title={`Document Preview - ${selectedTicket?.ticket_number || 'Details'}`}>
-
+        title={`Design Preview - ${selectedTicket?.ticket_number || 'Details'}`}
+        size="6xl">
         {selectedTicket && (
-          <div className="design-review-actions p-2">
-            {selectedTicket.design_notes && (
-              <div className="alert alert-warning border small mb-3 shadow-sm">
-                <h6 className="font-weight-bold mb-1"><i className="ti-info-alt mr-1"></i> Design Notes:</h6>
-                <p className="mb-0 italic">"{selectedTicket.design_notes}"</p>
-                {selectedTicket.updated_by_user && (
-                  <div className="mt-1 x-small opacity-75 text-right">
-                    — {selectedTicket.updated_by_user.name}
+          <div className="row">
+            <div className="col-md-7">
+              <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
+                <img
+                  src={filepath}
+                  alt="Design Preview"
+                  className="img-fluid"
+                  style={{ maxHeight: '75vh', width: '100%', objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+            <div className="col-md-5 border-left">
+              <div className="p-3">
+                {selectedTicket.design_description && (
+                  <div className="mb-4">
+                    <p className="mb-2 text-primary small uppercase font-weight-bold">Design Description / Elaboration</p>
+                    <div
+                      className="p-3 bg-light border rounded shadow-inner tiptap-content"
+                      style={{ maxHeight: '350px', overflowY: 'auto' }}
+                      dangerouslySetInnerHTML={{ __html: selectedTicket.design_description }}
+                    />
                   </div>
                 )}
-              </div>
-            )}
 
-            {selectedTicket.design_status === 'mockup_uploaded' && (
-              <div className="card border-primary-subtle bg-light shadow-inner">
-                <div className="card-body p-3">
-                  <h6 className="mb-3 text-primary d-flex align-items-center">
-                    <i className="ti-star mr-2"></i> Design Approval Workflow
-                  </h6>
+                {selectedTicket.design_notes && (
+                  <div className="alert alert-warning border small mb-3 shadow-sm">
+                    <h6 className="font-weight-bold mb-1"><i className="ti-info-alt mr-1"></i> Developer/Designer Notes:</h6>
+                    <p className="mb-0 italic text-dark font-weight-500">
+                      "{selectedTicket.design_notes}"
+                    </p>
+                    {selectedTicket.updated_by_user && (
+                      <div className="mt-1 x-small opacity-75 text-right">
+                        — {selectedTicket.updated_by_user.name}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                  {showRevisionInput ? (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="form-group mb-2">
-                        <textarea
-                          className="form-control form-control-sm"
-                          rows="3"
-                          placeholder="Describe what needs to be changed..."
-                          value={revisionNotes}
-                          onChange={(e) => setRevisionNotes(e.target.value)}
-                          autoFocus
-                        />
-                      </div>
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-warning btn-sm flex-grow-1"
-                          onClick={handleRequestRevisionDesign}
-                          disabled={loading || !revisionNotes.trim()}
-                        >
-                          <i className="ti-check mr-1"></i> Confirm Revision Request
-                        </button>
-                        <button
-                          className="btn btn-light btn-sm"
-                          onClick={() => setShowRevisionInput(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                {selectedTicket.design_status === 'mockup_uploaded' && (
+                  <div className="card border-primary-subtle bg-light shadow-inner mb-3">
+                    <div className="card-body p-3">
+                      <h6 className="mb-3 text-primary d-flex align-items-center">
+                        <i className="ti-star mr-2"></i> Design Approval Workflow
+                      </h6>
+
+                      {showRevisionInput ? (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="form-group mb-2">
+                            <textarea
+                              className="form-control form-control-sm"
+                              rows="3"
+                              placeholder="Describe what needs to be changed..."
+                              value={revisionNotes}
+                              onChange={(e) => setRevisionNotes(e.target.value)}
+                              autoFocus
+                            />
+                          </div>
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-warning btn-sm flex-grow-1"
+                              onClick={handleRequestRevisionDesign}
+                              disabled={loading || !revisionNotes.trim()}
+                            >
+                              <i className="ti-check mr-1"></i> Send Revision
+                            </button>
+                            <button
+                              className="btn btn-light btn-sm"
+                              onClick={() => setShowRevisionInput(false)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-success flex-grow-1 font-weight-bold shadow-sm"
+                            onClick={handleApproveDesign}
+                            disabled={loading}
+                          >
+                            <i className="ti-check mr-1"></i> APPROVE DESIGN
+                          </button>
+                          <button
+                            className="btn btn-outline-warning btn-sm"
+                            onClick={() => setShowRevisionInput(true)}
+                            disabled={loading}
+                          >
+                            <i className="ti-reload mr-1"></i> Request Revision
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-success flex-grow-1 font-weight-bold shadow-sm"
-                        onClick={handleApproveDesign}
-                        disabled={loading}
-                      >
-                        <i className="ti-check mr-1"></i> APPROVE DESIGN
-                      </button>
-                      <button
-                        className="btn btn-outline-warning btn-sm"
-                        onClick={() => setShowRevisionInput(true)}
-                        disabled={loading}
-                      >
-                        <i className="ti-reload mr-1"></i> Request Revision
-                      </button>
-                    </div>
-                  )}
+                  </div>
+                )}
+
+                <div className="mt-4 border-top pt-3">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-block py-2"
+                    onClick={() => setShow(false)}>
+                    Close Preview
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         )}
-      </PreviewModal>
+      </Modal>
 
       {/* Customer Modal */}
       <Modal
@@ -1104,7 +1139,7 @@ export default function Tickets({
                       const hasDiscount = discountPct > 0;
                       let originalPrice = parseFloat(selectedTicket.original_price || 0);
                       let totalAmount = parseFloat(selectedTicket.total_amount || 0);
-                      
+
                       // Calculate discounted total if we have discount info
                       let finalTotal = totalAmount; // Default to total_amount
                       if (hasDiscount) {
@@ -1112,13 +1147,13 @@ export default function Tickets({
                         if (originalPrice === 0 && totalAmount > 0) {
                           originalPrice = totalAmount;
                         }
-                        
+
                         // Calculate discounted amount
                         const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
                         const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
                         const discountedTotal = originalPrice - calculatedDiscountAmount;
                         finalTotal = discountedTotal; // Use discounted total for balance calculation
-                        
+
                         return (
                           <>
                             <p className="m-b-5 text-muted">
@@ -1149,7 +1184,7 @@ export default function Tickets({
                           </>
                         );
                       }
-                      
+
                       return (
                         <>
                           <p className="m-b-5">
@@ -1300,18 +1335,18 @@ export default function Tickets({
                     const hasDiscount = discountPct > 0;
                     let originalPrice = parseFloat(selectedTicket.original_price || 0);
                     let totalAmount = parseFloat(selectedTicket.total_amount || 0);
-                    
+
                     if (hasDiscount) {
                       // If original_price is not set, use total_amount as original
                       if (originalPrice === 0 && totalAmount > 0) {
                         originalPrice = totalAmount;
                       }
-                      
+
                       // Calculate discounted amount
                       const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
                       const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
                       const discountedTotal = originalPrice - calculatedDiscountAmount;
-                      
+
                       return (
                         <>
                           Original Price: <span className="text-decoration-line-through">{formatPeso(originalPrice.toFixed(2))}</span><br />
@@ -1320,7 +1355,7 @@ export default function Tickets({
                         </>
                       );
                     }
-                    
+
                     return (
                       <>
                         Total Amount: <strong>{totalAmount > 0 ? formatPeso(totalAmount.toFixed(2)) : "To be confirmed"}</strong>

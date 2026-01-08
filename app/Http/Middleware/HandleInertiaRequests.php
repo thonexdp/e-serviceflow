@@ -7,16 +7,16 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    
+
     protected $rootView = 'app';
 
-    
+
     public function version(Request $request): string|null
     {
         return parent::version($request);
     }
 
-    
+
     public function share(Request $request): array
     {
         return [
@@ -44,6 +44,7 @@ class HandleInertiaRequests extends Middleware
                     'branch' => $request->user()->branch ? [
                         'id' => $request->user()->branch->id,
                         'name' => $request->user()->branch->name,
+                        'email' => $request->user()->branch->email,
                         'code' => $request->user()->branch->code,
                         'can_accept_orders' => $request->user()->branch->can_accept_orders,
                         'can_produce' => $request->user()->branch->can_produce,

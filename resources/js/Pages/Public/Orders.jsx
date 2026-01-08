@@ -11,6 +11,8 @@ import { getColorName, getFullColorName } from "@/Utils/colors";
 export default function CustomerPOSOrder() {
   const { jobCategories = [], branches = [] } = usePage().props;
 
+  console.log(branches);
+
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     customer_firstname: "",
@@ -852,6 +854,7 @@ export default function CustomerPOSOrder() {
         general: [
           "Unable to proceed. The following files exceed the 10MB limit:",
           ...largeFiles,
+          `Please send a Google Drive link to ${formData.branch_id ? branches.find(b => b.id.toString() === formData.branch_id.toString())?.email : (branches.length === 1 ? branches[0].email : "our email")} or include it in the description.`,
         ],
       });
       return;
@@ -887,7 +890,7 @@ export default function CustomerPOSOrder() {
       orderData.append("due_date", formData.due_date);
       orderData.append("subtotal", subtotal.toFixed(2));
       orderData.append("total_amount", subtotal.toFixed(2));
-      
+
       // Append discount information if applicable
       if (discountPercentage > 0) {
         orderData.append("original_price", originalPrice.toFixed(2));
@@ -1974,10 +1977,12 @@ export default function CustomerPOSOrder() {
                   >
                     <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden mr-4 bg-gray-50 border flex-shrink-0 flex items-center justify-center transition-all duration-300 ${formData.category_id === "others" ? "border-orange-200" : "border-gray-100 group-hover:border-orange-100"
                       }`}>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${formData.category_id === "others" ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-400 group-hover:bg-orange-50 group-hover:text-orange-400"
-                        }`}>
-                        <i className="ti-layers-alt text-xl"></i>
-                      </div>
+                     
+                            <img
+                              src={'/images/others-category.png'}
+                              alt="Others Category"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            />
                     </div>
 
                     <div className="flex-1 text-left">
@@ -2594,6 +2599,21 @@ export default function CustomerPOSOrder() {
                       (1/1 file)
                     </span>
                   )}
+                  <span className="block mt-1 text-[10px] sm:text-xs font-normal text-orange-600">
+                    * Large files? Send a Google Drive link to{" "}
+                    <span className="font-bold">
+                      {formData.branch_id
+                        ? branches.find(
+                          (b) =>
+                            b.id.toString() ===
+                            formData.branch_id.toString()
+                        )?.email
+                        : branches.length > 0
+                          ? branches[0].email
+                          : "our email"}
+                    </span>{" "}
+                    or include it in the description.
+                  </span>
                 </label>
                 <input
                   ref={designFileInputRef}

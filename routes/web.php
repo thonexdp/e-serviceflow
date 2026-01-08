@@ -60,7 +60,7 @@ Route::get('/orders', function () {
         ->where('can_accept_orders', true)
         ->orderBy('sort_order')
         ->orderBy('name')
-        ->get(['id', 'name', 'code', 'address', 'can_produce']);
+        ->get(['id', 'name', 'email', 'code', 'address', 'can_produce']);
 
     return Inertia::render('Public/Orders', [
         'jobCategories' => $jobCategories,
