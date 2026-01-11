@@ -24,27 +24,77 @@ export default function BillingStatement({ data }) {
     const ticketNumbers = tickets.map(t => t.ticket_number || t.ticket_id).join(", ");
 
     // Group all items from all selected tickets/receivables
-    const allItems = tickets.flatMap(t => {
+    const allItems = [];
+    const ticketDiscounts = [];
+
+    tickets.forEach(t => {
+        // Check if ticket has discount
+        const hasDiscount = t.job_type?.discount > 0 || t.discount_percentage > 0 || t.discount > 0;
+        // Use subtotal column from tickets (prioritize subtotal, then fall back to other fields)
+        const ticketSubtotal = parseFloat(t.subtotal || t.total_invoiced || t.original_price || t.total_amount || 0);
+        const discountPct = parseFloat(t.discount_percentage || t.job_type?.discount || t.discount || 0);
+        const discountAmount = parseFloat(t.discount_amount || 0);
+        const calculatedDiscount = discountAmount > 0 ? discountAmount : (ticketSubtotal * (discountPct / 100));
+        const discountedTotal = ticketSubtotal - calculatedDiscount;
+
         if (t.items && t.items.length > 0) {
-            return t.items.map(item => ({
-                date: t.created_at ? new Date(t.created_at).toLocaleDateString() : "",
-                description: item.description || t.description || "Service",
-                qty: item.quantity,
-                price: item.unit_price,
-                total: item.total
-            }));
+            // Ticket has items - add each item
+            t.items.forEach(item => {
+                allItems.push({
+                    date: t.created_at ? new Date(t.created_at).toLocaleDateString() : "",
+                    description: item.description || t.description || "Service",
+                    qty: item.quantity,
+                    price: item.unit_price,
+                    total: item.total,
+                    hasDiscount: false,
+                    discountPct: 0,
+                    discountAmount: 0,
+                    originalPrice: item.total,
+                    ticketNumber: t.ticket_number || t.ticket_id
+                });
+            });
+
+            // If ticket has discount, use ticket column subtotal for discount calculation
+            if (hasDiscount) {
+                ticketDiscounts.push({
+                    ticketNumber: t.ticket_number || t.ticket_id,
+                    discountPct: discountPct,
+                    discountAmount: calculatedDiscount,
+                    itemsSubtotal: ticketSubtotal // Use ticket column subtotal, not sum of items
+                });
+            }
         } else {
-            return [{
+            // Single service without items
+            allItems.push({
                 date: t.created_at ? new Date(t.created_at).toLocaleDateString() : "",
                 description: t.description || "Service",
                 qty: t.quantity || 1,
-                price: t.total_invoiced || t.amount || 0,
-                total: t.total_invoiced || t.amount || 0
-            }];
+                price: hasDiscount ? discountedTotal : ticketSubtotal,
+                total: hasDiscount ? discountedTotal : ticketSubtotal,
+                hasDiscount: hasDiscount,
+                discountPct: discountPct,
+                discountAmount: calculatedDiscount,
+                originalPrice: ticketSubtotal,
+                ticketNumber: t.ticket_number || t.ticket_id
+            });
         }
     });
 
-    const subtotal = allItems.reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
+    // Calculate totals with discount considerations
+    // Use subtotal column from tickets for original subtotal (prioritize subtotal column)
+    const originalSubtotal = tickets.reduce((sum, t) => {
+        // Use subtotal column from ticket (prioritize subtotal, then fall back to other fields)
+        const ticketSubtotal = parseFloat(t.subtotal || t.total_invoiced || t.original_price || t.total_amount || 0);
+        return sum + ticketSubtotal;
+    }, 0);
+
+    // Total discounts: ticket-level discounts (for tickets with items) + item-level discounts (for single-service tickets)
+    const totalTicketDiscounts = ticketDiscounts.reduce((sum, td) => sum + parseFloat(td.discountAmount || 0), 0);
+    const totalItemDiscounts = allItems.reduce((sum, item) => sum + parseFloat(item.discountAmount || 0), 0);
+    const totalDiscount = totalTicketDiscounts + totalItemDiscounts;
+
+    // Final subtotal after discounts
+    const subtotal = originalSubtotal - totalDiscount;
     const totalBalanceDue = summary.totalBalanceDue || subtotal;
 
     return (
@@ -274,6 +324,12 @@ export default function BillingStatement({ data }) {
                                 <td>Previous Balance :</td>
                                 <td className="amount-col">{formatPeso(summary.previousBalance || 0)}</td>
                             </tr>
+                            {totalDiscount > 0 && (
+                                <tr>
+                                    <td style={{ color: '#28a745', fontWeight: 'bold' }}>Total Discount :</td>
+                                    <td className="amount-col" style={{ color: '#28a745', fontWeight: 'bold' }}>-{formatPeso(totalDiscount)}</td>
+                                </tr>
+                            )}
                             <tr>
                                 <td>Credits :</td>
                                 <td className="amount-col">{formatPeso(summary.credits || 0)}</td>
@@ -305,21 +361,69 @@ export default function BillingStatement({ data }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {[...Array(Math.max(5, allItems.length))].map((_, i) => {
-                        const item = allItems[i];
+                    {(() => {
+                        let rowNumber = 1;
+                        const rows = [];
+                        let currentTicketNumber = null;
 
-                        return (
-                            <tr key={i} style={{ height: '25px' }}>
-                                <td>{i + 1}</td>
-                                <td>{item?.date || ""}</td>
-                                <td>{item?.description || ""}</td>
-                                <td>{item?.qty || ""}</td>
-                                <td>{item ? formatPeso(item.price) : ""}</td>
-                                <td>{item ? formatPeso(item.total) : ""}</td>
-                            </tr>
-                        );
-                    })}
+                        allItems.forEach((item, i) => {
+                            const hasDiscount = item?.hasDiscount && item?.discountAmount > 0;
+                            const isLastItem = i === allItems.length - 1;
+                            const isLastItemForTicket = isLastItem || allItems[i + 1]?.ticketNumber !== item.ticketNumber;
 
+                            // Add item row
+                            rows.push(
+                                <tr key={`item-${i}`} style={{ height: hasDiscount ? '35px' : '25px' }}>
+                                    <td>{rowNumber++}</td>
+                                    <td>{item?.date || ""}</td>
+                                    <td>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span>{item?.description || ""}</span>
+                                        </div>
+                                    </td>
+                                    <td>{item?.qty || ""}</td>
+                                    <td>{item ? formatPeso(item.price) : ""}</td>
+                                    <td>{item ? formatPeso(item.total) : ""}</td>
+                                </tr>
+                            );
+
+                            // Check if we need to add a ticket-level discount row
+                            if (isLastItemForTicket && item.ticketNumber) {
+                                const ticketDiscount = ticketDiscounts.find(td => td.ticketNumber === item.ticketNumber);
+                                if (ticketDiscount) {
+                                    rows.push(
+                                        <tr key={`discount-${i}`} style={{ backgroundColor: '#f8f9fa', height: '30px' }}>
+                                            <td>{rowNumber++}</td>
+                                            <td></td>
+                                            <td colSpan="2" style={{ textAlign: 'right', fontWeight: 'bold', color: '#28a745', fontSize: '9pt' }}>
+                                                Ticket {ticketDiscount.ticketNumber} - Discount ({ticketDiscount.discountPct}%):
+                                            </td>
+                                            <td></td>
+                                            <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#28a745', fontSize: '9pt' }}>
+                                                -{formatPeso(ticketDiscount.discountAmount)}
+                                            </td>
+                                        </tr>
+                                    );
+                                }
+                            }
+                        });
+
+                        // Fill remaining rows if needed
+                        while (rows.length < 5) {
+                            rows.push(
+                                <tr key={`empty-${rows.length}`} style={{ height: '25px' }}>
+                                    <td>{rowNumber++}</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                            );
+                        }
+
+                        return rows;
+                    })()}
                 </tbody>
             </table>
 
@@ -339,12 +443,24 @@ export default function BillingStatement({ data }) {
                 </div>
 
                 <div className="totals-box">
+                    {totalDiscount > 0 && (
+                        <>
+                            <div className="total-row">
+                                <span>Subtotal (Original)</span>
+                                <span>{formatPeso(originalSubtotal)}</span>
+                            </div>
+                            <div className="total-row" style={{ color: '#28a745', fontWeight: 'bold' }}>
+                                <span>Less: Discount</span>
+                                <span>-{formatPeso(totalDiscount)}</span>
+                            </div>
+                        </>
+                    )}
                     <div className="total-row">
                         <span>Subtotal</span>
                         <span>{formatPeso(subtotal)}</span>
                     </div>
                     <div className="total-row">
-                        <span>downpayment</span>
+                        <span>Downpayment</span>
                         <span>{formatPeso(summary.credits || 0)}</span>
                     </div>
                     <div className="total-row grand-total">

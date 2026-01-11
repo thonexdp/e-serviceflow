@@ -221,12 +221,36 @@ export default function Tickets({
     setStatusModalOpen(true);
   };
 
+  const getAllTicketFiles = (ticket) => {
+    if (!ticket) return [];
+    const customerFiles = (ticket.customer_files || []).map(f => ({ ...f, type: 'customer' }));
+    const mockupFiles = (ticket.mockup_files || []).map(f => ({ ...f, type: 'mockup' }));
+    const paymentFiles = (ticket.payments || []).flatMap(p => (p.documents || []).map(d => ({ ...d, file_path: d.file_path, file_name: d.file_name, type: 'payment' })));
+    return [...customerFiles, ...mockupFiles, ...paymentFiles];
+  };
+
   const handlePreviewFile = (ticket, path) => {
     setSelectedTicket(ticket);
     setFilepath(path);
     setShow(true);
     setRevisionNotes("");
     setShowRevisionInput(false);
+  };
+
+  const handleNextFile = () => {
+    const allFiles = getAllTicketFiles(selectedTicket);
+    const currentIndex = allFiles.findIndex(f => f.file_path === filepath);
+    if (currentIndex !== -1 && currentIndex < allFiles.length - 1) {
+      setFilepath(allFiles[currentIndex + 1].file_path);
+    }
+  };
+
+  const handlePrevFile = () => {
+    const allFiles = getAllTicketFiles(selectedTicket);
+    const currentIndex = allFiles.findIndex(f => f.file_path === filepath);
+    if (currentIndex !== -1 && currentIndex > 0) {
+      setFilepath(allFiles[currentIndex - 1].file_path);
+    }
   };
 
 
@@ -790,14 +814,58 @@ export default function Tickets({
         {selectedTicket && (
           <div className="row">
             <div className="col-md-7">
-              <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
+              <div className="border rounded p-2 bg-dark shadow-sm mockup-preview-container text-center position-relative" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={filepath}
                   alt="Design Preview"
                   className="img-fluid"
-                  style={{ maxHeight: '75vh', width: '100%', objectFit: 'contain' }}
+                  style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
                 />
+
+                {/* Navigation Controls */}
+                {getAllTicketFiles(selectedTicket).length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevFile}
+                      disabled={getAllTicketFiles(selectedTicket).findIndex(f => f.file_path === filepath) === 0}
+                      className="btn btn-dark btn-circle position-absolute"
+                      style={{ left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.7, zIndex: 10 }}
+                    >
+                      <i className="ti-angle-left"></i>
+                    </button>
+                    <button
+                      onClick={handleNextFile}
+                      disabled={getAllTicketFiles(selectedTicket).findIndex(f => f.file_path === filepath) === getAllTicketFiles(selectedTicket).length - 1}
+                      className="btn btn-dark btn-circle position-absolute"
+                      style={{ right: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.7, zIndex: 10 }}
+                    >
+                      <i className="ti-angle-right"></i>
+                    </button>
+
+                    <div className="position-absolute" style={{ bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
+                      <span className="badge badge-dark opacity-75 px-3 py-2">
+                        {getAllTicketFiles(selectedTicket).findIndex(f => f.file_path === filepath) + 1} / {getAllTicketFiles(selectedTicket).length}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* Thumbnails row */}
+              {getAllTicketFiles(selectedTicket).length > 1 && (
+                <div className="mt-3 d-flex gap-2 overflow-x-auto pb-2 justify-content-center">
+                  {getAllTicketFiles(selectedTicket).map((file, idx) => (
+                    <img
+                      key={idx}
+                      src={file.file_path}
+                      alt={`Thumb ${idx}`}
+                      className={`img-thumbnail cursor-pointer ${filepath === file.file_path ? 'border-primary ring-2 ring-primary' : 'opacity-50'}`}
+                      style={{ width: '60px', height: '60px', objectFit: 'cover' }}
+                      onClick={() => setFilepath(file.file_path)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <div className="col-md-5 border-left">
               <div className="p-3">

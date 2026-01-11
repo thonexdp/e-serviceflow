@@ -13,24 +13,98 @@ export default function OfficialReceipt({ payment }) {
         });
     };
 
+
     const ticket = payment.ticket || {};
     const items = ticket.items || [];
     const hasItems = items.length > 0;
 
+    // Check if ticket has discount
+    const hasDiscount = ticket.job_type?.discount > 0 || ticket.discount_percentage > 0 || ticket.discount > 0;
+
+    // Use ticket column data (total_invoiced/subtotal) for subtotal - refer to ticket column like BillingStatement
+    // If total_invoiced is not available, calculate from items as fallback
+    let originalSubtotal = 0;
+    if (ticket.total_invoiced) {
+        // Use total_invoiced from ticket column (preferred method)
+        originalSubtotal = parseFloat(ticket.total_invoiced);
+    } else if (hasItems && items.length > 0) {
+        // Fallback: Calculate from items if ticket column data not available
+        originalSubtotal = items.reduce((sum, item) => sum + parseFloat(item.total || 0), 0);
+    } else {
+        // Fallback: Use other ticket fields
+        originalSubtotal = parseFloat(ticket.original_price || ticket.subtotal || ticket.total_amount || 0);
+    }
+
+    const discountPct = parseFloat(ticket.discount_percentage || ticket.job_type?.discount || ticket.discount || 0);
+    const discountAmount = parseFloat(ticket.discount_amount || 0);
+    const calculatedDiscount = discountAmount > 0 ? discountAmount : (originalSubtotal * (discountPct / 100));
+    const totalAmount = originalSubtotal - calculatedDiscount; // This is the ticket total after discount
+
     const currentPaymentAmount = parseFloat(payment.amount || 0);
-    const subTotal = parseFloat(ticket.subtotal || ticket.total_amount || 0);
-    const totalPaidSoFar = (ticket.payments || [])
-        .filter(p => p.status !== 'rejected' && p.status !== 'pending')
-        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-    // If the current payment is already in the list, don't add it again
-    const isCurrentInList = (ticket.payments || []).some(p => p.id === payment.id);
-    const totalPaidIncludingCurrent = isCurrentInList ? totalPaidSoFar : totalPaidSoFar + currentPaymentAmount;
-
-    const balanceRemaining = Math.max(0, parseFloat(ticket.total_amount || 0) - totalPaidIncludingCurrent);
-    const partialPayment = isCurrentInList ? totalPaidSoFar - currentPaymentAmount : totalPaidSoFar;
 
     const paymentMethod = payment.payment_method?.toLowerCase() || '';
+
+
+    // Calculate partial payment (total paid BEFORE this current payment)
+    // let partialPayment = 0;
+    // const ticketAmountPaid = parseFloat(ticket.amount_paid || 0);
+    const partialPayment = parseFloat(ticket.amount_paid || 0);
+
+    // Check payment status - defaults to 'posted' if not set (for ledger payments)
+    const paymentStatus = payment.status || 'posted';
+    const isPaymentCleared = paymentStatus !== 'rejected' && paymentStatus !== 'pending';
+
+    // // Method 1: Calculate from payments array (most accurate - shows actual payment records)
+    // if (ticket.payments && Array.isArray(ticket.payments) && ticket.payments.length > 0) {
+    //     const calculatedFromPayments = ticket.payments
+    //         .filter(p => {
+    //             // Include only cleared/posted payments (exclude rejected and pending)
+    //             const pStatus = (p.status || 'posted').toLowerCase();
+    //             const isCleared = pStatus !== 'rejected' && pStatus !== 'pending';
+
+    //             // Exclude current payment being printed - check both ID and amount as fallback
+    //             const isNotCurrent = p.id && payment.id &&
+    //                 String(p.id) !== String(payment.id) &&
+    //                 String(p.id) !== String(payment.ticket_id);
+
+    //             // Additional check: if IDs match but amounts are same and date is same, it's the current payment
+    //             const isSamePayment = p.amount === payment.amount &&
+    //                 p.payment_date === payment.payment_date &&
+    //                 p.id === payment.id;
+
+    //             return isCleared && isNotCurrent && !isSamePayment;
+    //         })
+    //         .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+    //     if (calculatedFromPayments > 0) {
+    //         partialPayment = calculatedFromPayments;
+    //     }
+    // }
+
+    // // Method 2: Use ticket.amount_paid as fallback/primary source
+    // // This is more reliable if payments array is incomplete or not loaded
+    // if (ticketAmountPaid > 0) {
+    //     if (isPaymentCleared) {
+    //         // Payment is cleared/posted, already included in amount_paid
+    //         // Partial payment = total paid (amount_paid) minus current payment
+    //         const calculatedPartial = Math.max(0, ticketAmountPaid - currentPaymentAmount);
+
+    //         // Use amount_paid calculation if it gives a higher value, or if payments array gave 0
+    //         if (calculatedPartial > partialPayment || partialPayment === 0) {
+    //             partialPayment = calculatedPartial;
+    //         }
+    //     } else {
+    //         // Payment is pending/rejected, not yet in amount_paid
+    //         // Partial payment = amount_paid (all previous payments)
+    //         if (ticketAmountPaid > partialPayment || partialPayment === 0) {
+    //             partialPayment = ticketAmountPaid;
+    //         }
+    //     }
+    // }
+
+
+    const balanceRemaining = paymentMethod === "check" || paymentMethod === "government_ar" ? totalAmount : Math.max(0, totalAmount - partialPayment); // currentPaymentAmount
+
     const capitalizeName = (name = '') => name.replace(/\b\w/g, char => char.toUpperCase());
 
     return (
@@ -183,9 +257,18 @@ export default function OfficialReceipt({ payment }) {
                                 <td>
                                     <div className="flex items-center">
                                         <div className="row-number">{i + 1}</div>
-                                        <div style={{ fontWeight: item ? 'bold' : 'normal', fontSize: '8.5pt' }}>
-                                            {item ? item.description : ''}
-                                            {i === 0 && !hasItems && (ticket.job_type?.name || ticket.description || "Service")}
+                                        <div style={{ fontWeight: item ? 'bold' : 'normal', fontSize: '8.5pt', display: 'flex', flexDirection: 'column' }}>
+                                            <span>{item ? item.description : ''}</span>
+                                            {i === 0 && !hasItems && (
+                                                <>
+                                                    <span>{ticket.job_type?.name || ticket.description || "Service"}</span>
+                                                    {hasDiscount && (
+                                                        <span style={{ fontSize: '7pt', color: '#28a745', fontWeight: 'bold', marginTop: '2px' }}>
+                                                            Discount ({discountPct}%): -{formatPeso(calculatedDiscount)}
+                                                        </span>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </td>
@@ -193,10 +276,30 @@ export default function OfficialReceipt({ payment }) {
                                     {item ? item.quantity : (i === 0 && !hasItems ? (ticket.quantity || 1) : '')}
                                 </td>
                                 <td style={{ textAlign: 'center', fontSize: '8.5pt' }}>
-                                    {item ? formatPeso(item.unit_price) : ''}
+                                    {item ? formatPeso(item.unit_price) : (i === 0 && !hasItems && hasDiscount ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                            <span style={{ textDecoration: 'line-through', fontSize: '7pt', color: '#999' }}>
+                                                {formatPeso(originalSubtotal / (ticket.quantity || 1))}
+                                            </span>
+                                            <span style={{ color: '#28a745', fontWeight: 'bold' }}>
+                                                {formatPeso(totalAmount / (ticket.quantity || 1))}
+                                            </span>
+                                        </div>
+                                    ) : (i === 0 && !hasItems ? formatPeso(originalSubtotal / (ticket.quantity || 1)) : ''))}
                                 </td>
                                 <td style={{ textAlign: 'right', paddingRight: '5px', fontWeight: 'bold', fontSize: '8.5pt' }}>
-                                    {item ? formatPeso(item.total) : (i === 0 && !hasItems ? formatPeso(ticket.total_amount) : '')}
+                                    {item ? formatPeso(item.total) : (i === 0 && !hasItems ? (
+                                        hasDiscount ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                <span style={{ textDecoration: 'line-through', fontSize: '7pt', color: '#999' }}>
+                                                    {formatPeso(originalSubtotal)}
+                                                </span>
+                                                <span style={{ color: '#28a745' }}>
+                                                    {formatPeso(totalAmount)}
+                                                </span>
+                                            </div>
+                                        ) : formatPeso(originalSubtotal)
+                                    ) : '')}
                                 </td>
                             </tr>
                         );
@@ -299,23 +402,27 @@ export default function OfficialReceipt({ payment }) {
                 <div style={{ width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                     <div style={{ width: '100%' }}>
                         <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
-                            <span>Subtotal</span>
-                            <span>: {formatPeso(subTotal)}</span>
+                            <span>Subtotal:</span>
+                            <span>{formatPeso(originalSubtotal)}</span>
                         </div>
-                        <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
-                            <span>PARTIAL PAYMENT</span>
-                            <span>: {formatPeso(partialPayment)}</span>
+                        {hasDiscount && calculatedDiscount > 0 && (
+                            <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
+                                <span>Discount:</span>
+                                <span>{formatPeso(calculatedDiscount)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between mb-0.5 font-bold" style={{ fontSize: '8.5pt', borderTop: '1px solid #000', paddingTop: '2px', marginTop: '2px' }}>
+                            <span>Total Amount:</span>
+                            <span>{formatPeso(totalAmount)}</span>
                         </div>
-                        <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt' }}>
-                            <span>BALANCE</span>
-                            <span>: {formatPeso(balanceRemaining)}</span>
+                        <div className="flex justify-between mb-0.5" style={{ fontSize: '8.5pt', marginTop: '4px' }}>
+                            <span>Partial Payment:</span>
+                            <span>{formatPeso(partialPayment)}</span>
                         </div>
-                        <div style={{ borderTop: '1.5px solid #000', margin: '1px 0' }}></div>
-                        <div className="flex justify-between font-bold" style={{ fontSize: '9pt' }}>
-                            <span>Total</span>
-                            <span>: {formatPeso(currentPaymentAmount)}</span>
+                        <div className="flex justify-between mb-0.5 font-bold" style={{ fontSize: '8.5pt', borderTop: '1.5px solid #000', paddingTop: '2px', marginTop: '2px' }}>
+                            <span>Balance:</span>
+                            <span>{formatPeso(balanceRemaining)}</span>
                         </div>
-                        <div style={{ borderTop: '1.5px solid #000', margin: '1px 0' }}></div>
                     </div>
                 </div>
             </div>
