@@ -143,6 +143,26 @@ export default function Mockups({
       }
     });
   };
+  const handleStatusToggle = (status) => {
+    let currentStatuses = filters.design_status
+      ? (Array.isArray(filters.design_status) ? [...filters.design_status] : filters.design_status.split(','))
+      : ['pending', 'in_review', 'revision_requested', 'mockup_uploaded'];
+
+    if (currentStatuses.includes(status)) {
+      currentStatuses = currentStatuses.filter(s => s !== status);
+    } else {
+      currentStatuses.push(status);
+    }
+
+    router.get(buildUrl("mock-ups"), {
+      ...filters,
+      design_status: currentStatuses.length > 0 ? currentStatuses : ['none']
+    }, {
+      preserveState: false,
+      preserveScroll: true
+    });
+  };
+
 
   const handleDownload = (fileId, filename) => {
     const url = buildUrl(`/mock-ups/files/${fileId}/download`);
@@ -155,13 +175,36 @@ export default function Mockups({
     document.body.removeChild(link);
   };
 
+  const getAllTicketFiles = (ticket) => {
+    if (!ticket) return [];
+    const mockupFiles = ticket.mockup_files || [];
+    const customerFiles = ticket.customer_files || (ticket.files?.filter(f => f.type === 'customer')) || [];
+    return [...customerFiles, ...mockupFiles];
+  };
+
   const handlePreview = (filepath) => {
     setSelectedImage(filepath);
   };
 
+  const handleNextPreview = () => {
+    const allFiles = getAllTicketFiles(selectedPreviewTicket);
+    const currentIndex = allFiles.findIndex(f => f.file_path === selectedPreviewFile?.file_path);
+    if (currentIndex !== -1 && currentIndex < allFiles.length - 1) {
+      setSelectedPreviewFile(allFiles[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevPreview = () => {
+    const allFiles = getAllTicketFiles(selectedPreviewTicket);
+    const currentIndex = allFiles.findIndex(f => f.file_path === selectedPreviewFile?.file_path);
+    if (currentIndex !== -1 && currentIndex > 0) {
+      setSelectedPreviewFile(allFiles[currentIndex - 1]);
+    }
+  };
+
   const handlePrint = () => {
     if (!selectedPreviewFile || !selectedPreviewTicket) return;
-    
+
     setPreviewToPrint({
       file: selectedPreviewFile,
       ticket: selectedPreviewTicket
@@ -348,9 +391,9 @@ export default function Mockups({
         // Get preview file - prefer mockup files, fallback to customer files
         const mockupFiles = row.mockup_files || [];
         const customerFiles = row.files?.filter((f) => f.type === 'customer') || [];
-        const previewFile = mockupFiles.length > 0 
+        const previewFile = mockupFiles.length > 0
           ? mockupFiles[mockupFiles.length - 1]
-          : customerFiles.length > 0 
+          : customerFiles.length > 0
             ? customerFiles[customerFiles.length - 1]
             : null;
 
@@ -972,14 +1015,58 @@ export default function Mockups({
         {selectedPreviewFile && (
           <div className="row">
             <div className="col-md-7">
-              <div className="border rounded p-2 bg-white shadow-sm mockup-preview-container text-center">
+              <div className="border rounded p-2 bg-dark shadow-sm mockup-preview-container text-center position-relative" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={selectedPreviewFile.file_path}
                   alt={selectedPreviewFile.file_name}
                   className="img-fluid"
-                  style={{ maxHeight: '75vh', width: '100%', objectFit: 'contain' }}
+                  style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
                 />
+
+                {/* Navigation Controls */}
+                {getAllTicketFiles(selectedPreviewTicket).length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevPreview}
+                      disabled={getAllTicketFiles(selectedPreviewTicket).findIndex(f => f.file_path === selectedPreviewFile.file_path) === 0}
+                      className="btn btn-dark btn-circle position-absolute"
+                      style={{ left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.7, zIndex: 10 }}
+                    >
+                      <i className="ti-angle-left"></i>
+                    </button>
+                    <button
+                      onClick={handleNextPreview}
+                      disabled={getAllTicketFiles(selectedPreviewTicket).findIndex(f => f.file_path === selectedPreviewFile.file_path) === getAllTicketFiles(selectedPreviewTicket).length - 1}
+                      className="btn btn-dark btn-circle position-absolute"
+                      style={{ right: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.7, zIndex: 10 }}
+                    >
+                      <i className="ti-angle-right"></i>
+                    </button>
+
+                    <div className="position-absolute" style={{ bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
+                      <span className="badge badge-dark opacity-75 px-3 py-2">
+                        {getAllTicketFiles(selectedPreviewTicket).findIndex(f => f.file_path === selectedPreviewFile.file_path) + 1} / {getAllTicketFiles(selectedPreviewTicket).length}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* Thumbnails row */}
+              {getAllTicketFiles(selectedPreviewTicket).length > 1 && (
+                <div className="mt-3 d-flex gap-2 overflow-x-auto pb-2 justify-content-center">
+                  {getAllTicketFiles(selectedPreviewTicket).map((file, idx) => (
+                    <img
+                      key={idx}
+                      src={file.file_path}
+                      alt={`Thumb ${idx}`}
+                      className={`img-thumbnail cursor-pointer ${selectedPreviewFile.file_path === file.file_path ? 'border-primary ring-2 ring-primary' : 'opacity-50'}`}
+                      style={{ width: '60px', height: '60px', objectFit: 'cover' }}
+                      onClick={() => setSelectedPreviewFile(file)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <div className="col-md-5 border-left">
               <div className="p-3">
@@ -1071,29 +1158,66 @@ export default function Mockups({
                             route="mock-ups" />
                         </div>
                         <div className="col-md-3">
-                          <FormInput
-                            label=""
-                            type="select"
-                            name="design_status"
-                            value={filters.design_status || "all"}
-                            onChange={(e) => {
-                              router.get(buildUrl("mock-ups"), {
-                                ...filters,
-                                design_status: e.target.value === "all" ? null : e.target.value
-                              }, {
-                                preserveState: false,
-                                preserveScroll: true
-                              });
-                            }}
-                            options={[
-                              { value: "all", label: "All Status" },
-                              { value: "pending", label: "Pending Review" },
-                              { value: "in_review", label: "In Review" },
-                              { value: "revision_requested", label: "Revision Requested" },
-                              { value: "mockup_uploaded", label: "Mock-up Uploaded" },
-                              { value: "approved", label: "Approved" }
-                            ]}
-                          />
+                          <div className="dropdown">
+                            <button
+                              className="btn btn-outline-secondary dropdown-toggle w-100 text-left d-flex justify-content-between align-items-center"
+                              type="button"
+                              id="statusFilterDropdown"
+                              data-toggle="dropdown"
+                              aria-haspopup="true"
+                              aria-expanded="false"
+                              style={{ height: '38px', borderRadius: '4px', marginTop: '-20px' }}
+                            >
+                              <span className="text-truncate">
+                                {filters.design_status
+                                  ? (Array.isArray(filters.design_status) ? filters.design_status.length : 1) + ' Statuses'
+                                  : 'Filter Status'}
+                              </span>
+                            </button>
+                            <div className="dropdown-menu shadow-sm w-100" aria-labelledby="statusFilterDropdown" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                              <h6 className="dropdown-header">Select Status</h6>
+                              <div className="dropdown-divider"></div>
+                              {[
+                                { value: "pending", label: "Pending Review" },
+                                // { value: "in_review", label: "In Review" },
+                                { value: "revision_requested", label: "Revision Requested" },
+                                { value: "mockup_uploaded", label: "Mock-up Uploaded" },
+                                { value: "approved", label: "Approved" }
+                              ].map((opt) => {
+                                const isChecked = filters.design_status
+                                  ? (Array.isArray(filters.design_status) ? filters.design_status.includes(opt.value) : filters.design_status === opt.value)
+                                  : opt.value !== 'approved';
+
+                                return (
+                                  <div className="dropdown-item p-0 px-2 mb-1" key={opt.value}>
+                                    <div className="custom-control custom-checkbox">
+                                      <input
+                                        type="checkbox"
+                                        className="custom-control-input"
+                                        id={`status-${opt.value}`}
+                                        checked={isChecked}
+                                        onChange={() => handleStatusToggle(opt.value)}
+                                      />
+                                      <label
+                                        className="custom-control-label small d-block w-100 cursor-pointer"
+                                        htmlFor={`status-${opt.value}`}
+                                        style={{ cursor: 'pointer' }}
+                                      >
+                                        {opt.label}
+                                      </label>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              <div className="dropdown-divider"></div>
+                              <button
+                                className="dropdown-item btn-link text-center text-primary small font-weight-bold"
+                                onClick={() => router.get(buildUrl("mock-ups"), { ...filters, design_status: null })}
+                              >
+                                Reset to Default
+                              </button>
+                            </div>
+                          </div>
                         </div>
                         <div className="col-md-4 mb-4">
                           <DateRangeFilter
@@ -1126,11 +1250,17 @@ export default function Mockups({
                                   Search: {filters.search}
                                 </span>
                               }
-                              {filters.design_status &&
+                              {filters.design_status ? (
                                 <span className="badge badge-info mr-2 text-capitalize">
-                                  Status: {filters.design_status.replace(/_/g, " ")}
+                                  Status: {Array.isArray(filters.design_status)
+                                    ? filters.design_status.map(s => s.replace(/_/g, " ")).join(", ")
+                                    : filters.design_status.replace(/_/g, " ")}
                                 </span>
-                              }
+                              ) : (
+                                <span className="badge badge-secondary mr-2">
+                                  Status: Default (Excludes Approved)
+                                </span>
+                              )}
                               {filters.date_range &&
                                 <span className="badge badge-primary mr-2">
                                   <i className="ti-calendar mr-1"></i>
@@ -1189,14 +1319,14 @@ export default function Mockups({
               WebkitPrintColorAdjust: 'exact',
               printColorAdjust: 'exact'
             }}>
-              <div style={{ display: 'flex', width: '100%', minHeight: '100%'}}>
+              <div style={{ display: 'flex', width: '100%', minHeight: '100%' }}>
                 {/* Left Side - Image (only on first page) */}
-                <div 
+                <div
                   className="print-image-container"
-                  style={{ 
-                    width: '70%', 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
+                  style={{
+                    width: '70%',
+                    display: 'flex',
+                    alignItems: 'flex-start',
                     justifyContent: 'center',
                     border: '1px solid #ddd',
                     padding: '10px',
@@ -1205,17 +1335,17 @@ export default function Mockups({
                   <img
                     src={previewToPrint.file.file_path}
                     alt={previewToPrint.file.file_name}
-                    style={{ 
-                      maxWidth: '100%', 
-                      maxHeight: '180mm', 
-                      objectFit: 'contain' 
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '180mm',
+                      objectFit: 'contain'
                     }}
                   />
                 </div>
 
                 {/* Right Side - Design Description Only */}
-                <div style={{ 
-                  width: '30%', 
+                <div style={{
+                  width: '30%',
                   paddingLeft: '5px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1224,8 +1354,8 @@ export default function Mockups({
                   {previewToPrint.ticket.design_description ? (
                     <div
                       className="tiptap-content print-description"
-                      style={{ 
-                        fontSize: '11pt', 
+                      style={{
+                        fontSize: '11pt',
                         padding: '5px',
                         border: '1px solid #eee',
                         borderRadius: '4px',
@@ -1234,8 +1364,8 @@ export default function Mockups({
                       dangerouslySetInnerHTML={{ __html: previewToPrint.ticket.design_description }}
                     />
                   ) : (
-                    <div style={{ 
-                      fontSize: '11pt', 
+                    <div style={{
+                      fontSize: '11pt',
                       color: '#999',
                       fontStyle: 'italic',
                       padding: '20px'

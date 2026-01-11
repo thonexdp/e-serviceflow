@@ -382,10 +382,7 @@ class DashboardController extends Controller
                     };
 
                     return [
-                        'ticketsPendingReview' => Ticket::where(function ($q) {
-                            $q->whereNull('design_status')
-                                ->orWhere('design_status', 'pending');
-                        })
+                        'ticketsPendingReview' => Ticket::where('design_status', 'pending')
                             ->whereBetween('created_at', [$startDate, $endDate])
                             ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
@@ -405,16 +402,14 @@ class DashboardController extends Controller
                 },
                 'ticketsPendingReview' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'customerFiles', 'jobType'])
-                        ->where(function ($q) {
-                            $q->whereNull('design_status')
-                                ->orWhere('design_status', 'pending');
-                        })
+                        ->where('design_status', 'pending')
+                        ->whereNot('payment_status', 'awaiting_verification')
 
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
-                        ->orderBy('created_at', 'desc')
-                        ->limit(10);
+                        ->orderBy('created_at', 'desc');
+
 
                     return $query->get()->map(function ($ticket) {
                         return [
@@ -425,6 +420,7 @@ class DashboardController extends Controller
                                 'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
                             ] : null,
                             'description' => $ticket->description,
+                            'design_status' => $ticket->design_status,
                             'due_date' => $ticket->due_date,
                             'created_at' => $ticket->created_at,
                             'customer_files' => $ticket->customerFiles->map(function ($file) {
@@ -457,6 +453,7 @@ class DashboardController extends Controller
                                 'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
                             ] : null,
                             'description' => $ticket->description,
+                            'design_status' => $ticket->design_status,
                             'design_notes' => $ticket->design_notes,
                             'due_date' => $ticket->due_date,
                             'updated_at' => $ticket->updated_at,
@@ -474,8 +471,6 @@ class DashboardController extends Controller
                 'mockupsUploadedToday' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
                         ->where('design_status', 'mockup_uploaded')
-                        ->whereDate('updated_at', today())
-
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
@@ -491,6 +486,7 @@ class DashboardController extends Controller
                                 'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
                             ] : null,
                             'description' => $ticket->description,
+                            'design_status' => $ticket->design_status,
                             'due_date' => $ticket->due_date,
                             'updated_at' => $ticket->updated_at,
                             'mockup_files' => $ticket->mockupFiles->map(function ($file) {

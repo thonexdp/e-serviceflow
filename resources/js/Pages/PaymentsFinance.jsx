@@ -154,7 +154,9 @@ export default function PaymentsFinance({
   const [billingForm, setBillingForm] = useState({
     name: "",
     company_name: "",
-    address: ""
+    address: "",
+    previous_balance: 0,
+    due_date: ""
   });
   const [billingToPrint, setBillingToPrint] = useState(null);
   const [selectionWarning, setSelectionWarning] = useState(null);
@@ -282,7 +284,9 @@ export default function PaymentsFinance({
       setBillingForm({
         name: fullName,
         company_name: "", // Manual input as requested
-        address: customerObj.address || ""
+        address: customerObj.address || "",
+        previous_balance: 0,
+        due_date: ""
       });
       setBillingModalOpen(true);
     }
@@ -304,9 +308,12 @@ export default function PaymentsFinance({
       date: new Date().toLocaleDateString(),
       tickets: selectedData,
       summary: {
-        totalBalanceDue: selectedData.reduce((sum, item) => sum + parseFloat(item.balance || item.amount || 0), 0),
-        credits: 0, // Could be calculated if needed
-        previousBalance: 0,
+        totalBalanceDue: selectedData.reduce((sum, item) => sum + parseFloat(item.balance || item.amount || 0), 0) + parseFloat(billingForm.previous_balance || 0),
+        credits: activeTab === 'receivables'
+          ? selectedData.reduce((sum, item) => sum + parseFloat(item.total_paid || 0), 0)
+          : 0,
+        previousBalance: parseFloat(billingForm.previous_balance || 0),
+        dueDate: billingForm.due_date ? new Date(billingForm.due_date).toLocaleDateString() : ""
       },
       bankName: capitalizeName(printSettings?.bank_account?.bank_name),
       accountName: capitalizeName(printSettings?.bank_account?.account_name),
@@ -594,18 +601,18 @@ export default function PaymentsFinance({
         const ticketDiscountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
         const ticketDiscountAmount = parseFloat(selectedTicket.discount_amount || 0);
         const manualDiscountPct = parseFloat(paymentForm.discount || 0);
-        
+
         // Prioritize ticket's stored discount, fallback to manual input
         const discountPercent = ticketDiscountPct > 0 ? ticketDiscountPct : manualDiscountPct;
-        
+
         // Calculate subtotal and discount
         const subtotal = parseFloat(selectedTicket.original_price || selectedTicket.subtotal || selectedTicket.total_amount || 0);
-        
+
         // If ticket has stored discount_amount, use it; otherwise calculate from percentage
-        const discountAmount = (ticketDiscountPct > 0 && ticketDiscountAmount > 0) 
-          ? ticketDiscountAmount 
+        const discountAmount = (ticketDiscountPct > 0 && ticketDiscountAmount > 0)
+          ? ticketDiscountAmount
           : (subtotal * (discountPercent / 100));
-        
+
         const ticketTotal = subtotal - discountAmount;
         const previousPayments = parseFloat(selectedTicket.amount_paid || 0);
         const balanceBeforePayment = Math.max(ticketTotal - previousPayments, 0);
@@ -1030,8 +1037,8 @@ export default function PaymentsFinance({
         </span>
 
     },
-    { 
-      label: "Total Amount", 
+    {
+      label: "Total Amount",
       render: (row) => {
         const hasDiscount = row.job_type?.discount > 0;
         if (hasDiscount) {
@@ -1040,7 +1047,7 @@ export default function PaymentsFinance({
           const discountAmount = parseFloat(row.discount_amount || 0);
           const calculatedDiscount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
           const discountedTotal = originalPrice - calculatedDiscount;
-          
+
           return (
             <div className="flex flex-col">
               <span className="text-xs text-muted line-through">{formatPeso(originalPrice)}</span>
@@ -1342,6 +1349,29 @@ export default function PaymentsFinance({
             onChange={(e) => setBillingForm({ ...billingForm, address: e.target.value })}
           ></textarea>
         </div>
+        <div className="col-md-6 mb-3">
+          <label className="form-label">Previous Balance  <small><i>(Optional)</i></small> </label>
+          <div className="input-group">
+            <div className="input-group-prepend">
+              <span className="input-group-text">₱</span>
+            </div>
+            <input
+              type="number"
+              className="form-control"
+              value={billingForm.previous_balance}
+              onChange={(e) => setBillingForm({ ...billingForm, previous_balance: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="col-md-6 mb-3">
+          <label className="form-label">Payment Due Date <small><i>(Optional)</i></small></label>
+          <input
+            type="date"
+            className="form-control"
+            value={billingForm.due_date}
+            onChange={(e) => setBillingForm({ ...billingForm, due_date: e.target.value })}
+          />
+        </div>
 
         <div className="col-md-12 mt-3 p-3 bg-light rounded">
           <h6 className="font-bold border-bottom pb-2 mb-2 uppercase text-xs">Summary of Selection</h6>
@@ -1355,7 +1385,7 @@ export default function PaymentsFinance({
               {formatPeso(
                 (activeTab === 'receivables' ? filteredReceivables : pendingPayments)
                   .filter(item => selectedItems.includes(item.id) || selectedItems.includes(item.ticket_id))
-                  .reduce((sum, item) => sum + parseFloat(item.balance || item.amount || 0), 0)
+                  .reduce((sum, item) => sum + parseFloat(item.balance || item.amount || 0), 0) + parseFloat(billingForm.previous_balance || 0)
               )}
             </span>
           </div>
@@ -1437,18 +1467,18 @@ export default function PaymentsFinance({
               const ticketDiscountPct = parseFloat(selectedTicket.discount_percentage || selectedTicket.discount || 0);
               const ticketDiscountAmount = parseFloat(selectedTicket.discount_amount || 0);
               const manualDiscountPct = parseFloat(paymentForm.discount || 0);
-              
+
               // Prioritize ticket's stored discount, fallback to manual input
               const discountPercent = ticketDiscountPct > 0 ? ticketDiscountPct : manualDiscountPct;
-              
+
               // Calculate subtotal and discount
               let subtotal = parseFloat(selectedTicket.original_price || selectedTicket.subtotal || selectedTicket.total_amount || 0);
-              
+
               // If ticket has stored discount_amount, use it; otherwise calculate from percentage
-              const discountAmount = (ticketDiscountPct > 0 && ticketDiscountAmount > 0) 
-                ? ticketDiscountAmount 
+              const discountAmount = (ticketDiscountPct > 0 && ticketDiscountAmount > 0)
+                ? ticketDiscountAmount
                 : (subtotal * (discountPercent / 100));
-              
+
               const ticketTotal = subtotal - discountAmount;
 
               const previousPayments = parseFloat(selectedTicket.amount_paid || 0);

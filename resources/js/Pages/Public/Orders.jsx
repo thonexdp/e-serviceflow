@@ -505,9 +505,9 @@ export default function CustomerPOSOrder() {
     // Clear previous error
     setDesignFileError("");
 
-    // Check if adding these files would exceed the limit of 1
-    if (files.length > 1 || designFiles.length >= 1) {
-      setDesignFileError(`You can only upload 1 design file.`);
+    // Check if adding these files would exceed the limit of 5
+    if (designFiles.length + files.length > 5) {
+      setDesignFileError(`You can only upload up to 5 design files.`);
       event.target.value = "";
       return;
     }
@@ -1977,12 +1977,12 @@ export default function CustomerPOSOrder() {
                   >
                     <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden mr-4 bg-gray-50 border flex-shrink-0 flex items-center justify-center transition-all duration-300 ${formData.category_id === "others" ? "border-orange-200" : "border-gray-100 group-hover:border-orange-100"
                       }`}>
-                     
-                            <img
-                              src={'/images/others-category.png'}
-                              alt="Others Category"
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            />
+
+                      <img
+                        src={'/images/others-category.png'}
+                        alt="Others Category"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
                     </div>
 
                     <div className="flex-1 text-left">
@@ -2596,7 +2596,7 @@ export default function CustomerPOSOrder() {
                   Upload Design/Reference (Optional)
                   {designFiles.length > 0 && (
                     <span className="ml-2 text-xs text-gray-500">
-                      (1/1 file)
+                      ({designFiles.length}/5 files)
                     </span>
                   )}
                   <span className="block mt-1 text-[10px] sm:text-xs font-normal text-orange-600">
@@ -2619,18 +2619,17 @@ export default function CustomerPOSOrder() {
                   ref={designFileInputRef}
                   type="file"
                   accept="image/*"
-                  // multiple
+                  multiple
                   onChange={handleImageUpload}
-                  disabled={designFiles.length >= 1}
+                  disabled={designFiles.length >= 5}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
-                {designFiles.length >= 1 && (
+                {designFiles.length >= 5 && (
                   <p className="text-xs text-orange-200 mt-1 font-medium">
-                    Maximum file limit reached. Remove the file to upload another.
+                    Maximum file limit reached. Remove some files to upload more.
                   </p>
                 )}
 
-                {/* <p className="text-xs text-gray-500 mt-1">You can upload multiple images (PNG, JPG up to 10MB each)</p> */}
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2 mt-1">
                   <svg
                     className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5"
@@ -2652,11 +2651,11 @@ export default function CustomerPOSOrder() {
                     <ul className="mt-1 space-y-0.5 text-xs">
                       <li>
                         • Maximum files:{" "}
-                        <strong>1 file only</strong>
+                        <strong>5 files</strong>
                       </li>
                       <li>
                         • Maximum size:{" "}
-                        <strong>10MB</strong>
+                        <strong>10MB per file</strong>
                       </li>
                       <li>
                         • Accepted formats:{" "}
@@ -2711,91 +2710,85 @@ export default function CustomerPOSOrder() {
 
                 {designFiles.length > 0 && (
                   <div className="mt-4">
-                    {designFiles.length > 1 && (
-                      <div className="flex gap-2 mb-3 overflow-x-auto">
-                        {designFiles.map((_, index) => (
+                    <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+                      {designFiles.map((file, index) => (
+                        <div key={index} className="relative flex-shrink-0">
                           <button
-                            key={index}
                             type="button"
-                            onClick={() =>
-                              setActiveDesignTab(
-                                index
-                              )
-                            }
-                            className={`px-3 py-1 rounded text-sm whitespace-nowrap ${activeDesignTab ===
-                              index
-                              ? "bg-orange-600 text-white"
-                              : "bg-gray-200 text-gray-700"
+                            onClick={() => setActiveDesignTab(index)}
+                            className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${activeDesignTab === index
+                              ? "border-orange-600 ring-2 ring-orange-200"
+                              : "border-gray-200 opacity-60 hover:opacity-100"
                               }`}
                           >
-                            Design {index + 1}
+                            <img
+                              src={file.preview}
+                              alt={`Thumb ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
                           </button>
-                        ))}
-                      </div>
-                    )}
+                          {file.invalid && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center border border-white">
+                              <span className="text-[8px] text-white font-bold">!</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
                     <div
-                      className={`border-2 border-dashed rounded-lg p-4 ${designFiles[activeDesignTab]
+                      className={`border-2 border-dashed rounded-lg p-4 relative ${designFiles[activeDesignTab]
                         ?.invalid
                         ? "border-red-400 bg-red-50"
                         : "border-gray-300 bg-gray-50"
                         }`}
                     >
-                      {designFiles[activeDesignTab]
-                        ?.invalid && (
-                          <div className="flex items-center gap-2 text-red-600 mb-2 justify-center">
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                            <span className="text-sm font-bold">
-                              {
-                                designFiles[
-                                  activeDesignTab
-                                ].errorMessage
-                              }
-                            </span>
-                          </div>
-                        )}
+                      {designFiles[activeDesignTab]?.invalid && (
+                        <div className="flex items-center gap-2 text-red-600 mb-2 justify-center">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span className="text-sm font-bold">
+                            {designFiles[activeDesignTab].errorMessage}
+                          </span>
+                        </div>
+                      )}
+
                       <img
-                        src={
-                          designFiles[activeDesignTab]
-                            ?.preview
-                        }
-                        alt={`Design ${activeDesignTab + 1
-                          }`}
-                        className="max-h-64 mx-auto rounded"
+                        src={designFiles[activeDesignTab]?.preview}
+                        alt={`Design ${activeDesignTab + 1}`}
+                        className="max-h-64 mx-auto rounded shadow-sm bg-white"
                       />
 
-                      <div className="text-center mt-2 text-sm text-gray-600">
-                        {
-                          designFiles[activeDesignTab]
-                            ?.name
-                        }
+                      <div className="text-center mt-3 text-sm text-gray-700 font-medium truncate px-8">
+                        {designFiles[activeDesignTab]?.name}
                       </div>
-                      <div className="text-center mt-1 text-xs text-gray-500">
-                        {activeDesignTab + 1} of{" "}
-                        {designFiles.length}
+
+                      <div className="flex items-center justify-between mt-4">
+                        <div className="text-xs text-gray-500 italic">
+                          File {activeDesignTab + 1} of {designFiles.length}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeDesignFile(activeDesignTab)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-semibold"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Remove
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeDesignFile(
-                            activeDesignTab
-                          )
-                        }
-                        className="w-full mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
-                      >
-                        Remove File
-                      </button>
                     </div>
                   </div>
                 )}

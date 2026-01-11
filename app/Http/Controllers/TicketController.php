@@ -44,6 +44,7 @@ class TicketController extends BaseCrudController
     public function index(Request $request)
     {
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $query = Ticket::with(['customer', 'customerFiles', 'payments.documents', 'mockupFiles', 'assignedToUser', 'orderBranch', 'productionBranch']);
 
@@ -318,6 +319,7 @@ class TicketController extends BaseCrudController
     public function update(Request $request, $id)
     {
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
@@ -455,6 +457,7 @@ class TicketController extends BaseCrudController
 
     public function destroy($id)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $ticket = Ticket::findOrFail($id);
 
@@ -792,6 +795,7 @@ class TicketController extends BaseCrudController
 
     protected function notifyStatusChange(Ticket $ticket, string $oldStatus, string $newStatus): void
     {
+        /** @var \App\Models\User $triggeredBy */
         $triggeredBy = Auth::user();
         $recipientIds = [];
         $notificationType = '';
@@ -954,6 +958,7 @@ class TicketController extends BaseCrudController
             return response()->json(['message' => 'Ticket number is required'], 400);
         }
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $query = Ticket::with(['customer', 'jobType.category', 'orderBranch', 'productionBranch']);
 
