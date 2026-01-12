@@ -23,24 +23,37 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
         deliveredBy: "",
         modeOfDelivery: "Pick-up",
         deliveryDateTime: "",
-        items: Array(6).fill({ description: "", qty: "", total: "" })
+        items: Array(5).fill({ description: "", qty: "", price: "", total: "" }),
+        subtotal: 0,
+        downpayment: 0,
+        balance: 0
     });
 
     const [searching, setSearching] = useState(false);
     const [searchError, setSearchError] = useState("");
+
+    const generateDRNo = () => {
+        const year = new Date().getFullYear();
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const timestamp = new Date().getTime().toString().slice(-4);
+        return `RC-${year}-${random}${timestamp}`;
+    };
 
     const handleOpenDeliveryModal = () => {
         setDeliveryForm({
             deliveredTo: "",
             companyName: "",
             address: "",
-            drNo: "",
+            drNo: generateDRNo(),
             date: new Date().toISOString().slice(0, 10),
             ticketNo: "",
             deliveredBy: "",
             modeOfDelivery: "Pick-up",
             deliveryDateTime: "",
-            items: Array(6).fill({ description: "", qty: "", total: "" })
+            items: Array(5).fill({ description: "", qty: "", price: "", total: "" }),
+            subtotal: 0,
+            downpayment: 0,
+            balance: 0
         });
         setSearchError("");
         setDeliveryModalOpen(true);
@@ -59,22 +72,53 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
 
     const handleDRItemChange = (index, field, value) => {
         const newItems = [...deliveryForm.items];
-        newItems[index] = { ...newItems[index], [field]: value };
-        setDeliveryForm({ ...deliveryForm, items: newItems });
+        const updatedItem = { ...newItems[index], [field]: value };
+
+        // Auto-calculate total if qty or price changes
+        if (field === 'qty' || field === 'price') {
+            const qty = parseFloat(field === 'qty' ? value : updatedItem.qty) || 0;
+            const price = parseFloat(field === 'price' ? value : updatedItem.price) || 0;
+            updatedItem.total = (qty * price).toFixed(2);
+        }
+
+        newItems[index] = updatedItem;
+
+        // Calculate subtotal
+        const newSubtotal = newItems.reduce((acc, item) => {
+            const val = parseFloat(item.total) || 0;
+            return acc + val;
+        }, 0);
+
+        setDeliveryForm({
+            ...deliveryForm,
+            items: newItems,
+            subtotal: newSubtotal,
+            balance: newSubtotal - (parseFloat(deliveryForm.downpayment) || 0)
+        });
     };
 
     const addDRRow = () => {
         setDeliveryForm({
             ...deliveryForm,
-            items: [...deliveryForm.items, { description: "", qty: "", total: "" }]
+            items: [...deliveryForm.items, { description: "", qty: "", price: "", total: "" }]
         });
     };
 
     const removeDRRow = (index) => {
         const newItems = deliveryForm.items.filter((_, i) => i !== index);
+        const finalItems = newItems.length > 0 ? newItems : [{ description: "", qty: "", price: "", total: "" }];
+
+        // Calculate subtotal
+        const newSubtotal = finalItems.reduce((acc, item) => {
+            const val = parseFloat(item.total) || 0;
+            return acc + val;
+        }, 0);
+
         setDeliveryForm({
             ...deliveryForm,
-            items: newItems.length > 0 ? newItems : [{ description: "", qty: "", total: "" }]
+            items: finalItems,
+            subtotal: newSubtotal,
+            balance: newSubtotal - (parseFloat(deliveryForm.downpayment) || 0)
         });
     };
 
@@ -87,6 +131,11 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
             const response = await axios.get(`/api/tickets/search?ticket_number=${ticketNo}`);
             if (response.data && response.data.ticket) {
                 const ticket = response.data.ticket;
+                const subtotal = parseFloat(ticket.total_amount) || 0;
+                const downpayment = parseFloat(ticket.down_payment) || 0;
+                const qty = parseFloat(ticket.quantity) || 0;
+                const price = qty > 0 ? (subtotal / qty).toFixed(2) : subtotal;
+
                 setDeliveryForm({
                     ...deliveryForm,
                     deliveredTo: ticket.customer ? `${ticket.customer.firstname} ${ticket.customer.lastname}` : deliveryForm.deliveredTo,
@@ -94,9 +143,17 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
                     address: ticket.customer?.address || deliveryForm.address,
                     ticketNo: ticket.ticket_number,
                     items: [
-                        { description: ticket.description || ticket.job_type?.name || "", qty: ticket.quantity || "", total: ticket.total_amount || "" },
+                        {
+                            description: ticket.description || ticket.job_type?.name || "",
+                            qty: ticket.quantity || "",
+                            price: price,
+                            total: ticket.total_amount || ""
+                        },
                         ...deliveryForm.items.slice(1)
-                    ]
+                    ],
+                    subtotal: subtotal,
+                    downpayment: downpayment,
+                    balance: subtotal - downpayment
                 });
                 toast.success("Ticket details loaded");
             } else {
@@ -248,6 +305,7 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
                                     <th style={{ width: '50px' }}>No</th>
                                     <th>Description</th>
                                     <th style={{ width: '100px' }}>Qty</th>
+                                    <th style={{ width: '120px' }}>Unit Price</th>
                                     <th style={{ width: '150px' }}>Total</th>
                                     <th style={{ width: '40px' }}></th>
                                 </tr>
@@ -266,7 +324,7 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
                                         </td>
                                         <td>
                                             <input
-                                                type="text"
+                                                type="number"
                                                 className="form-control form-control-sm border-0 bg-transparent text-center"
                                                 value={item.qty}
                                                 onChange={(e) => handleDRItemChange(index, 'qty', e.target.value)}
@@ -274,11 +332,22 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
                                         </td>
                                         <td>
                                             <input
-                                                type="text"
+                                                type="number"
                                                 className="form-control form-control-sm border-0 bg-transparent text-center"
+                                                value={item.price}
+                                                onChange={(e) => handleDRItemChange(index, 'price', e.target.value)}
+                                                placeholder="0.00"
+                                            />
+                                        </td>
+                                        <td>
+                                            <p className="form-control form-control-sm border-0 bg-transparent text-right font-weight-bold">{item.total}</p>
+                                            {/* <input
+                                                type="number"
+
+                                                className="form-control form-control-sm border-0 bg-transparent text-right font-weight-bold"
                                                 value={item.total}
                                                 onChange={(e) => handleDRItemChange(index, 'total', e.target.value)}
-                                            />
+                                            /> */}
                                         </td>
                                         <td className="text-center align-middle">
                                             <button
@@ -335,6 +404,48 @@ export default function DeliveryReceiptsIndex({ user, notifications, messages, c
                                     value={deliveryForm.deliveryDateTime}
                                     onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryDateTime: e.target.value })}
                                 />
+                            </div>
+                        </div>
+                        <div className="col-md-6 text-right">
+                            <div className="d-flex justify-content-end mb-2">
+                                <div style={{ width: '200px' }}>
+                                    <label className="small mb-1 font-weight-bold">Subtotal</label>
+                                    <input
+                                        type="number"
+                                        className="form-control form-control-sm text-right font-weight-bold"
+                                        value={deliveryForm.subtotal}
+                                        readOnly
+                                    />
+                                </div>
+                            </div>
+                            <div className="d-flex justify-content-end mb-2">
+                                <div style={{ width: '200px' }}>
+                                    <label className="small mb-1 font-weight-bold">Downpayment</label>
+                                    <input
+                                        type="number"
+                                        className="form-control form-control-sm text-right"
+                                        value={deliveryForm.downpayment}
+                                        onChange={(e) => {
+                                            const dp = parseFloat(e.target.value) || 0;
+                                            setDeliveryForm({
+                                                ...deliveryForm,
+                                                downpayment: dp,
+                                                balance: deliveryForm.subtotal - dp
+                                            });
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="d-flex justify-content-end mb-2">
+                                <div style={{ width: '200px' }}>
+                                    <label className="small mb-1 font-weight-bold">Balance</label>
+                                    <input
+                                        type="number"
+                                        className="form-control form-control-sm text-right font-weight-bold text-danger"
+                                        value={deliveryForm.balance}
+                                        readOnly
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
