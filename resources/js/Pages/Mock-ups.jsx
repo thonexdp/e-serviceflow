@@ -484,12 +484,12 @@ export default function Mockups({
               <strong>Notes:</strong> {row.design_notes}
             </div>
           )}
-          {row.updated_by_user && (
+          {/* {row.updated_by_user && (
             <div className="small text-muted mt-1">
               <i className="ti-user mr-1" style={{ fontSize: '10px' }}></i>
               by: {row.updated_by_user.name}
             </div>
-          )}
+          )} */}
         </div>
       )
     },
