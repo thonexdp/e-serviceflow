@@ -28,7 +28,8 @@ export default function Tickets({
   selectedCustomer = null,
   filters = {},
   branches = [],
-  customer_order_qrcode = ""
+  customer_order_qrcode = "",
+  jobCategories = []
 }) {
   const [openCustomerModal, setCustomerModalOpen] = useState(false);
   const [openTicketModal, setTicketModalOpen] = useState(false);
@@ -47,6 +48,7 @@ export default function Tickets({
   const { api, buildUrl } = useRoleApi();
   const { flash, auth } = usePage().props;
   const [error, setError] = useState(null);
+  const [statusUpdateError, setStatusUpdateError] = useState("");
   const [verifyFormData, setVerifyFormData] = useState({
     notes: ""
   });
@@ -107,6 +109,7 @@ export default function Tickets({
 
 
   const [show, setShow] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [filepath, setFilepath] = useState("");
 
   const [statusFormData, setStatusFormData] = useState({
@@ -134,6 +137,7 @@ export default function Tickets({
 
 
   const handleCustomerSubmit = async (formData) => {
+    
     try {
       const { data } = await api.post(`/customers`, formData);
 
@@ -152,6 +156,7 @@ export default function Tickets({
   };
 
   const handleTicketSubmit = (data) => {
+    console.log(data);
     const formData = new FormData();
     const arrayKeyMap = {
       ticketAttachments: "attachments[]",
@@ -214,6 +219,7 @@ export default function Tickets({
 
   const handleOpenStatusModal = (ticket) => {
     setSelectedTicket(ticket);
+    setStatusUpdateError("");
     setStatusFormData({
       status: ticket.status || "pending",
       notes: ""
@@ -230,9 +236,10 @@ export default function Tickets({
   };
 
   const handlePreviewFile = (ticket, path) => {
-    setSelectedTicket(ticket);
+    // console.log(ticket, path);
+    // setSelectedTicket(ticket);
     setFilepath(path);
-    setShow(true);
+    setShowPreview(true);
     setRevisionNotes("");
     setShowRevisionInput(false);
   };
@@ -287,6 +294,30 @@ export default function Tickets({
   const handleStatusUpdate = async () => {
     if (!selectedTicket) return;
 
+    // Check if workflow steps are missing when changing to "In Designer"
+    // Only check for custom tickets (job_type_id is null) or "Others" category tickets
+    if (statusFormData.status === 'in_designer') {
+      // Determine if this is a custom/others ticket
+      const isCustomTicket = !selectedTicket.job_type_id || 
+        selectedTicket.custom_job_type_description ||
+        (typeof selectedTicket.job_type === 'string' && selectedTicket.job_type);
+      
+      // Only validate workflow steps for custom tickets
+      if (isCustomTicket) {
+        const hasWorkflowSteps = selectedTicket.custom_workflow_steps && 
+          (Array.isArray(selectedTicket.custom_workflow_steps) 
+            ? selectedTicket.custom_workflow_steps.length > 0 
+            : (typeof selectedTicket.custom_workflow_steps === 'object' 
+                ? Object.keys(selectedTicket.custom_workflow_steps).length > 0 
+                : false));
+        
+        if (!hasWorkflowSteps) {
+          setStatusUpdateError("Please set the Production Workflow Template first by editing the ticket.");
+          return;
+        }
+      }
+    }
+
     setIsUpdating(true);
     try {
       await api.patch(
@@ -299,7 +330,7 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Status update failed:", error);
-      toast.error(error.response?.data?.message || "Failed to update status");
+      setStatusUpdateError(error.response?.data?.message || "Failed to update status");
     } finally {
       setIsUpdating(false);
     }
@@ -424,6 +455,7 @@ export default function Tickets({
     setStatusModalOpen(false);
     setSelectedTicket(null);
     setStatusFormData({ status: "", notes: "" });
+    setStatusUpdateError("");
   };
 
   const closePaymentModal = () => {
@@ -554,7 +586,6 @@ export default function Tickets({
       companyName: ticket.customer?.company_name || "",
       address: ticket.customer?.address || "",
       validUntil: "",
-      quotationNo: ticket.ticket_number,
       projectDescription: ticket.description || "",
       valueAddedTax: "0",
       others: "0",
@@ -806,10 +837,46 @@ export default function Tickets({
 
   return (
     <>
+
+
+
+       <Modal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        title="Payment Proof"
+        size="5xl">
+
+           <div className="row">
+            <div className="col-md-12">
+              <div className="border rounded p-2 shadow-sm text-center position-relative" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={filepath}
+                  alt="Payment Proof"
+                  className="img-fluid"
+                  style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+            <div className="pt-3 text-left">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-block py-2"
+                    onClick={() => setShowPreview(false)}>
+                    Close Preview
+                  </button>
+                </div>
+          </div>
+        </Modal>
+
+    
+
+
+
+
       <Modal
         isOpen={show}
         onClose={() => setShow(false)}
-        title={`Design Preview - ${selectedTicket?.ticket_number || 'Details'}`}
+        title={`Preview - ${selectedTicket?.ticket_number || 'Details'}`}
         size="6xl">
         {selectedTicket && (
           <div className="row">
@@ -997,7 +1064,8 @@ export default function Tickets({
           customerId={_selectedCustomer?.id}
           onSubmit={handleTicketSubmit}
           onCancel={closeTicketModal}
-          branches={branches} />
+          branches={branches}
+          jobCategories={jobCategories} />
 
       </Modal>
 
@@ -1087,6 +1155,12 @@ export default function Tickets({
               </div>
             }
 
+            {!!statusUpdateError && (
+              <div className="alert alert-danger">
+                {statusUpdateError}
+              </div>
+            )}
+
             <div className="form-group">
               <label htmlFor="status">
                 New Status{" "}
@@ -1110,6 +1184,45 @@ export default function Tickets({
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
+
+            {/* Warning message when changing to "In Designer" without workflow steps */}
+            {/* Only show for custom tickets (job_type_id is null) or "Others" category tickets */}
+            {statusFormData.status === 'in_designer' && selectedTicket && (() => {
+              // Determine if this is a custom/others ticket
+              const isCustomTicket = !selectedTicket.job_type_id || 
+                selectedTicket.custom_job_type_description ||
+                (typeof selectedTicket.job_type === 'string' && selectedTicket.job_type);
+              
+              // Only show warning for custom tickets
+              if (!isCustomTicket) {
+                return null;
+              }
+              
+              const hasWorkflowSteps = selectedTicket.custom_workflow_steps && 
+                (Array.isArray(selectedTicket.custom_workflow_steps) 
+                  ? selectedTicket.custom_workflow_steps.length > 0 
+                  : (typeof selectedTicket.custom_workflow_steps === 'object' 
+                      ? Object.keys(selectedTicket.custom_workflow_steps).length > 0 
+                      : false));
+              
+              if (!hasWorkflowSteps) {
+                return (
+                  <div className="alert alert-warning border-warning mt-3">
+                    <h6 className="alert-heading font-weight-bold">
+                      <i className="ti-alert mr-2"></i>
+                      Production Workflow Template Required
+                    </h6>
+                    <p className="mb-2">
+                      Before changing the status to <strong>"In Designer"</strong>, you must set the <strong>Production Workflow Template</strong> for this ticket.
+                    </p>
+                    <p className="mb-0">
+                      <strong>Action Required:</strong> Please click <strong>"Edit"</strong> on the ticket to set the Production Workflow Template before proceeding.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div className="form-group">
               <label htmlFor="notes">Notes (Optional)</label>
@@ -1886,7 +1999,7 @@ export default function Tickets({
                   onChange={(e) => setQuotationForm({ ...quotationForm, address: e.target.value })}
                 />
               </div>
-              <div className="col-md-4 mb-3">
+              <div className="col-md-7 mb-3">
                 <label className="form-label font-weight-bold">Valid Until</label>
                 <input
                   type="text"
@@ -1896,16 +2009,7 @@ export default function Tickets({
                   onChange={(e) => setQuotationForm({ ...quotationForm, validUntil: e.target.value })}
                 />
               </div>
-              <div className="col-md-4 mb-3">
-                <label className="form-label font-weight-bold">Quotation No.</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={quotationForm.quotationNo}
-                  onChange={(e) => setQuotationForm({ ...quotationForm, quotationNo: e.target.value })}
-                />
-              </div>
-              <div className="col-md-4 mb-3">
+              <div className="col-md-5 mb-3">
                 <label className="form-label font-weight-bold">Date</label>
                 <input
                   type="date"

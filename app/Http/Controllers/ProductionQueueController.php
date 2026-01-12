@@ -71,8 +71,11 @@ class ProductionQueueController extends Controller
             })
 
 
-            ->whereHas('jobType', function ($q) {
-                $q->where('show_in_dashboard', true);
+            ->where(function ($q) {
+                $q->whereHas('jobType', function ($jobTypeQuery) {
+                    $jobTypeQuery->where('show_in_dashboard', true);
+                })
+                    ->orWhereNotNull('custom_workflow_steps');
             });
 
 
@@ -1097,12 +1100,14 @@ class ProductionQueueController extends Controller
             ]);
 
 
-            $query->whereHas('jobType', function ($q) use ($workflowStep) {
-
-                $q->where(function ($sq) use ($workflowStep) {
-                    $sq->where("workflow_steps->{$workflowStep}->enabled", true)
-                        ->orWhere("workflow_steps->{$workflowStep}", true);
-                });
+            $query->where(function ($q) use ($workflowStep) {
+                $q->whereHas('jobType', function ($jobTypeQuery) use ($workflowStep) {
+                    $jobTypeQuery->where(function ($sq) use ($workflowStep) {
+                        $sq->where("workflow_steps->{$workflowStep}->enabled", true)
+                            ->orWhere("workflow_steps->{$workflowStep}", true);
+                    });
+                })
+                    ->orWhereJsonContains('custom_workflow_steps', $workflowStep);
             });
 
 

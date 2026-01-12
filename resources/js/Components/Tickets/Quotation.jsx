@@ -17,6 +17,12 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
         });
     };
 
+    const generatedQuotationNo = React.useMemo(() => {
+        const year = new Date().getFullYear();
+        const uniqueNumber = String(Date.now()).slice(-6).padStart(6, "0");
+        return `RC-${year}-${uniqueNumber}`;
+    }, [ticket?.id, ticket?.ticket_number]);
+
     const items = ticket.items || [];
     const hasItems = items.length > 0;
 
@@ -26,7 +32,7 @@ export default function Quotation({ ticket, customerOrderQrcode, customData = {}
         companyName: customData.companyName || (ticket.customer?.company_name || ''),
         address: customData.address || (ticket.customer?.address || ''),
         validUntil: customData.validUntil || '',
-        quotationNo: customData.quotationNo || ticket.ticket_number || '',
+        quotationNo: generatedQuotationNo,
         projectDescription: customData.projectDescription || ticket.description || '',
         valueAddedTax: parseFloat(customData.valueAddedTax || 0),
         others: parseFloat(customData.others || 0),

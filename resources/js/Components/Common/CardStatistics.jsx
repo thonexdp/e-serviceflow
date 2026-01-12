@@ -8,7 +8,8 @@ export default function CardStatistics({
     statChange = false,
     changePercent = 0,
     changeLabel = "vs previous period",
-    onClick = null
+    onClick = null,
+    details = null
 }) {
     const isPositive = changePercent >= 0;
     const formattedPercent = Math.abs(changePercent).toFixed(1);
@@ -26,6 +27,12 @@ export default function CardStatistics({
                     <p className="text-3xl font-bold text-gray-900 mt-1">
                         {statistics}
                     </p>
+
+                    {details &&
+                        <div className="mt-1 text-xs text-gray-500">
+                            {details}
+                        </div>
+                    }
                     {
                         statChange &&
                         <div className="flex items-center mt-2 text-xs">

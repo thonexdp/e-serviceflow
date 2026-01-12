@@ -10,9 +10,6 @@ import { getColorName, getFullColorName } from "@/Utils/colors";
 
 export default function CustomerPOSOrder() {
   const { jobCategories = [], branches = [] } = usePage().props;
-
-  console.log(branches);
-
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     customer_firstname: "",

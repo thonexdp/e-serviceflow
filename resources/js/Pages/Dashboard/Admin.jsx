@@ -1,153 +1,319 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router } from "@inertiajs/react";
 import Modal from "@/Components/Main/Modal";
 import { LineChart } from "@mui/x-charts/LineChart";
 import {
-  Box,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Typography } from
-"@mui/material";
+    Box,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    Typography,
+} from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
 import CardStatistics from "@/Components/Common/CardStatistics";
+import DataTable from "@/Components/Common/DataTable";
+import { formatPeso } from "@/Utils/currency";
+import { useRoleApi } from "@/Hooks/useRoleApi";
 
 export default function Dashboard({
-  user = {},
-  notifications = [],
-  messages = [],
-  filters = {},
-  dashboardData = {}
+    user = {},
+    notifications = [],
+    messages = [],
+    filters = {},
+    dashboardData = {},
 }) {
-  const [openPaymentModal, setPaymentModalOpen] = useState(false);
+    const [openPaymentModal, setPaymentModalOpen] = useState(false);
+    const [openVerifyModal, setVerifyModalOpen] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [verifyErrors, setVerifyErrors] = useState({});
+    const [verifyFormData, setVerifyFormData] = useState({
+        notes: "",
+        total_amount: "",
+    });
 
-  const handleSave = () => {
-    console.log("save");
-  };
+    const { api } = useRoleApi();
 
-  const [year, setYear] = useState(filters.year || new Date().getFullYear().toString());
-  const [month, setMonth] = useState(filters.month || (new Date().getMonth() + 1).toString().padStart(2, '0'));
-  const [dateRange, setDateRange] = useState(filters.date_range || "this_month");
-  const [refreshing, setRefreshing] = useState(false);
+    const handleSave = () => {
+        console.log("save");
+    };
 
-
-
-  const currentStats = dashboardData.current_stats || {};
-  const previousStats = dashboardData.previous_stats || {};
-  const dailyOrders = dashboardData.daily_orders || [];
-  const dailyRevenue = dashboardData.daily_revenue || [];
-
-
-  const calculateChange = (current, previous) => {
-    if (!previous || previous === 0) return current > 0 ? 100 : 0;
-    return (current - previous) / previous * 100;
-  };
-
-  const ordersChange = calculateChange(currentStats.total_orders, previousStats.total_orders);
-  const completedChange = calculateChange(currentStats.completed_orders, previousStats.completed_orders);
-  const salesChange = calculateChange(currentStats.total_sales, previousStats.total_sales);
-  const revenueChange = calculateChange(currentStats.net_income, previousStats.net_income);
-
-
-  const xData = dailyOrders.map((d) => d.day.toString());
-  const yData = dailyOrders.map((d) => d.orders);
-
-  const xDataR = dailyRevenue.map((d) => d.day.toString());
-  const yDataSales = dailyRevenue.map((d) => d.sales);
-  const yDataNetIncome = dailyRevenue.map((d) => d.net_income);
-  const yDataCOGS = dailyRevenue.map((d) => d.cogs || 0);
-
-  const pesoFormatter = (value) => {
-    if (value >= 1_000_000_000) {
-      return `${(value / 1_000_000_000).toFixed(1)}B`;
-    } else if (value >= 1_000_000) {
-      return `${(value / 1_000_000).toFixed(1)}M`;
-    } else if (value >= 1_000) {
-      return `${(value / 1_000).toFixed(1)}K`;
-    }
-    return `${value}`;
-  };
-
-  const refreshDashboard = () => {
-    setRefreshing(true);
-    router.get(
-      "/admin/",
-      { date_range: dateRange, year, month },
-      {
-        preserveState: true,
-        preserveScroll: true,
-        onFinish: () => setRefreshing(false)
-      }
+    const [year, setYear] = useState(
+        filters.year || new Date().getFullYear().toString()
     );
-  };
-
-  const handleDateRangeChange = (range) => {
-    setDateRange(range);
-    router.get(
-      "/admin/",
-      { date_range: range, year, month },
-      {
-        preserveState: true,
-        preserveScroll: true
-      }
+    const [month, setMonth] = useState(
+        filters.month || (new Date().getMonth() + 1).toString().padStart(2, "0")
     );
-  };
-
-  const handleYearChange = (newYear) => {
-    setYear(newYear);
-    router.get(
-      "/admin/",
-      { date_range: dateRange, year: newYear, month },
-      {
-        preserveState: true,
-        preserveScroll: true
-      }
+    const [dateRange, setDateRange] = useState(
+        filters.date_range || "this_month"
     );
-  };
+    const [refreshing, setRefreshing] = useState(false);
 
-  const handleMonthChange = (newMonth) => {
-    setMonth(newMonth);
-    router.get(
-      "/admin/",
-      { date_range: dateRange, year, month: newMonth },
-      {
-        preserveState: true,
-        preserveScroll: true
-      }
+    const currentStats = dashboardData.current_stats || {};
+    const previousStats = dashboardData.previous_stats || {};
+    const dailyOrders = dashboardData.daily_orders || [];
+    const dailyRevenue = dashboardData.daily_revenue || [];
+
+    const onlineOrdersPagination = dashboardData.online_orders || {};
+    const onlineOrders = onlineOrdersPagination.data || [];
+
+    const calculateChange = (current, previous) => {
+        if (!previous || previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+    };
+
+    const ordersChange = calculateChange(
+        currentStats.total_orders,
+        previousStats.total_orders
     );
-  };
+    const completedChange = calculateChange(
+        currentStats.completed_orders,
+        previousStats.completed_orders
+    );
+    const salesChange = calculateChange(
+        currentStats.total_sales,
+        previousStats.total_sales
+    );
+    const revenueChange = calculateChange(
+        currentStats.net_income,
+        previousStats.net_income
+    );
 
-  return (
-    <AdminLayout
-      user={user}
-      notifications={notifications}
-      messages={messages}>
+    const xData = dailyOrders.map((d) => d.day.toString());
+    const yData = dailyOrders.map((d) => d.orders);
 
+    const xDataR = dailyRevenue.map((d) => d.day.toString());
+    const yDataSales = dailyRevenue.map((d) => d.sales);
+    const yDataNetIncome = dailyRevenue.map((d) => d.net_income);
+    const yDataCOGS = dailyRevenue.map((d) => d.cogs || 0);
+
+    const pesoFormatter = (value) => {
+        if (value >= 1_000_000_000) {
+            return `${(value / 1_000_000_000).toFixed(1)}B`;
+        } else if (value >= 1_000_000) {
+            return `${(value / 1_000_000).toFixed(1)}M`;
+        } else if (value >= 1_000) {
+            return `${(value / 1_000).toFixed(1)}K`;
+        }
+        return `${value}`;
+    };
+
+    const refreshDashboard = () => {
+        setRefreshing(true);
+        router.get(
+            "/admin/",
+            { date_range: dateRange, year, month },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => setRefreshing(false),
+            }
+        );
+    };
+
+    const handleDateRangeChange = (range) => {
+        setDateRange(range);
+        router.get(
+            "/admin/",
+            { date_range: range, year, month },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
+    };
+
+    const handleYearChange = (newYear) => {
+        setYear(newYear);
+        router.get(
+            "/admin/",
+            { date_range: dateRange, year: newYear, month },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
+    };
+
+    const handleMonthChange = (newMonth) => {
+        setMonth(newMonth);
+        router.get(
+            "/admin/",
+            { date_range: dateRange, year, month: newMonth },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
+    };
+
+    const getPaymentStatusBadge = (row) => {
+        const { payment_status: status, payment_method } = row;
+        const classes = {
+            pending: "badge-warning",
+            partial: "badge-info",
+            paid: "badge-success",
+            awaiting_verification: "badge-secondary",
+        };
+
+        if (status === "awaiting_verification") {
+            const isWalkin = payment_method === "cash" || payment_method === "walkin";
+            return (
+                <div
+                    className={`badge ${isWalkin ? "badge-dark" : "badge-secondary"}`}
+                >
+                    {isWalkin ? "WALK-IN ORDER" : "AWAITING VERIFICATION"}
+                </div>
+            );
+        }
+
+        return (
+            <div className={`badge ${classes[status] || "badge-secondary"}`}>
+                {status?.toUpperCase() || "PENDING"}
+            </div>
+        );
+    };
+
+    const handleOpenVerifyModal = (order) => {
+        setSelectedOrder(order);
+        setVerifyFormData({
+            notes: "",
+            total_amount: order.total_amount || "",
+        });
+        setVerifyErrors({});
+        setVerifyModalOpen(true);
+    };
+
+    const closeVerifyModal = () => {
+        setVerifyModalOpen(false);
+        setSelectedOrder(null);
+        setVerifyErrors({});
+        setVerifyFormData({ notes: "", total_amount: "" });
+    };
+
+    const handleVerifyPayment = async () => {
+        if (!api || !selectedOrder) return;
+
+        setIsUpdating(true);
+        setVerifyErrors({});
+
+        const errors = {};
+        if (selectedOrder && (!selectedOrder.job_type_id || selectedOrder.custom_job_type_description)) {
+            if (!verifyFormData.total_amount || parseFloat(verifyFormData.total_amount) <= 0) {
+                errors.total_amount =
+                    "Please enter the total price for this custom order before confirming.";
+                setVerifyErrors(errors);
+                setIsUpdating(false);
+                return;
+            }
+        }
+
+        try {
+            await api.patch(`/tickets/${selectedOrder.id}/verify-payment`, verifyFormData);
+            closeVerifyModal();
+            router.reload({ preserveScroll: true });
+        } catch (error) {
+            const errorMessage =
+                error.response?.data?.message ||
+                "Failed to verify payment. Please check your data.";
+            setVerifyErrors({ general: errorMessage });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const onlineOrderColumns = [
+        {
+            label: "#",
+            key: "index",
+            render: (row, index) =>
+                (((onlineOrdersPagination.current_page || 1) - 1) *
+                    (onlineOrdersPagination.per_page || 10)) +
+                index +
+                1,
+        },
+        {
+            label: "Ticket",
+            key: "ticket_number",
+            render: (row) => <span className="font-weight-bold">{row.ticket_number}</span>,
+        },
+        {
+            label: "Customer",
+            key: "customer",
+            render: (row) => row.customer?.full_name || "N/A",
+        },
+        {
+            label: "Branch",
+            key: "order_branch",
+            render: (row) => row.order_branch?.name || "N/A",
+        },
+        { label: "Description", key: "description" },
+        {
+            label: "Total",
+            key: "total_amount",
+            render: (row) => {
+                const discountPct = parseFloat(row.discount_percentage || 0);
+                const hasDiscount = discountPct > 0;
+                const totalAmount = parseFloat(row.total_amount || 0);
+                if (!hasDiscount) {
+                    return totalAmount > 0 ? formatPeso(totalAmount.toFixed(2)) : "To be confirmed";
+                }
+
+                let originalPrice = parseFloat(row.original_price || 0);
+                if (originalPrice === 0 && totalAmount > 0) {
+                    originalPrice = totalAmount;
+                }
+                const discountAmount = parseFloat(row.discount_amount || 0);
+                const calculatedDiscountAmount =
+                    discountAmount > 0 ? discountAmount : originalPrice * (discountPct / 100);
+                const discountedTotal = originalPrice - calculatedDiscountAmount;
+                return (
+                    <div>
+                        <div className="text-decoration-line-through text-muted">
+                            {formatPeso(originalPrice.toFixed(2))}
+                        </div>
+                        <div className="text-success font-weight-bold">
+                            {formatPeso(discountedTotal.toFixed(2))}
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            label: "Payment",
+            key: "payment_status",
+            render: (row) => (
+                <div className="d-flex align-items-center">
+                    {getPaymentStatusBadge(row)}
+                    {row.payment_status === "awaiting_verification" && (
+                        <button
+                            type="button"
+                            onClick={() => handleOpenVerifyModal(row)}
+                            className="btn btn-sm btn-success ml-1"
+                            style={{ padding: "2px 8px", fontSize: "11px" }}
+                            title="Verify Order">
+                            <i className="ti-check-box"></i> Verify
+                        </button>
+                    )}
+                </div>
+            ),
+        },
+        {
+            label: "Created",
+            key: "created_at",
+            render: (row) =>
+                row.created_at ? new Date(row.created_at).toLocaleString() : "N/A",
+        },
+    ];
+
+    return (
+        <AdminLayout
+            user={user}
+            notifications={notifications}
+            messages={messages}
+        >
             <Head title="Dashboard" />
 
             <div className="row">
@@ -175,13 +341,13 @@ export default function Dashboard({
             </div>
 
             <Modal
-        title="Payments"
-        isOpen={openPaymentModal}
-        onClose={() => setPaymentModalOpen(false)}
-        onSave={handleSave}
-        size="3xl"
-        submitButtonText="Record Payment">
-
+                title="Payments"
+                isOpen={openPaymentModal}
+                onClose={() => setPaymentModalOpen(false)}
+                onSave={handleSave}
+                size="3xl"
+                submitButtonText="Record Payment"
+            >
                 <form>
                     <div className="mb-4">
                         <h3 className="mb-4">
@@ -207,22 +373,11 @@ export default function Dashboard({
                                 Paymeny Amount :
                             </label>
                             <input
-                type="text"
-                className="mt-1 w-full border"
-                placeholder="0.00"
-                value="" />
-
-
-
-
-
-
-
-
-
-
-
-
+                                type="text"
+                                className="mt-1 w-full border"
+                                placeholder="0.00"
+                                value=""
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium">
@@ -241,182 +396,433 @@ export default function Dashboard({
                                 Notes
                             </label>
                             <input
-                type="text"
-                className="mt-1 w-full border rounded-md p-2"
-                placeholder=""
-                value="" />
-
-
-
-
-
-
-
-
-
-
-
+                                type="text"
+                                className="mt-1 w-full border rounded-md p-2"
+                                placeholder=""
+                                value=""
+                            />
                         </div>
                     </div>
                 </form>
             </Modal>
 
+      <Modal
+                    title="Verify Order & Payment"
+                    isOpen={openVerifyModal}
+                    onClose={closeVerifyModal}
+                    size="lg"
+                    submitButtonText={null}
+                >
+                    <div className="modal-body">
+                        {verifyErrors.general && (
+                            <div className="alert alert-danger mb-4">
+                                <i className="ti-alert mr-2"></i>
+                                {verifyErrors.general}
+                            </div>
+                        )}
+
+                        {selectedOrder && (
+                            <div
+                                className={`alert ${
+                                    selectedOrder.payment_method === "cash"
+                                        ? "alert-info"
+                                        : "alert-warning"
+                                } mb-4`}
+                            >
+                                <h6 className="alert-heading f-s-14">
+                                    <i className="ti-info-alt mr-2"></i>
+                                    {selectedOrder.payment_method === "cash"
+                                        ? "Walk-in order confirmation"
+                                        : "Verification required for online payment"}
+                                </h6>
+                                <p className="mb-0 small">
+                                    Ticket: <strong>{selectedOrder.ticket_number}</strong>
+                                    <br />
+                                    {(() => {
+                                        const discountPct = parseFloat(
+                                            selectedOrder.discount_percentage ||
+                                                selectedOrder.discount ||
+                                                0
+                                        );
+                                        const hasDiscount = discountPct > 0;
+                                        let originalPrice = parseFloat(
+                                            selectedOrder.original_price || 0
+                                        );
+                                        let totalAmount = parseFloat(
+                                            selectedOrder.total_amount || 0
+                                        );
+
+                                        if (hasDiscount) {
+                                            if (originalPrice === 0 && totalAmount > 0) {
+                                                originalPrice = totalAmount;
+                                            }
+
+                                            const discountAmount = parseFloat(
+                                                selectedOrder.discount_amount || 0
+                                            );
+                                            const calculatedDiscountAmount =
+                                                discountAmount > 0
+                                                    ? discountAmount
+                                                    : originalPrice * (discountPct / 100);
+                                            const discountedTotal =
+                                                originalPrice - calculatedDiscountAmount;
+
+                                            return (
+                                                <>
+                                                    Original Price:{" "}
+                                                    <span className="text-decoration-line-through">
+                                                        {formatPeso(originalPrice.toFixed(2))}
+                                                    </span>
+                                                    <br />
+                                                    Discount:{" "}
+                                                    <span className="text-success font-weight-bold">
+                                                        {discountPct}% OFF (-
+                                                        {formatPeso(
+                                                            calculatedDiscountAmount.toFixed(2)
+                                                        )}
+                                                        )
+                                                    </span>
+                                                    <br />
+                                                    Total Amount:{" "}
+                                                    <strong className="text-success">
+                                                        {formatPeso(discountedTotal.toFixed(2))}
+                                                    </strong>
+                                                </>
+                                            );
+                                        }
+
+                                        return (
+                                            <>
+                                                Total Amount:{" "}
+                                                <strong>
+                                                    {totalAmount > 0
+                                                        ? formatPeso(totalAmount.toFixed(2))
+                                                        : "To be confirmed"}
+                                                </strong>
+                                            </>
+                                        );
+                                    })()}
+                                    {selectedOrder.payment_method === "cash" && (
+                                        <>
+                                            <br />
+                                            Confirm this order once the customer arrives at the branch.
+                                        </>
+                                    )}
+                                </p>
+                            </div>
+                        )}
+
+                        {selectedOrder &&
+                            (!selectedOrder.job_type_id ||
+                                selectedOrder.custom_job_type_description) && (
+                                <div className="form-group mb-4">
+                                    <label className="form-label f-s-13 font-weight-bold">
+                                        Update Total Price (Manual){" "}
+                                        <span className="text-danger">*</span>
+                                    </label>
+                                    <div className="input-group">
+                                        <div className="input-group-prepend">
+                                            <span className="input-group-text">₱</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            className={`form-control ${
+                                                verifyErrors.total_amount ? "is-invalid" : ""
+                                            }`}
+                                            value={verifyFormData.total_amount}
+                                            onChange={(e) => {
+                                                setVerifyFormData({
+                                                    ...verifyFormData,
+                                                    total_amount: e.target.value,
+                                                });
+                                                if (verifyErrors.total_amount) {
+                                                    setVerifyErrors({
+                                                        ...verifyErrors,
+                                                        total_amount: null,
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="0.00"
+                                            step="0.01"
+                                            required
+                                        />
+                                    </div>
+                                    {verifyErrors.total_amount && (
+                                        <div className="invalid-feedback d-block">
+                                            {verifyErrors.total_amount}
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-muted mt-1">
+                                        Since this is a custom order, you must set the final price
+                                        before confirming.
+                                    </p>
+                                </div>
+                            )}
+
+                        <div className="form-group mb-4">
+                            <label className="form-label f-s-13">
+                                Verification Notes (Optional)
+                            </label>
+                            <textarea
+                                className="form-control"
+                                rows="2"
+                                value={verifyFormData.notes}
+                                onChange={(e) =>
+                                    setVerifyFormData({
+                                        ...verifyFormData,
+                                        notes: e.target.value,
+                                    })
+                                }
+                                placeholder="Add any notes for the cashier or designers..."
+                            ></textarea>
+                        </div>
+
+                        <div className="modal-footer border-top pt-3 px-0">
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={closeVerifyModal}
+                                disabled={isUpdating}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-success btn-sm"
+                                onClick={handleVerifyPayment}
+                                disabled={isUpdating}
+                            >
+                                {isUpdating ? (
+                                    <>
+                                        <i className="fa fa-spinner fa-spin mr-1"></i> Verifying...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="ti-check mr-1"></i> Confirm & Release to Cashier
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+
             <section id="main-content">
                 {/* Date Filter Section */}
                 <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-gray-800">
+                        Dashboard
+                    </h1>
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
                         <button
-              onClick={refreshDashboard}
-              className="btn btn-sm btn-link"
-              disabled={refreshing}>
-
+                            onClick={refreshDashboard}
+                            className="btn btn-sm btn-link"
+                            disabled={refreshing}
+                        >
                             <i className={`ti-reload "animate-spin"`}></i>
                             {refreshing ? " Refreshing..." : " Refresh"}
-                        </button> |
-                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </button>{" "}
+                        |
+                        <svg
+                            className="w-4 h-4 text-gray-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
                         </svg>
                         <select
-              className="text-sm font-medium text-gray-700 border-none bg-transparent focus:ring-0 p-0 pr-6 cursor-pointer"
-              value={dateRange}
-              onChange={(e) => handleDateRangeChange(e.target.value)}>
-
+                            className="text-sm font-medium text-gray-700 border-none bg-transparent focus:ring-0 p-0 pr-6 cursor-pointer"
+                            value={dateRange}
+                            onChange={(e) =>
+                                handleDateRangeChange(e.target.value)
+                            }
+                        >
                             <option value="today">Today</option>
                             <option value="this_week">This Week</option>
                             <option value="this_month">This Month</option>
                             <option value="last_30_days">Last 30 Days</option>
                             <option value="this_year">This Year</option>
-                            {Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => new Date().getFullYear() - i).map((year) =>
-              <option key={year} value={`year_${year}`}>
+                            {Array.from(
+                                { length: new Date().getFullYear() - 2023 },
+                                (_, i) => new Date().getFullYear() - i
+                            ).map((year) => (
+                                <option key={year} value={`year_${year}`}>
                                     {year}
                                 </option>
-              )}
+                            ))}
                         </select>
                     </div>
                 </div>
                 <div className="row">
                     <div className="col-lg-3">
                         <CardStatistics
-              label="Total Orders"
-              statistics={currentStats.total_orders || 0}
-              icon="ti-ticket"
-              color="bg-primary"
-              statChange={true}
-              changePercent={ordersChange}
-              changeLabel={`vs previous period`} />
-
+                            label="Total Orders"
+                            statistics={currentStats.total_orders || 0}
+                            icon="ti-ticket"
+                            color="bg-primary"
+                            details={`Online: ${currentStats.online_orders || 0} | Walk-in: ${currentStats.walkin_orders || 0}`}
+                            statChange={true}
+                            changePercent={ordersChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                     <div className="col-lg-3">
                         <CardStatistics
-              label="Complete Orders"
-              statistics={currentStats.completed_orders || 0}
-              icon="ti-check-box"
-              color="bg-success"
-              statChange={true}
-              changePercent={completedChange}
-              changeLabel={`vs previous period`} />
-
+                            label="Complete Orders"
+                            statistics={currentStats.completed_orders || 0}
+                            icon="ti-check-box"
+                            color="bg-success"
+                            statChange={true}
+                            changePercent={completedChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                     <div className="col-lg-3">
                         <CardStatistics
-              label="Total Sales"
-              statistics={`₱ ${(currentStats.total_sales || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              icon="ti-stats-up"
-              color="bg-info"
-              statChange={true}
-              changePercent={salesChange}
-              changeLabel={`vs previous period`} />
-
+                            label="Total Sales"
+                            statistics={`₱ ${(
+                                currentStats.total_sales || 0
+                            ).toLocaleString("en-PH", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })}`}
+                            icon="ti-stats-up"
+                            color="bg-info"
+                            statChange={true}
+                            changePercent={salesChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                     <div className="col-lg-3">
                         <CardStatistics
-              label="Net Income"
-              statistics={`₱ ${(currentStats.net_income || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              icon="ti-money"
-              color="bg-success"
-              statChange={true}
-              changePercent={revenueChange}
-              changeLabel={`vs previous period`} />
-
+                            label="Net Income"
+                            statistics={`₱ ${(
+                                currentStats.net_income || 0
+                            ).toLocaleString("en-PH", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })}`}
+                            icon="ti-money"
+                            color="bg-success"
+                            statChange={true}
+                            changePercent={revenueChange}
+                            changeLabel={`vs previous period`}
+                        />
                     </div>
                 </div>
+
+          
                 <div className="row">
                     <div className="col-lg-6">
                         <div className="card">
                             <div className="card-body">
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                    }}
+                                >
                                     <Typography variant="h6" gutterBottom>
                                         Daily Orders
                                     </Typography>
 
                                     {/* 🔹 Year and Month selectors */}
                                     <Box
-                    sx={{ display: "flex", gap: 1, mb: 2 }}>
-
+                                        sx={{ display: "flex", gap: 1, mb: 2 }}
+                                    >
                                         <FormControl size="small">
                                             <InputLabel>Year</InputLabel>
                                             <Select
-                        value={year}
-                        label="Year"
-                        onChange={(e) =>
-                        handleYearChange(e.target.value)
-                        }
-                        sx={{ minWidth: 100 }}>
-
-                                                {[2024, 2025, 2026].map((y) =>
-                        <MenuItem key={y} value={y.toString()}>
+                                                value={year}
+                                                label="Year"
+                                                onChange={(e) =>
+                                                    handleYearChange(
+                                                        e.target.value
+                                                    )
+                                                }
+                                                sx={{ minWidth: 100 }}
+                                            >
+                                                {[2024, 2025, 2026].map((y) => (
+                                                    <MenuItem
+                                                        key={y}
+                                                        value={y.toString()}
+                                                    >
                                                         {y}
                                                     </MenuItem>
-                        )}
+                                                ))}
                                             </Select>
                                         </FormControl>
 
                                         <FormControl size="small">
                                             <InputLabel>Month</InputLabel>
                                             <Select
-                        value={month}
-                        label="Month"
-                        onChange={(e) =>
-                        handleMonthChange(e.target.value)
-                        }
-                        sx={{ minWidth: 100 }}>
-
-                                                {['January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) =>
-                        <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
-                                                            {m}
-                                                        </MenuItem>
-                        )}
+                                                value={month}
+                                                label="Month"
+                                                onChange={(e) =>
+                                                    handleMonthChange(
+                                                        e.target.value
+                                                    )
+                                                }
+                                                sx={{ minWidth: 100 }}
+                                            >
+                                                {[
+                                                    "January",
+                                                    "February",
+                                                    "March",
+                                                    "April",
+                                                    "May",
+                                                    "June",
+                                                    "July",
+                                                    "August",
+                                                    "September",
+                                                    "October",
+                                                    "November",
+                                                    "December",
+                                                ].map((m, i) => (
+                                                    <MenuItem
+                                                        key={i}
+                                                        value={(i + 1)
+                                                            .toString()
+                                                            .padStart(2, "0")}
+                                                    >
+                                                        {m}
+                                                    </MenuItem>
+                                                ))}
                                             </Select>
                                         </FormControl>
                                     </Box>
                                 </Box>
-                                <Box sx={{ width: '100%', overflowX: 'auto' }}>
+                                <Box sx={{ width: "100%", overflowX: "auto" }}>
                                     {/* 🔹 Chart */}
                                     <LineChart
-                    xAxis={[
-                    {
-                      data: xData,
-                      label: "Day",
-                      scaleType: "band"
-                    }]
-                    }
-                    yAxis={[
-                    {
-                      label: "Orders"
-                    }]
-                    }
-                    series={[
-                    {
-                      data: yData,
-                      label: "Order",
-                      color: "#fb8c00"
-                    }]
-                    }
-                    height={400}
-                    sx={{ width: '100%', minWidth: 300 }} />
-
+                                        xAxis={[
+                                            {
+                                                data: xData,
+                                                label: "Day",
+                                                scaleType: "band",
+                                            },
+                                        ]}
+                                        yAxis={[
+                                            {
+                                                label: "Orders",
+                                            },
+                                        ]}
+                                        series={[
+                                            {
+                                                data: yData,
+                                                label: "Order",
+                                                color: "#fb8c00",
+                                            },
+                                        ]}
+                                        height={400}
+                                        sx={{ width: "100%", minWidth: 300 }}
+                                    />
                                 </Box>
                             </div>
                         </div>
@@ -424,88 +830,140 @@ export default function Dashboard({
                     <div className="col-lg-6">
                         <div className="card">
                             <div className="card-body"></div>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                }}
+                            >
                                 <Typography variant="h6" gutterBottom>
                                     Daily Revenue
                                 </Typography>
 
                                 {/* 🔹 Year & Month selectors */}
-                                <Box sx={{ display: "flex", justifyContent: 'flex-end', gap: 1, mb: 2 }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "flex-end",
+                                        gap: 1,
+                                        mb: 2,
+                                    }}
+                                >
                                     <FormControl size="small">
                                         <InputLabel>Year</InputLabel>
                                         <Select
-                      size="small"
-                      value={year}
-                      label="Year"
-                      onChange={(e) =>
-                      handleYearChange(e.target.value)
-                      }
-                      sx={{ minWidth: 100 }}>
-
-                                            {[2024, 2025, 2026].map((y) =>
-                      <MenuItem key={y} value={y.toString()}>
+                                            size="small"
+                                            value={year}
+                                            label="Year"
+                                            onChange={(e) =>
+                                                handleYearChange(e.target.value)
+                                            }
+                                            sx={{ minWidth: 100 }}
+                                        >
+                                            {[2024, 2025, 2026].map((y) => (
+                                                <MenuItem
+                                                    key={y}
+                                                    value={y.toString()}
+                                                >
                                                     {y}
                                                 </MenuItem>
-                      )}
+                                            ))}
                                         </Select>
                                     </FormControl>
 
                                     <FormControl size="small">
                                         <InputLabel>Month</InputLabel>
                                         <Select
-                      size="small"
-                      value={month}
-                      label="Month"
-                      onChange={(e) =>
-                      handleMonthChange(e.target.value)
-                      }
-                      sx={{ minWidth: 120 }}>
-
-                                            {['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) =>
-                      <MenuItem key={i} value={(i + 1).toString().padStart(2, '0')}>
-                                                        {m}
-                                                    </MenuItem>
-                      )}
+                                            size="small"
+                                            value={month}
+                                            label="Month"
+                                            onChange={(e) =>
+                                                handleMonthChange(
+                                                    e.target.value
+                                                )
+                                            }
+                                            sx={{ minWidth: 120 }}
+                                        >
+                                            {[
+                                                "January",
+                                                "February",
+                                                "March",
+                                                "April",
+                                                "May",
+                                                "June",
+                                                "July",
+                                                "August",
+                                                "September",
+                                                "October",
+                                                "November",
+                                                "December",
+                                            ].map((m, i) => (
+                                                <MenuItem
+                                                    key={i}
+                                                    value={(i + 1)
+                                                        .toString()
+                                                        .padStart(2, "0")}
+                                                >
+                                                    {m}
+                                                </MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Box>
                             </Box>
-                            <Box sx={{ width: '100%', overflowX: 'auto' }}>
-
+                            <Box sx={{ width: "100%", overflowX: "auto" }}>
                                 {/* 🔹 Stacked Bar Chart - Sales vs Net Income */}
                                 <BarChart
-                  xAxis={[
-                  {
-                    data: xDataR,
-                    label: "Day",
-                    scaleType: "band"
-                  }]
-                  }
-                  yAxis={[
-                  {
-                    label: "Amount (₱)",
-                    valueFormatter: pesoFormatter
-                  }]
-                  }
-                  series={[
-                  {
-                    data: yDataNetIncome,
-                    label: "Net Income",
-                    color: "#10b981",
-                    stack: 'total'
-                  },
-                  {
-                    data: yDataCOGS,
-                    label: "COGS (Actual)",
-                    color: "#f59e0b",
-                    stack: 'total'
-                  }]
-                  }
-                  height={400}
-                  sx={{ width: '100%', minWidth: 300 }} />
-
+                                    xAxis={[
+                                        {
+                                            data: xDataR,
+                                            label: "Day",
+                                            scaleType: "band",
+                                        },
+                                    ]}
+                                    yAxis={[
+                                        {
+                                            label: "Amount (₱)",
+                                            valueFormatter: pesoFormatter,
+                                        },
+                                    ]}
+                                    series={[
+                                        {
+                                            data: yDataNetIncome,
+                                            label: "Net Income",
+                                            color: "#10b981",
+                                            stack: "total",
+                                        },
+                                        {
+                                            data: yDataCOGS,
+                                            label: "COGS (Actual)",
+                                            color: "#f59e0b",
+                                            stack: "total",
+                                        },
+                                    ]}
+                                    height={400}
+                                    sx={{ width: "100%", minWidth: 300 }}
+                                />
                             </Box>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="row">
+                    <div className="col-lg-12">
+                        <div className="card">
+                            <div className="card-title pr">
+                                <h4>Customer Orders (Online)</h4>
+                            </div>
+                            <div className="card-body">
+                                <DataTable
+                                    columns={onlineOrderColumns}
+                                    data={onlineOrders}
+                                    pagination={onlineOrdersPagination}
+                                    emptyMessage="No online orders found."
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -529,23 +987,50 @@ export default function Dashboard({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(dashboardData.frontdesk_transactions || []).length > 0 ?
-                      dashboardData.frontdesk_transactions.map((transaction, index) =>
-                      <tr key={index}>
-                                                        <td>{index + 1}</td>
-                                                        <td>{transaction.name}</td>
-                                                        <td>{transaction.metric_1_value}</td>
-                                                        <td className="text-success">
-                                                            ₱ {Number(transaction.metric_2_value).toLocaleString('en-PH')}
-                                                        </td>
-                                                        <td>{transaction.last_activity}</td>
-                                                    </tr>
-                      ) :
-
-                      <tr>
-                                                    <td colSpan="5" className="text-center">No activity</td>
+                                            {(
+                                                dashboardData.frontdesk_transactions ||
+                                                []
+                                            ).length > 0 ? (
+                                                dashboardData.frontdesk_transactions.map(
+                                                    (transaction, index) => (
+                                                        <tr key={index}>
+                                                            <td>{index + 1}</td>
+                                                            <td>
+                                                                {
+                                                                    transaction.name
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                {
+                                                                    transaction.metric_1_value
+                                                                }
+                                                            </td>
+                                                            <td className="text-success">
+                                                                ₱{" "}
+                                                                {Number(
+                                                                    transaction.metric_2_value
+                                                                ).toLocaleString(
+                                                                    "en-PH"
+                                                                )}
+                                                            </td>
+                                                            <td>
+                                                                {
+                                                                    transaction.last_activity
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
+                                            ) : (
+                                                <tr>
+                                                    <td
+                                                        colSpan="5"
+                                                        className="text-center"
+                                                    >
+                                                        No activity
+                                                    </td>
                                                 </tr>
-                      }
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -570,21 +1055,47 @@ export default function Dashboard({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(dashboardData.designer_transactions || []).length > 0 ?
-                      dashboardData.designer_transactions.map((transaction, index) =>
-                      <tr key={index}>
-                                                        <td>{index + 1}</td>
-                                                        <td>{transaction.name}</td>
-                                                        <td>{transaction.metric_1_value}</td>
-                                                        <td className="text-success">{transaction.metric_2_value}</td>
-                                                        <td>{transaction.last_activity}</td>
-                                                    </tr>
-                      ) :
-
-                      <tr>
-                                                    <td colSpan="5" className="text-center">No activity</td>
+                                            {(
+                                                dashboardData.designer_transactions ||
+                                                []
+                                            ).length > 0 ? (
+                                                dashboardData.designer_transactions.map(
+                                                    (transaction, index) => (
+                                                        <tr key={index}>
+                                                            <td>{index + 1}</td>
+                                                            <td>
+                                                                {
+                                                                    transaction.name
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                {
+                                                                    transaction.metric_1_value
+                                                                }
+                                                            </td>
+                                                            <td className="text-success">
+                                                                {
+                                                                    transaction.metric_2_value
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                {
+                                                                    transaction.last_activity
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
+                                            ) : (
+                                                <tr>
+                                                    <td
+                                                        colSpan="5"
+                                                        className="text-center"
+                                                    >
+                                                        No activity
+                                                    </td>
                                                 </tr>
-                      }
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -609,31 +1120,55 @@ export default function Dashboard({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(dashboardData.production_transactions || []).length > 0 ?
-                      dashboardData.production_transactions.map((transaction, index) =>
-                      <tr key={index}>
-                                                        <td>{index + 1}</td>
-                                                        <td>{transaction.name}</td>
-                                                        <td>{transaction.metric_1_value}</td>
-                                                        <td className="text-primary">{transaction.metric_2_value}</td>
-                                                        <td>{transaction.last_activity}</td>
-                                                    </tr>
-                      ) :
-
-                      <tr>
-                                                    <td colSpan="5" className="text-center">No activity</td>
+                                            {(
+                                                dashboardData.production_transactions ||
+                                                []
+                                            ).length > 0 ? (
+                                                dashboardData.production_transactions.map(
+                                                    (transaction, index) => (
+                                                        <tr key={index}>
+                                                            <td>{index + 1}</td>
+                                                            <td>
+                                                                {
+                                                                    transaction.name
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                {
+                                                                    transaction.metric_1_value
+                                                                }
+                                                            </td>
+                                                            <td className="text-primary">
+                                                                {
+                                                                    transaction.metric_2_value
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                {
+                                                                    transaction.last_activity
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
+                                            ) : (
+                                                <tr>
+                                                    <td
+                                                        colSpan="5"
+                                                        className="text-center"
+                                                    >
+                                                        No activity
+                                                    </td>
                                                 </tr>
-                      }
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </section>
-
-        </AdminLayout>);
-
+        </AdminLayout>
+    );
 }
