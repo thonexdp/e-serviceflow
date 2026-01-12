@@ -136,7 +136,6 @@ class FinanceController extends Controller
         $summary['pending_government_total'] = $pendingPayments->where('payment_method', 'government_ar')->sum('amount');
         $summary['collectable_total'] = $summary['pending_cheques_total'] + $summary['pending_government_total'];
 
-
         return Inertia::render('PaymentsFinance', [
             'ledger' => $ledger,
             'pendingPayments' => $pendingPayments,
@@ -206,6 +205,7 @@ class FinanceController extends Controller
                     'ticket_number' => $ticket->ticket_number,
                     'name' => $ticket->customer ? $ticket->customer->full_name : 'Walk-in',
                     'description' => $ticket->description,
+                    'subtotal' => $ticket->subtotal,
                     'total_invoiced' => $ticket->total_amount,
                     'total_paid' => $ticket->amount_paid,
                     'balance' => $ticket->total_amount - $ticket->amount_paid,

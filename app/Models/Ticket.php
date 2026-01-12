@@ -38,6 +38,7 @@ class Ticket extends Model
         'payment_method',
         'status',
         'current_workflow_step',
+        'custom_workflow_steps',
         'assigned_to_user_id',
         'design_status',
         'design_notes',
@@ -54,6 +55,8 @@ class Ticket extends Model
         'is_size_based',
         'custom_width',
         'custom_height',
+        'design_description',
+        'is_online_order',
     ];
 
     protected $casts = [
@@ -69,6 +72,8 @@ class Ticket extends Model
         'quantity' => 'integer',
         'free_quantity' => 'integer',
         'produced_quantity' => 'integer',
+        'custom_workflow_steps' => 'array',
+        'is_online_order' => 'boolean',
     ];
 
     protected $appends = [
@@ -86,6 +91,12 @@ class Ticket extends Model
             }
             $ticket->created_by = auth()->id();
 
+            // Set is_online_order flag if not already set
+            // If created_by is null (no auth user), it's an online order
+            // If created_by exists (authenticated user), it's a walk-in order
+            if (!isset($ticket->is_online_order)) {
+                $ticket->is_online_order = auth()->id() === null;
+            }
 
             if (auth()->user() && auth()->user()->branch_id) {
                 $userBranch = auth()->user()->branch;

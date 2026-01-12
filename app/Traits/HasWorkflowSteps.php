@@ -5,13 +5,47 @@ namespace App\Traits;
 trait HasWorkflowSteps
 {
 
-    public function getFirstWorkflowStep(): ?string
+    protected function resolveWorkflowSteps(): ?array
     {
-        if (!$this->jobType || !$this->jobType->workflow_steps) {
-            return null;
+        if (isset($this->jobType) && $this->jobType && $this->jobType->workflow_steps) {
+            return $this->jobType->workflow_steps;
         }
 
-        $workflowSteps = $this->jobType->workflow_steps;
+        if (!empty($this->custom_workflow_steps)) {
+            return $this->custom_workflow_steps;
+        }
+
+        return null;
+    }
+
+    protected function isWorkflowStepEnabled(array $workflowSteps, string $step): bool
+    {
+        // Support array format: ['printing', 'cutting', ...]
+        if (array_is_list($workflowSteps)) {
+            return in_array($step, $workflowSteps, true);
+        }
+
+        // Support keyed map formats:
+        // - { printing: true }
+        // - { printing: { enabled: true } }
+        if (!isset($workflowSteps[$step])) {
+            return false;
+        }
+
+        $data = $workflowSteps[$step];
+        if (is_array($data) && isset($data['enabled'])) {
+            return (bool) $data['enabled'];
+        }
+
+        return (bool) $data;
+    }
+
+    public function getFirstWorkflowStep(): ?string
+    {
+        $workflowSteps = $this->resolveWorkflowSteps();
+        if (!$workflowSteps) {
+            return null;
+        }
 
 
         $stepOrder = [
@@ -29,17 +63,7 @@ trait HasWorkflowSteps
 
 
         foreach ($stepOrder as $step) {
-
-            $isEnabled = false;
-            if (isset($workflowSteps[$step])) {
-                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
-                    $isEnabled = $workflowSteps[$step]['enabled'];
-                } else {
-                    $isEnabled = (bool) $workflowSteps[$step];
-                }
-            }
-
-            if ($isEnabled) {
+            if ($this->isWorkflowStepEnabled($workflowSteps, $step)) {
                 return $step;
             }
         }
@@ -50,11 +74,10 @@ trait HasWorkflowSteps
 
     public function getNextWorkflowStep(): ?string
     {
-        if (!$this->jobType || !$this->jobType->workflow_steps || !$this->current_workflow_step) {
+        $workflowSteps = $this->resolveWorkflowSteps();
+        if (!$workflowSteps || !$this->current_workflow_step) {
             return null;
         }
-
-        $workflowSteps = $this->jobType->workflow_steps;
 
 
         $stepOrder = [
@@ -80,17 +103,7 @@ trait HasWorkflowSteps
 
         for ($i = $currentIndex + 1; $i < count($stepOrder); $i++) {
             $step = $stepOrder[$i];
-
-            $isEnabled = false;
-            if (isset($workflowSteps[$step])) {
-                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
-                    $isEnabled = $workflowSteps[$step]['enabled'];
-                } else {
-                    $isEnabled = (bool) $workflowSteps[$step];
-                }
-            }
-
-            if ($isEnabled) {
+            if ($this->isWorkflowStepEnabled($workflowSteps, $step)) {
                 return $step;
             }
         }
@@ -102,11 +115,10 @@ trait HasWorkflowSteps
 
     public function getPreviousWorkflowStep(): ?string
     {
-        if (!$this->jobType || !$this->jobType->workflow_steps || !$this->current_workflow_step) {
+        $workflowSteps = $this->resolveWorkflowSteps();
+        if (!$workflowSteps || !$this->current_workflow_step) {
             return null;
         }
-
-        $workflowSteps = $this->jobType->workflow_steps;
 
 
         $stepOrder = [
@@ -132,17 +144,7 @@ trait HasWorkflowSteps
 
         for ($i = $currentIndex - 1; $i >= 0; $i--) {
             $step = $stepOrder[$i];
-
-            $isEnabled = false;
-            if (isset($workflowSteps[$step])) {
-                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
-                    $isEnabled = $workflowSteps[$step]['enabled'];
-                } else {
-                    $isEnabled = (bool) $workflowSteps[$step];
-                }
-            }
-
-            if ($isEnabled) {
+            if ($this->isWorkflowStepEnabled($workflowSteps, $step)) {
                 return $step;
             }
         }
@@ -153,11 +155,10 @@ trait HasWorkflowSteps
 
     public function getActiveWorkflowSteps(): array
     {
-        if (!$this->jobType || !$this->jobType->workflow_steps) {
+        $workflowSteps = $this->resolveWorkflowSteps();
+        if (!$workflowSteps) {
             return [];
         }
-
-        $workflowSteps = $this->jobType->workflow_steps;
 
 
         $stepOrder = [
@@ -175,17 +176,7 @@ trait HasWorkflowSteps
 
         $activeSteps = [];
         foreach ($stepOrder as $step) {
-
-            $isEnabled = false;
-            if (isset($workflowSteps[$step])) {
-                if (is_array($workflowSteps[$step]) && isset($workflowSteps[$step]['enabled'])) {
-                    $isEnabled = $workflowSteps[$step]['enabled'];
-                } else {
-                    $isEnabled = (bool) $workflowSteps[$step];
-                }
-            }
-
-            if ($isEnabled) {
+            if ($this->isWorkflowStepEnabled($workflowSteps, $step)) {
                 $activeSteps[] = $step;
             }
         }

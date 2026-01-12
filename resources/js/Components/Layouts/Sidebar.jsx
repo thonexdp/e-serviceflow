@@ -111,6 +111,15 @@ export default function Sidebar({ isCollapsed }) {
                                     </li>
                                 )
                             }
+                            {
+                                hasPermission('purchase_orders', 'read') && (
+                                    <li className={isActive("/frontdesk/purchase-orders") ? "active" : ""}>
+                                        <Link href="/frontdesk/purchase-orders">
+                                            <i className="ti-shopping-cart"></i>{" "}
+                                            Purchase Orders
+                                        </Link>
+                                    </li>)
+                            }
                         </ul> :
                         role === "Designer" ?
                             <ul>

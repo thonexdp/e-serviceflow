@@ -174,6 +174,7 @@ class PublicOrderController extends Controller
             'payment_method' => $paymentMethod === 'walkin' ? 'cash' : $paymentMethod,
             'payment_status' => $paymentStatus,
             'status' => 'pending',
+            'is_online_order' => true, // Mark as online order from public form
             // Discount fields
             'original_price' => $validated['original_price'] ?? null,
             'discount_percentage' => $validated['discount_percentage'] ?? null,
@@ -184,6 +185,7 @@ class PublicOrderController extends Controller
         if ($isOthersCategory) {
             // For 'others' category, store custom description in 'job_type' field
             $ticketData['job_type'] = $validated['custom_job_type_description'] ?? 'Custom Job';
+            $ticketData['custom_job_type_description'] = $validated['custom_job_type_description'] ?? 'Custom Job';
             $ticketData['job_type_id'] = null;
         } else {
             // Regular job type with ID

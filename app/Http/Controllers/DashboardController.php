@@ -232,14 +232,21 @@ class DashboardController extends Controller
                             'payment_status' => $ticket->payment_status,
                             'payment_method' => $ticket->payment_method,
                             'created_at' => $ticket->created_at,
-                            'customer_files' => $ticket->customerFiles->map(function ($file) {
-                                return [
-                                    'id' => $file->id,
-                                    'file_name' => $file->file_name,
-                                    'file_path' => $file->file_path,
-                                    'type' => $file->type,
-                                ];
-                            }),
+                            'customer_files' => (function () use ($ticket) {
+                                // Get the first document from the first payment instead of customer_files
+                                $firstPayment = $ticket->payments->first();
+
+                                if ($firstPayment && $firstPayment->documents->isNotEmpty()) {
+                                    $firstDocument = $firstPayment->documents->first();
+                                    return [[
+                                        'id' => $firstDocument->id,
+                                        'file_name' => $firstDocument->original_name ?? 'Payment Proof',
+                                        'file_path' => $firstDocument->file_path,
+                                        'type' => 'payment',
+                                    ]];
+                                }
+                                return [];
+                            })(),
                         ];
                     });
                 },
@@ -382,10 +389,7 @@ class DashboardController extends Controller
                     };
 
                     return [
-                        'ticketsPendingReview' => Ticket::where(function ($q) {
-                            $q->whereNull('design_status')
-                                ->orWhere('design_status', 'pending');
-                        })
+                        'ticketsPendingReview' => Ticket::where('design_status', 'pending')
                             ->whereBetween('created_at', [$startDate, $endDate])
                             ->when($user && !$user->isAdmin() && $user->branch_id, $branchFilter)
                             ->count(),
@@ -405,16 +409,14 @@ class DashboardController extends Controller
                 },
                 'ticketsPendingReview' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'customerFiles', 'jobType'])
-                        ->where(function ($q) {
-                            $q->whereNull('design_status')
-                                ->orWhere('design_status', 'pending');
-                        })
+                        ->where('design_status', 'pending')
+                        ->whereNot('payment_status', 'awaiting_verification')
 
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
-                        ->orderBy('created_at', 'desc')
-                        ->limit(10);
+                        ->orderBy('created_at', 'desc');
+
 
                     return $query->get()->map(function ($ticket) {
                         return [
@@ -425,6 +427,7 @@ class DashboardController extends Controller
                                 'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
                             ] : null,
                             'description' => $ticket->description,
+                            'design_status' => $ticket->design_status,
                             'due_date' => $ticket->due_date,
                             'created_at' => $ticket->created_at,
                             'customer_files' => $ticket->customerFiles->map(function ($file) {
@@ -457,6 +460,7 @@ class DashboardController extends Controller
                                 'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
                             ] : null,
                             'description' => $ticket->description,
+                            'design_status' => $ticket->design_status,
                             'design_notes' => $ticket->design_notes,
                             'due_date' => $ticket->due_date,
                             'updated_at' => $ticket->updated_at,
@@ -474,8 +478,6 @@ class DashboardController extends Controller
                 'mockupsUploadedToday' => function () use ($request, $user) {
                     $query = Ticket::with(['customer', 'mockupFiles', 'jobType'])
                         ->where('design_status', 'mockup_uploaded')
-                        ->whereDate('updated_at', today())
-
                         ->when($user && !$user->isAdmin() && $user->branch_id, function ($query) use ($user) {
                             $query->where('order_branch_id', $user->branch_id);
                         })
@@ -491,6 +493,7 @@ class DashboardController extends Controller
                                 'name' => $ticket->customer->firstname . ' ' . $ticket->customer->lastname,
                             ] : null,
                             'description' => $ticket->description,
+                            'design_status' => $ticket->design_status,
                             'due_date' => $ticket->due_date,
                             'updated_at' => $ticket->updated_at,
                             'mockup_files' => $ticket->mockupFiles->map(function ($file) {
@@ -674,6 +677,19 @@ class DashboardController extends Controller
 
         $currentStats = $this->calculatePeriodStats($dates['current_start'], $dates['current_end']);
 
+        $onlineOrdersCount = Ticket::where('is_online_order', true)
+            ->whereBetween('created_at', [$dates['current_start'], $dates['current_end']])
+            ->where('status', '!=', 'cancelled')
+            ->count();
+
+        $walkinOrdersCount = Ticket::where('is_online_order', false)
+            ->whereBetween('created_at', [$dates['current_start'], $dates['current_end']])
+            ->where('status', '!=', 'cancelled')
+            ->count();
+
+        $currentStats['online_orders'] = $onlineOrdersCount;
+        $currentStats['walkin_orders'] = $walkinOrdersCount;
+
 
         $previousStats = $this->calculatePeriodStats($dates['previous_start'], $dates['previous_end']);
 
@@ -686,6 +702,44 @@ class DashboardController extends Controller
         $designerTransactions = $this->getUserTransactions('Designer', $dates['current_start'], $dates['current_end']);
         $productionTransactions = $this->getUserTransactions('Production', $dates['current_start'], $dates['current_end']);
 
+        $onlineOrders = Ticket::with(['customer', 'orderBranch', 'payments.documents'])
+            ->where('is_online_order', true)
+            ->whereBetween('created_at', [$dates['current_start'], $dates['current_end']])
+            ->where('status', '!=', 'cancelled')
+            ->orderByRaw("CASE WHEN payment_status = 'awaiting_verification' THEN 0 ELSE 1 END")
+            ->orderBy('created_at', 'desc')
+            ->paginate(5)
+            ->withQueryString();
+
+        $onlineOrders = $onlineOrders->through(function ($ticket) {
+            return [
+                'id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'customer' => $ticket->customer ? [
+                    'id' => $ticket->customer->id,
+                    'firstname' => $ticket->customer->firstname,
+                    'lastname' => $ticket->customer->lastname,
+                    'full_name' => $ticket->customer->full_name ?? ($ticket->customer->firstname . ' ' . $ticket->customer->lastname),
+                    'email' => $ticket->customer->email,
+                    'phone' => $ticket->customer->phone,
+                ] : null,
+                'order_branch' => $ticket->orderBranch ? [
+                    'id' => $ticket->orderBranch->id,
+                    'name' => $ticket->orderBranch->name,
+                ] : null,
+                'description' => $ticket->description,
+                'job_type_id' => $ticket->job_type_id,
+                'custom_job_type_description' => $ticket->custom_job_type_description,
+                'total_amount' => $ticket->total_amount,
+                'original_price' => $ticket->original_price,
+                'discount_percentage' => $ticket->discount_percentage,
+                'discount_amount' => $ticket->discount_amount,
+                'payment_status' => $ticket->payment_status,
+                'payment_method' => $ticket->payment_method,
+                'created_at' => $ticket->created_at,
+            ];
+        });
+
         return [
             'current_stats' => $currentStats,
             'previous_stats' => $previousStats,
@@ -694,6 +748,7 @@ class DashboardController extends Controller
             'frontdesk_transactions' => $frontDeskTransactions,
             'designer_transactions' => $designerTransactions,
             'production_transactions' => $productionTransactions,
+            'online_orders' => $onlineOrders,
             'date_info' => [
                 'current_start' => $dates['current_start']->format('Y-m-d'),
                 'current_end' => $dates['current_end']->format('Y-m-d'),

@@ -15,7 +15,7 @@ export default function PurchaseOrdersShow({
     messages = [],
     purchaseOrder = {}
 }) {
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
     const { buildUrl } = useRoleApi();
     const [openApproveModal, setApproveModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -24,6 +24,11 @@ export default function PurchaseOrdersShow({
 
     const handleCloseModal = () => {
         setApproveModalOpen(false);
+    };
+
+    const hasPermission = (module, feature) => {
+        if (auth.user.role === 'admin') return true;
+        return auth.user.permissions && auth.user.permissions.includes(`${module}.${feature}`);
     };
 
     const handleConfirmApprove = () => {
@@ -138,7 +143,9 @@ export default function PurchaseOrdersShow({
                                             <h4>Purchase Order Details</h4>
                                             <div>
                                                 {getStatusBadge(purchaseOrder.status)}
-                                                {purchaseOrder.status === "draft" &&
+                                                {
+                                                    hasPermission('purchase_orders', 'manage') &&
+                                                    purchaseOrder.status === "draft" &&
                                                     <button
                                                         className="btn btn-primary btn-sm ml-2"
                                                         onClick={() => {
@@ -149,7 +156,7 @@ export default function PurchaseOrdersShow({
                                                         <i className="ti-check"></i> Approve
                                                     </button>
                                                 }
-                                                {purchaseOrder.status === "approved" &&
+                                                {hasPermission('purchase_orders', 'manage') && purchaseOrder.status === "approved" &&
                                                     <button
                                                         className="btn btn-warning btn-sm ml-2"
                                                         onClick={() => {
@@ -160,7 +167,7 @@ export default function PurchaseOrdersShow({
                                                         <i className="ti-shopping-cart"></i> Mark as Ordered
                                                     </button>
                                                 }
-                                                {!["received", "cancelled"].includes(purchaseOrder.status) &&
+                                                {hasPermission('purchase_orders', 'manage') && !["received", "cancelled"].includes(purchaseOrder.status) &&
                                                     <button
                                                         className="btn btn-danger btn-sm ml-2"
                                                         onClick={() => {
@@ -280,7 +287,7 @@ export default function PurchaseOrdersShow({
 
                                                     Back to List
                                                 </button>
-                                                {(purchaseOrder.status === "approved" || purchaseOrder.status === "ordered") &&
+                                                {hasPermission('purchase_orders', 'manage') && (purchaseOrder.status === "approved" || purchaseOrder.status === "ordered") &&
                                                     <button
                                                         type="button"
                                                         className="btn btn-success"

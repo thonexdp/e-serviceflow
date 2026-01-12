@@ -28,7 +28,8 @@ export default function Tickets({
   selectedCustomer = null,
   filters = {},
   branches = [],
-  customer_order_qrcode = ""
+  customer_order_qrcode = "",
+  jobCategories = []
 }) {
   const [openCustomerModal, setCustomerModalOpen] = useState(false);
   const [openTicketModal, setTicketModalOpen] = useState(false);
@@ -47,6 +48,7 @@ export default function Tickets({
   const { api, buildUrl } = useRoleApi();
   const { flash, auth } = usePage().props;
   const [error, setError] = useState(null);
+  const [statusUpdateError, setStatusUpdateError] = useState("");
   const [verifyFormData, setVerifyFormData] = useState({
     notes: ""
   });
@@ -107,6 +109,7 @@ export default function Tickets({
 
 
   const [show, setShow] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [filepath, setFilepath] = useState("");
 
   const [statusFormData, setStatusFormData] = useState({
@@ -134,6 +137,7 @@ export default function Tickets({
 
 
   const handleCustomerSubmit = async (formData) => {
+    
     try {
       const { data } = await api.post(`/customers`, formData);
 
@@ -152,6 +156,7 @@ export default function Tickets({
   };
 
   const handleTicketSubmit = (data) => {
+    console.log(data);
     const formData = new FormData();
     const arrayKeyMap = {
       ticketAttachments: "attachments[]",
@@ -214,6 +219,7 @@ export default function Tickets({
 
   const handleOpenStatusModal = (ticket) => {
     setSelectedTicket(ticket);
+    setStatusUpdateError("");
     setStatusFormData({
       status: ticket.status || "pending",
       notes: ""
@@ -221,12 +227,37 @@ export default function Tickets({
     setStatusModalOpen(true);
   };
 
+  const getAllTicketFiles = (ticket) => {
+    if (!ticket) return [];
+    const customerFiles = (ticket.customer_files || []).map(f => ({ ...f, type: 'customer' }));
+    const mockupFiles = (ticket.mockup_files || []).map(f => ({ ...f, type: 'mockup' }));
+    const paymentFiles = (ticket.payments || []).flatMap(p => (p.documents || []).map(d => ({ ...d, file_path: d.file_path, file_name: d.file_name, type: 'payment' })));
+    return [...customerFiles, ...mockupFiles, ...paymentFiles];
+  };
+
   const handlePreviewFile = (ticket, path) => {
-    setSelectedTicket(ticket);
+    // console.log(ticket, path);
+    // setSelectedTicket(ticket);
     setFilepath(path);
-    setShow(true);
+    setShowPreview(true);
     setRevisionNotes("");
     setShowRevisionInput(false);
+  };
+
+  const handleNextFile = () => {
+    const allFiles = getAllTicketFiles(selectedTicket);
+    const currentIndex = allFiles.findIndex(f => f.file_path === filepath);
+    if (currentIndex !== -1 && currentIndex < allFiles.length - 1) {
+      setFilepath(allFiles[currentIndex + 1].file_path);
+    }
+  };
+
+  const handlePrevFile = () => {
+    const allFiles = getAllTicketFiles(selectedTicket);
+    const currentIndex = allFiles.findIndex(f => f.file_path === filepath);
+    if (currentIndex !== -1 && currentIndex > 0) {
+      setFilepath(allFiles[currentIndex - 1].file_path);
+    }
   };
 
 
@@ -263,6 +294,30 @@ export default function Tickets({
   const handleStatusUpdate = async () => {
     if (!selectedTicket) return;
 
+    // Check if workflow steps are missing when changing to "In Designer"
+    // Only check for custom tickets (job_type_id is null) or "Others" category tickets
+    if (statusFormData.status === 'in_designer') {
+      // Determine if this is a custom/others ticket
+      const isCustomTicket = !selectedTicket.job_type_id || 
+        selectedTicket.custom_job_type_description ||
+        (typeof selectedTicket.job_type === 'string' && selectedTicket.job_type);
+      
+      // Only validate workflow steps for custom tickets
+      if (isCustomTicket) {
+        const hasWorkflowSteps = selectedTicket.custom_workflow_steps && 
+          (Array.isArray(selectedTicket.custom_workflow_steps) 
+            ? selectedTicket.custom_workflow_steps.length > 0 
+            : (typeof selectedTicket.custom_workflow_steps === 'object' 
+                ? Object.keys(selectedTicket.custom_workflow_steps).length > 0 
+                : false));
+        
+        if (!hasWorkflowSteps) {
+          setStatusUpdateError("Please set the Production Workflow Template first by editing the ticket.");
+          return;
+        }
+      }
+    }
+
     setIsUpdating(true);
     try {
       await api.patch(
@@ -275,7 +330,7 @@ export default function Tickets({
       router.reload({ preserveScroll: true });
     } catch (error) {
       console.error("Status update failed:", error);
-      toast.error(error.response?.data?.message || "Failed to update status");
+      setStatusUpdateError(error.response?.data?.message || "Failed to update status");
     } finally {
       setIsUpdating(false);
     }
@@ -400,6 +455,7 @@ export default function Tickets({
     setStatusModalOpen(false);
     setSelectedTicket(null);
     setStatusFormData({ status: "", notes: "" });
+    setStatusUpdateError("");
   };
 
   const closePaymentModal = () => {
@@ -530,7 +586,6 @@ export default function Tickets({
       companyName: ticket.customer?.company_name || "",
       address: ticket.customer?.address || "",
       validUntil: "",
-      quotationNo: ticket.ticket_number,
       projectDescription: ticket.description || "",
       valueAddedTax: "0",
       others: "0",
@@ -782,85 +837,200 @@ export default function Tickets({
 
   return (
     <>
-      <PreviewModal
+
+
+
+       <Modal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        title="Payment Proof"
+        size="5xl">
+
+           <div className="row">
+            <div className="col-md-12">
+              <div className="border rounded p-2 shadow-sm text-center position-relative" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={filepath}
+                  alt="Payment Proof"
+                  className="img-fluid"
+                  style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+            <div className="pt-3 text-left">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-block py-2"
+                    onClick={() => setShowPreview(false)}>
+                    Close Preview
+                  </button>
+                </div>
+          </div>
+        </Modal>
+
+    
+
+
+
+
+      <Modal
         isOpen={show}
         onClose={() => setShow(false)}
-        fileUrl={filepath}
-        title={`Document Preview - ${selectedTicket?.ticket_number || 'Details'}`}>
-
+        title={`Preview - ${selectedTicket?.ticket_number || 'Details'}`}
+        size="6xl">
         {selectedTicket && (
-          <div className="design-review-actions p-2">
-            {selectedTicket.design_notes && (
-              <div className="alert alert-warning border small mb-3 shadow-sm">
-                <h6 className="font-weight-bold mb-1"><i className="ti-info-alt mr-1"></i> Design Notes:</h6>
-                <p className="mb-0 italic">"{selectedTicket.design_notes}"</p>
-                {selectedTicket.updated_by_user && (
-                  <div className="mt-1 x-small opacity-75 text-right">
-                    — {selectedTicket.updated_by_user.name}
-                  </div>
+          <div className="row">
+            <div className="col-md-7">
+              <div className="border rounded p-2 bg-dark shadow-sm mockup-preview-container text-center position-relative" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={filepath}
+                  alt="Design Preview"
+                  className="img-fluid"
+                  style={{ maxHeight: '75vh', maxWidth: '100%', objectFit: 'contain' }}
+                />
+
+                {/* Navigation Controls */}
+                {getAllTicketFiles(selectedTicket).length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevFile}
+                      disabled={getAllTicketFiles(selectedTicket).findIndex(f => f.file_path === filepath) === 0}
+                      className="btn btn-dark btn-circle position-absolute"
+                      style={{ left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.7, zIndex: 10 }}
+                    >
+                      <i className="ti-angle-left"></i>
+                    </button>
+                    <button
+                      onClick={handleNextFile}
+                      disabled={getAllTicketFiles(selectedTicket).findIndex(f => f.file_path === filepath) === getAllTicketFiles(selectedTicket).length - 1}
+                      className="btn btn-dark btn-circle position-absolute"
+                      style={{ right: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.7, zIndex: 10 }}
+                    >
+                      <i className="ti-angle-right"></i>
+                    </button>
+
+                    <div className="position-absolute" style={{ bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
+                      <span className="badge badge-dark opacity-75 px-3 py-2">
+                        {getAllTicketFiles(selectedTicket).findIndex(f => f.file_path === filepath) + 1} / {getAllTicketFiles(selectedTicket).length}
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
-            )}
 
-            {selectedTicket.design_status === 'mockup_uploaded' && (
-              <div className="card border-primary-subtle bg-light shadow-inner">
-                <div className="card-body p-3">
-                  <h6 className="mb-3 text-primary d-flex align-items-center">
-                    <i className="ti-star mr-2"></i> Design Approval Workflow
-                  </h6>
+              {/* Thumbnails row */}
+              {getAllTicketFiles(selectedTicket).length > 1 && (
+                <div className="mt-3 d-flex gap-2 overflow-x-auto pb-2 justify-content-center">
+                  {getAllTicketFiles(selectedTicket).map((file, idx) => (
+                    <img
+                      key={idx}
+                      src={file.file_path}
+                      alt={`Thumb ${idx}`}
+                      className={`img-thumbnail cursor-pointer ${filepath === file.file_path ? 'border-primary ring-2 ring-primary' : 'opacity-50'}`}
+                      style={{ width: '60px', height: '60px', objectFit: 'cover' }}
+                      onClick={() => setFilepath(file.file_path)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="col-md-5 border-left">
+              <div className="p-3">
+                {selectedTicket.design_description && (
+                  <div className="mb-4">
+                    <p className="mb-2 text-primary small uppercase font-weight-bold">Design Description / Elaboration</p>
+                    <div
+                      className="p-3 bg-light border rounded shadow-inner tiptap-content"
+                      style={{ maxHeight: '350px', overflowY: 'auto' }}
+                      dangerouslySetInnerHTML={{ __html: selectedTicket.design_description }}
+                    />
+                  </div>
+                )}
 
-                  {showRevisionInput ? (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="form-group mb-2">
-                        <textarea
-                          className="form-control form-control-sm"
-                          rows="3"
-                          placeholder="Describe what needs to be changed..."
-                          value={revisionNotes}
-                          onChange={(e) => setRevisionNotes(e.target.value)}
-                          autoFocus
-                        />
+                {selectedTicket.design_notes && (
+                  <div className="alert alert-warning border small mb-3 shadow-sm">
+                    <h6 className="font-weight-bold mb-1"><i className="ti-info-alt mr-1"></i> Developer/Designer Notes:</h6>
+                    <p className="mb-0 italic text-dark font-weight-500">
+                      "{selectedTicket.design_notes}"
+                    </p>
+                    {selectedTicket.updated_by_user && (
+                      <div className="mt-1 x-small opacity-75 text-right">
+                        — {selectedTicket.updated_by_user.name}
                       </div>
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-warning btn-sm flex-grow-1"
-                          onClick={handleRequestRevisionDesign}
-                          disabled={loading || !revisionNotes.trim()}
-                        >
-                          <i className="ti-check mr-1"></i> Confirm Revision Request
-                        </button>
-                        <button
-                          className="btn btn-light btn-sm"
-                          onClick={() => setShowRevisionInput(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedTicket.design_status === 'mockup_uploaded' && (
+                  <div className="card border-primary-subtle bg-light shadow-inner mb-3">
+                    <div className="card-body p-3">
+                      <h6 className="mb-3 text-primary d-flex align-items-center">
+                        <i className="ti-star mr-2"></i> Design Approval Workflow
+                      </h6>
+
+                      {showRevisionInput ? (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="form-group mb-2">
+                            <textarea
+                              className="form-control form-control-sm"
+                              rows="3"
+                              placeholder="Describe what needs to be changed..."
+                              value={revisionNotes}
+                              onChange={(e) => setRevisionNotes(e.target.value)}
+                              autoFocus
+                            />
+                          </div>
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-warning btn-sm flex-grow-1"
+                              onClick={handleRequestRevisionDesign}
+                              disabled={loading || !revisionNotes.trim()}
+                            >
+                              <i className="ti-check mr-1"></i> Send Revision
+                            </button>
+                            <button
+                              className="btn btn-light btn-sm"
+                              onClick={() => setShowRevisionInput(false)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-success flex-grow-1 font-weight-bold shadow-sm"
+                            onClick={handleApproveDesign}
+                            disabled={loading}
+                          >
+                            <i className="ti-check mr-1"></i> APPROVE DESIGN
+                          </button>
+                          <button
+                            className="btn btn-outline-warning btn-sm"
+                            onClick={() => setShowRevisionInput(true)}
+                            disabled={loading}
+                          >
+                            <i className="ti-reload mr-1"></i> Request Revision
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-success flex-grow-1 font-weight-bold shadow-sm"
-                        onClick={handleApproveDesign}
-                        disabled={loading}
-                      >
-                        <i className="ti-check mr-1"></i> APPROVE DESIGN
-                      </button>
-                      <button
-                        className="btn btn-outline-warning btn-sm"
-                        onClick={() => setShowRevisionInput(true)}
-                        disabled={loading}
-                      >
-                        <i className="ti-reload mr-1"></i> Request Revision
-                      </button>
-                    </div>
-                  )}
+                  </div>
+                )}
+
+                <div className="mt-4 border-top pt-3">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-block py-2"
+                    onClick={() => setShow(false)}>
+                    Close Preview
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         )}
-      </PreviewModal>
+      </Modal>
 
       {/* Customer Modal */}
       <Modal
@@ -894,7 +1064,8 @@ export default function Tickets({
           customerId={_selectedCustomer?.id}
           onSubmit={handleTicketSubmit}
           onCancel={closeTicketModal}
-          branches={branches} />
+          branches={branches}
+          jobCategories={jobCategories} />
 
       </Modal>
 
@@ -984,6 +1155,12 @@ export default function Tickets({
               </div>
             }
 
+            {!!statusUpdateError && (
+              <div className="alert alert-danger">
+                {statusUpdateError}
+              </div>
+            )}
+
             <div className="form-group">
               <label htmlFor="status">
                 New Status{" "}
@@ -1007,6 +1184,45 @@ export default function Tickets({
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
+
+            {/* Warning message when changing to "In Designer" without workflow steps */}
+            {/* Only show for custom tickets (job_type_id is null) or "Others" category tickets */}
+            {statusFormData.status === 'in_designer' && selectedTicket && (() => {
+              // Determine if this is a custom/others ticket
+              const isCustomTicket = !selectedTicket.job_type_id || 
+                selectedTicket.custom_job_type_description ||
+                (typeof selectedTicket.job_type === 'string' && selectedTicket.job_type);
+              
+              // Only show warning for custom tickets
+              if (!isCustomTicket) {
+                return null;
+              }
+              
+              const hasWorkflowSteps = selectedTicket.custom_workflow_steps && 
+                (Array.isArray(selectedTicket.custom_workflow_steps) 
+                  ? selectedTicket.custom_workflow_steps.length > 0 
+                  : (typeof selectedTicket.custom_workflow_steps === 'object' 
+                      ? Object.keys(selectedTicket.custom_workflow_steps).length > 0 
+                      : false));
+              
+              if (!hasWorkflowSteps) {
+                return (
+                  <div className="alert alert-warning border-warning mt-3">
+                    <h6 className="alert-heading font-weight-bold">
+                      <i className="ti-alert mr-2"></i>
+                      Production Workflow Template Required
+                    </h6>
+                    <p className="mb-2">
+                      Before changing the status to <strong>"In Designer"</strong>, you must set the <strong>Production Workflow Template</strong> for this ticket.
+                    </p>
+                    <p className="mb-0">
+                      <strong>Action Required:</strong> Please click <strong>"Edit"</strong> on the ticket to set the Production Workflow Template before proceeding.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div className="form-group">
               <label htmlFor="notes">Notes (Optional)</label>
@@ -1104,7 +1320,7 @@ export default function Tickets({
                       const hasDiscount = discountPct > 0;
                       let originalPrice = parseFloat(selectedTicket.original_price || 0);
                       let totalAmount = parseFloat(selectedTicket.total_amount || 0);
-                      
+
                       // Calculate discounted total if we have discount info
                       let finalTotal = totalAmount; // Default to total_amount
                       if (hasDiscount) {
@@ -1112,13 +1328,13 @@ export default function Tickets({
                         if (originalPrice === 0 && totalAmount > 0) {
                           originalPrice = totalAmount;
                         }
-                        
+
                         // Calculate discounted amount
                         const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
                         const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
                         const discountedTotal = originalPrice - calculatedDiscountAmount;
                         finalTotal = discountedTotal; // Use discounted total for balance calculation
-                        
+
                         return (
                           <>
                             <p className="m-b-5 text-muted">
@@ -1149,7 +1365,7 @@ export default function Tickets({
                           </>
                         );
                       }
-                      
+
                       return (
                         <>
                           <p className="m-b-5">
@@ -1300,18 +1516,18 @@ export default function Tickets({
                     const hasDiscount = discountPct > 0;
                     let originalPrice = parseFloat(selectedTicket.original_price || 0);
                     let totalAmount = parseFloat(selectedTicket.total_amount || 0);
-                    
+
                     if (hasDiscount) {
                       // If original_price is not set, use total_amount as original
                       if (originalPrice === 0 && totalAmount > 0) {
                         originalPrice = totalAmount;
                       }
-                      
+
                       // Calculate discounted amount
                       const discountAmount = parseFloat(selectedTicket.discount_amount || 0);
                       const calculatedDiscountAmount = discountAmount > 0 ? discountAmount : (originalPrice * (discountPct / 100));
                       const discountedTotal = originalPrice - calculatedDiscountAmount;
-                      
+
                       return (
                         <>
                           Original Price: <span className="text-decoration-line-through">{formatPeso(originalPrice.toFixed(2))}</span><br />
@@ -1320,7 +1536,7 @@ export default function Tickets({
                         </>
                       );
                     }
-                    
+
                     return (
                       <>
                         Total Amount: <strong>{totalAmount > 0 ? formatPeso(totalAmount.toFixed(2)) : "To be confirmed"}</strong>
@@ -1546,7 +1762,7 @@ export default function Tickets({
                       <i className="ti-reload"></i>
                     </button>
 
-                    {hasPermission('tickets', 'create') &&
+                    {hasPermission('tickets', 'manage') &&
 
                       <button
                         type="button"
@@ -1783,7 +1999,7 @@ export default function Tickets({
                   onChange={(e) => setQuotationForm({ ...quotationForm, address: e.target.value })}
                 />
               </div>
-              <div className="col-md-4 mb-3">
+              <div className="col-md-7 mb-3">
                 <label className="form-label font-weight-bold">Valid Until</label>
                 <input
                   type="text"
@@ -1793,16 +2009,7 @@ export default function Tickets({
                   onChange={(e) => setQuotationForm({ ...quotationForm, validUntil: e.target.value })}
                 />
               </div>
-              <div className="col-md-4 mb-3">
-                <label className="form-label font-weight-bold">Quotation No.</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={quotationForm.quotationNo}
-                  onChange={(e) => setQuotationForm({ ...quotationForm, quotationNo: e.target.value })}
-                />
-              </div>
-              <div className="col-md-4 mb-3">
+              <div className="col-md-5 mb-3">
                 <label className="form-label font-weight-bold">Date</label>
                 <input
                   type="date"

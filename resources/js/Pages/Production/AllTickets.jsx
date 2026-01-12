@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { getColorName, getFullColorName } from "@/Utils/colors";
 import AdminLayout from "@/Components/Layouts/AdminLayout";
 import { Head, router, usePage } from "@inertiajs/react";
@@ -33,6 +34,7 @@ export default function AllTickets({
   const [openTimelineModal, setTimelineModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
+  const [previewToPrint, setPreviewToPrint] = useState(null);
   const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
   const isProductionHead = auth?.user?.role === 'Production' && auth?.user?.is_head;
@@ -58,7 +60,6 @@ export default function AllTickets({
   };
 
   const handleAssignUsers = (ticket, userIds) => {
-    console.log('✅ handleAssignUsers called with ticket:', ticket, 'userIds:', userIds);
     if (!isProductionHead && !isAdmin) {
       return;
     }
@@ -108,6 +109,23 @@ export default function AllTickets({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handlePrint = () => {
+    if (!selectedPreviewFile || !selectedTicket) return;
+    
+    setPreviewToPrint({
+      file: selectedPreviewFile,
+      ticket: selectedTicket
+    });
+
+    document.body.classList.add("printing-preview");
+
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove("printing-preview");
+      setPreviewToPrint(null);
+    }, 500);
   };
 
   const getStatusBadge = (status) => {
@@ -460,12 +478,22 @@ export default function AllTickets({
                     <div className="card">
                       <div className="card-body text-center">
                         {selectedPreviewFile &&
-                          <img
-                            src={selectedPreviewFile?.file_path}
-                            alt={selectedPreviewFile?.file_name}
-                            className="img-fluid mb-2"
-                            style={{ maxHeight: "280px", objectFit: "contain" }} />
-
+                          <>
+                            <img
+                              src={selectedPreviewFile?.file_path}
+                              alt={selectedPreviewFile?.file_name}
+                              className="img-fluid mb-2"
+                              style={{ maxHeight: "280px", objectFit: "contain" }} />
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                className="btn btn-info btn-sm"
+                                onClick={handlePrint}
+                                disabled={!selectedPreviewFile || !selectedTicket}>
+                                <i className="ti-printer mr-2"></i>Print Preview
+                              </button>
+                            </div>
+                          </>
                         }
                       </div>
                     </div>
@@ -594,6 +622,141 @@ export default function AllTickets({
           </div>
         </div>
       </section>
+
+      {/* Hidden Print Preview - Portaled to Body */}
+      {createPortal(
+        <div id="preview-print-overlay" style={{ display: previewToPrint ? 'block' : 'none' }}>
+          {previewToPrint && (
+            <div className="preview-print-container bg-white text-black" style={{
+              fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif",
+              fontSize: '11pt',
+              width: '297mm',
+              minHeight: '210mm',
+              margin: '0 auto',
+              boxSizing: 'border-box',
+              position: 'relative',
+              color: '#333',
+              WebkitPrintColorAdjust: 'exact',
+              printColorAdjust: 'exact'
+            }}>
+              <div style={{ display: 'flex', width: '100%', minHeight: '100%' }}>
+                {/* Left Side - Image (only on first page) */}
+                <div 
+                  className="print-image-container"
+                  style={{ 
+                    width: '70%', 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    justifyContent: 'center',
+                    border: '1px solid #ddd',
+                    flexShrink: 0
+                  }}>
+                  <img
+                    src={previewToPrint.file.file_path}
+                    alt={previewToPrint.file.file_name}
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '180mm', 
+                      objectFit: 'contain' 
+                    }}
+                  />
+                </div>
+
+                {/* Right Side - Design Description Only */}
+                <div style={{ 
+                  width: '30%', 
+                  paddingLeft: '5px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: '100%'
+                }}>
+                  {previewToPrint.ticket.design_description ? (
+                    <div
+                      className="tiptap-content print-description"
+                      style={{ 
+                        fontSize: '11pt', 
+                        padding: '5px',
+                        border: '1px solid #eee',
+                        borderRadius: '4px',
+                        minHeight: '100%'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: previewToPrint.ticket.design_description }}
+                    />
+                  ) : (
+                    <div style={{ 
+                      fontSize: '11pt', 
+                      color: '#999',
+                      fontStyle: 'italic',
+                      padding: '20px'
+                    }}>
+                      No design description available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      <style>{`
+        @media print {
+          @page {
+            margin: 0;
+            size: A4 landscape;
+          }
+          body.printing-preview {
+            visibility: hidden;
+            overflow: visible !important;
+            height: auto !important;
+          }
+          #app {
+            display: none !important;
+          }
+          
+          body.printing-preview #preview-print-overlay,
+          body.printing-preview #preview-print-overlay .preview-print-container {
+            visibility: visible !important;
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            background: white !important;
+            z-index: 99999 !important;
+            overflow: visible !important;
+            page-break-inside: avoid;
+          }
+          body.printing-preview #preview-print-overlay * {
+            visibility: visible !important;
+          }
+          
+          /* Image only on first page - keep together */
+          body.printing-preview #preview-print-overlay .print-image-container {
+            page-break-inside: avoid;
+          }
+          
+          /* Allow description to flow across pages */
+          body.printing-preview #preview-print-overlay .print-description {
+            overflow: visible !important;
+            max-height: none !important;
+            page-break-inside: auto;
+            break-inside: auto;
+          }
+          
+          body.printing-preview #preview-print-overlay .print-description * {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          
+          /* Ensure content can flow to new pages */
+          body.printing-preview #preview-print-overlay .preview-print-container > div {
+            page-break-inside: auto;
+          }
+        }
+      `}</style>
 
     </AdminLayout>);
 

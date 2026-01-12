@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { getColorName, getFullColorName } from "@/Utils/colors";
 import FormInput from "@/Components/Common/FormInput";
+import TiptapEditor from "@/Components/Common/TiptapEditor";
 import { usePage } from "@inertiajs/react";
 
 const parseSizeValue = (value) => {
@@ -27,7 +28,7 @@ const Section = ({ title, children }) =>
 
 const PromoBox = ({ text }) =>
   <div className="alert alert-info mt-2">
-    <i className="ti-gift mr-2"></i>
+    <i className="ti-gift mr-2" style={{ fontFamily: 'themify' }}></i>
     <strong>Promo:</strong> {text}
   </div>;
 
@@ -39,9 +40,11 @@ export default function TicketForm({
   onCancel,
   hasPermission,
   isPublic = false,
-  branches = []
+  branches = [],
+  jobCategories: jobCategoriesProp = null
 }) {
-  const { jobCategories = [], auth } = usePage().props;
+  const { jobCategories: jobCategoriesFromPage = [], auth } = usePage().props;
+  const jobCategories = jobCategoriesProp ?? jobCategoriesFromPage;
   const userRole = auth?.user?.role;
 
 
@@ -58,6 +61,7 @@ export default function TicketForm({
     description: "",
     category_id: "",
     job_type_id: "",
+    custom_workflow_steps: [],
     quantity: "",
     free_quantity: 0,
     size_value: "",
@@ -90,8 +94,40 @@ export default function TicketForm({
     is_size_based: false,
     custom_width: "",
     custom_height: "",
-    selected_color: ""
+    selected_color: "",
+    design_description: ""
   });
+
+  const WORKFLOW_STEP_OPTIONS = [
+    { key: 'printing', label: 'Printing', icon: 'ti-printer' },
+    { key: 'lamination_heatpress', label: 'Lamination/Heatpress', icon: 'ti-layers' },
+    { key: 'cutting', label: 'Cutting', icon: 'ti-cut' },
+    { key: 'sewing', label: 'Sewing', icon: 'ti-pin-alt' },
+    { key: 'dtf_press', label: 'DTF Press', icon: 'ti-stamp' },
+    { key: 'embroidery', label: 'Embroidery', icon: 'ti-pencil-alt' },
+    { key: 'knitting', label: 'Knitting', icon: 'ti-layout-grid2' },
+    { key: 'lasser_cutting', label: 'Laser Cutting', icon: 'ti-bolt' },
+    { key: 'qa', label: 'Quality Assurance', icon: 'ti-check-box' }
+  ];
+
+  const normalizeWorkflowSteps = (steps) => {
+    if (!steps) return [];
+
+    if (Array.isArray(steps)) {
+      return steps;
+    }
+
+    if (typeof steps === 'object') {
+      return Object.entries(steps)
+        .filter(([, v]) => {
+          if (v && typeof v === 'object' && 'enabled' in v) return !!v.enabled;
+          return !!v;
+        })
+        .map(([k]) => k);
+    }
+
+    return [];
+  };
 
   const [errors, setErrors] = useState({});
   const [processing, setProcessing] = useState(false);
@@ -119,6 +155,39 @@ export default function TicketForm({
     return category?.jobTypes || category?.job_types || [];
   }, [formData.category_id, jobCategories]);
 
+  const jobTypeIdToCategoryId = useMemo(() => {
+    const map = new Map();
+    for (const cat of jobCategories || []) {
+      const jobTypes = cat?.jobTypes || cat?.job_types || [];
+      for (const jt of jobTypes) {
+        if (jt?.id !== undefined && jt?.id !== null) {
+          map.set(jt.id.toString(), cat.id.toString());
+        }
+      }
+    }
+    return map;
+  }, [jobCategories]);
+
+  const sortedJobCategories = useMemo(() => {
+    return [...(jobCategories || [])].sort((a, b) =>
+      (a?.name || "").localeCompare(b?.name || "")
+    );
+  }, [jobCategories]);
+
+  const formatJobTypeLabel = (jt) => {
+    let label = jt.name;
+    if (jt.discount > 0) {
+      label += ` (PROMO - ${parseFloat(jt.discount)}% OFF)`;
+    } else if (jt.price_tiers && jt.price_tiers.length > 0) {
+      label += " (Tiered Pricing)";
+    } else if (jt.size_rates && jt.size_rates.length > 0) {
+      label += " (Size-Based)";
+    } else {
+      label += ` - ₱${parseFloat(jt.price).toFixed(2)}/${jt.price_by}`;
+    }
+    return label;
+  };
+
 
   useEffect(() => {
     if (ticket) {
@@ -129,11 +198,16 @@ export default function TicketForm({
       // 1. If job_type is a string (not an object), it's custom
       // 2. If job_type_id is null/empty and job_type exists as string
       // 3. If custom_job_type_description exists (for newer records)
+      // 4. If custom_workflow_steps exists (indicates custom ticket)
       const isJobTypeString = typeof ticket.job_type === 'string';
+      const hasCustomWorkflowSteps = ticket.custom_workflow_steps && 
+        (Array.isArray(ticket.custom_workflow_steps) ? ticket.custom_workflow_steps.length > 0 : 
+         (typeof ticket.custom_workflow_steps === 'object' ? Object.keys(ticket.custom_workflow_steps).length > 0 : false));
       const isCustomTicket = isJobTypeString ||
         (!ticket.job_type_id && ticket.job_type) ||
         ticket.custom_job_type_description ||
-        (!ticket.job_type_id && !ticket.job_type?.id);
+        (!ticket.job_type_id && !ticket.job_type?.id) ||
+        hasCustomWorkflowSteps;
 
       let categoryId = "";
       if (isCustomTicket) {
@@ -214,15 +288,16 @@ export default function TicketForm({
 
       // Use original_price as subtotal if available, otherwise use subtotal or total_amount
       const ticketSubtotal = ticket.original_price || ticket.subtotal || ticket.total_amount || "";
-      
+
       // Use discount_percentage if available, fallback to discount
       const ticketDiscount = ticket.discount_percentage || ticket.discount || "";
-      
+
       setFormData({
         customer_id: ticket.customer_id || customerId || "",
         description: ticket.description || "",
         category_id: categoryId,
         job_type_id: jobTypeId,
+        custom_workflow_steps: normalizeWorkflowSteps(ticket.custom_workflow_steps),
         quantity: ticket.quantity || 1,
         free_quantity: ticket.free_quantity || 0,
         size_value: ticket.size_value || "",
@@ -258,18 +333,19 @@ export default function TicketForm({
         is_size_based: isSizeBased,
         custom_width: customWidth,
         custom_height: customHeight,
-        selected_color: ticket.selected_color || ""
+        selected_color: ticket.selected_color || "",
+        design_description: ticket.design_description || ""
       });
       setSizeDimensions(parsedSize);
       // Enable discount if ticket has discount_percentage, discount, or job type discount
       const hasDiscount = parseFloat(
-        ticket.discount_percentage || 
-        ticket.discount || 
-        ticket.job_type?.discount || 
+        ticket.discount_percentage ||
+        ticket.discount ||
+        ticket.job_type?.discount ||
         0
       ) > 0;
       setEnableDiscount(hasDiscount);
-      
+
       // Set selectedJobType if ticket has job_type object (for customer orders)
       if (ticket.job_type && typeof ticket.job_type === 'object') {
         setSelectedJobType(ticket.job_type);
@@ -283,6 +359,10 @@ export default function TicketForm({
       setIsOthersCategory(false);
     }
   }, [ticket, customerId, jobCategories]);
+
+  // Note: Workflow steps are now available for all tickets, not just "Others" category
+  // We no longer auto-clear workflow steps when switching categories
+  // Users can set workflow steps for any ticket type
 
 
   // Sync isOthersCategory with category_id - but only if category_id is set and not already synced
@@ -310,9 +390,9 @@ export default function TicketForm({
         if (ticket && ticket.job_type_id?.toString() === formData.job_type_id?.toString()) {
           // Check all possible discount sources (in order of priority)
           newDiscount = ticket.discount_percentage || // New field (highest priority)
-                       ticket.discount ||            // Old field
-                       ticket.job_type?.discount ||  // Job type's discount on ticket object
-                       jobType.discount;             // Current job type's discount (fallback)
+            ticket.discount ||            // Old field
+            ticket.job_type?.discount ||  // Job type's discount on ticket object
+            jobType.discount;             // Current job type's discount (fallback)
         }
 
         setFormData((prev) => ({
@@ -680,6 +760,28 @@ export default function TicketForm({
     clearError(name);
   };
 
+  const groupedSelectionValue = isOthersCategory ? "others" : (formData.job_type_id || "");
+
+  const handleGroupedJobTypeChange = (e) => {
+    const value = e.target.value;
+
+    if (!value) {
+      handleChange({ target: { name: "category_id", value: "" } });
+      return;
+    }
+
+    if (value === "others") {
+      handleChange({ target: { name: "category_id", value: "others" } });
+      return;
+    }
+
+    const categoryId = jobTypeIdToCategoryId.get(value.toString());
+    if (categoryId) {
+      handleChange({ target: { name: "category_id", value: categoryId } });
+    }
+    handleChange({ target: { name: "job_type_id", value } });
+  };
+
   const MAX_FILE_SIZE_MB = 10;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
@@ -796,6 +898,10 @@ export default function TicketForm({
       newErrors.due_date = "Due date is required";
     }
 
+    if (!isOthersCategory && !formData.job_type_id) {
+      newErrors.job_type_id = "Job type is required";
+    }
+
     if (sizeRates.length > 0) {
       const currentRate =
         sizeRates.find(
@@ -825,6 +931,13 @@ export default function TicketForm({
         newErrors.custom_job_type_description = "Job type description is required";
       }
 
+      // Only require workflow steps for "Others" category during creation
+      // For editing existing tickets, workflow steps are recommended but not required here
+      // (validation happens when changing status to "In Designer")
+      if (!ticket && (!Array.isArray(formData.custom_workflow_steps) || formData.custom_workflow_steps.length === 0)) {
+        newErrors.custom_workflow_steps = "Please select at least one production workflow step";
+      }
+
       if (formData.custom_price_mode === "per_item") {
         const pricePerItem = parseFloat(formData.custom_price_per_item);
         if (!pricePerItem || pricePerItem <= 0) {
@@ -846,13 +959,24 @@ export default function TicketForm({
         }
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const toggleCustomWorkflowStep = (stepKey) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.custom_workflow_steps) ? prev.custom_workflow_steps : [];
+      const exists = current.includes(stepKey);
+      const next = exists ? current.filter((s) => s !== stepKey) : [...current, stepKey];
+      return { ...prev, custom_workflow_steps: next };
+    });
+
+    clearError('custom_workflow_steps');
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
 
     if (!validateForm()) {
       return;
@@ -874,10 +998,12 @@ export default function TicketForm({
       size_height: isOthersCategory && formData.is_size_based ? formData.custom_height : sizeDimensions.height,
       // Convert is_size_based to proper boolean (0 or 1 for Laravel)
       is_size_based: isOthersCategory ? (formData.is_size_based ? 1 : 0) : 0,
+      custom_workflow_steps: formData.custom_workflow_steps || [],
       ticketAttachments: ticketAttachments.
         filter((attachment) => !attachment.existing && attachment.file).
         map((attachment) => attachment.file)
     };
+
 
     // For custom tickets with size, format the size_value
     if (isOthersCategory && formData.is_size_based) {
@@ -892,7 +1018,7 @@ export default function TicketForm({
       }
     }
 
-    // Clean up custom fields if not Others category
+    // Clean up custom fields if not Others category (but keep workflow steps)
     if (!isOthersCategory) {
       delete submitData.custom_job_type_description;
       delete submitData.custom_price_mode;
@@ -900,6 +1026,7 @@ export default function TicketForm({
       delete submitData.custom_fixed_total;
       delete submitData.custom_width;
       delete submitData.custom_height;
+      // Note: custom_workflow_steps is kept for all tickets
     }
 
 
@@ -954,31 +1081,6 @@ export default function TicketForm({
     { value: "bank_account", label: "Bank Account" }];
 
 
-  const categoryOptions = [
-    ...jobCategories.map((cat) => ({
-      value: cat.id.toString(),
-      label: cat.name
-    })),
-    { value: "others", label: "Others (Custom)" }
-  ];
-
-  const jobTypeOptions = availableJobTypes.map((jt) => {
-    let label = jt.name;
-    if (jt.discount > 0) {
-      label += ` (PROMO - ${parseFloat(jt.discount)}% OFF)`;
-    } else if (jt.price_tiers && jt.price_tiers.length > 0) {
-      label += " (Tiered Pricing)";
-    } else if (jt.size_rates && jt.size_rates.length > 0) {
-      label += " (Size-Based)";
-    } else {
-      label += ` - ₱${parseFloat(jt.price).toFixed(2)}/${jt.price_by}`;
-    }
-    return {
-      value: jt.id.toString(),
-      label
-    };
-  });
-
   return (
     <>
       <form onSubmit={handleSubmit} className="row">
@@ -1011,7 +1113,7 @@ export default function TicketForm({
                     {(enableDiscount || discountAmountValue > 0) && (
                       <div className="d-flex justify-content-between align-items-center py-2 border-bottom bg-success-subtle">
                         <span className="text-success small text-uppercase font-weight-bold">
-                          <i className="ti-gift mr-1"></i>
+                          <i className="ti-gift mr-1" style={{ fontFamily: 'themify' }}></i>
                           Discount {parseFloat(formData.discount || 0) > 0 && `(${parseFloat(formData.discount).toFixed(2)}%)`}
                         </span>
                         <span className="text-success font-weight-bold">
@@ -1115,48 +1217,60 @@ export default function TicketForm({
             </div>
 
             <div className="row">
-              <div className="col-md-5">
-                <FormInput
-                  label="Category"
-                  type="select"
-                  name="category_id"
-                  value={formData.category_id}
-                  onChange={handleChange}
-                  error={errors.category_id}
-                  options={categoryOptions}
-                  placeholder="Select Category"
-                  required />
+              <div className="col-md-10">
+                <div className="mb-4">
+                  <label
+                    htmlFor="job_type_grouped"
+                    className="block text-sm font-medium text-gray-700 mb-1">
+                    Category / Job Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="job_type_grouped"
+                    name="job_type_grouped"
+                    value={groupedSelectionValue}
+                    onChange={handleGroupedJobTypeChange}
+                    required
+                    className="
+                      w-full text-sm rounded-md border border-gray-300 
+                      focus:border-orange-500 focus:ring-2 focus:ring-orange-200 
+                      outline-none transition duration-150 ease-in-out
+                      placeholder-gray-400
+                      bg-white
+                      p-2.5
+                    ">
+                    <option value="">Select</option>
+                    {sortedJobCategories.map((cat) => {
+                      const jobTypes = (cat?.jobTypes || cat?.job_types || [])
+                        .filter((jt) => jt?.is_active !== false)
+                        .sort((a, b) => {
+                          const aSort = a?.sort_order ?? 0;
+                          const bSort = b?.sort_order ?? 0;
+                          if (aSort !== bSort) return aSort - bSort;
+                          return (a?.name || "").localeCompare(b?.name || "");
+                        });
 
-              </div>
+                      if (!jobTypes.length) {
+                        return null;
+                      }
 
-              <div className="col-md-5">
-                {isOthersCategory ? (
-                  <FormInput
-                    label="Job Type (Custom)"
-                    type="text"
-                    name="custom_job_type_description"
-                    value={formData.custom_job_type_description}
-                    onChange={handleChange}
-                    error={errors.custom_job_type_description}
-                    placeholder="Enter custom job type"
-                    required />
-                ) : (
-                  <FormInput
-                    label="Job Type"
-                    type="select"
-                    name="job_type_id"
-                    value={formData.job_type_id}
-                    onChange={handleChange}
-                    error={errors.job_type_id}
-                    options={jobTypeOptions}
-                    placeholder={
-                      formData.category_id ?
-                        "Select Job Type" :
-                        "Select category first"
-                    }
-                    disabled={!formData.category_id}
-                    required />
-                )}
+                      return (
+                        <optgroup key={cat.id} label={cat.name}>
+                          {jobTypes.map((jt) => (
+                            <option key={jt.id} value={jt.id.toString()}>
+                              {formatJobTypeLabel(jt)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
+                    <option value="others">Others (Custom)</option>
+                  </select>
+                  {(errors.job_type_id || errors.category_id) && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.job_type_id || errors.category_id}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="col-md-2">
                 <FormInput
@@ -1199,7 +1313,7 @@ export default function TicketForm({
                         >
                           {formData.selected_color === hex && (
                             <div className="w-100 h-100 d-flex align-items-center justify-center">
-                              <i className="ti-check text-white" style={{ fontSize: '12px', textShadow: '0 0 2px #000' }}></i>
+                              <i className="ti-check text-white" style={{ fontSize: '12px', textShadow: '0 0 2px #000', fontFamily: 'themify' }}></i>
                             </div>
                           )}
                         </div>
@@ -1228,6 +1342,20 @@ export default function TicketForm({
             {/* Others Category Custom Fields */}
             {isOthersCategory && (
               <>
+                <div className="row mt-3">
+                  <div className="col-md-12">
+                    <FormInput
+                      label="Job Type Description"
+                      type="text"
+                      name="custom_job_type_description"
+                      value={formData.custom_job_type_description}
+                      onChange={handleChange}
+                      error={errors.custom_job_type_description}
+                      placeholder="Describe the custom job type"
+                      required />
+                  </div>
+                </div>
+
                 <div className="row mt-2">
                   <div className="col-md-12">
                     <div className="form-check form-switch">
@@ -1352,6 +1480,70 @@ export default function TicketForm({
                     </div>
                   )}
                 </div>
+
+                <hr />
+                <div className="mt-4">
+                  <h6 className="mb-2">Production Workflow Template</h6>
+                  <p className="text-muted text-sm mb-2">
+                    Select the production steps that apply to this custom job type.
+                  </p>
+
+                  <div className="row">
+                    {WORKFLOW_STEP_OPTIONS.map((step) => (
+                      <div key={step.key} className="col-md-3 mb-2">
+                          <div className="form-check custom-checkbox">
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              id={`custom_workflow_${step.key}`}
+                              checked={(formData.custom_workflow_steps || []).includes(step.key)}
+                              onChange={() => toggleCustomWorkflowStep(step.key)} />
+
+                            <label className="form-check-label font-weight-bold" htmlFor={`custom_workflow_${step.key}`}>
+                              <i className={`${step.icon} mr-1`} style={{ fontFamily: 'themify' }}></i> {step.label}
+                            </label>
+                          </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {errors.custom_workflow_steps && (
+                    <p className="mt-1 text-xs text-red-500">{errors.custom_workflow_steps}</p>
+                  )}
+
+                  <div className="mt-3 p-2 bg-light rounded border">
+                    <h6 className="mb-2 font-weight-bold text-dark">Workflow Preview</h6>
+                    <div className="d-flex flex-wrap align-items-center" style={{ gap: '6px' }}>
+                      {WORKFLOW_STEP_OPTIONS
+                        .filter((s) => (formData.custom_workflow_steps || []).includes(s.key))
+                        .map((s, index, array) => (
+                          <React.Fragment key={s.key}>
+                            <div className="d-flex align-items-center">
+                              <div className="badge badge-primary p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                                {s.label}
+                              </div>
+                              {index < array.length - 1 && (
+                                <span className="mx-2 text-muted font-weight-bold" style={{ fontSize: '16px', lineHeight: '1' }}>→</span>
+                              )}
+                            </div>
+                          </React.Fragment>
+                        ))}
+
+                      {(formData.custom_workflow_steps || []).length > 0 && (
+                        <>
+                          <span className="mx-2 text-muted font-weight-bold" style={{ fontSize: '16px', lineHeight: '1' }}>→</span>
+                          <div className="badge badge-success p-2 px-3 rounded-pill shadow-sm" style={{ fontSize: '0.9rem' }}>
+                            Completed
+                          </div>
+                        </>
+                      )}
+
+                      {(formData.custom_workflow_steps || []).length === 0 && (
+                        <span className="text-muted font-italic">Select steps above to see the workflow preview.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </>
             )}
 
@@ -1362,7 +1554,7 @@ export default function TicketForm({
                   {formData.free_quantity > 0 ?
                     <div className="alert alert-success">
                       <div className="d-flex align-items-center">
-                        <i className="ti-gift mr-2 text-xl"></i>
+                        <i className="ti-gift mr-2 text-xl" style={{ fontFamily: 'themify' }}></i>
                         <div>
                           <strong>Promo Applied!</strong>
                           <div>
@@ -1375,7 +1567,7 @@ export default function TicketForm({
                     </div> :
 
                     <div className="alert alert-info">
-                      <i className="ti-gift mr-2"></i>
+                      <i className="ti-gift mr-2" style={{ fontFamily: 'themify' }}></i>
                       <strong>Available Promo:</strong>
                       <ul className="mb-0 pl-4 mt-1">
                         {selectedJobType.promo_rules?.map((rule, idx) =>
@@ -1584,7 +1776,7 @@ export default function TicketForm({
             </div>
             {isFrontDesk &&
               <div className="alert alert-info mt-3">
-                <i className="ti-info-alt mr-2"></i>
+                <i className="ti-info-alt mr-2" style={{ fontFamily: 'themify' }}></i>
                 <strong>Note:</strong> Payment will be processed separately by the Cashier.
                 Ticket will be created with "Pending" payment status.
               </div>
@@ -1659,7 +1851,7 @@ export default function TicketForm({
                             className="custom-control-label"
                             htmlFor="enableDiscount">
 
-                            <i className="ti-cut mr-1"></i>{" "}
+                            <i className="ti-cut mr-1" style={{ fontFamily: 'themify' }}></i>{" "}
                             <small>Add Discount</small>
                           </label>
                         </div>
@@ -1755,7 +1947,7 @@ export default function TicketForm({
                                 onClick={() => setActiveProofTab(index)}
                                 style={{ fontSize: "0.75rem" }}>
 
-                                <i className="ti-receipt mr-1"></i>
+                                <i className="ti-receipt mr-1" style={{ fontFamily: 'themify' }}></i>
                                 Proof {index + 1}
                                 {paymentProofs[index].existing &&
                                   <span className="badge badge-success ml-1">
@@ -1795,7 +1987,7 @@ export default function TicketForm({
                               "Remove proof"
                           }>
 
-                          <i className="ti-trash mr-1"></i>
+                          <i className="ti-trash mr-1" style={{ fontFamily: 'themify' }}></i>
                           {paymentProofs[activeProofTab]?.existing ?
                             "Existing Proof" :
                             "Remove Proof"}
@@ -1803,7 +1995,7 @@ export default function TicketForm({
                       </div> :
 
                       <div className="border rounded p-4 text-center text-muted bg-light mt-3">
-                        <i className="ti-receipt" style={{ fontSize: "32px" }}></i>
+                        <i className="ti-receipt" style={{ fontSize: "32px", fontFamily: 'themify' }}></i>
                         <p className="mt-2 small mb-0">
                           Upload screenshots of payment confirmations
                         </p>
@@ -1820,7 +2012,7 @@ export default function TicketForm({
             <div className="card shadow-sm border-0">
               <div className="card-body">
                 <div className="d-flex align-items-center mb-2">
-                  <i className="ti-image mr-2"></i>
+                  <i className="ti-image mr-2" style={{ fontFamily: 'themify' }}></i>
                   <span className="font-semibold">Attachments/Mock-Up Design</span>
                 </div>
                 <input
@@ -1829,6 +2021,7 @@ export default function TicketForm({
                   accept="image/*"
                   multiple
                   onChange={handleTicketAttachmentUpload} />
+
 
                 {ticketAttachments.length > 0 &&
                   <div className="mt-3">
@@ -1848,7 +2041,7 @@ export default function TicketForm({
                             onClick={() => setActiveAttachmentTab(index)}
                             style={{ fontSize: "0.75rem" }}>
 
-                            <i className="ti-image mr-1"></i>
+                            <i className="ti-image mr-1" style={{ fontFamily: 'themify' }}></i>
                             File {index + 1}
                             {ticketAttachments[index].existing &&
                               <span className="badge badge-success ml-1">
@@ -1907,7 +2100,7 @@ export default function TicketForm({
                           "Remove attachment"
                       }>
 
-                      <i className="ti-trash mr-1"></i>
+                      <i className="ti-trash mr-1" style={{ fontFamily: 'themify' }}></i>
                       {ticketAttachments[activeAttachmentTab]?.existing ?
                         "Existing file" :
                         "Remove Attachment"}
@@ -1918,7 +2111,7 @@ export default function TicketForm({
                   <div className="border rounded p-5 text-center text-muted bg-light">
                     <i
                       className="ti-image"
-                      style={{ fontSize: "40px" }}>
+                      style={{ fontSize: "40px", fontFamily: 'themify' }}>
                     </i>
                     <p className="mt-2 small">
                       No images selected
@@ -1929,6 +2122,18 @@ export default function TicketForm({
             </div>
           </Section>
 
+          <div className="row mt-3">
+            <div className="col-md-12">
+              <label className="text-sm font-medium text-gray-700 mb-2">
+                <i className="ti-info-alt mr-1" style={{ fontFamily: 'themify' }}></i> Design Description / Elaboration
+              </label>
+              <TiptapEditor
+                value={formData.design_description}
+                onChange={(html) => setFormData(prev => ({ ...prev, design_description: html }))}
+              />
+            </div>
+          </div>
+
           {/* ACTION BUTTONS */}
           <div className="mt-4 d-flex justify-content-end gap-3">
             <button
@@ -1936,7 +2141,7 @@ export default function TicketForm({
               className="btn btn-light"
               onClick={onCancel}>
 
-              <i className="ti-back-left mr-1"></i>Cancel
+              <i className="ti-back-left mr-1" style={{ fontFamily: 'themify' }}></i>Cancel
             </button>
             <button
               type="submit"
@@ -1954,7 +2159,7 @@ export default function TicketForm({
                 </> :
 
                 <>
-                  <i className="ti-save-alt mr-1"></i>Save
+                  <i className="ti-save-alt mr-1" style={{ fontFamily: 'themify' }}></i>Save
                   Ticket
                 </>
               }
@@ -1962,7 +2167,7 @@ export default function TicketForm({
           </div>
           {uploadError &&
             <div className="alert alert-danger mt-3">
-              <i className="ti-alert mr-2"></i>
+              <i className="ti-alert mr-2" style={{ fontFamily: 'themify' }}></i>
               {uploadError}
             </div>
           }

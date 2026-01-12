@@ -35,28 +35,42 @@ class MockupsController extends Controller
 
         if ($dateRange) {
             if ($dateRange === 'custom' && $request->filled('start_date') && $request->filled('end_date')) {
-                $query->whereBetween('created_at', [
+                $query->whereBetween('updated_at', [
                     $request->start_date . ' 00:00:00',
                     $request->end_date . ' 23:59:59'
                 ]);
             } elseif ($dateRange === 'last_30_days') {
-                $query->whereBetween('created_at', [
+                $query->whereBetween('updated_at', [
                     now()->subDays(30)->startOfDay(),
                     now()->endOfDay()
                 ]);
             } elseif ($dateRange === 'today') {
-                $query->whereDate('created_at', today());
+                $query->whereDate('updated_at', today());
             } elseif ($dateRange === 'this_week') {
-                $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
+                $query->whereBetween('updated_at', [now()->startOfWeek(), now()->endOfWeek()]);
             } elseif ($dateRange === 'this_month') {
-                $query->whereMonth('created_at', now()->month)
-                    ->whereYear('created_at', now()->year);
+                $query->whereMonth('updated_at', now()->month)
+                    ->whereYear('updated_at', now()->year);
             } elseif ($dateRange === 'last_month') {
-                $query->whereMonth('created_at', now()->subMonth()->month)
-                    ->whereYear('created_at', now()->subMonth()->year);
+                $query->whereMonth('updated_at', now()->subMonth()->month)
+                    ->whereYear('updated_at', now()->subMonth()->year);
             } elseif (is_numeric($dateRange) && strlen($dateRange) === 4) {
-                $query->whereYear('created_at', $dateRange);
+                $query->whereYear('updated_at', $dateRange);
             }
+        }
+
+        if ($request->has('design_status') && $request->design_status) {
+            $statuses = is_array($request->design_status) ? $request->design_status : explode(',', $request->design_status);
+            if (!in_array('all', $statuses)) {
+                $query->whereIn('design_status', $statuses);
+            }
+        } else {
+            // Default: Exclude approved
+            $query->where('design_status', '!=', 'approved');
+        }
+
+        if ($request->has('branch_id') && $request->branch_id) {
+            $query->where('order_branch_id', $request->branch_id);
         }
 
         $tickets = $query->latest('updated_at')
