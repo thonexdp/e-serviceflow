@@ -187,6 +187,8 @@ class TicketController extends BaseCrudController
             'description' => 'required|string',
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
+            'custom_workflow_steps' => 'nullable|array',
+            'custom_workflow_steps.*' => 'string|in:printing,lamination_heatpress,cutting,sewing,dtf_press,embroidery,knitting,lasser_cutting,qa',
             'quantity' => 'nullable|integer|min:1',
             'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
@@ -223,6 +225,9 @@ class TicketController extends BaseCrudController
         ]);
 
         $ticketData = $validated;
+
+        // Note: custom_workflow_steps is now allowed for all tickets, not just "Others" category
+        // We no longer clear workflow steps when job_type_id is set
 
 
         $transientKeys = [
@@ -347,6 +352,8 @@ class TicketController extends BaseCrudController
             'description' => 'required|string',
             'job_type' => 'nullable|string|max:255',
             'job_type_id' => 'nullable|exists:job_types,id',
+            'custom_workflow_steps' => 'nullable|array',
+            'custom_workflow_steps.*' => 'string|in:printing,lamination_heatpress,cutting,sewing,dtf_press,embroidery,knitting,lasser_cutting,qa',
             'quantity' => 'nullable|integer|min:1',
             'free_quantity' => 'nullable|integer|min:0',
             'size_rate_id' => 'nullable|exists:job_type_size_rates,id',
@@ -383,6 +390,9 @@ class TicketController extends BaseCrudController
         ]);
 
         $ticketData = $validated;
+
+        // Note: custom_workflow_steps is now allowed for all tickets, not just "Others" category
+        // We no longer clear workflow steps when job_type_id is set
         $transientKeys = [
             'attachments',
             'payment_proofs',
@@ -593,6 +603,35 @@ class TicketController extends BaseCrudController
             'design_status' => 'nullable|in:pending,in_designer,cancelled',
         ]);
 
+        // Check if workflow steps are set when changing to "In Designer"
+        // Only check for custom tickets (job_type_id is null) or "Others" category tickets
+        if ($validated['status'] === 'in_designer') {
+            // Determine if this is a custom/others ticket
+            $isCustomTicket = !$ticket->job_type_id || 
+                $ticket->custom_job_type_description ||
+                (is_string($ticket->job_type) && !empty($ticket->job_type));
+            
+            // Only validate workflow steps for custom tickets
+            if ($isCustomTicket) {
+                $workflowSteps = $ticket->custom_workflow_steps;
+                $hasWorkflowSteps = false;
+                
+                if ($workflowSteps) {
+                    if (is_array($workflowSteps)) {
+                        $hasWorkflowSteps = count($workflowSteps) > 0;
+                    } elseif (is_object($workflowSteps)) {
+                        $hasWorkflowSteps = count((array)$workflowSteps) > 0;
+                    }
+                }
+                
+                if (!$hasWorkflowSteps) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Production Workflow Template must be set before changing status to "In Designer". Please edit the ticket and set the workflow steps first.',
+                    ], 422);
+                }
+            }
+        }
 
         $ticket->status = $validated['status'];
         $ticket->design_status = $validated['status'] === 'in_designer' ? 'pending' : null;

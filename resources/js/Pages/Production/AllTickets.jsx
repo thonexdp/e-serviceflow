@@ -60,7 +60,6 @@ export default function AllTickets({
   };
 
   const handleAssignUsers = (ticket, userIds) => {
-    console.log('✅ handleAssignUsers called with ticket:', ticket, 'userIds:', userIds);
     if (!isProductionHead && !isAdmin) {
       return;
     }

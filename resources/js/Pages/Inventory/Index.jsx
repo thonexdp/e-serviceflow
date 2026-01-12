@@ -22,6 +22,7 @@ export default function InventoryIndex({
   const [openStockModal, setStockModalOpen] = useState(false);
   const [openAdjustModal, setAdjustModalOpen] = useState(false);
   const [openDeleteModal, setDeleteModalOpen] = useState(false);
+  const [openReportModal, setReportModalOpen] = useState(false);
   const [editingStockItem, setEditingStockItem] = useState(null);
   const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [selectedID, setSelectedID] = useState(null);
@@ -65,6 +66,7 @@ export default function InventoryIndex({
     setStockModalOpen(false);
     setAdjustModalOpen(false);
     setDeleteModalOpen(false);
+    setReportModalOpen(false);
     setEditingStockItem(null);
     setSelectedStockItem(null);
     setAdjustQuantity(0);
@@ -237,6 +239,49 @@ export default function InventoryIndex({
     }
     return <div className="badge badge-success">In Stock</div>;
   };
+
+  const parseNumber = (value) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const getStockCategory = (stockItem) => {
+    const currentStock = parseNumber(stockItem?.current_stock);
+    const minLevel = parseNumber(stockItem?.minimum_stock_level);
+
+    if (currentStock <= 0) return "out";
+    if (currentStock <= minLevel) return "critical";
+    return "in";
+  };
+
+  const applyStockStatusFilter = (status) => {
+    handleCloseModal();
+    router.get(
+      buildUrl("/inventory"),
+      {
+        ...filters,
+        stock_status: status || null
+      },
+      {
+        preserveState: false,
+        preserveScroll: true
+      }
+    );
+  };
+
+  const visibleStockItems = Array.isArray(stockItems?.data) ? stockItems.data : [];
+  const outOfStockItems = visibleStockItems.filter((item) => getStockCategory(item) === "out");
+  const criticalStockItems = visibleStockItems.filter((item) => getStockCategory(item) === "critical");
+  const inStockItems = visibleStockItems.filter((item) => getStockCategory(item) === "in");
+  const totalVisibleQty = visibleStockItems.reduce(
+    (sum, item) => sum + parseNumber(item?.current_stock),
+    0
+  );
+  const canViewCost = isAdmin || hasPermission("inventory", "manage");
+  const totalVisibleValue = visibleStockItems.reduce(
+    (sum, item) => sum + parseNumber(item?.current_stock) * parseNumber(item?.unit_cost),
+    0
+  );
 
   const stockItemColumns = [
     {
@@ -786,6 +831,188 @@ export default function InventoryIndex({
         </form>
       </Modal>
 
+      <Modal
+        title={"Inventory Report"}
+        isOpen={openReportModal}
+        onClose={handleCloseModal}
+        size="6xl"
+        submitButtonText={null}>
+
+        <div className="mb-3 text-sm text-muted">
+          This report summarizes the currently loaded stock items in the table.
+          {stockItems?.total ? (
+            <span>
+              {" "}Showing {visibleStockItems.length} of {stockItems.total} item(s)
+              {stockItems.current_page && stockItems.last_page
+                ? ` (page ${stockItems.current_page} of ${stockItems.last_page}).`
+                : "."}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="row">
+          <div className="col-md-4">
+            <div className="card border-danger">
+              <div className="card-body">
+                <div className="d-flex align-items-center justify-content-between">
+                  <h5 className="mb-0">Out of Stock</h5>
+                  <span className="badge badge-danger">{outOfStockItems.length}</span>
+                </div>
+                <div className="text-muted mt-2 text-sm">Items with stock at 0 (or below).</div>
+                <div className="mt-3 d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    onClick={() => applyStockStatusFilter("out")}
+                  >
+                    View Out of Stock
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-4">
+            <div className="card border-warning">
+              <div className="card-body">
+                <div className="d-flex align-items-center justify-content-between">
+                  <h5 className="mb-0">Critical Stock</h5>
+                  <span className="badge badge-warning">{criticalStockItems.length}</span>
+                </div>
+                <div className="text-muted mt-2 text-sm">
+                  Items at or below minimum stock level.
+                  {typeof lowStockCount === "number" && lowStockCount > 0 ? (
+                    <div className="mt-1">Overall low stock count: <b>{lowStockCount}</b></div>
+                  ) : null}
+                </div>
+                <div className="mt-3 d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-warning"
+                    onClick={() => applyStockStatusFilter("low")}
+                  >
+                    View Critical Stock
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-4">
+            <div className="card border-success">
+              <div className="card-body">
+                <div className="d-flex align-items-center justify-content-between">
+                  <h5 className="mb-0">All Stocks</h5>
+                  <span className="badge badge-success">{visibleStockItems.length}</span>
+                </div>
+                <div className="mt-2 text-sm">
+                  <div className="text-muted">
+                    In Stock: <b>{inStockItems.length}</b>
+                  </div>
+                  <div className="text-muted">
+                    Total Qty (visible): <b>{totalVisibleQty.toFixed(2)}</b>
+                  </div>
+                  {canViewCost ? (
+                    <div className="text-muted">
+                      Total Value (visible): <b>{formatPeso(totalVisibleValue.toFixed(2))}</b>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-3 d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => applyStockStatusFilter("")}
+                  >
+                    View All
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light"
+                    onClick={() => window.print()}
+                  >
+                    Print
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <h5 className="mb-2">Out of Stock Items</h5>
+          <div className="table-responsive">
+            <table className="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th className="text-right">Current Stock</th>
+                  <th className="text-right">Min Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outOfStockItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-muted">No out of stock items in the current table view.</td>
+                  </tr>
+                ) : (
+                  outOfStockItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.sku}</td>
+                      <td>{item.name}</td>
+                      <td className="text-right">
+                        {parseNumber(item.current_stock).toFixed(2)} {item.base_unit_of_measure}
+                      </td>
+                      <td className="text-right">
+                        {parseNumber(item.minimum_stock_level).toFixed(2)} {item.base_unit_of_measure}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <h5 className="mb-2">Critical Stock Items</h5>
+          <div className="table-responsive">
+            <table className="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th className="text-right">Current Stock</th>
+                  <th className="text-right">Min Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                {criticalStockItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-muted">No critical stock items in the current table view.</td>
+                  </tr>
+                ) : (
+                  criticalStockItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.sku}</td>
+                      <td>{item.name}</td>
+                      <td className="text-right">
+                        {parseNumber(item.current_stock).toFixed(2)} {item.base_unit_of_measure}
+                      </td>
+                      <td className="text-right">
+                        {parseNumber(item.minimum_stock_level).toFixed(2)} {item.base_unit_of_measure}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </Modal>
+
       {/* Adjust Stock Modal */}
       <Modal
         key={selectedStockItem?.id || 'adjust-stock'}
@@ -925,6 +1152,14 @@ export default function InventoryIndex({
                             Add Stock Item
                           </button>
                         }
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary ml-2"
+                          onClick={() => setReportModalOpen(true)}>
+
+                          <i className="ti-bar-chart"></i>{" "}
+                          Report
+                        </button>
                          <button
                           className="btn btn-sm btn-light btn-rounded ml-2 text-orange-500"
                           onClick={handleRefresh}
