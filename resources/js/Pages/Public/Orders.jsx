@@ -1988,10 +1988,10 @@ export default function CustomerPOSOrder() {
                     <div className="flex-1 text-left">
                       <p className={`font-bold text-sm sm:text-base transition-colors ${formData.category_id === "others" ? "text-orange-900" : "text-gray-700 group-hover:text-orange-600"
                         }`}>
-                        Others
+                        Other Services
                       </p>
                       <p className="text-[11px] sm:text-xs text-gray-500 mt-1 font-medium">
-                        Custom Order
+                        by Quotation
                       </p>
                     </div>
 
