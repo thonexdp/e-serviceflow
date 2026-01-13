@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\JobType;
 use App\Models\JobCategory;
+use App\Models\JobTypeInventory;
 use App\Models\UserActivityLog;
 use App\Http\Requests\JobTypeRequest;
 use App\Services\JobTypePricingService;
@@ -23,7 +24,7 @@ class JobTypeController extends Controller
 
     public function index(Request $request)
     {
-        $jobTypes = JobType::with(['category', 'priceTiers', 'sizeRates', 'promoRules'])
+        $jobTypes = JobType::with(['category', 'priceTiers', 'sizeRates', 'promoRules', 'inventoryRecipe.stockItem'])
             ->when(request('search'), function ($q) {
                 $search = request('search');
                 $q->where('name', 'like', "%{$search}%")
@@ -124,6 +125,7 @@ class JobTypeController extends Controller
         $jobType = JobType::create($validated);
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
         $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
+        $this->syncInventoryRecipe($jobType, $validated['inventory_recipe'] ?? []);
 
         UserActivityLog::log(
             auth()->id(),
@@ -222,6 +224,7 @@ class JobTypeController extends Controller
         $jobType->update($validated);
         $this->pricing->sync($jobType, $validated['price_tiers'] ?? [], $validated['size_rates'] ?? []);
         $this->syncPromoRules($jobType, $validated['promo_rules'] ?? []);
+        $this->syncInventoryRecipe($jobType, $validated['inventory_recipe'] ?? []);
 
         UserActivityLog::log(
             auth()->id(),
@@ -282,5 +285,82 @@ class JobTypeController extends Controller
                 ]);
             }
         }
+    }
+
+    /**
+     * Sync inventory recipe (BOM) for job type
+     */
+    private function syncInventoryRecipe(JobType $jobType, array $inventoryRecipe)
+    {
+        Log::info('Syncing inventory recipe for job type', [
+            'job_type_id' => $jobType->id,
+            'job_type_name' => $jobType->name,
+            'recipe_count' => count($inventoryRecipe),
+            'recipe_data' => $inventoryRecipe
+        ]);
+
+        // Delete existing recipe items
+        $jobType->inventoryRecipe()->delete();
+
+        $stockItems = collect($inventoryRecipe)
+            ->pluck('stock_item_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $stockItemMap = $stockItems->isNotEmpty()
+            ? \App\Models\StockItem::whereIn('id', $stockItems)->get()->keyBy('id')
+            : collect();
+
+        // Create new recipe items
+        $created = 0;
+        foreach ($inventoryRecipe as $item) {
+            if (!empty($item['stock_item_id']) && !empty($item['avg_quantity_per_unit'])) {
+                $stockItem = $stockItemMap->get((int) $item['stock_item_id']);
+                $consumeType = $this->mapMeasurementToConsumeType(
+                    $stockItem?->measurement_type,
+                    $stockItem?->is_area_based,
+                    $item['consume_type'] ?? null
+                );
+
+                $jobType->inventoryRecipe()->create([
+                    'stock_item_id' => $item['stock_item_id'],
+                    'consume_type' => $consumeType,
+                    'avg_quantity_per_unit' => $item['avg_quantity_per_unit'],
+                    'is_optional' => $item['is_optional'] ?? false,
+                    'notes' => $item['notes'] ?? null,
+                ]);
+                $created++;
+            }
+        }
+
+        Log::info('Inventory recipe sync completed', [
+            'job_type_id' => $jobType->id,
+            'items_created' => $created
+        ]);
+    }
+
+    private function mapMeasurementToConsumeType(?string $measurementType, ?bool $isAreaBased, ?string $fallback = null): string
+    {
+        // Map old consume_type values to new ones for backward compatibility
+        if ($fallback) {
+            $fallback = match (strtolower($fallback)) {
+                'area' => 'sqft',
+                'liter' => 'ml',
+                'meter' => 'm',
+                default => $fallback,
+            };
+        }
+
+        if ($isAreaBased || $measurementType === 'area') {
+            return 'sqft';
+        }
+
+        return match (strtolower($measurementType ?? '')) {
+            'weight' => 'kg',
+            'volume' => 'ml',
+            'length' => 'm',
+            default => $fallback ?? 'pcs',
+        };
     }
 }

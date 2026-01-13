@@ -37,6 +37,9 @@ class Ticket extends Model
         'downpayment',
         'payment_method',
         'status',
+        'materials_deducted',
+        'materials_deducted_at',
+        'materials_deducted_by',
         'current_workflow_step',
         'custom_workflow_steps',
         'assigned_to_user_id',
@@ -74,6 +77,8 @@ class Ticket extends Model
         'produced_quantity' => 'integer',
         'custom_workflow_steps' => 'array',
         'is_online_order' => 'boolean',
+        'materials_deducted' => 'boolean',
+        'materials_deducted_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -248,6 +253,12 @@ class Ticket extends Model
     public function updatedByUser()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+
+    public function materialsDeductedBy()
+    {
+        return $this->belongsTo(User::class, 'materials_deducted_by');
     }
 
 

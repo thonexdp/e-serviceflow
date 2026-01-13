@@ -120,6 +120,28 @@ class JobType extends Model
     }
 
 
+    /**
+     * Get the inventory recipe/BOM for this job type (NEW - Job-type driven)
+     */
+    public function inventoryRecipe()
+    {
+        return $this->hasMany(JobTypeInventory::class);
+    }
+
+    /**
+     * Get stock items with recipe details for this job type
+     */
+    public function recipeStockItems()
+    {
+        return $this->belongsToMany(StockItem::class, 'job_type_inventory')
+            ->withPivot('consume_type', 'avg_quantity_per_unit', 'is_optional', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * OLD RELATIONSHIP - Kept for backward compatibility during migration
+     * @deprecated Use inventoryRecipe() instead
+     */
     public function requiredStockItems()
     {
         return $this->belongsToMany(StockItem::class, 'job_type_stock_requirements')
@@ -149,6 +171,41 @@ class JobType extends Model
 
 
         return (float) ($this->incentive_price ?? 0);
+    }
+
+    /**
+     * Calculate estimated material usage for a given production quantity
+     * 
+     * @param int $quantity Number of units to produce
+     * @param float|null $length Optional length for area-based calculations
+     * @param float|null $width Optional width for area-based calculations
+     * @return array Array of materials with estimated quantities
+     */
+    public function calculateEstimatedMaterials(int $quantity, ?float $length = null, ?float $width = null): array
+    {
+        $materials = [];
+        
+        foreach ($this->inventoryRecipe as $recipe) {
+            $stockItem = $recipe->stockItem;
+            if (!$stockItem) continue;
+            
+            $estimatedQty = $recipe->calculateQuantityNeeded($quantity, $length, $width);
+            
+            $materials[] = [
+                'stock_item_id' => $stockItem->id,
+                'stock_item_name' => $stockItem->name,
+                'stock_item_sku' => $stockItem->sku,
+                'current_stock' => $stockItem->current_stock,
+                'base_unit' => $stockItem->base_unit_of_measure,
+                'consume_type' => $recipe->consume_type,
+                'avg_per_unit' => $recipe->avg_quantity_per_unit,
+                'estimated_quantity' => $estimatedQty,
+                'is_optional' => $recipe->is_optional,
+                'sufficient_stock' => $stockItem->current_stock >= $estimatedQty,
+            ];
+        }
+        
+        return $materials;
     }
 
     /**

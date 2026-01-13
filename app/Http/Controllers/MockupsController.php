@@ -141,24 +141,55 @@ class MockupsController extends Controller
 
     public function approve(Request $request, $id)
     {
-        $ticket = Ticket::findOrFail($id);
+        $ticket = Ticket::with('jobType')->findOrFail($id);
         $oldStatus = $ticket->status;
 
         $request->validate([
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        $ticket->update([
-            'design_status' => 'approved',
-            'design_notes' => $request->notes,
-            'status' => 'ready_to_print',
-        ]);
+        // Determine the appropriate status and workflow step based on job type configuration
+        $firstWorkflowStep = $ticket->getFirstWorkflowStep();
+        $hasPrintingWorkflow = false;
 
+        // Check if the job type has a printing workflow step
+        $workflowSteps = $ticket->jobType?->workflow_steps ?? $ticket->custom_workflow_steps;
+        if ($workflowSteps) {
+            // Support both array formats: ['printing', 'cutting'] or { printing: true, cutting: true }
+            if (is_array($workflowSteps)) {
+                if (array_is_list($workflowSteps)) {
+                    $hasPrintingWorkflow = in_array('printing', $workflowSteps, true);
+                } else {
+                    $hasPrintingWorkflow = isset($workflowSteps['printing']) &&
+                        (is_bool($workflowSteps['printing']) ? $workflowSteps['printing'] : (isset($workflowSteps['printing']['enabled']) && $workflowSteps['printing']['enabled']));
+                }
+            }
+        }
 
+        // Set status and workflow step based on whether printing is required
+        if ($hasPrintingWorkflow) {
+            // Traditional flow: ready_to_print status, no workflow step set yet
+            $newStatus = 'ready_to_print';
+            $updateData = [
+                'design_status' => 'approved',
+                'design_notes' => $request->notes,
+                'status' => $newStatus,
+            ];
+        } else {
+            // No printing workflow: go directly to in_production with first workflow step
+            $newStatus = 'in_production';
+            $updateData = [
+                'design_status' => 'approved',
+                'design_notes' => $request->notes,
+                'status' => $newStatus,
+                'current_workflow_step' => $firstWorkflowStep,
+            ];
+        }
+
+        $ticket->update($updateData);
         $ticket->refresh();
 
-
-        $this->notifyStatusChange($ticket, $oldStatus, 'ready_to_print');
+        $this->notifyStatusChange($ticket, $oldStatus, $newStatus);
 
         return redirect()->back()->with('success', 'Design approved successfully.');
     }
@@ -233,6 +264,26 @@ class MockupsController extends Controller
                 $notificationType = 'ticket_approved';
                 $title = 'Ticket Approved';
                 $message = "Ticket {$ticket->ticket_number} has been approved by {$triggeredBy->name} and is ready for production.";
+                break;
+
+            case 'in_production':
+                // Handle tickets that go directly to production (no printing workflow)
+                $frontDeskUsers = \App\Models\User::where('role', \App\Models\User::ROLE_FRONTDESK)
+                    ->when($ticket->order_branch_id, function ($query) use ($ticket) {
+                        $query->where('branch_id', $ticket->order_branch_id);
+                    })
+                    ->get();
+                $productionUsers = \App\Models\User::where('role', \App\Models\User::ROLE_PRODUCTION)
+                    ->when($ticket->production_branch_id, function ($query) use ($ticket) {
+                        $query->where('branch_id', $ticket->production_branch_id);
+                    })
+                    ->get();
+                $recipientIds = $frontDeskUsers->pluck('id')->merge($productionUsers->pluck('id'))->unique()->toArray();
+
+                $notificationType = 'ticket_in_production';
+                $title = 'Ticket In Production';
+                $workflowStepLabel = $ticket->current_workflow_step ? ucfirst(str_replace('_', ' ', $ticket->current_workflow_step)) : 'production';
+                $message = "Ticket {$ticket->ticket_number} has been approved by {$triggeredBy->name} and is now in production ({$workflowStepLabel}).";
                 break;
 
             case 'rejected':
