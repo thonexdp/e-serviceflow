@@ -40,10 +40,180 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [pendingColor, setPendingColor] = useState("#33ccff");
+  const [inventoryRecipe, setInventoryRecipe] = useState([]);
+  const [availableStockItems, setAvailableStockItems] = useState([]);
+  const [stockItemsLoading, setStockItemsLoading] = useState(false);
+  const [stockItemsPage, setStockItemsPage] = useState(1);
+  const [stockItemsHasMore, setStockItemsHasMore] = useState(true);
+  const [stockItemsTotal, setStockItemsTotal] = useState(0);
 
+  const deriveConsumeType = (stockItem, fallback = "pcs") => {
+    if (!stockItem) return fallback;
+    if (stockItem.is_area_based || stockItem.measurement_type === "area") return "sqft";
+
+    switch (stockItem.measurement_type) {
+      case "weight":
+        return "kg";
+      case "volume":
+        return "ml";
+      case "length":
+        return "m";
+      default:
+        return fallback || "pcs";
+    }
+  };
+
+  const consumeTypeLabels = {
+    pcs: "Pieces",
+    sqft: "Area (sqft)",
+    kg: "Kilograms (kg)",
+    ml: "Milliliters (ml)",
+    m: "Meters (m)"
+  };
+
+  const getConsumeStep = (type) => {
+    if (type === "pcs") return "1";
+    if (type === "sqft" || type === "m") return "0.01";
+    return "0.001"; // for kg and ml
+  };
+  const getConsumePlaceholder = (type) => {
+    switch (type) {
+      case "sqft":
+        return "e.g., 30 (sqft per job unit)";
+      case "kg":
+        return "e.g., 0.5 (kg per job unit)";
+      case "ml":
+        return "e.g., 250 (ml per job unit)";
+      case "m":
+        return "e.g., 2.5 (m per job unit)";
+      default:
+        return "e.g., 1 (pcs per job unit)";
+    }
+  };
+
+  const getAvgQtyLabel = (type) => {
+    if (sizeBase && type === "sqft") return "Consumption Multiplier";
+    switch (type) {
+      case "sqft":
+        return "Usage per Unit";
+      case "kg":
+        return "Usage per Unit";
+      case "ml":
+        return "Usage per Unit";
+      case "m":
+        return "Usage per Unit";
+      default:
+        return "Usage per Unit";
+    }
+  };
+
+  const getAvgQtyHelperText = (type) => {
+    switch (type) {
+      case "sqft":
+        return "Enter sqft consumed per job unit (e.g., 30 sqft per unit)";
+      case "kg":
+        return "Enter kg consumed per job unit (e.g., 0.5 kg per unit)";
+      case "ml":
+        return "Enter ml consumed per job unit (e.g., 250 ml per unit)";
+      case "m":
+        return "Enter meters consumed per job unit (e.g., 2.5 m per unit)";
+      default:
+        return "Enter pieces consumed per job unit (e.g., 1 pcs per unit)";
+    }
+  };
+
+
+  // Fetch available stock items with pagination
+  const fetchStockItems = async (page = 1, append = false) => {
+    if (stockItemsLoading) return; // Prevent multiple simultaneous requests
+
+    setStockItemsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        per_page: '50'
+      });
+
+      const response = await fetch(`/api/stock-items?${params}`);
+      const data = await response.json();
+
+      if (append) {
+        setAvailableStockItems(prev => [...prev, ...(data.stockItems || [])]);
+      } else {
+        setAvailableStockItems(data.stockItems || []);
+      }
+
+      setStockItemsHasMore(data.pagination?.has_more || false);
+      setStockItemsTotal(data.pagination?.total || 0);
+      setStockItemsPage(page);
+    } catch (err) {
+      console.error('Failed to load stock items:', err);
+    } finally {
+      setStockItemsLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchStockItems(1, false);
+  }, []);
+
+  // Close dropdowns when clicking outside or scrolling
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.position-relative') && !event.target.closest('[data-dropdown-index]')) {
+        document.querySelectorAll('[data-dropdown-index]').forEach(dropdown => {
+          dropdown.style.display = 'none';
+        });
+      }
+    };
+
+    const handleScroll = (event) => {
+      // Don't close if scrolling inside the dropdown or its scroll container
+      const target = event.target;
+      const isInsideDropdown = target.closest('[data-dropdown-index]') ||
+        target.closest('[data-scroll-container]') ||
+        target.hasAttribute('data-dropdown-index') ||
+        target.hasAttribute('data-scroll-container');
+
+      if (isInsideDropdown) {
+        return; // Don't close when scrolling inside dropdown
+      }
+
+      // Check if scroll is from window/document (page scroll) or table container
+      const isPageScroll = event.target === window ||
+        event.target === document ||
+        event.target === document.body ||
+        event.target.closest('.table-responsive') ||
+        event.target.closest('.main') ||
+        event.target.closest('.content-wrap');
+
+      if (isPageScroll) {
+        // Only close if scrolling the page/table, not inside dropdown
+        document.querySelectorAll('[data-dropdown-index]').forEach(dropdown => {
+          if (dropdown.style.display === 'block') {
+            dropdown.style.display = 'none';
+          }
+        });
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    // Listen to scroll on window (page scroll) - use capture phase to catch early
+    window.addEventListener('scroll', handleScroll, true);
+    // Also listen on document body
+    document.body.addEventListener('scroll', handleScroll, true);
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+      document.body.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
 
   useEffect(() => {
     if (jobType) {
+      setSizeBase(jobType.size_rates && jobType.size_rates.length > 0);
       setFormData({
         category_id: jobType.category_id?.toString() || jobType.category_id || "",
         name: jobType.name || "",
@@ -145,10 +315,60 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         setImagePreview(null);
       }
       setImageFile(null);
+
+      // Load inventory recipe if available
+      if (jobType.inventory_recipe && Array.isArray(jobType.inventory_recipe)) {
+        console.log('Loading inventory recipe:', jobType.inventory_recipe);
+        const recipeItems = jobType.inventory_recipe.map(item => {
+          // Map old consume_type values to new ones for backward compatibility
+          let consumeType = item.consume_type;
+          if (consumeType === "area") consumeType = "sqft";
+          if (consumeType === "liter") consumeType = "ml";
+          if (consumeType === "meter") consumeType = "m";
+
+          return {
+            id: item.id || null,
+            stock_item_id: item.stock_item_id || item.stock_item?.id || "",
+            stock_item_name: item.stock_item?.name || "",
+            consume_type: deriveConsumeType(item.stock_item, consumeType || "pcs"),
+            avg_quantity_per_unit: item.avg_quantity_per_unit || "",
+            is_optional: item.is_optional || false,
+            notes: item.notes || ""
+          };
+        });
+        setInventoryRecipe(recipeItems);
+
+        // Add stock items from recipe to availableStockItems if not already present
+        recipeItems.forEach(recipeItem => {
+          if (recipeItem.stock_item_id && jobType.inventory_recipe) {
+            const stockItem = jobType.inventory_recipe.find(r =>
+              (r.stock_item_id || r.stock_item?.id) == recipeItem.stock_item_id
+            )?.stock_item;
+
+            if (stockItem && !availableStockItems.find(s => String(s.id) === String(recipeItem.stock_item_id))) {
+              setAvailableStockItems(prev => [...prev, {
+                id: stockItem.id || recipeItem.stock_item_id,
+                sku: stockItem.sku || '',
+                name: stockItem.name || recipeItem.stock_item_name || '',
+                base_unit_of_measure: stockItem.base_unit_of_measure || '',
+                measurement_type: stockItem.measurement_type || 'pieces',
+                is_area_based: stockItem.is_area_based || false,
+                length: stockItem.length || null,
+                width: stockItem.width || null,
+                is_active: stockItem.is_active !== undefined ? stockItem.is_active : true
+              }]);
+            }
+          }
+        });
+      } else {
+        console.log('No inventory recipe found or not an array');
+        setInventoryRecipe([]);
+      }
     } else {
       setPriceTiers([]);
       setSizeRates([]);
       setPromoRules([]);
+      setInventoryRecipe([]);
       setWorkflowSteps({
         printing: { enabled: false, incentive_price: "" },
         lamination_heatpress: { enabled: false, incentive_price: "" },
@@ -162,8 +382,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
       });
       setImagePreview(null);
       setImageFile(null);
+      setSizeBase(false);
     }
   }, [jobType]);
+
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -317,6 +539,46 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
     setPromoRules((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Inventory Recipe Handlers
+  const addInventoryItem = () => {
+    setInventoryRecipe((prev) => [
+      ...prev,
+      {
+        stock_item_id: "",
+        consume_type: "pcs",
+        avg_quantity_per_unit: sizeBase ? "1" : "",
+        is_optional: false,
+        notes: ""
+      }
+    ]);
+  };
+
+  const updateInventoryItem = (index, field, value) => {
+    setInventoryRecipe((prev) => {
+      const updated = [...prev];
+      if (field === "stock_item_id") {
+        const stock = availableStockItems.find((s) => String(s.id) === String(value));
+        const consumeType = deriveConsumeType(stock, updated[index].consume_type);
+        updated[index] = {
+          ...updated[index],
+          stock_item_id: value,
+          consume_type: consumeType,
+          avg_quantity_per_unit: (sizeBase && consumeType === "sqft" && (!updated[index].avg_quantity_per_unit || updated[index].avg_quantity_per_unit === "0")) ? "1" : updated[index].avg_quantity_per_unit
+        };
+      } else {
+        updated[index] = {
+          ...updated[index],
+          [field]: value
+        };
+      }
+      return updated;
+    });
+  };
+
+  const removeInventoryItem = (index) => {
+    setInventoryRecipe((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -384,6 +646,18 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
         is_active: rule.is_active !== undefined ? rule.is_active : true
       }));
 
+    // Format inventory recipe
+    const formattedInventoryRecipe = inventoryRecipe.
+      filter((item) => item.stock_item_id && item.avg_quantity_per_unit).
+      map((item) => ({
+        id: item.id || null,
+        stock_item_id: Number(item.stock_item_id),
+        consume_type: item.consume_type || "pcs",
+        avg_quantity_per_unit: Number(item.avg_quantity_per_unit),
+        is_optional: item.is_optional || false,
+        notes: item.notes || null
+      }));
+
     const submitData = {
       ...formData,
       category_id: parseInt(formData.category_id),
@@ -394,11 +668,17 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
       size_rates: formattedSizeRates,
       promo_rules: formattedPromoRules,
       workflow_steps: workflowSteps,
+      inventory_recipe: formattedInventoryRecipe,
       image: imageFile,
       brochure_link: formData.brochure_link,
       has_colors: formData.has_colors,
       available_colors: formData.available_colors
     };
+
+    console.log('Submitting job type with inventory recipe:', {
+      inventory_recipe: formattedInventoryRecipe,
+      total_items: formattedInventoryRecipe.length
+    });
 
     onSubmit(submitData);
 
@@ -719,21 +999,19 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
            </div>
         </div> */}
 
-      <div class="flex space-x-4">
-        <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
-          <input type="radio" name="role" value="FrontDesk" class="h-4 w-4 text-indigo-600"
+      <div className="flex space-x-4 mb-4">
+        <label className={`flex items-center space-x-2 px-4 py-2 rounded-lg cursor-pointer transition-all ${!sizeBase ? 'bg-orange-100 border border-orange-200 text-orange-700' : 'bg-gray-100 border border-gray-200 text-gray-600 hover:bg-gray-200'}`}>
+          <input type="radio" name="pricing_model" value="quantity" className="h-4 w-4 text-orange-600 focus:ring-orange-500"
             checked={!sizeBase}
             onChange={() => setSizeBase(false)} />
-
-          <span>Quantity Base</span>
+          <span className="font-medium text-sm">Quantity Base</span>
         </label>
 
-        <label class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200">
-          <input type="radio" name="role" value="Designer" class="h-4 w-4 text-indigo-600"
+        <label className={`flex items-center space-x-2 px-4 py-2 rounded-lg cursor-pointer transition-all ${sizeBase ? 'bg-orange-100 border border-orange-200 text-orange-700' : 'bg-gray-100 border border-gray-200 text-gray-600 hover:bg-gray-200'}`}>
+          <input type="radio" name="pricing_model" value="size" className="h-4 w-4 text-orange-600 focus:ring-orange-500"
             checked={sizeBase}
             onChange={() => setSizeBase(true)} />
-
-          <span>Size Base</span>
+          <span className="font-medium text-sm">Size Base (Dynamic)</span>
         </label>
       </div>
 
@@ -803,11 +1081,10 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
                             className="form-control form-control-sm"
                             value={rate.dimension_unit}
                             onChange={(e) => updateSizeRate(index, "dimension_unit", e.target.value)}>
-
                             <option value="ft">Feet</option>
-                            <option value="m">Meters</option>
+                            {/* <option value="m">Meters</option>
                             <option value="cm">Centimeters</option>
-                            <option value="in">Inches</option>
+                            <option value="in">Inches</option> */}
                           </select>
                         </td>
                         <td>
@@ -997,8 +1274,316 @@ export default function JobTypeForm({ jobType = null, allcategories = [], onSubm
 
       }
 
+      {/* Inventory Recipe / BOM Section */}
+      <div className="mt-4">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <h5 className="mb-0">
+            <i className="ti-package mr-2"></i>Material Recipe (BOM)
+          </h5>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-info"
+            onClick={addInventoryItem}>
+            <i className="ti-plus"></i> Add Material
+          </button>
+        </div>
+        <div className="alert alert-info">
+          <i className="ti-info-alt mr-2"></i>
+          <strong>Job-Type Driven Inventory:</strong> Define which stock items this job type consumes.
+          The system will automatically calculate and deduct materials upon production completion.
+        </div>
 
+        {inventoryRecipe.length > 0 ? (
+          <div className="table-responsive">
+            <table className="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th>Stock Item</th>
+                  <th>Consume Type</th>
+                  <th>Avg Qty per Unit</th>
+                  <th>Optional</th>
+                  <th>Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryRecipe.map((item, index) => {
+                  const selectedStock = availableStockItems.find(s => String(s.id) === String(item.stock_item_id));
+                  const consumeType = item.consume_type || "pcs";
+                  const consumeLabel = consumeTypeLabels[consumeType] || consumeType;
+                  const step = getConsumeStep(consumeType);
+                  const placeholder = getConsumePlaceholder(consumeType);
 
+                  return (
+                    <tr key={index}>
+                      <td style={{ position: 'relative', overflow: 'visible' }}>
+                        <div className="position-relative" style={{ zIndex: 1 }}>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Click to select stock item..."
+                            value={selectedStock ? `${selectedStock.name} (${selectedStock.sku})` : ""}
+                            readOnly
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const input = e.target;
+                              const dropdown = document.querySelector(`[data-dropdown-index="${index}"]`);
+                              if (dropdown) {
+                                // Close all other dropdowns
+                                document.querySelectorAll('[data-dropdown-index]').forEach(d => {
+                                  if (d !== dropdown) d.style.display = 'none';
+                                });
+                                // Toggle current dropdown
+                                const isOpen = dropdown.style.display === 'block';
+                                dropdown.style.display = isOpen ? 'none' : 'block';
+
+                                // Calculate fixed position based on input position
+                                if (!isOpen) {
+                                  setTimeout(() => {
+                                    const inputRect = input.getBoundingClientRect();
+                                    const viewportHeight = window.innerHeight;
+                                    const viewportWidth = window.innerWidth;
+                                    const headerHeight = 50; // approximate header height
+                                    const dropdownWidth = 450;
+                                    const maxDropdownHeight = 500;
+
+                                    // Calculate top position (below input by default)
+                                    let top = inputRect.bottom + 2;
+                                    let availableHeight = viewportHeight - top - 10;
+
+                                    // If dropdown would go below viewport, show above instead
+                                    if (availableHeight < 200) {
+                                      top = inputRect.top - maxDropdownHeight - 2;
+                                      availableHeight = top - 10;
+
+                                      // If still doesn't fit, position at top of viewport
+                                      if (top < 10) {
+                                        top = 10;
+                                        availableHeight = viewportHeight - top - 10;
+                                      }
+                                    }
+
+                                    // Calculate left position
+                                    let left = inputRect.left;
+
+                                    // If dropdown would go off right edge, align to right
+                                    if (left + dropdownWidth > viewportWidth) {
+                                      left = viewportWidth - dropdownWidth - 10;
+                                    }
+
+                                    // Ensure it doesn't go off left edge
+                                    if (left < 10) {
+                                      left = 10;
+                                    }
+
+                                    // Apply fixed positioning
+                                    dropdown.style.position = 'fixed';
+                                    dropdown.style.top = `${top}px`;
+                                    dropdown.style.left = `${left}px`;
+                                    dropdown.style.right = 'auto';
+                                    dropdown.style.bottom = 'auto';
+                                    dropdown.style.marginTop = '0';
+                                    dropdown.style.marginBottom = '0';
+
+                                    // Update scroll container max height
+                                    const scrollContainer = dropdown.querySelector('[data-scroll-container]');
+                                    if (scrollContainer) {
+                                      const actualMaxHeight = Math.min(availableHeight - headerHeight, 450);
+                                      scrollContainer.style.maxHeight = `${actualMaxHeight}px`;
+                                    }
+                                  }, 10);
+                                }
+                              }
+                            }}
+                            required
+                          />
+                          <div
+                            data-dropdown-index={index}
+                            className="bg-white border rounded shadow-lg"
+                            style={{
+                              display: 'none',
+                              position: 'fixed',
+                              zIndex: 9999,
+                              width: '450px',
+                              minWidth: '400px',
+                              maxHeight: '500px',
+                              top: 0,
+                              left: 0
+                            }}
+                            onClick={(e) => e.stopPropagation()}>
+                            <div className="p-2 border-bottom bg-light sticky-top" style={{ zIndex: 1 }}>
+                              <small className="text-muted">
+                                {stockItemsTotal > 0 ? (
+                                  <>Showing {availableStockItems.length} of {stockItemsTotal} items. Scroll to load more.</>
+                                ) : (
+                                  <>Loading stock items...</>
+                                )}
+                              </small>
+                            </div>
+                            <div
+                              data-scroll-container={index}
+                              className="stock-items-scroll"
+                              style={{
+                                maxHeight: '450px',
+                                overflowY: 'auto',
+                                overflowX: 'hidden',
+                                WebkitOverflowScrolling: 'touch',
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: '#cbd5e0 #f7fafc',
+                                position: 'relative'
+                              }}
+                              onScroll={(e) => {
+                                e.stopPropagation(); // Prevent scroll event from bubbling to page scroll handler
+                                const container = e.target;
+                                const scrollTop = container.scrollTop;
+                                const scrollHeight = container.scrollHeight;
+                                const clientHeight = container.clientHeight;
+
+                                // Load more when scrolled to within 100px of bottom
+                                if (scrollHeight - scrollTop - clientHeight < 100 && stockItemsHasMore && !stockItemsLoading) {
+                                  fetchStockItems(stockItemsPage + 1, true);
+                                }
+                              }}>
+                              {stockItemsLoading && availableStockItems.length === 0 ? (
+                                <div className="p-3 text-center text-muted">
+                                  <i className="ti-reload fa-spin mr-2"></i> Loading...
+                                </div>
+                              ) : availableStockItems.length === 0 ? (
+                                <div className="p-3 text-center text-muted">
+                                  No stock items found
+                                </div>
+                              ) : (
+                                <>
+                                  {availableStockItems.map((stock) => (
+                                    <div
+                                      key={stock.id}
+                                      className={`p-3 cursor-pointer border-bottom ${String(item.stock_item_id) === String(stock.id)
+                                        ? 'bg-orange-50 border-left border-orange-500'
+                                        : 'hover:bg-gray-50'
+                                        }`}
+                                      style={{
+                                        borderLeft: String(item.stock_item_id) === String(stock.id) ? '4px solid #f97316' : '4px solid transparent',
+                                        minHeight: '50px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center'
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Ensure the stock item is in availableStockItems
+                                        if (!availableStockItems.find(s => String(s.id) === String(stock.id))) {
+                                          setAvailableStockItems(prev => [...prev, stock]);
+                                        }
+                                        updateInventoryItem(index, "stock_item_id", stock.id);
+                                        const dropdown = document.querySelector(`[data-dropdown-index="${index}"]`);
+                                        if (dropdown) {
+                                          dropdown.style.display = 'none';
+                                        }
+                                      }}>
+                                      <div className="font-weight-bold text-sm mb-1">{stock.name}</div>
+                                      <div className="text-xs text-muted">
+                                        SKU: {stock.sku} | Unit: {stock.base_unit_of_measure || 'N/A'}
+                                        {stock.is_active === false && (
+                                          <span className="badge badge-warning badge-sm ml-1">Inactive</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {stockItemsLoading && availableStockItems.length > 0 && (
+                                    <div className="p-2 text-center border-top">
+                                      <span className="text-muted">
+                                        <i className="ti-reload fa-spin mr-1"></i> Loading more...
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {selectedStock && (
+                          <small className="text-muted d-block mt-1">
+                            Unit: {selectedStock.base_unit_of_measure || 'N/A'}
+                          </small>
+                        )}
+                      </td>
+                      <td>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className={`badge ${consumeType === 'pcs' ? 'badge-secondary' :
+                            consumeType === 'sqft' ? 'badge-info' :
+                              consumeType === 'kg' ? 'badge-warning' :
+                                consumeType === 'ml' ? 'badge-primary' :
+                                  consumeType === 'm' ? 'badge-success' :
+                                    'badge-secondary'
+                            } d-inline-block`} style={{ fontSize: '0.75rem', padding: '4px 8px' }}>
+                            {consumeLabel}
+                          </span>
+                          <i className="ti-lock text-muted" title="Auto-detected from stock item"></i>
+                        </div>
+                        <small className="text-muted d-block mt-1">
+                          <i className="ti-info-alt"></i> Auto-detected from inventory unit
+                        </small>
+                      </td>
+                      <td>
+                        <small className="text-muted d-block mb-1">
+                          <strong>{getAvgQtyLabel(consumeType)}</strong>
+                        </small>
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          value={item.avg_quantity_per_unit}
+                          onChange={(e) => updateInventoryItem(index, "avg_quantity_per_unit", e.target.value)}
+                          min="0"
+                          step={step}
+                          placeholder={placeholder}
+                          required
+                        />
+                        <small className="text-muted d-block mt-1">
+                          {sizeBase && consumeType === "sqft" ? (
+                            <span className="text-orange-600 font-weight-bold">
+                              <i className="ti-bolt"></i> Multiplier: Total Sqft x {item.avg_quantity_per_unit || '1'}
+                            </span>
+                          ) : getAvgQtyHelperText(consumeType)}
+                        </small>
+                      </td>
+                      <td className="text-center">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={item.is_optional}
+                          onChange={(e) => updateInventoryItem(index, "is_optional", e.target.checked)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          value={item.notes}
+                          onChange={(e) => updateInventoryItem(index, "notes", e.target.value)}
+                          placeholder="Optional notes"
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-link text-danger"
+                          onClick={() => removeInventoryItem(index)}>
+                          <i className="ti-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="alert alert-warning">
+            <i className="ti-alert mr-2"></i>
+            No materials defined yet. This job type will not consume any inventory automatically.
+          </div>
+        )}
+      </div>
 
       <div className="mt-4">
         <div className="d-flex justify-content-between align-items-center mb-2">

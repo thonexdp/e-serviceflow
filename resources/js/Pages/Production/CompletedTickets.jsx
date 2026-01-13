@@ -196,9 +196,18 @@ export default function CompletedTickets({
 }) {
   const [openViewModal, setViewModalOpen] = useState(false);
   const [openTimelineModal, setTimelineModalOpen] = useState(false);
+  const [openMaterialModal, setMaterialModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedPreviewFile, setSelectedPreviewFile] = useState(null);
   const [selectedEvidenceImage, setSelectedEvidenceImage] = useState(null);
+  const [estimatedMaterials, setEstimatedMaterials] = useState([]);
+  const [adjustedMaterials, setAdjustedMaterials] = useState({});
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [deductingStock, setDeductingStock] = useState(false);
+  const [useEstimatedUsage, setUseEstimatedUsage] = useState(true);
+  const [showAdvancedAdjust, setShowAdvancedAdjust] = useState(false);
+  const [materialsDeducted, setMaterialsDeducted] = useState(false);
+  const [deductedTicketIds, setDeductedTicketIds] = useState(new Set());
   const { flash, auth } = usePage().props;
   const { buildUrl } = useRoleApi();
 
@@ -224,9 +233,84 @@ export default function CompletedTickets({
   const handleCloseModals = () => {
     setViewModalOpen(false);
     setTimelineModalOpen(false);
+    setMaterialModalOpen(false);
     setSelectedTicket(null);
     setSelectedPreviewFile(null);
     setSelectedEvidenceImage(null);
+    setEstimatedMaterials([]);
+    setAdjustedMaterials({});
+    setUseEstimatedUsage(true);
+    setShowAdvancedAdjust(false);
+    setMaterialsDeducted(false);
+  };
+
+  const handleOpenMaterialModal = async (ticket) => {
+    setSelectedTicket(ticket);
+    setLoadingMaterials(true);
+    setMaterialModalOpen(true);
+    // Check if materials were already deducted from the database flag
+    const isDeducted = ticket.materials_deducted === true || ticket.materials_deducted === 1;
+    setMaterialsDeducted(isDeducted);
+
+    try {
+      // Fetch estimated materials from backend
+      const response = await fetch(buildUrl(`/production/tickets/${ticket.id}/estimated-materials`));
+      const data = await response.json();
+      setEstimatedMaterials(data.materials || []);
+
+      // Initialize adjusted materials with estimated values
+      const initialAdjusted = {};
+      (data.materials || []).forEach(material => {
+        initialAdjusted[material.stock_item_id] = material.estimated_quantity;
+      });
+      setAdjustedMaterials(initialAdjusted);
+    } catch (error) {
+      console.error('Failed to load materials:', error);
+      setEstimatedMaterials([]);
+    } finally {
+      setLoadingMaterials(false);
+    }
+  };
+
+  const handleConfirmMaterialUsage = () => {
+    // Prevent multiple submissions
+    if (!selectedTicket || materialsDeducted || deductingStock) return;
+
+    setDeductingStock(true);
+
+    // Prepare materials data
+    // Use estimated or adjusted based on mode
+    const materialsToDeduct = estimatedMaterials.map(material => ({
+      stock_item_id: material.stock_item_id,
+      quantity: showAdvancedAdjust
+        ? (adjustedMaterials[material.stock_item_id] || material.estimated_quantity)
+        : material.estimated_quantity
+    }));
+
+
+    router.post(buildUrl(`/production/tickets/${selectedTicket.id}/deduct-materials`), {
+      materials: materialsToDeduct
+    }, {
+      onSuccess: () => {
+        setMaterialsDeducted(true);
+        setDeductedTicketIds((prev) => {
+          const next = new Set(prev);
+          next.add(selectedTicket.id);
+          return next;
+        });
+        // Don't close modal immediately, let user see success message
+        // They can close it manually
+      },
+      onError: (errors) => {
+        console.error('Failed to deduct materials:', errors);
+      },
+      onFinish: () => {
+        setDeductingStock(false);
+      },
+      preserveScroll: true,
+      // Keep component state so button stays disabled after success
+      preserveState: true
+    });
   };
 
   const handleDownload = (fileId, filename) => {
@@ -363,26 +447,84 @@ export default function CompletedTickets({
       render: (row) => <TeamMemberCell productionRecords={row.production_records} />
     },
     {
+      label: "Material Status",
+      key: "material_deduction_status",
+      render: (row) => {
+        const hasMaterialsDeducted = row.materials_deducted === true || row.materials_deducted === 1;
+
+        // Only show for tickets with job types that HAVE a recipe defined
+        const hasRecipe = row.job_type &&
+          row.job_type.inventory_recipe &&
+          Array.isArray(row.job_type.inventory_recipe) &&
+          row.job_type.inventory_recipe.length > 0;
+
+        if (!hasRecipe) {
+          return <span className="text-muted">N/A</span>;
+        }
+
+        return (
+          <div className="text-center">
+            {hasMaterialsDeducted ? (
+              <div>
+                <span className="badge badge-success mb-1" style={{ fontSize: '0.75rem' }}>
+                  <i className="ti-check mr-1"></i>
+                  Deducted
+                </span>
+                {row.materials_deducted_at && (
+                  <div className="text-muted" style={{ fontSize: '0.65rem' }}>
+                    {new Date(row.materials_deducted_at).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="badge badge-warning pulse-animation" style={{ fontSize: '0.75rem' }}>
+                <i className="ti-alert mr-1"></i>
+                Pending
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
       label: "Actions",
       key: "actions",
-      render: (row) =>
-        <div className="btn-group-vertical btn-group-sm">
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-purple-500"
-            onClick={() => handleViewTimeline(row)}>
+      render: (row) => {
+        const hasMaterialsDeducted = row.materials_deducted === true || row.materials_deducted === 1;
 
-            <i className="ti-time"></i> Timeline
-          </button>
-          <button
-            type="button"
-            className="btn btn-link btn-sm text-orange-500"
-            onClick={() => handleView(row)}>
+        return (
+          <div className="btn-group-vertical btn-group-sm">
+            <button
+              type="button"
+              className="btn btn-link btn-sm text-purple-500"
+              onClick={() => handleViewTimeline(row)}>
 
-            <i className="ti-eye"></i> View
-          </button>
-        </div>
+              <i className="ti-time"></i> Timeline
+            </button>
+            <button
+              type="button"
+              className="btn btn-link btn-sm text-orange-500"
+              onClick={() => handleView(row)}>
 
+              <i className="ti-eye"></i> View
+            </button>
+            {auth.user.role === 'admin' && row.job_type &&
+              row.job_type.inventory_recipe &&
+              Array.isArray(row.job_type.inventory_recipe) &&
+              row.job_type.inventory_recipe.length > 0 && (
+                <button
+                  type="button"
+                  className={`btn btn-link btn-sm ${hasMaterialsDeducted ? 'text-success' : 'text-warning'}`}
+                  onClick={() => handleOpenMaterialModal(row)}
+                  title={hasMaterialsDeducted ? "Materials Already Deducted" : "Confirm Material Usage"}
+                  disabled={hasMaterialsDeducted}>
+
+                  <i className={`${hasMaterialsDeducted ? 'ti-check' : 'ti-package'}`}></i> {hasMaterialsDeducted ? 'Confirmed' : 'Materials'}
+                </button>
+              )}
+          </div>
+        );
+      }
     }];
 
 
@@ -403,6 +545,64 @@ export default function CompletedTickets({
       {flash?.error &&
         <FlashMessage type="error" message={flash.error} />
       }
+
+      {/* Material Deduction Summary */}
+      {auth.user.role === 'admin' && (() => {
+        const completedTickets = tickets.data || [];
+        // Only count tickets with job types that have material recipes defined
+        const ticketsWithMaterials = completedTickets.filter(t =>
+          t.job_type &&
+          t.job_type.inventory_recipe &&
+          Array.isArray(t.job_type.inventory_recipe) &&
+          t.job_type.inventory_recipe.length > 0
+        );
+        const pendingDeduction = ticketsWithMaterials.filter(t => !(t.materials_deducted === true || t.materials_deducted === 1));
+        const alreadyDeducted = ticketsWithMaterials.filter(t => t.materials_deducted === true || t.materials_deducted === 1);
+
+        if (ticketsWithMaterials.length > 0) {
+          return (
+            <div className="row mb-3">
+              <div className="col-12">
+                <div className={`alert ${pendingDeduction.length > 0 ? 'alert-warning' : 'alert-success'} d-flex align-items-center justify-content-between`}>
+                  <div>
+                    <i className={`${pendingDeduction.length > 0 ? 'ti-alert' : 'ti-check'} mr-2`}></i>
+                    <strong>Material Deduction Status:</strong>
+                    {' '}
+                    <span
+                      className="cursor-pointer hover:underline"
+                      onClick={() => router.get(buildUrl("/production/completed"), { ...filters, material_status: 'deducted' })}
+                      title="Click to filter deducted tickets"
+                    >
+                      {alreadyDeducted.length} of {ticketsWithMaterials.length} tickets have materials deducted
+                    </span>
+                    {pendingDeduction.length > 0 && (
+                      <span
+                        className="ml-2 cursor-pointer hover:underline"
+                        onClick={() => router.get(buildUrl("/production/completed"), { ...filters, material_status: 'pending' })}
+                        title="Click to filter pending materials"
+                      >
+                        | <strong className="text-danger">{pendingDeduction.length} pending</strong>
+                      </span>
+                    )}
+                  </div>
+                  {pendingDeduction.length > 0 && (
+                    <div
+                      className="cursor-pointer transition-transform hover:scale-105"
+                      onClick={() => router.get(buildUrl("/production/completed"), { ...filters, material_status: 'pending' })}
+                      title="Click to filter pending materials"
+                    >
+                      <span className="badge badge-warning badge-lg px-3 py-2">
+                        <i className="ti-package mr-1"></i>
+                        {pendingDeduction.length} Ticket{pendingDeduction.length !== 1 ? 's' : ''} Need Material Confirmation
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+      })()}
 
       <div className="row">
         <div className="col-lg-8 p-r-0 title-margin-right">
@@ -697,6 +897,309 @@ export default function CompletedTickets({
         }
       </Modal>
 
+      {/* Material Usage Confirmation Modal */}
+      <Modal
+        title={
+          <div className="d-flex align-items-center">
+            <i className="ti-package mr-2"></i>
+            Material Deduction - Ticket #{selectedTicket?.ticket_number}
+            {showAdvancedAdjust && (
+              <span className="badge badge-warning ml-2">Advanced Mode</span>
+            )}
+          </div>
+        }
+        isOpen={openMaterialModal}
+        onClose={handleCloseModals}
+        size="5xl">
+
+        {selectedTicket && (
+          <div>
+            {materialsDeducted ? (
+              <div className="alert alert-success mb-4">
+                <i className="ti-check-box mr-2"></i>
+                <strong>Materials Deducted Successfully!</strong>
+                {' '}Inventory has been updated. You can close this dialog now.
+              </div>
+            ) : (
+              <div className={`alert ${showAdvancedAdjust ? 'alert-warning' : 'alert-info'} mb-4`}>
+                <i className={`${showAdvancedAdjust ? 'ti-settings' : 'ti-info-alt'} mr-2`}></i>
+                <strong>
+                  {showAdvancedAdjust ? 'Advanced Adjustment Mode:' : 'Production Completed:'}
+                </strong>
+                {showAdvancedAdjust
+                  ? ' You can manually adjust quantities to account for waste or misprints.'
+                  : ' Review estimated material usage and confirm automatic deduction.'
+                }
+              </div>
+            )}
+
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <p><strong>Job Type:</strong> {selectedTicket.job_type?.name}</p>
+                <p><strong>Quantity Produced:</strong> {selectedTicket.total_quantity || (selectedTicket.quantity + (selectedTicket.free_quantity || 0))} pcs</p>
+              </div>
+              <div className="col-md-6">
+                {selectedTicket.size_value && (
+                  <p><strong>Size:</strong> {selectedTicket.size_value} {selectedTicket.size_unit}</p>
+                )}
+              </div>
+            </div>
+
+            <hr className="my-3" />
+
+            {loadingMaterials ? (
+              <div className="text-center py-4">
+                <i className="fa fa-spinner fa-spin fa-2x"></i>
+                <p className="mt-2">Loading materials...</p>
+              </div>
+            ) : estimatedMaterials.length > 0 ? (
+              <div>
+                <h6 className="mb-3">
+                  <i className="ti-package mr-2"></i>
+                  Estimated Material Usage:
+                </h6>
+
+                {/* Simple Material List */}
+                <div className="card bg-light mb-3">
+                  <div className="card-body">
+                    <div className="table-responsive">
+                      <table className="table table-sm table-borderless mb-0">
+                        <thead>
+                          <tr>
+                            <th>Material</th>
+                            <th>Current Stock</th>
+                            <th>Will Deduct</th>
+                            <th>Remaining</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {estimatedMaterials.map((material, index) => {
+                            const qtyToDeduct = showAdvancedAdjust
+                              ? (adjustedMaterials[material.stock_item_id] || material.estimated_quantity)
+                              : material.estimated_quantity;
+                            const remaining = material.current_stock - qtyToDeduct;
+                            const isSufficient = remaining >= 0;
+
+                            return (
+                              <tr key={index} className={!isSufficient ? 'bg-warning' : ''}>
+                                <td>
+                                  <strong>{material.stock_item_name}</strong>
+                                  <br />
+                                  <small className="text-muted">{material.stock_item_sku}</small>
+                                  {material.is_optional && (
+                                    <span className="badge badge-secondary badge-sm ml-2">Optional</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <strong>{parseFloat(material.current_stock).toFixed(2)}</strong> {material.base_unit}
+                                </td>
+                                <td>
+                                  <strong className="text-danger">-{parseFloat(qtyToDeduct).toFixed(4)}</strong> {material.base_unit}
+                                  <br />
+                                  <small className="text-muted">
+                                    ({material.avg_per_unit} × {selectedTicket.total_quantity || (selectedTicket.quantity + (selectedTicket.free_quantity || 0))})
+                                  </small>
+                                </td>
+                                <td>
+                                  <strong className={remaining < 0 ? 'text-danger' : 'text-success'}>
+                                    {parseFloat(remaining).toFixed(2)}
+                                  </strong> {material.base_unit}
+                                </td>
+                                <td>
+                                  {isSufficient ? (
+                                    <span className="badge badge-success">✓ OK</span>
+                                  ) : (
+                                    <span className="badge badge-danger">⚠ Low</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Selection */}
+                {!materialsDeducted && (
+                  <div className="card border-primary mb-3">
+                    <div className="card-body">
+                      <div className="form-check mb-3">
+                        <input
+                          type="radio"
+                          className="form-check-input"
+                          id="useEstimatedUsage"
+                          name="deductionMode"
+                          checked={useEstimatedUsage && !showAdvancedAdjust}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setUseEstimatedUsage(true);
+                              setShowAdvancedAdjust(false);
+                            }
+                          }}
+                          disabled={materialsDeducted}
+                        />
+                        <label className="form-check-label font-weight-bold text-success cursor-pointer" htmlFor="useEstimatedUsage">
+                          <i className="ti-check mr-2"></i>
+                          Deduct estimated usage (Recommended - Fast & Easy)
+                        </label>
+                        <p className="text-muted small ml-4 mb-0">
+                          System will automatically deduct the calculated material quantities.
+                        </p>
+                      </div>
+
+                      <div className="form-check">
+                        <input
+                          type="radio"
+                          className="form-check-input"
+                          id="showAdvancedAdjust"
+                          name="deductionMode"
+                          checked={showAdvancedAdjust}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setShowAdvancedAdjust(true);
+                              setUseEstimatedUsage(false);
+                            }
+                          }}
+                          disabled={materialsDeducted}
+                        />
+                        <label className="form-check-label font-weight-bold text-warning cursor-pointer" htmlFor="showAdvancedAdjust">
+                          <i className="ti-settings mr-2"></i>
+                          Adjust usage (Advanced - For waste/misprint adjustments)
+                        </label>
+                        <p className="text-muted small ml-4 mb-0">
+                          Manually adjust quantities if there was material waste or misprints.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Advanced Adjustment Table (Only shown when enabled) */}
+                {showAdvancedAdjust && !materialsDeducted && (
+                  <div className="card border-warning mb-3">
+                    <div className="card-header bg-warning text-white">
+                      <h6 className="mb-0">
+                        <i className="ti-pencil mr-2"></i>
+                        Manual Adjustment Mode
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="table-responsive">
+                        <table className="table table-bordered table-sm">
+                          <thead className="thead-light">
+                            <tr>
+                              <th>Material</th>
+                              <th>Estimated</th>
+                              <th>Adjusted Quantity</th>
+                              <th>Remaining</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {estimatedMaterials.map((material, index) => {
+                              const adjustedQty = adjustedMaterials[material.stock_item_id] || material.estimated_quantity;
+                              const remaining = material.current_stock - adjustedQty;
+                              const isSufficient = remaining >= 0;
+
+                              return (
+                                <tr key={index} className={!isSufficient ? 'bg-warning-light' : ''}>
+                                  <td>
+                                    <strong>{material.stock_item_name}</strong>
+                                    <br />
+                                    <small className="text-muted">{material.stock_item_sku}</small>
+                                  </td>
+                                  <td>
+                                    {parseFloat(material.estimated_quantity).toFixed(4)} {material.base_unit}
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      className="form-control form-control-sm"
+                                      value={adjustedQty}
+                                      onChange={(e) => setAdjustedMaterials(prev => ({
+                                        ...prev,
+                                        [material.stock_item_id]: parseFloat(e.target.value) || 0
+                                      }))}
+                                      step="0.0001"
+                                      min="0"
+                                      style={{ width: '150px' }}
+                                      disabled={materialsDeducted}
+                                    />
+                                  </td>
+                                  <td className={remaining < 0 ? 'text-danger font-weight-bold' : 'text-success'}>
+                                    {parseFloat(remaining).toFixed(2)} {material.base_unit}
+                                  </td>
+                                  <td>
+                                    {isSufficient ? (
+                                      <span className="badge badge-success">✓ OK</span>
+                                    ) : (
+                                      <span className="badge badge-danger">⚠ Insufficient</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="alert alert-warning">
+                <i className="ti-alert mr-2"></i>
+                No material recipe defined for this job type. Inventory will not be deducted.
+              </div>
+            )}
+
+            <div className="d-flex justify-content-between mt-4">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleCloseModals}
+                disabled={deductingStock}>
+                <i className="ti-close mr-2"></i>
+                {materialsDeducted ? 'Close' : 'Cancel'}
+              </button>
+              {estimatedMaterials.length > 0 && !materialsDeducted && (
+                <button
+                  type="button"
+                  className={`btn ${showAdvancedAdjust ? 'btn-warning' : 'btn-primary'} btn-lg`}
+                  onClick={handleConfirmMaterialUsage}
+                  disabled={deductingStock || materialsDeducted || (!useEstimatedUsage && !showAdvancedAdjust)}>
+                  {deductingStock ? (
+                    <>
+                      <i className="fa fa-spinner fa-spin mr-2"></i>
+                      Deducting Stock...
+                    </>
+                  ) : showAdvancedAdjust ? (
+                    <>
+                      <i className="ti-pencil-alt mr-2"></i>
+                      Update with Adjusted Usage
+                    </>
+                  ) : (
+                    <>
+                      <i className="ti-check mr-2"></i>
+                      Deduct Estimated Usage
+                    </>
+                  )}
+                </button>
+              )}
+              {materialsDeducted && estimatedMaterials.length > 0 && (
+                <span className="badge badge-success badge-pill px-3 py-2" style={{ fontSize: '14px' }}>
+                  <i className="ti-check-box mr-2"></i>
+                  Materials Already Deducted (locked for this ticket)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
 
       <section id="main-content">
         <div className="content-wrap">
@@ -741,7 +1244,7 @@ export default function CompletedTickets({
                       </div>
 
                       {/* Active Filters Indicator */}
-                      {(filters.search || filters.status || filters.payment_status || filters.date_range) &&
+                      {(filters.search || filters.status || filters.payment_status || filters.date_range || filters.material_status) &&
                         <div className="row mb-3 mt-3">
                           <div className="col-12">
                             <div className="alert alert-light border p-2 mb-0">
@@ -778,6 +1281,12 @@ export default function CompletedTickets({
                                   Branch: {branches?.find((b) => b.id == filters.branch_id)?.name}
                                 </span>
                               }
+                              {filters.material_status &&
+                                <span className="badge badge-warning mr-2">
+                                  <i className="ti-package mr-1"></i>
+                                  Materials: {filters.material_status === 'pending' ? 'Pending Confirmation' : 'Deducted'}
+                                </span>
+                              }
                               <button
                                 type="button"
                                 className="btn btn-link btn-sm text-danger p-0 ml-2"
@@ -808,4 +1317,26 @@ export default function CompletedTickets({
 
     </AdminLayout>);
 
+}
+
+// Add CSS for pulse animation
+if (typeof document !== 'undefined' && !document.getElementById('material-status-styles')) {
+  const style = document.createElement('style');
+  style.id = 'material-status-styles';
+  style.innerHTML = `
+    @keyframes pulse-animation {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+      }
+    }
+    .pulse-animation {
+      animation: pulse-animation 2s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(style);
 }

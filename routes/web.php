@@ -155,6 +155,11 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->name('admin.')->grou
         ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('production.workflow.view');
     Route::get('/production/completed', [ProductionQueueController::class, 'completedTickets'])->name('production.completed');
+    
+    // Material deduction routes (Admin only)
+    Route::get('/production/tickets/{ticket}/estimated-materials', [ProductionQueueController::class, 'getEstimatedMaterials'])->name('production.tickets.estimated-materials');
+    Route::post('/production/tickets/{ticket}/deduct-materials', [ProductionQueueController::class, 'deductMaterials'])->name('production.tickets.deduct-materials');
+    
     Route::get('/workflow/{workflowStep}', [ProductionQueueController::class, 'workflowView'])
         ->where('workflowStep', '(printing|lamination_heatpress|cutting|sewing|dtf_press|embroidery|knitting|lasser_cutting|qa)')
         ->name('workflow.view');

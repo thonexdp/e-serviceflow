@@ -18,6 +18,7 @@ class StockItem extends Model
         'description',
         'category',
         'base_unit_of_measure',
+        'measurement_type',
         'length',
         'width',
         'is_area_based',
@@ -36,6 +37,7 @@ class StockItem extends Model
         'width' => 'decimal:2',
         'is_area_based' => 'boolean',
         'is_garment' => 'boolean',
+        'measurement_type' => 'string',
         'current_stock' => 'decimal:2',
         'minimum_stock_level' => 'decimal:2',
         'maximum_stock_level' => 'decimal:2',
@@ -84,13 +86,36 @@ class StockItem extends Model
         return 'in_stock';
     }
 
-    
+    /**
+     * Get the job types that use this stock item in their recipe/BOM (NEW - Job-type driven)
+     */
+    public function jobTypesUsingThis()
+    {
+        return $this->belongsToMany(JobType::class, 'job_type_inventory')
+            ->withPivot('consume_type', 'avg_quantity_per_unit', 'is_optional', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get inventory recipe entries for this stock item
+     */
+    public function inventoryRecipes()
+    {
+        return $this->hasMany(JobTypeInventory::class);
+    }
+
+    /**
+     * OLD RELATIONSHIPS - Kept for backward compatibility during migration
+     * @deprecated - Inventory should not "know" about job types in new design
+     */
     public function jobType()
     {
         return $this->belongsTo(JobType::class);
     }
 
-    
+    /**
+     * @deprecated Use jobTypesUsingThis() instead
+     */
     public function jobTypes()
     {
         return $this->belongsToMany(JobType::class, 'job_type_stock_requirements')

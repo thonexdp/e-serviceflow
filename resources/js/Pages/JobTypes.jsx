@@ -568,7 +568,7 @@ export default function JobTypes({
         title={editingJobType ? "Edit Job Type" : "Add Job Type"}
         isOpen={openJobTypeModal}
         onClose={handleCloseModals}
-        size="4xl"
+        size="7xl"
         submitButtonText={null}>
 
         <JobTypeForm
