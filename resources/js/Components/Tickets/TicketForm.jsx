@@ -200,9 +200,9 @@ export default function TicketForm({
       // 3. If custom_job_type_description exists (for newer records)
       // 4. If custom_workflow_steps exists (indicates custom ticket)
       const isJobTypeString = typeof ticket.job_type === 'string';
-      const hasCustomWorkflowSteps = ticket.custom_workflow_steps && 
-        (Array.isArray(ticket.custom_workflow_steps) ? ticket.custom_workflow_steps.length > 0 : 
-         (typeof ticket.custom_workflow_steps === 'object' ? Object.keys(ticket.custom_workflow_steps).length > 0 : false));
+      const hasCustomWorkflowSteps = ticket.custom_workflow_steps &&
+        (Array.isArray(ticket.custom_workflow_steps) ? ticket.custom_workflow_steps.length > 0 :
+          (typeof ticket.custom_workflow_steps === 'object' ? Object.keys(ticket.custom_workflow_steps).length > 0 : false));
       const isCustomTicket = isJobTypeString ||
         (!ticket.job_type_id && ticket.job_type) ||
         ticket.custom_job_type_description ||
@@ -305,11 +305,21 @@ export default function TicketForm({
         size_rate_id: "",
         size_width: parsedSize.width,
         size_height: parsedSize.height,
-        due_date: ticket.due_date ?
-          ticket.due_date.includes("T") ?
-            ticket.due_date.split("T")[0] :
-            ticket.due_date :
-          "",
+        due_date: (() => {
+          if (!ticket.due_date) return "";
+          // Handle string dates (e.g., "2026-01-14" or "2026-01-14T00:00:00.000000Z")
+          if (typeof ticket.due_date === 'string') {
+            return ticket.due_date.split('T')[0].split(' ')[0];
+          }
+          // Handle Date objects
+          if (ticket.due_date instanceof Date) {
+            const year = ticket.due_date.getFullYear();
+            const month = String(ticket.due_date.getMonth() + 1).padStart(2, '0');
+            const day = String(ticket.due_date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+          return "";
+        })(),
         subtotal: ticketSubtotal,
         discount: ticketDiscount,
         discount_amount: ticket.discount_amount || "",
@@ -1491,18 +1501,18 @@ export default function TicketForm({
                   <div className="row">
                     {WORKFLOW_STEP_OPTIONS.map((step) => (
                       <div key={step.key} className="col-md-3 mb-2">
-                          <div className="form-check custom-checkbox">
-                            <input
-                              type="checkbox"
-                              className="form-check-input"
-                              id={`custom_workflow_${step.key}`}
-                              checked={(formData.custom_workflow_steps || []).includes(step.key)}
-                              onChange={() => toggleCustomWorkflowStep(step.key)} />
+                        <div className="form-check custom-checkbox">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            id={`custom_workflow_${step.key}`}
+                            checked={(formData.custom_workflow_steps || []).includes(step.key)}
+                            onChange={() => toggleCustomWorkflowStep(step.key)} />
 
-                            <label className="form-check-label font-weight-bold" htmlFor={`custom_workflow_${step.key}`}>
-                              <i className={`${step.icon} mr-1`} style={{ fontFamily: 'themify' }}></i> {step.label}
-                            </label>
-                          </div>
+                          <label className="form-check-label font-weight-bold" htmlFor={`custom_workflow_${step.key}`}>
+                            <i className={`${step.icon} mr-1`} style={{ fontFamily: 'themify' }}></i> {step.label}
+                          </label>
+                        </div>
                       </div>
                     ))}
                   </div>

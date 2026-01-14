@@ -113,7 +113,7 @@ export default function AllTickets({
 
   const handlePrint = () => {
     if (!selectedPreviewFile || !selectedTicket) return;
-    
+
     setPreviewToPrint({
       file: selectedPreviewFile,
       ticket: selectedTicket
@@ -597,7 +597,7 @@ export default function AllTickets({
                         </div>
                         <div className="col-md-2 text-right">
                           <button
-                            onClick={() => router.reload()}
+                            onClick={() => router.visit("/admin/production/tickets/all")}
                             className="btn btn-outline-primary mr-2"
                             title="Refresh Data">
 
@@ -641,12 +641,12 @@ export default function AllTickets({
             }}>
               <div style={{ display: 'flex', width: '100%', minHeight: '100%' }}>
                 {/* Left Side - Image (only on first page) */}
-                <div 
+                <div
                   className="print-image-container"
-                  style={{ 
-                    width: '70%', 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
+                  style={{
+                    width: '70%',
+                    display: 'flex',
+                    alignItems: 'flex-start',
                     justifyContent: 'center',
                     border: '1px solid #ddd',
                     flexShrink: 0
@@ -654,17 +654,17 @@ export default function AllTickets({
                   <img
                     src={previewToPrint.file.file_path}
                     alt={previewToPrint.file.file_name}
-                    style={{ 
-                      maxWidth: '100%', 
-                      maxHeight: '180mm', 
-                      objectFit: 'contain' 
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '180mm',
+                      objectFit: 'contain'
                     }}
                   />
                 </div>
 
                 {/* Right Side - Design Description Only */}
-                <div style={{ 
-                  width: '30%', 
+                <div style={{
+                  width: '30%',
                   paddingLeft: '5px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -673,8 +673,8 @@ export default function AllTickets({
                   {previewToPrint.ticket.design_description ? (
                     <div
                       className="tiptap-content print-description"
-                      style={{ 
-                        fontSize: '11pt', 
+                      style={{
+                        fontSize: '11pt',
                         padding: '5px',
                         border: '1px solid #eee',
                         borderRadius: '4px',
@@ -683,8 +683,8 @@ export default function AllTickets({
                       dangerouslySetInnerHTML={{ __html: previewToPrint.ticket.design_description }}
                     />
                   ) : (
-                    <div style={{ 
-                      fontSize: '11pt', 
+                    <div style={{
+                      fontSize: '11pt',
                       color: '#999',
                       fontStyle: 'italic',
                       padding: '20px'

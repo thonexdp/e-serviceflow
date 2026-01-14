@@ -326,7 +326,7 @@ class TicketController extends BaseCrudController
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $ticket = Ticket::findOrFail($id);
+        $ticket = Ticket::with('jobType')->findOrFail($id);
 
 
         if ($user && !$user->isAdmin()) {
@@ -425,6 +425,74 @@ class TicketController extends BaseCrudController
 
         $this->applyPricing($ticketData, $request);
         unset($ticketData['size_width'], $ticketData['size_height'], $ticketData['size_rate_id']);
+
+        // Determine workflow status for custom/Others category tickets
+        // Check if this is a custom ticket (Others category or has custom_workflow_steps)
+        $isCustomTicket = !empty($ticketData['custom_workflow_steps']) ||
+            !empty($ticketData['custom_job_type_description']) ||
+            (!isset($ticketData['job_type_id']) && isset($ticketData['job_type']));
+
+        $isPendingOrInDesigner = $ticket->status === 'pending' || $ticket->status === 'in_designer';
+
+        if ($isCustomTicket && !empty($ticketData['custom_workflow_steps'])) {
+            // Check if printing workflow exists
+            $workflowSteps = $ticketData['custom_workflow_steps'];
+            $hasPrintingWorkflow = false;
+
+            if (is_array($workflowSteps)) {
+                $hasPrintingWorkflow = in_array('printing', $workflowSteps, true);
+            }
+
+
+            // Only update status/workflow if ticket is in a state that allows it
+            // Don't override if ticket is already in_production, completed, or cancelled
+            // if (!in_array($ticket->status, ['in_production', 'completed', 'cancelled'])) {
+            if (!in_array($ticket->status, ['completed', 'cancelled'])) {
+                // if ($hasPrintingWorkflow) {
+                //     // Has printing: use ready_to_print status
+                //     if ($ticket->status === 'pending' || $ticket->status === 'in_designer') {
+                //         // Don't change status, let it flow naturally
+                //     }
+                // } else {
+                // No printing: if status would be ready_to_print, change to in_production
+                // and set the first workflow step
+                // dd($hasPrintingWorkflow, $ticketData['status']);
+
+                // if (isset($ticketData['status']) && $ticketData['status'] === 'ready_to_print') {
+                if (isset($ticketData['status'])) {
+                    if (!$isPendingOrInDesigner) {
+                        if ($hasPrintingWorkflow) {
+                            $ticketData['status'] = 'ready_to_print';
+                        } else {
+                            $ticketData['status'] = 'in_production';
+                        }
+                    }
+                    // Get first workflow step
+                    if (!empty($workflowSteps)) {
+                        $stepOrder = [
+                            'printing',
+                            'lamination_heatpress',
+                            'cutting',
+                            'sewing',
+                            'dtf_press',
+                            'embroidery',
+                            'knitting',
+                            'lasser_cutting',
+                            'qa'
+                        ];
+                        if (!$isPendingOrInDesigner) {
+                            foreach ($stepOrder as $step) {
+                                if (in_array($step, $workflowSteps, true)) {
+                                    $ticketData['current_workflow_step'] = $step;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    // }
+                }
+            }
+        }
 
         $ticket->update($ticketData);
 
@@ -607,15 +675,15 @@ class TicketController extends BaseCrudController
         // Only check for custom tickets (job_type_id is null) or "Others" category tickets
         if ($validated['status'] === 'in_designer') {
             // Determine if this is a custom/others ticket
-            $isCustomTicket = !$ticket->job_type_id || 
+            $isCustomTicket = !$ticket->job_type_id ||
                 $ticket->custom_job_type_description ||
                 (is_string($ticket->job_type) && !empty($ticket->job_type));
-            
+
             // Only validate workflow steps for custom tickets
             if ($isCustomTicket) {
                 $workflowSteps = $ticket->custom_workflow_steps;
                 $hasWorkflowSteps = false;
-                
+
                 if ($workflowSteps) {
                     if (is_array($workflowSteps)) {
                         $hasWorkflowSteps = count($workflowSteps) > 0;
@@ -623,7 +691,7 @@ class TicketController extends BaseCrudController
                         $hasWorkflowSteps = count((array)$workflowSteps) > 0;
                     }
                 }
-                
+
                 if (!$hasWorkflowSteps) {
                     return response()->json([
                         'success' => false,
