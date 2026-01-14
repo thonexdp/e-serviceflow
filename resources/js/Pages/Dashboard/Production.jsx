@@ -961,7 +961,54 @@ export default function Productions({
           {getStatusBadge(row.status)}
         </div>
 
-    }];
+    },
+    // {
+    //   label: "Material Status",
+    //   key: "material_status",
+    //   render: (row) => {
+    //     const hasMaterialsDeducted = row.materials_deducted === true || row.materials_deducted === 1;
+    //     return (
+    //       <div className="text-center">
+    //         {hasMaterialsDeducted ? (
+    //           <div className="badge badge-success" style={{ fontSize: isFullscreen ? '0.9rem' : '0.75rem' }}>
+    //             <i className="ti-check mr-1"></i>
+    //             Materials Deducted
+    //           </div>
+    //         ) : (
+    //           <div className="badge badge-secondary" style={{ fontSize: isFullscreen ? '0.9rem' : '0.75rem' }}>
+    //             <i className="ti-time mr-1"></i>
+    //             Pending Deduction
+    //           </div>
+    //         )}
+    //       </div>
+    //     );
+    //   }
+    // },
+    // {
+    //   label: "Actions",
+    //   key: "actions",
+    //   render: (row) => {
+    //     const hasMaterialsDeducted = row.materials_deducted === true || row.materials_deducted === 1;
+    //     const canUpdate = canUpdateTicket(row);
+
+    //     return (
+    //       <div className="btn-group" style={{ minWidth: '150px' }}>
+    //         {getActionButton(row)}
+    //         {!isFullscreen && row.status !== 'completed' && !hasMaterialsDeducted && (
+    //           <button
+    //             type="button"
+    //             className="btn btn-link btn-sm text-primary"
+    //             onClick={() => handleOpenStockModal(row)}
+    //             disabled={!canUpdate}
+    //             title={!canUpdate ? "You are not assigned to this workflow step" : "Record material usage"}>
+    //             <i className="ti-package"></i> Deduct Materials
+    //           </button>
+    //         )}
+    //       </div>
+    //     );
+    //   }
+    // }
+  ];
 
 
   return (

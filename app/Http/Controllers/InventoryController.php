@@ -24,6 +24,51 @@ class InventoryController extends Controller
         $this->stockService = $stockService;
     }
 
+    private function normalizeMeasurementType(?string $type, ?bool $isAreaBased): string
+    {
+        if ($isAreaBased) {
+            return 'area';
+        }
+
+        return match (strtolower($type ?? '')) {
+            'area' => 'area',
+            'weight', 'kg', 'kilogram', 'kilograms' => 'weight',
+            'volume', 'liter', 'litre', 'liters', 'litres', 'l' => 'volume',
+            'length', 'm', 'meter', 'meters', 'metre', 'metres' => 'length',
+            default => 'pieces',
+        };
+    }
+
+    private function deriveBaseUnit(string $measurementType, ?string $inputUnit): string
+    {
+        $unit = strtolower($inputUnit ?? '');
+        if ($measurementType === 'area') {
+            return $unit ?: 'sqft';
+        }
+
+        if ($measurementType === 'weight') {
+            return 'kg';
+        }
+
+        if ($measurementType === 'volume') {
+            return 'ml'; // Store as ml, not liters
+        }
+
+        if ($measurementType === 'length') {
+            return 'm';
+        }
+
+        return $unit ?: 'pcs';
+    }
+
+    private function convertToBaseQuantity(string $measurementType, float $value): float
+    {
+        return match ($measurementType) {
+            'weight' => $value / 1000, // grams -> kg (frontend sends grams, we store as kg)
+            // 'volume' => $value, // ml stays as ml (no conversion)
+            default => $value, // For volume (ml), pieces, area (sqft), length (m) - no conversion
+        };
+    }
 
     public function index(Request $request)
     {
@@ -111,7 +156,7 @@ class InventoryController extends Controller
 
             $validated = $request->validate([
                 'job_type_id' => 'nullable|exists:job_types,id', // Keep for backward compatibility
-                'job_type_ids' => $isGarment ? 'nullable|array' : 'required|array|min:1',
+                'job_type_ids' => 'nullable|array', // Optional - job types now define their own materials
                 'job_type_ids.*' => 'exists:job_types,id',
                 'sku' => [
                     'required',
@@ -121,11 +166,12 @@ class InventoryController extends Controller
                 ],
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
-                'base_unit_of_measure' => 'required|string|max:50',
+                'base_unit_of_measure' => 'nullable|string|max:50',
+                'measurement_type' => 'nullable|string|in:pieces,area,weight,volume,length',
                 'is_area_based' => 'boolean',
                 'is_garment' => 'boolean',
-                'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
-                'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
+                'length' => 'nullable|numeric|min:0',
+                'width' => 'nullable|numeric|min:0',
                 'current_stock' => 'nullable|numeric|min:0',
                 'minimum_stock_level' => 'nullable|numeric|min:0',
                 'maximum_stock_level' => 'nullable|numeric|min:0',
@@ -137,12 +183,39 @@ class InventoryController extends Controller
 
             // Store job type IDs for later syncing
             $jobTypeIds = $validated['job_type_ids'] ?? [];
-            
+
             // Remove job_type_ids from validated data as it's not a column
             unset($validated['job_type_ids']);
             $validated['is_active'] = true;
+            $measurementType = $this->normalizeMeasurementType(
+                $validated['measurement_type'] ?? null,
+                $validated['is_area_based'] ?? false
+            );
+            $validated['measurement_type'] = $measurementType;
+            $validated['is_area_based'] = $measurementType === 'area';
+            $validated['base_unit_of_measure'] = $this->deriveBaseUnit($measurementType, $validated['base_unit_of_measure'] ?? null);
+
+            if ($measurementType !== 'area') {
+                $validated['length'] = null;
+                $validated['width'] = null;
+            }
+
+            // Convert stock levels based on measurement type
+            // For weight: input is in grams, convert to kg
+            // For volume: input is in ml, store as ml (no conversion)
+            // For others: store as-is
             $initialStock = $validated['current_stock'] ?? 0;
             $validated['current_stock'] = 0;
+            $initialStock = $this->convertToBaseQuantity($measurementType, (float) $initialStock);
+            
+            // Also convert minimum and maximum stock levels
+            if (isset($validated['minimum_stock_level'])) {
+                $validated['minimum_stock_level'] = $this->convertToBaseQuantity($measurementType, (float) $validated['minimum_stock_level']);
+            }
+            if (isset($validated['maximum_stock_level'])) {
+                $validated['maximum_stock_level'] = $this->convertToBaseQuantity($measurementType, (float) $validated['maximum_stock_level']);
+            }
+            
             $stockItem = StockItem::create($validated);
 
             // Sync job types in pivot table
@@ -182,15 +255,16 @@ class InventoryController extends Controller
 
         $validated = $request->validate([
             'job_type_id' => 'nullable|exists:job_types,id', // Keep for backward compatibility
-            'job_type_ids' => $isGarment ? 'nullable|array' : 'required|array|min:1',
+            'job_type_ids' => 'nullable|array', // Optional - job types now define their own materials
             'job_type_ids.*' => 'exists:job_types,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'base_unit_of_measure' => 'required|string|max:50',
+            'base_unit_of_measure' => 'nullable|string|max:50',
+            'measurement_type' => 'nullable|string|in:pieces,area,weight,volume,length',
             'is_area_based' => 'boolean',
             'is_garment' => 'boolean',
-            'length' => 'nullable|required_if:is_area_based,1|numeric|min:0',
-            'width' => 'nullable|required_if:is_area_based,1|numeric|min:0',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
             'minimum_stock_level' => 'nullable|numeric|min:0',
             'maximum_stock_level' => 'nullable|numeric|min:0',
             'unit_cost' => 'nullable|numeric|min:0',
@@ -201,9 +275,33 @@ class InventoryController extends Controller
 
         // Store job type IDs for later syncing
         $jobTypeIds = $validated['job_type_ids'] ?? [];
-        
+
         // Remove job_type_ids from validated data as it's not a column
         unset($validated['job_type_ids']);
+        $validated['is_active'] = true;
+        $measurementType = $this->normalizeMeasurementType(
+            $validated['measurement_type'] ?? $stockItem->measurement_type,
+            $validated['is_area_based'] ?? $stockItem->is_area_based
+        );
+        $validated['measurement_type'] = $measurementType;
+        $validated['is_area_based'] = $measurementType === 'area';
+        $validated['base_unit_of_measure'] = $this->deriveBaseUnit($measurementType, $validated['base_unit_of_measure'] ?? $stockItem->base_unit_of_measure);
+
+        if ($measurementType !== 'area') {
+            $validated['length'] = null;
+            $validated['width'] = null;
+        }
+
+        // Convert stock levels based on measurement type (for updates)
+        // For weight: input is in grams, convert to kg
+        // For volume: input is in ml, store as ml (no conversion)
+        // For others: store as-is
+        if (isset($validated['minimum_stock_level'])) {
+            $validated['minimum_stock_level'] = $this->convertToBaseQuantity($measurementType, (float) $validated['minimum_stock_level']);
+        }
+        if (isset($validated['maximum_stock_level'])) {
+            $validated['maximum_stock_level'] = $this->convertToBaseQuantity($measurementType, (float) $validated['maximum_stock_level']);
+        }
 
         $stockItem->update($validated);
 

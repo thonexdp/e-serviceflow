@@ -63,6 +63,14 @@ class JobTypeRequest extends FormRequest
             'promo_rules.*.is_active' => 'boolean',
 
             'workflow_steps' => 'nullable|array',
+
+            // Inventory Recipe (BOM) - New job-type driven system
+            'inventory_recipe' => 'nullable|array',
+            'inventory_recipe.*.stock_item_id' => 'required_with:inventory_recipe.*.avg_quantity_per_unit|exists:stock_items,id',
+            'inventory_recipe.*.consume_type' => 'required_with:inventory_recipe.*.stock_item_id|in:pcs,area,sqft,kg,liter,ml,meter,m',
+            'inventory_recipe.*.avg_quantity_per_unit' => 'required_with:inventory_recipe.*.stock_item_id|numeric|min:0',
+            'inventory_recipe.*.is_optional' => 'boolean',
+            'inventory_recipe.*.notes' => 'nullable|string|max:500',
         ];
     }
 

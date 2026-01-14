@@ -237,9 +237,13 @@ export default function Tickets({
 
   const handlePreviewFile = (ticket, path) => {
     // console.log(ticket, path);
-    // setSelectedTicket(ticket);
+    if(!ticket){
+       setShowPreview(true);
+    }else{
+       setSelectedTicket(ticket);
+       setShow(true)
+    }
     setFilepath(path);
-    setShowPreview(true);
     setRevisionNotes("");
     setShowRevisionInput(false);
   };

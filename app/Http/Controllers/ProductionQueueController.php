@@ -545,6 +545,11 @@ class ProductionQueueController extends Controller
             return redirect()->back()->with('error', 'Stock consumption can only be recorded for completed tickets.');
         }
 
+        // Check if materials have already been deducted
+        if ($ticket->materials_deducted) {
+            return redirect()->back()->with('error', 'Materials have already been deducted for this ticket.');
+        }
+
         $validated = $request->validate([
             'stock_consumptions' => 'required|array|min:1',
             'stock_consumptions.*.stock_item_id' => 'required|exists:stock_items,id',
@@ -553,14 +558,23 @@ class ProductionQueueController extends Controller
         ]);
 
         try {
-            foreach ($validated['stock_consumptions'] as $consumption) {
-                $this->stockService->consumeStockForProduction(
-                    $ticket->id,
-                    $consumption['stock_item_id'],
-                    $consumption['quantity'],
-                    $consumption['notes'] ?? null
-                );
-            }
+            DB::transaction(function () use ($ticket, $validated) {
+                foreach ($validated['stock_consumptions'] as $consumption) {
+                    $this->stockService->consumeStockForProduction(
+                        $ticket->id,
+                        $consumption['stock_item_id'],
+                        $consumption['quantity'],
+                        $consumption['notes'] ?? null
+                    );
+                }
+
+                // Mark materials as deducted
+                $ticket->update([
+                    'materials_deducted' => true,
+                    'materials_deducted_at' => now(),
+                    'materials_deducted_by' => Auth::id(),
+                ]);
+            });
 
             return redirect()->back()->with('success', 'Stock consumption recorded successfully.');
         } catch (\Exception $e) {
@@ -1559,7 +1573,7 @@ class ProductionQueueController extends Controller
     {
         $query = Ticket::with([
             'customer',
-            'jobType',
+            'jobType.inventoryRecipe',
             'mockupFiles',
             'workflowProgress',
             'productionRecords.user',
@@ -1577,6 +1591,17 @@ class ProductionQueueController extends Controller
                 $q->where('ticket_number', 'like', "%{$request->search}%")
                     ->orWhere('description', 'like', "%{$request->search}%");
             });
+        }
+
+        if ($request->filled('material_status')) {
+            if ($request->material_status === 'pending') {
+                $query->where(function ($q) {
+                    $q->where('materials_deducted', false)
+                        ->orWhereNull('materials_deducted');
+                })->whereHas('jobType.inventoryRecipe');
+            } elseif ($request->material_status === 'deducted') {
+                $query->where('materials_deducted', true);
+            }
         }
 
         $dateRange = $request->input('date_range', 'last_30_days');
@@ -1661,6 +1686,153 @@ class ProductionQueueController extends Controller
             DB::rollBack();
             Log::error('Workflow assignment failed: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Failed to assign users. Please try again.');
+        }
+    }
+
+    /**
+     * Get estimated materials for a completed ticket
+     */
+    public function getEstimatedMaterials(Ticket $ticket)
+    {
+        // Ensure ticket is completed
+        if ($ticket->status !== 'completed') {
+            return response()->json([
+                'error' => 'Ticket is not completed yet'
+            ], 400);
+        }
+
+        // Get job type with inventory recipe
+        $jobType = $ticket->jobType()->with('inventoryRecipe.stockItem')->first();
+
+        if (!$jobType || !$jobType->inventoryRecipe || $jobType->inventoryRecipe->count() === 0) {
+            return response()->json([
+                'materials' => [],
+                'message' => 'No material recipe defined for this job type'
+            ]);
+        }
+
+        // Calculate quantity
+        $quantity = $ticket->total_quantity ?: ($ticket->quantity + ($ticket->free_quantity ?? 0));
+
+        // Parse dimensions if available using model helper
+        $dimensions = $ticket->parseSizeDimensions();
+        $width = $dimensions['width'];
+        $length = $dimensions['height']; // In our context, height is length/height
+
+
+        // Get estimated materials
+        $materials = $jobType->calculateEstimatedMaterials($quantity, $length, $width);
+
+        return response()->json([
+            'materials' => $materials,
+            'ticket' => [
+                'id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'quantity' => $quantity,
+                'length' => $length,
+                'width' => $width,
+            ]
+        ]);
+    }
+
+    /**
+     * Deduct materials from inventory after production completion
+     */
+    public function deductMaterials(Request $request, Ticket $ticket)
+    {
+        // Validate admin role
+        if (!auth()->user() || auth()->user()->role !== 'admin') {
+            return back()->with('error', 'Only admins can deduct inventory.');
+        }
+
+        // Ensure ticket is completed
+        if ($ticket->status !== 'completed') {
+            return back()->with('error', 'Ticket is not completed yet.');
+        }
+
+        // Check if materials have already been deducted
+        if ($ticket->materials_deducted) {
+            return back()->with('error', 'Materials have already been deducted for this ticket.');
+        }
+
+        $validated = $request->validate([
+            'materials' => 'required|array',
+            'materials.*.stock_item_id' => 'required|exists:stock_items,id',
+            'materials.*.quantity' => 'required|numeric|min:0'
+        ]);
+
+        DB::beginTransaction();
+        try {
+            foreach ($validated['materials'] as $materialData) {
+                $stockItem = \App\Models\StockItem::findOrFail($materialData['stock_item_id']);
+                $quantityToDeduct = $materialData['quantity'];
+
+                // Check if sufficient stock
+                if ($stockItem->current_stock < $quantityToDeduct) {
+                    DB::rollBack();
+                    return back()->with('error', "Insufficient stock for {$stockItem->name}. Available: {$stockItem->current_stock}, Required: {$quantityToDeduct}");
+                }
+
+                // Deduct from stock
+                $stockItem->current_stock -= $quantityToDeduct;
+                $stockItem->save();
+
+                // Log stock movement
+                $stockBefore = $stockItem->current_stock + $quantityToDeduct; // Before we deducted
+                $stockAfter = $stockItem->current_stock; // After deduction
+
+                \App\Models\StockMovement::create([
+                    'stock_item_id' => $stockItem->id,
+                    'quantity' => -$quantityToDeduct,
+                    'movement_type' => 'production',
+                    'reference_id' => $ticket->id,
+                    'reference_type' => 'App\Models\Ticket',
+                    'stock_before' => $stockBefore,
+                    'stock_after' => $stockAfter,
+                    'unit_cost' => $stockItem->unit_cost,
+                    'total_cost' => $quantityToDeduct * $stockItem->unit_cost,
+                    'notes' => "Production consumption for Ticket #{$ticket->ticket_number}",
+                    'user_id' => auth()->id()
+                ]);
+
+                // Log production consumption
+                \App\Models\ProductionStockConsumption::create([
+                    'ticket_id' => $ticket->id,
+                    'stock_item_id' => $stockItem->id,
+                    'quantity_consumed' => $quantityToDeduct,
+                    'unit_cost' => $stockItem->unit_cost,
+                    'total_cost' => $quantityToDeduct * $stockItem->unit_cost,
+                    'notes' => "Material consumed for production"
+                ]);
+            }
+
+            // Mark materials as deducted
+            $ticket->update([
+                'materials_deducted' => true,
+                'materials_deducted_at' => now(),
+                'materials_deducted_by' => auth()->id(),
+            ]);
+
+            DB::commit();
+
+            \App\Models\UserActivityLog::log(
+                auth()->id(),
+                'deducted_production_materials',
+                "Deducted materials for Ticket #{$ticket->ticket_number}",
+                $ticket,
+                ['materials' => $validated['materials']]
+            );
+
+            return back()->with('success', 'Materials deducted successfully from inventory.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Material deduction failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'ticket_id' => $ticket->id,
+                'materials' => $validated['materials'] ?? []
+            ]);
+            return back()->with('error', 'Failed to deduct materials: ' . $e->getMessage());
         }
     }
 }
